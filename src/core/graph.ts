@@ -13,34 +13,58 @@ export function canLink(topology: Topology, a: string, b: string): boolean {
   );
 }
 
+/** One strongest representative per visited device set. Unlike a capped DFS,
+ * this subset search cannot miss a better route behind a dense branch. With
+ * fourteen table sockets there are at most 2^14 states per endpoint. */
 export function paths(
   topology: Topology,
   excludedNodes = new Set<string>(),
   excludedLinks = new Set<string>(),
 ): string[][] {
   if (excludedNodes.has("alpha") || excludedNodes.has("omega")) return [];
-  const graph = new Map(
-    topology.nodes.map((node) => [node.id, [] as string[]]),
-  );
+  const nodes = topology.nodes;
+  if (nodes.length > 14) return [];
+  const index = new Map(nodes.map((node, i) => [node.id, i]));
+  const alpha = index.get("alpha"),
+    omega = index.get("omega");
+  if (alpha === undefined || omega === undefined) return [];
+  const graph = nodes.map(() => [] as { next: number; power: number }[]);
   for (const link of topology.links) {
     if (excludedLinks.has(linkKey(link.a, link.b))) continue;
-    graph.get(link.a)?.push(link.b);
-    graph.get(link.b)?.push(link.a);
+    const a = index.get(link.a),
+      b = index.get(link.b);
+    if (a === undefined || b === undefined) continue;
+    graph[a].push({ next: b, power: Number(!!link.boosted) });
+    graph[b].push({ next: a, power: Number(!!link.boosted) });
   }
+  const width = nodes.length;
+  const states = new Map<number, { route: string[]; power: number }>();
+  states.set((1 << alpha) * width + alpha, { route: ["alpha"], power: 0 });
   const result: string[][] = [];
-  const visit = (node: string, path: string[]) => {
-    if (result.length >= 256) return;
-    if (node === "omega") {
-      result.push(path);
-      return;
+  for (let mask = 0; mask < 1 << width; mask++) {
+    for (let end = 0; end < width; end++) {
+      const state = states.get(mask * width + end);
+      if (!state) continue;
+      if (end === omega) {
+        result.push(state.route);
+        continue;
+      }
+      for (const { next, power } of graph[end]) {
+        if (mask & (1 << next) || excludedNodes.has(nodes[next].id)) continue;
+        const key = (mask | (1 << next)) * width + next;
+        const value = Math.min(2, state.power + power);
+        const previous = states.get(key);
+        if (!previous || value > previous.power)
+          states.set(key, {
+            route: [...state.route, nodes[next].id],
+            power: value,
+          });
+      }
     }
-    for (const next of graph.get(node) ?? []) {
-      if (!path.includes(next) && !excludedNodes.has(next))
-        visit(next, [...path, next]);
-    }
-  };
-  visit("alpha", ["alpha"]);
-  return result;
+  }
+  return result.sort(
+    (a, b) => a.length - b.length || a.join().localeCompare(b.join()),
+  );
 }
 
 export function roleInPath(
@@ -57,16 +81,16 @@ export function independentRouterPaths(
   topology: Topology,
   candidatePaths: string[][],
 ): [string[], string[]] | null {
+  const indices = new Map(topology.nodes.map((node, i) => [node.id, i]));
   const routed = candidatePaths.filter((path) =>
     roleInPath(path, topology, "router"),
   );
-  for (let i = 0; i < routed.length; i++) {
-    for (let j = i + 1; j < routed.length; j++) {
-      const first = new Set(routed[i].slice(1, -1));
-      if (routed[j].slice(1, -1).every((id) => !first.has(id)))
-        return [routed[i], routed[j]];
-    }
-  }
+  const masks = routed.map((path) =>
+    path.slice(1, -1).reduce((mask, id) => mask | (1 << indices.get(id)!), 0),
+  );
+  for (let i = 0; i < routed.length; i++)
+    for (let j = i + 1; j < routed.length; j++)
+      if ((masks[i] & masks[j]) === 0) return [routed[i], routed[j]];
   return null;
 }
 

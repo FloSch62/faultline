@@ -1,6 +1,6 @@
 import { CARDS, RELICS } from "./cards.ts";
 import { createRun } from "./run.ts";
-import type { RunState, RelicId } from "./types.ts";
+import type { RunState, RelicId, CardId } from "./types.ts";
 
 export type Archetype = "architect" | "warden" | "ghost";
 export const ARCHETYPES: Record<
@@ -31,7 +31,7 @@ export const ARCHETYPES: Record<
     story:
       "You have watched a thousand firewalls fail. This one holds. This time, you are the boundary.",
     relic: "shield-array",
-    integrity: 18,
+    integrity: 16,
     art: "shield",
     color: "#dfb87a",
   },
@@ -72,13 +72,29 @@ export function newExpedition(
   const profile = ARCHETYPES[archetype];
   run.integrity = run.maxIntegrity = profile.integrity;
   run.relics = [profile.relic];
+  const replace = (from: CardId, to: CardId) => {
+    const index = run.deck.indexOf(from);
+    if (index >= 0) run.deck[index] = to;
+  };
+  if (archetype === "architect") {
+    replace("fiber", "duplex");
+    replace("switch", "relay");
+  }
   if (archetype === "ghost") {
     let replaced = 0;
     run.deck = run.deck.map((card) =>
       card === "fiber" && replaced++ < 2 ? "crosslink" : card,
     );
   }
-  if (archetype === "warden") run.deck.push("shield", "firewall");
+  if (archetype === "ghost") {
+    replace("firewall", "pulse");
+    replace("patch", "diagnostic");
+  }
+  if (archetype === "warden") {
+    replace("router", "hardened-router");
+    replace("firewall", "bastion");
+    replace("surge", "barrier");
+  }
   run.phase = "map";
   return {
     version: 2,
@@ -128,8 +144,27 @@ export function parseExpedition(value: string | null): Expedition | null {
       r.floor > 7
     )
       return null;
+    // Alpha adds transient combat resources without invalidating version-2 saves.
+    r.exhaustPile ??= [];
+    r.block ??= 0;
+    r.packetBoost ??= 0;
+    r.reserveEnergy ??= 0;
+    r.cardsPlayed ??= 0;
     if (
-      ![r.deck, r.hand, r.drawPile, r.discardPile, r.cardRewards].every(
+      ![r.block, r.packetBoost, r.reserveEnergy, r.cardsPlayed].every(
+        (value) => Number.isFinite(value) && value >= 0,
+      )
+    )
+      return null;
+    if (
+      ![
+        r.deck,
+        r.hand,
+        r.drawPile,
+        r.discardPile,
+        r.exhaustPile,
+        r.cardRewards,
+      ].every(
         (p) =>
           Array.isArray(p) &&
           p.length <= 200 &&
@@ -173,6 +208,7 @@ export function parseExpedition(value: string | null): Expedition | null {
     )
       return null;
     const ids = new Set(r.topology.nodes.map((n) => n.id));
+    if (ids.size !== r.topology.nodes.length || ids.size > 14) return null;
     if (
       !ids.has("alpha") ||
       !ids.has("omega") ||
@@ -188,16 +224,8 @@ export function parseExpedition(value: string | null): Expedition | null {
         ![r.enemy.hp, r.enemy.maxHp, r.enemy.turn].every(Number.isFinite))
     )
       return null;
-    // Existing expeditions receive the two new cards without resetting their run.
-    if (e.cardSet !== 2) {
-      for (const id of ["containerlab", "clabernetes"] as const) {
-        if (!r.deck.includes(id)) {
-          r.deck.push(id);
-          if (r.phase === "battle") r.drawPile.push(id);
-        }
-      }
-      e.cardSet = 2;
-    }
+    // Preserve earned cards in older saves; never inject rare or legendary rewards.
+    if (r.hand.length > 10) r.discardPile.push(...r.hand.splice(10));
     return e;
   } catch {
     return null;

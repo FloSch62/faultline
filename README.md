@@ -6,7 +6,7 @@ A desktop deckbuilding roguelike set in a ruined orbital relay. Build a working 
 
 **[Play in your browser](https://flosch62.github.io/faultline/)** · [Contributing](CONTRIBUTING.md) · [MIT license](LICENSE)
 
-An independent open-source fan game in the Containerlab universe. Work in progress.
+An independent open-source fan game in the Containerlab universe. **Playable alpha 0.3**, focused on laptop and desktop.
 
 ![The relay](docs/screenshots/title.png)
 
@@ -25,52 +25,63 @@ Open **http://localhost:5174**. Music starts after the first interaction. Headph
 npm run build       # Type checking and production build in dist/
 npm run preview     # Serve the production build
 npm test            # Deterministic game rules and save migration
+npm run balance -- 500 # Reproducible seeded balance probe
 npx playwright install chromium
 npm run test:e2e    # Actual browser gameplay, desktop layout and audio playback
 ```
 
 Playing requires no API keys, GPU music model, Containerlab daemon, or external asset service. All artwork, fonts and playable music are bundled. Hardware-accelerated WebGL is recommended. Desktop is the primary target; this pass was checked at 1366×768, 1440×900 and 1920×1080.
 
-## Inside the expedition
+## Inside the alpha
 
-- One complete seven-sector act with branching routes, five hostile types, salvage, sanctuaries, elite encounters and a final boss.
-- Three starting architects with distinct integrity, relics and decks.
-- Eleven illustrated cards, five persistent relics, card rewards, undo before transmission, a card archive and field guide.
-- Physical network building with draggable hardware, live cables, visible enemy intentions, packet animations, jammed nodes and severed links.
-- Local autosave, continuation, a shared UTC daily seed and local run records.
-- Three original YuE2 instrumental tracks with scene crossfades, sound effects, volume controls and reduced motion.
+- One complete seven-sector act with a branching route, recovered messages, five distinct hostile mechanics, elite rewards, sanctuaries and a two-phase Blackout Core.
+- Three distinct starter decks: the Architect builds efficient routes, the Warden absorbs mistakes, and the Ghost trades protection for card flow and bursts.
+- **35 cards and nine persistent relics.** Common through legendary rewards support redundant networks, fortified circuits and burst turns. Powerful effects exhaust until the next encounter.
+- Router placement matters. Independent north/south circuits grant shield; moving installed hardware costs energy. A Wraith hunts your longest exposed cable; a Null Storm threatens a visible band.
+- Exact damage and shield calculations, signed enemy armor modifiers, displayed fault targets, highlighted signal routes and a combat journal. Forecast and resolution use the same rules.
+- An optional seven-step practice encounter that never replaces your expedition. Undo, card inspection, searchable rarity filters, starting-deck previews, quick transmissions, reduced motion and keyboard device management.
+- Local autosave, continuation, a shared UTC daily seed and local run records. Existing version-2 saves retain their progress and receive defaults for the new combat resources.
+- Expanded painted artwork, a new sanctuary scene, device deployment and shield effects, and three original instrumental tracks.
 - A Containerlab topology exporter. Combat is a browser simulation; exported labs need suitable images and real device configuration before they can route traffic.
 
-### The two signature cards
+Read the [complete implemented game design](docs/game-design.md), [story and world](docs/narrative.md), and [measured balance results](docs/balance-alpha.json). Simulated win rates are regression probes; human playtesting remains necessary to tune difficulty and enjoyment.
 
-| Card | Energy | Effect |
-| --- | --- | --- |
-| Containerlab | 3 | Deploy an overclocked router linked to ALPHA and OMEGA. A fresh route deals 7 damage. |
-| Clabernetes | 2 | Replicate a router with its existing links and overclock. Shield both routers from jams. Independent routes add 2 damage. |
+### Discover the signature cards
 
-Both are in starting decks and the reward pool. Containerlab appears in each opening hand alongside a router and two fibers. Existing saves receive the new cards in the deck and, during combat, the draw pile, without resetting progress. Cloning a router only creates an independent route when its surrounding topology permits one.
+| Card | Rarity | Energy | Effect |
+| --- | --- | --- | --- |
+| Containerlab | Rare | 3 | Deploy an overclocked router linked to ALPHA and OMEGA. A fresh route deals 7 damage. Exhaust. |
+| Clabernetes | Legendary | 2 | Replicate a router and its links/configuration. Protect both from jams. Independent routes add 2 damage. Exhaust. |
+
+These are discoveries, **not starter cards**. Opening hands provide a Core Router and two Optic Fibers so every deck can build its own route. Clabernetes has a lower individual reward chance than Containerlab. Startup Config, Linux Bridge, VXLAN Tunnel and Clab Inspect bring more of Containerlab's vocabulary into everyday builds.
+
+**Wireshark** is an uncommon, one-energy packet capture. It draws two cards and adds one temporary damage for each distinct hardware type on the live route, up to three. A mixed router, switch and firewall circuit earns the full burst. The card exhausts for the encounter, and its journal entry shows exactly what it captured.
+
+[See Wireshark's card and synergy explanation](docs/screenshots/wireshark.png).
 
 ## Controls
 
 | Action | Control |
 | --- | --- |
-| Play a card | Click, or press 1–9 |
+| Play a card | Click, or press 1–9; 0 selects the tenth card |
+| Inspect a card | Right-click, press I on a focused/selected card, or select it in the archive |
 | Place hardware | Click the table, drag its card, or use “Deploy in a free socket” |
 | Connect devices | Play a link, then choose two devices on the table or in the target strip |
 | Replicate / upgrade / shield | Play the card, then choose a valid device |
-| Move hardware | Drag a placed device |
+| Relocate hardware | Drag a placed device, or use Devices & placement; costs 1 energy |
 | Orbit the table | Drag empty table space |
 | Transmit / end turn | Brass dial, Space or Enter; focused buttons retain normal keyboard behavior |
 | Undo before transmitting | Z |
 | Cancel selection / settings | Escape |
 
-Faults last one player turn. Hot Patch clears them immediately. Energy returns to five and the hand is redrawn after each transmission; hardware remains until the encounter ends. Integrity carries between sectors.
+Faults last one player turn. Hot Patch clears them immediately. Energy returns to five plus reserves and the hand is redrawn after each transmission. Temporary shield and burst expire; hardware remains until the encounter ends. Exhausted cards return next encounter. Integrity carries between sectors.
 
 ## Project guide
 
 - `src/core/` — deterministic rules, topology graph, expeditions, persistence and YAML export.
 - `src/three/World.ts` — table, devices, cables, painted enemies, lighting and packet animation.
-- `src/ui.ts`, `src/style.css` — illustrated cards, menus and painted battle controls.
+- `src/ui.ts`, `src/alpha-ui.ts`, `src/style.css`, `src/alpha.css` — illustrated cards, painted instruments, inspection and tutorials.
+- `src/story.ts` — chapters, enemy motivations, sanctuary discoveries and endings.
 - `src/main.ts` — input, view transitions, targeting, undo and autosave.
 - `src/audio.ts` — music playback, crossfades and synthesized interaction effects.
 - `public/art/` — finished game artwork; [prompts and art direction](docs/art-prompts.md).

@@ -1,6 +1,6 @@
 {
   "name": "faultline",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --experimental-strip-types --test src/core/*.test.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "balance": "node --experimental-strip-types scripts/balance.ts"
   },
   "dependencies": {
     "three": "^0.180.0"

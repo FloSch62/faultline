@@ -193,8 +193,9 @@ test("export assigns one interface per link endpoint and rejects duplicates", ()
 
 test("Containerlab deploys an overclocked live route for three energy", () => {
   const run = firstBattle();
-  assert.ok(run.hand.includes("containerlab"));
-  assert.ok(run.deck.includes("clabernetes"));
+  assert.ok(!run.deck.includes("containerlab"));
+  assert.ok(!run.deck.includes("clabernetes"));
+  run.hand = ["containerlab"];
   assert.equal(playInstant(run, run.hand.indexOf("containerlab")).ok, true);
   assert.equal(run.energy, 2);
   assert.equal(run.topology.nodes.length, 3);

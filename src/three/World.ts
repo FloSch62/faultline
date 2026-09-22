@@ -9,9 +9,10 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { FXAAShader } from "three/addons/shaders/FXAAShader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { linkKey } from "../core/graph.ts";
-import type { Enemy, NetworkNode, Role, Topology } from "../core/types.ts";
+import type { Enemy, NetworkNode, Role, Topology, Zone } from "../core/types.ts";
 
 export type WorldPoint = { x: number; z: number };
+export type BoardZone = Zone;
 export interface WorldCallbacks {
   onGround: (point: WorldPoint) => void;
   onNode: (id: string) => void;
@@ -36,6 +37,20 @@ interface Spark {
   mesh: THREE.Mesh;
   velocity: THREE.Vector3;
   life: number;
+}
+interface SignalPulse {
+  mesh: THREE.Mesh<THREE.TorusGeometry, THREE.MeshBasicMaterial>;
+  life: number;
+  duration: number;
+  scale: number;
+}
+interface CableVisual {
+  body: THREE.MeshPhysicalMaterial;
+  filament: THREE.MeshBasicMaterial;
+  haze: THREE.MeshBasicMaterial;
+  color: number;
+  faulty: boolean;
+  source: string;
 }
 
 const COLORS: Record<Role, number> = {
@@ -112,6 +127,7 @@ export class World {
   private readonly environment: THREE.WebGLRenderTarget;
   private enemySprite!: THREE.Sprite;
   private enemyTexture!: THREE.Texture;
+  private enemyAlphaTexture!: THREE.Texture;
   private readonly canvas: HTMLCanvasElement;
   private readonly callbacks: WorldCallbacks;
   private readonly raycaster = new THREE.Raycaster();
@@ -126,11 +142,27 @@ export class World {
   private readonly hitObjects: THREE.Object3D[] = [];
   private readonly devices = new Map<string, DeviceGroup>();
   private readonly cableCurves = new Map<string, THREE.Curve<THREE.Vector3>>();
+  private readonly cableVisuals = new Map<string, CableVisual>();
+  private readonly signalSources = new Map<string, string>();
+  private readonly alternateSources = new Map<string, string>();
+  private routeSignature = "";
+  private forecastTarget: string | null = null;
+  private readonly forecastMarker = new THREE.Group();
+  private readonly zoneVisuals = new Map<BoardZone, {
+    fill: THREE.MeshBasicMaterial;
+    label: THREE.MeshBasicMaterial;
+    warning: THREE.Mesh;
+    color: number;
+  }>();
+  private forecastZone: BoardZone | null = null;
   private readonly cableBeads: {
-    bead: THREE.Mesh;
+    bead: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
     curve: THREE.Curve<THREE.Vector3>;
+    key: string;
     offset: number;
     active: boolean;
+    reversed: boolean;
+    routed: boolean;
   }[] = [];
   private readonly placement: THREE.Group;
   private scanMaterial!: THREE.ShaderMaterial;
@@ -139,6 +171,9 @@ export class World {
   private readonly light: THREE.PointLight;
   private packets: FlyingPacket[] = [];
   private sparks: Spark[] = [];
+  private pulses: SignalPulse[] = [];
+  private readonly deviceStates = new Map<string, string>();
+  private battleIdentity: string | null = null;
   private topology: Topology = { nodes: [], links: [] };
   private enemy: Enemy | null = null;
   private faultNode: string | null = null;
@@ -148,12 +183,15 @@ export class World {
   private linkSource: string | null = null;
   private pointerDown: {
     id: string | null;
+    pointerId: number;
     x: number;
     y: number;
     moved: boolean;
   } | null = null;
   private active = true;
   private visible = true;
+  private frame = 0;
+  private impactEndsAt = 0;
 
   constructor(canvas: HTMLCanvasElement, callbacks: WorldCallbacks) {
     this.canvas = canvas;
@@ -225,6 +263,8 @@ export class World {
     this.buildAmbiance();
     this.placement = this.buildPlacement();
     this.scene.add(this.placement);
+    this.buildForecastMarker();
+    this.scene.add(this.forecastMarker);
     this.scene.add(this.dynamic);
     this.enemyCore = new THREE.Group();
     this.enemyShell = new THREE.Group();
@@ -329,6 +369,7 @@ export class World {
     scan.position.y = 0.614;
     scan.renderOrder = 1;
     this.board.add(scan);
+    this.buildTableZones();
 
     // Alternating signal bays and bolts break up the silhouette on every edge.
     for (let i = -8; i <= 8; i++) {
@@ -388,6 +429,62 @@ export class World {
     insignia.position.set(0, 0.624, 0);
     this.board.add(insignia);
     this.scene.add(this.board);
+  }
+
+  private tableInscription(text: string, width: number, color: number) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 128;
+    const context = canvas.getContext("2d")!;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillStyle = "#ffffff";
+    context.font = "600 88px Barlow Condensed, sans-serif";
+    context.fillText(text, 256, 64, 488);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const material = new THREE.MeshBasicMaterial({
+      color, map: texture, transparent: true, opacity: 0.72, depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, width / 2.5), material);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.renderOrder = 2;
+    return mesh;
+  }
+
+  private buildTableZones() {
+    const zones: { id: BoardZone; name: string; z: number; depth: number; color: number }[] = [
+      { id: "north", name: "NORTH", z: -3.25, depth: 3.9, color: 0x82aabf },
+      { id: "center", name: "CENTER", z: 0, depth: 2.6, color: 0xc4ac7f },
+      { id: "south", name: "SOUTH", z: 3.25, depth: 3.9, color: 0x8ab7a4 },
+    ];
+    for (const zone of zones) {
+      const fill = glow(zone.color, 0.045);
+      const field = new THREE.Mesh(new THREE.PlaneGeometry(16.12, zone.depth), fill);
+      field.rotation.x = -Math.PI / 2;
+      field.position.set(0, 0.619, zone.z);
+      field.renderOrder = 1;
+      this.board.add(field);
+      const label = this.tableInscription(zone.name, 1.45, zone.color);
+      label.position.set(-7.22, 0.638, zone.z);
+      this.board.add(label);
+      const warning = this.tableInscription("INCOMING", 1.58, 0xf29a81);
+      warning.position.set(7.12, 0.64, zone.z);
+      warning.visible = false;
+      this.board.add(warning);
+      this.zoneVisuals.set(zone.id, { fill, label: label.material, warning, color: zone.color });
+    }
+    for (const z of [-1.3, 1.3]) {
+      const divider = new THREE.Mesh(new THREE.BoxGeometry(16.12, 0.006, 0.014), glow(0xa7a48b, 0.4));
+      divider.position.set(0, 0.637, z);
+      divider.renderOrder = 2;
+      this.board.add(divider);
+      for (let x = -8; x <= 8; x += 2) {
+        const tick = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.006, 0.18), glow(0xa7a48b, 0.5));
+        tick.position.set(x, 0.638, z);
+        this.board.add(tick);
+      }
+    }
   }
 
   private buildAmbiance() {
@@ -460,6 +557,22 @@ export class World {
     return group;
   }
 
+  private buildForecastMarker() {
+    for (let index = 0; index < 4; index++) {
+      const arc = new THREE.Mesh(
+        new THREE.TorusGeometry(1.07, 0.037, 6, 24, Math.PI / 3),
+        glow(0xf29a81, 0.9),
+      );
+      arc.rotation.x = Math.PI / 2;
+      arc.rotation.z = index * Math.PI / 2 + Math.PI / 12;
+      arc.material.toneMapped = false;
+      arc.material.depthTest = false;
+      arc.renderOrder = 3;
+      this.forecastMarker.add(arc);
+    }
+    this.forecastMarker.visible = false;
+  }
+
   private buildEnemy() {
     this.enemyGroup.position.set(0, 1.2, -6.4);
     this.enemyTexture = new THREE.TextureLoader().load(
@@ -468,6 +581,12 @@ export class World {
     this.enemyTexture.colorSpace = THREE.SRGBColorSpace;
     this.enemyTexture.repeat.set(1 / 3, 1);
     this.enemyTexture.offset.set(0, 0);
+    this.enemyAlphaTexture = new THREE.TextureLoader().load(
+      `${import.meta.env.BASE_URL}art/hostiles-alpha.png`,
+    );
+    this.enemyAlphaTexture.colorSpace = THREE.SRGBColorSpace;
+    this.enemyAlphaTexture.repeat.set(1 / 2, 1);
+    this.enemyAlphaTexture.offset.set(0, 0);
     this.enemySprite = new THREE.Sprite(
       new THREE.SpriteMaterial({
         map: this.enemyTexture,
@@ -489,18 +608,26 @@ export class World {
     canvas.width = 512;
     canvas.height = 112;
     const context = canvas.getContext("2d")!;
-    context.fillStyle = "rgba(7, 17, 31, .88)";
+    context.fillStyle = "rgba(12, 17, 20, .93)";
     context.beginPath();
-    context.roundRect(22, 22, 468, 68, 8);
+    context.moveTo(34, 22);
+    context.lineTo(478, 22);
+    context.lineTo(490, 34);
+    context.lineTo(490, 78);
+    context.lineTo(478, 90);
+    context.lineTo(34, 90);
+    context.lineTo(22, 78);
+    context.lineTo(22, 34);
+    context.closePath();
     context.fill();
     context.strokeStyle = `#${color.toString(16).padStart(6, "0")}`;
     context.lineWidth = 2;
     context.stroke();
     context.fillStyle = "#effcff";
-    context.font = "600 36px Barlow Condensed";
+    context.font = "600 32px Barlow Condensed, sans-serif";
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.fillText(name.slice(0, 18), 256, 57);
+    context.fillText(name.slice(0, 26), 256, 57, 428);
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     const sprite = new THREE.Sprite(
@@ -655,7 +782,7 @@ export class World {
           color: 0xfedb9f,
           wireframe: true,
           transparent: true,
-          opacity: 0.13,
+          opacity: 0.22,
           depthWrite: false,
         }),
       );
@@ -664,9 +791,15 @@ export class World {
       group.userData.floaters.push(shell);
     }
     if (node.upgraded) {
-      const crown = ring(0.39, 0.035, 0xff92ad, 2.19, 0.9);
+      const crown = ring(0.39, 0.035, 0xffd590, 2.19, 0.9);
       group.add(crown);
       group.userData.rings.push(crown);
+    }
+    if (node.amplified) {
+      const amplifier = ring(0.72, 0.034, 0x8ce6ef, 2.05, 0.85);
+      amplifier.rotation.x = Math.PI / 3;
+      group.add(amplifier);
+      group.userData.rings.push(amplifier);
     }
     if (node.id === this.faultNode) {
       const warning = ring(1.07, 0.055, 0xff526b, 0.68, 1);
@@ -676,7 +809,7 @@ export class World {
       group.add(red);
     }
     const label = this.makeLabel(
-      node.id.toUpperCase(),
+      `${node.id.toUpperCase()}${node.id === this.faultNode ? " · JAMMED" : node.upgraded ? " · UPGRADED" : node.amplified ? " · AMPLIFIED" : node.shielded ? " · GUARDED" : ""}`,
       node.id === this.faultNode ? 0xff6880 : color,
     );
     label.position.y = node.role === "client" ? 3.0 : 2.86;
@@ -706,8 +839,9 @@ export class World {
     center.y += Math.min(0.38 + start.distanceTo(end) * 0.07, 1.13);
     const curve = new THREE.QuadraticBezierCurve3(start, center, end);
     const key = linkKey(a, b);
+    const link = this.topology.links.find((edge) => linkKey(edge.a, edge.b) === key);
     const faulty = key === this.faultLink;
-    const color = faulty ? 0xec755d : 0xe4c58f;
+    const color = faulty ? 0xec755d : link?.boosted ? 0x8ce6ef : link?.armored ? 0xf5d196 : 0xe4c58f;
     const cable = new THREE.Group();
     const geometry = new THREE.TubeGeometry(curve, 48, 0.055, 8, false);
     const body = new THREE.Mesh(
@@ -725,6 +859,16 @@ export class World {
       glow(color, faulty ? 0.075 : 0.055),
     );
     cable.add(haze);
+    if (link?.armored) {
+      for (let index = 1; index < 12; index++) {
+        const collar = new THREE.Mesh(
+          new THREE.SphereGeometry(0.092, 6, 4),
+          mat(0x9c8054, 0x695431, 0.16),
+        );
+        collar.position.copy(curve.getPoint(index / 12));
+        cable.add(collar);
+      }
+    }
     const hit = new THREE.Mesh(
       new THREE.TubeGeometry(curve, 48, 0.17, 5, false),
       glow(0x000000, 0),
@@ -740,26 +884,36 @@ export class World {
       );
       bead.position.copy(curve.getPoint(i / 3));
       cable.add(bead);
-      this.cableBeads.push({ bead, curve, offset: i / 3, active: !faulty });
+      this.cableBeads.push({ bead, curve, key, offset: i / 3, active: !faulty, reversed: false, routed: false });
     }
     this.cableCurves.set(key, curve);
+    this.cableVisuals.set(key, { body: body.material, filament: filament.material, haze: haze.material, color, faulty, source: a });
     this.dynamic.add(cable);
   }
 
   private disposeObject(object: THREE.Object3D) {
+    const geometries = new Set<THREE.BufferGeometry>();
+    const materials = new Set<THREE.Material>();
+    const textures = new Set<THREE.Texture>();
     object.traverse((child) => {
-      if (child instanceof THREE.Mesh || child instanceof THREE.Sprite) {
-        child.geometry?.dispose();
-        const materials = Array.isArray(child.material)
+      if (child instanceof THREE.Mesh || child instanceof THREE.Sprite || child instanceof THREE.Points || child instanceof THREE.Line) {
+        // Sprite geometry is shared internally by Three.js; its material is owned here.
+        if (!(child instanceof THREE.Sprite)) geometries.add(child.geometry);
+        const childMaterials = Array.isArray(child.material)
           ? child.material
           : [child.material];
-        for (const material of materials) {
+        for (const material of childMaterials) {
           if ("map" in material && material.map instanceof THREE.Texture)
-            material.map.dispose();
-          material.dispose();
+            textures.add(material.map);
+          materials.add(material);
         }
       }
+      if (child instanceof THREE.DirectionalLight || child instanceof THREE.PointLight || child instanceof THREE.SpotLight)
+        child.shadow.dispose();
     });
+    for (const geometry of geometries) geometry.dispose();
+    for (const material of materials) material.dispose();
+    for (const texture of textures) texture.dispose();
   }
 
   setBattle(
@@ -768,6 +922,11 @@ export class World {
     faultNode: string | null,
     faultLink: string | null,
   ) {
+    const identity = enemy ? `${enemy.id}:${enemy.maxHp}` : null;
+    const sameBattle = this.battleIdentity === identity && enemy !== null;
+    const previousFault = this.faultNode;
+    if (!sameBattle) this.deviceStates.clear();
+    this.battleIdentity = identity;
     this.topology = topology;
     this.enemy = enemy;
     this.faultNode = faultNode;
@@ -779,28 +938,139 @@ export class World {
     this.hitObjects.length = 0;
     this.devices.clear();
     this.cableCurves.clear();
+    this.cableVisuals.clear();
     this.cableBeads.length = 0;
     for (const link of topology.links) this.addCable(link.a, link.b);
     for (const node of topology.nodes) {
       const group = this.createDevice(node);
       this.devices.set(node.id, group);
       this.dynamic.add(group);
+      const state = `${Boolean(node.shielded)}:${Boolean(node.upgraded)}:${Boolean(node.amplified)}`;
+      const previous = this.deviceStates.get(node.id);
+      if (sameBattle && previous === undefined && !node.fixed)
+        this.pulseAt(node.x, node.z, COLORS[node.role]);
+      else if (sameBattle && previous !== undefined && previous !== state)
+        this.pulseAt(node.x, node.z, node.upgraded ? 0xffd590 : 0x8ce6ef);
+      if (sameBattle && node.id === faultNode && node.id !== previousFault)
+        this.pulseAt(node.x, node.z, 0xff7869);
+      this.deviceStates.set(node.id, state);
     }
+    for (const id of this.deviceStates.keys())
+      if (!topology.nodes.some((node) => node.id === id)) this.deviceStates.delete(id);
     this.enemyGroup.visible = Boolean(enemy);
     if (enemy) {
-      const variant =
-        enemy.id === "core"
-          ? 2
-          : ["storm", "sentinel"].includes(enemy.id)
-            ? 1
-            : 0;
-      this.enemyTexture.offset.x = variant / 3;
-      this.enemySprite.scale.setScalar(enemy.id === "core" ? 5.0 : 4.3);
+      const expansion = enemy.id === "wraith" || enemy.id === "storm";
+      const texture = expansion ? this.enemyAlphaTexture : this.enemyTexture;
+      const variant = expansion ? Number(enemy.id === "storm") : enemy.id === "core" ? 2 : enemy.id === "sentinel" ? 1 : 0;
+      texture.offset.x = variant / (expansion ? 2 : 3);
+      if (this.enemySprite.material.map !== texture) {
+        this.enemySprite.material.map = texture;
+        this.enemySprite.material.needsUpdate = true;
+      }
+      this.enemySprite.scale.setScalar(enemy.id === "core" ? 5.0 : enemy.id === "storm" ? 4.6 : 4.3);
       (this.enemyGroup.children[1] as THREE.PointLight).color.setHex(
         enemy.color,
       );
     }
     this.refreshSelection();
+    this.refreshSignalRoute();
+    this.refreshForecastTarget();
+  }
+
+  /** Emphasizes the forecast's chosen routes without rebuilding cable geometry. */
+  setSignalRoute(path: string[], alternate: string[] = []) {
+    const signature = JSON.stringify([path, alternate]);
+    if (signature === this.routeSignature) return;
+    this.routeSignature = signature;
+    this.signalSources.clear();
+    this.alternateSources.clear();
+    for (let index = 0; index < path.length - 1; index++)
+      this.signalSources.set(linkKey(path[index], path[index + 1]), path[index]);
+    for (let index = 0; index < alternate.length - 1; index++)
+      this.alternateSources.set(linkKey(alternate[index], alternate[index + 1]), alternate[index]);
+    this.refreshSignalRoute();
+  }
+
+  private refreshSignalRoute() {
+    const hasRoute = this.signalSources.size > 0;
+    for (const [key, visual] of this.cableVisuals) {
+      const primary = this.signalSources.has(key);
+      const alternate = this.alternateSources.has(key);
+      const color = visual.faulty ? 0xec755d : primary ? 0x91e5ce : alternate ? 0x96accd : visual.color;
+      visual.body.emissive.setHex(color);
+      visual.body.emissiveIntensity = visual.faulty ? 0.18 : primary ? 0.75 : alternate ? 0.45 : hasRoute ? 0.15 : 0.34;
+      visual.filament.color.setHex(color);
+      visual.filament.opacity = visual.faulty ? 0.4 : primary ? 1 : alternate ? 0.85 : hasRoute ? 0.38 : 0.95;
+      visual.haze.color.setHex(color);
+      visual.haze.opacity = visual.faulty ? 0.075 : primary ? 0.13 : alternate ? 0.07 : hasRoute ? 0.025 : 0.055;
+    }
+    for (const item of this.cableBeads) {
+      const visual = this.cableVisuals.get(item.key)!;
+      const source = this.signalSources.get(item.key) ?? this.alternateSources.get(item.key);
+      item.routed = source !== undefined;
+      item.reversed = source !== undefined && source !== visual.source;
+      item.bead.material.color.copy(visual.filament.color);
+      item.bead.material.opacity = visual.faulty ? 0.12 : item.routed ? 0.95 : hasRoute ? 0.25 : 0.8;
+    }
+  }
+
+  /** Static segmented coral marker: distinct from a fault that has already happened. */
+  setForecastTarget(target: string | null) {
+    if (target === this.forecastTarget) return;
+    this.forecastTarget = target;
+    this.refreshForecastTarget();
+  }
+
+  /** Marks the announced storm band without motion or geometry replacement. */
+  setForecastZone(zone: BoardZone | null) {
+    if (zone === this.forecastZone) return;
+    this.forecastZone = zone;
+    for (const [id, visual] of this.zoneVisuals) {
+      const danger = id === zone;
+      visual.fill.color.setHex(danger ? 0xc35e4d : visual.color);
+      visual.fill.opacity = danger ? 0.18 : 0.045;
+      visual.label.color.setHex(danger ? 0xffb39a : visual.color);
+      visual.label.opacity = danger ? 1 : 0.72;
+      visual.warning.visible = danger;
+    }
+  }
+
+  private refreshForecastTarget() {
+    this.forecastMarker.visible = false;
+    if (!this.forecastTarget || !this.enemy) return;
+    const device = this.topology.nodes.find((node) => node.id === this.forecastTarget);
+    const cable = this.cableCurves.get(this.forecastTarget);
+    if (device) {
+      this.forecastMarker.position.set(device.x, 0.3, device.z);
+      this.forecastMarker.scale.setScalar(1);
+    } else if (cable) {
+      this.forecastMarker.position.copy(cable.getPoint(0.5));
+      this.forecastMarker.position.y += 0.12;
+      this.forecastMarker.scale.setScalar(0.5);
+    } else return;
+    this.forecastMarker.visible = true;
+  }
+
+  private reducedMotion() {
+    return document.documentElement.classList.contains("reduced-motion") ||
+      matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  private pulseAt(x: number, z: number, color: number, scale = 1) {
+    const mesh = new THREE.Mesh(
+      new THREE.TorusGeometry(0.7, 0.027, 6, 56),
+      glow(color, 0.8),
+    );
+    mesh.rotation.x = Math.PI / 2;
+    mesh.position.set(x, 0.3, z);
+    this.scene.add(mesh);
+    const duration = this.reducedMotion() ? 0.2 : 0.85;
+    this.pulses.push({ mesh, life: duration, duration, scale });
+  }
+
+  pulseNetwork(effect: "shield" | "repair" | "surge") {
+    const color = effect === "shield" ? 0xffd590 : effect === "repair" ? 0x83eec7 : 0x8ce6ef;
+    for (const node of this.topology.nodes) this.pulseAt(node.x, node.z, color);
   }
 
   setPlacement(role: Role | null, linkSource: string | null = null) {
@@ -874,6 +1144,7 @@ export class World {
     const hit = this.hit(event);
     this.pointerDown = {
       id: hit.node ?? null,
+      pointerId: event.pointerId,
       x: event.clientX,
       y: event.clientY,
       moved: false,
@@ -928,14 +1199,25 @@ export class World {
     }
   };
   private onPointerCancel = () => {
+    this.cancelInteraction();
+  };
+
+  /** Ends an interrupted drag without committing a placement or movement. */
+  cancelInteraction() {
+    const pointerId = this.pointerDown?.pointerId;
     this.pointerDown = null;
     this.controls.enabled = true;
-  };
+    this.placement.visible = false;
+    this.canvas.style.cursor = "grab";
+    if (pointerId !== undefined && this.canvas.hasPointerCapture(pointerId))
+      this.canvas.releasePointerCapture(pointerId);
+  }
   private onPointerLeave = () => {
     this.placement.visible = false;
   };
 
   playPacket(path: string[], onDone?: () => void, color = 0x8affea) {
+    if (!this.active) return;
     const routes: THREE.Curve<THREE.Vector3>[] = [];
     for (let i = 0; i < path.length - 1; i++) {
       const key = linkKey(path[i], path[i + 1]);
@@ -956,7 +1238,9 @@ export class World {
       onDone?.();
       return;
     }
-    for (let i = 0; i < 4; i++) {
+    const reduced = this.reducedMotion();
+    const count = reduced ? 1 : 4;
+    for (let i = 0; i < count; i++) {
       const group = new THREE.Group();
       const core = new THREE.Mesh(
         new THREE.SphereGeometry(i === 0 ? 0.12 : 0.085, 12, 12),
@@ -972,13 +1256,17 @@ export class World {
       this.packets.push({
         mesh: group,
         routes,
-        speed: 2.3,
+        speed: reduced ? routes.length / 0.2 : 2.3,
         start: performance.now() + i * 170,
-        done: i === 3 ? onDone : undefined,
+        done: i === count - 1 ? onDone : undefined,
       });
     }
   }
   impact(color = 0xff7c91, count = 28) {
+    if (this.reducedMotion()) {
+      this.pulseAt(0, -5.4, color, 1.7);
+      return;
+    }
     const origin = this.enemyGroup.position
       .clone()
       .add(new THREE.Vector3(0, 0.3, 0));
@@ -996,19 +1284,31 @@ export class World {
       );
       this.sparks.push({ mesh, velocity, life: 0.55 + Math.random() * 0.45 });
     }
-    const original = this.light.color.clone();
     this.light.color.setHex(color);
     this.light.intensity = 70;
-    window.setTimeout(() => {
-      this.light.color.copy(original);
-      this.light.intensity = 24;
-    }, 280);
+    this.impactEndsAt = performance.now() + 280;
   }
   pulseThreat() {
-    this.impact(0xff6479, 18);
+    for (const node of this.topology.nodes)
+      if (node.fixed) this.pulseAt(node.x, node.z, 0xff7869, 1.4);
   }
   setVisible(visible: boolean) {
+    if (this.visible && !visible) this.clearTransientEffects();
     this.visible = visible;
+  }
+
+  private clearTransientEffects() {
+    for (const effect of [...this.packets, ...this.sparks, ...this.pulses]) {
+      this.scene.remove(effect.mesh);
+      this.disposeObject(effect.mesh);
+    }
+    // Abandon callbacks with their encounter; they must not fire in a later battle.
+    this.packets = [];
+    this.sparks = [];
+    this.pulses = [];
+    this.impactEndsAt = 0;
+    this.light.color.setHex(0x4be7cf);
+    this.light.intensity = 24;
   }
   resetCamera() {
     this.camera.position.set(0, 12.8, 18.8);
@@ -1033,42 +1333,60 @@ export class World {
   }
   private tick = () => {
     if (!this.active) return;
-    requestAnimationFrame(this.tick);
+    this.frame = requestAnimationFrame(this.tick);
     const dt = Math.min(this.clock.getDelta(), 0.05);
+    if (this.impactEndsAt && performance.now() >= this.impactEndsAt) {
+      this.impactEndsAt = 0;
+      this.light.color.setHex(0x4be7cf);
+      this.light.intensity = 24;
+    }
     if (!this.visible || document.hidden) return;
     const time = this.clock.elapsedTime;
+    const reducedMotion = this.reducedMotion();
+    const motion = reducedMotion ? 0 : dt;
     this.controls.update();
-    this.scanMaterial.uniforms.uTime.value = time;
-    this.placement.rotation.y += dt * 0.55;
+    this.scanMaterial.uniforms.uTime.value = reducedMotion ? 0 : time;
+    this.placement.rotation.y += motion * 0.55;
     for (const group of this.devices.values()) {
       for (const [index, floater] of group.userData.floaters.entries()) {
-        floater.rotation.y += dt * (index % 2 ? -0.5 : 0.65);
+        floater.rotation.y += motion * (index % 2 ? -0.5 : 0.65);
         floater.position.y +=
-          Math.sin(time * 2 + group.position.x + index) * dt * 0.035;
+          Math.sin(time * 2 + group.position.x + index) * motion * 0.035;
       }
       for (const [index, decorativeRing] of group.userData.rings.entries()) {
         if (index > 0)
-          decorativeRing.rotation.z += dt * (index % 2 ? -0.35 : 0.35);
+          decorativeRing.rotation.z += motion * (index % 2 ? -0.35 : 0.35);
       }
     }
     for (const item of this.cableBeads) {
-      if (item.active)
+      if (item.active && !reducedMotion) {
+        const progress = (time * (item.routed ? 0.28 : 0.15) + item.offset) % 1;
         item.bead.position.copy(
-          item.curve.getPoint((time * 0.22 + item.offset) % 1),
+          item.curve.getPoint(item.reversed ? 1 - progress : progress),
         );
+      }
     }
-    this.enemyShell.rotation.y += dt * 0.26;
-    this.enemyShell.rotation.z = Math.sin(time * 0.7) * 0.08;
-    this.enemyCore.rotation.y -= dt * 0.7;
-    this.enemyCore.scale.setScalar(1 + Math.sin(time * 3.3) * 0.055);
-    const reducedMotion =
-      document.documentElement.classList.contains("reduced-motion") ||
-      matchMedia("(prefers-reduced-motion: reduce)").matches;
+    this.enemyShell.rotation.y += motion * 0.26;
+    this.enemyShell.rotation.z = reducedMotion ? 0 : Math.sin(time * 0.7) * 0.08;
+    this.enemyCore.rotation.y -= motion * 0.7;
+    this.enemyCore.scale.setScalar(reducedMotion ? 1 : 1 + Math.sin(time * 3.3) * 0.055);
     this.enemyGroup.position.y =
       1.2 + (reducedMotion ? 0 : Math.sin(time * 1.2) * 0.09);
     this.enemySprite.material.rotation = reducedMotion
       ? 0
       : Math.sin(time * 0.7) * 0.015;
+    for (let i = this.pulses.length - 1; i >= 0; i--) {
+      const pulse = this.pulses[i];
+      pulse.life -= dt;
+      const progress = 1 - Math.max(0, pulse.life) / pulse.duration;
+      pulse.mesh.material.opacity = (1 - progress) * 0.8;
+      pulse.mesh.scale.setScalar(pulse.scale * (reducedMotion ? 1 : 0.8 + progress * 2.4));
+      if (pulse.life <= 0) {
+        this.scene.remove(pulse.mesh);
+        this.disposeObject(pulse.mesh);
+        this.pulses.splice(i, 1);
+      }
+    }
     for (let i = this.packets.length - 1; i >= 0; i--) {
       const packet = this.packets[i];
       const elapsed = (performance.now() - packet.start) / 1000;
@@ -1101,18 +1419,35 @@ export class World {
     this.composer.render();
   };
   dispose() {
+    if (!this.active) return;
     this.active = false;
+    cancelAnimationFrame(this.frame);
+    this.cancelInteraction();
     this.resizeObserver.disconnect();
     this.canvas.removeEventListener("pointerdown", this.onPointerDown, true);
     this.canvas.removeEventListener("pointermove", this.onPointerMove);
     this.canvas.removeEventListener("pointerup", this.onPointerUp);
     this.canvas.removeEventListener("pointercancel", this.onPointerCancel);
     this.canvas.removeEventListener("pointerleave", this.onPointerLeave);
+    this.clearTransientEffects();
+    // Both atlases are owned by World, including whichever is not currently bound.
+    this.enemySprite.material.map = null;
+    this.enemyTexture.dispose();
+    this.enemyAlphaTexture.dispose();
     this.disposeObject(this.scene);
+    this.scene.clear();
+    this.hitObjects.length = 0;
+    this.devices.clear();
+    this.deviceStates.clear();
+    this.cableCurves.clear();
+    this.cableVisuals.clear();
+    this.cableBeads.length = 0;
+    this.zoneVisuals.clear();
     this.environment.dispose();
     if (this.scene.background instanceof THREE.Texture)
       this.scene.background.dispose();
     this.controls.dispose();
+    for (const pass of this.composer.passes) pass.dispose();
     this.composer.dispose();
     this.renderer.dispose();
   }

@@ -10,23 +10,45 @@ export type CardId =
   | "surge"
   | "firmware"
   | "containerlab"
-  | "clabernetes";
+  | "clabernetes"
+  | "guard"
+  | "pulse"
+  | "diagnostic"
+  | "reroute"
+  | "barrier"
+  | "capacitor"
+  | "relay"
+  | "hardened-router"
+  | "bastion"
+  | "duplex"
+  | "armored-fiber"
+  | "conduit"
+  | "salvage"
+  | "rebuild"
+  | "mirror"
+  | "zero-day"
+  | "compression"
+  | "emergency"
+  | "protocol"
+  | "startup-config"
+  | "linux-bridge"
+  | "vxlan"
+  | "inspect"
+  | "wireshark";
 export type RelicId =
   | "cold-start"
   | "hot-swap"
   | "parallel-core"
   | "shield-array"
-  | "deep-cache";
+  | "deep-cache"
+  | "grounded-core"
+  | "packet-lens"
+  | "repair-drone"
+  | "reserve-cell";
+export type Zone = "north" | "center" | "south";
 export type RoomType = "battle" | "elite" | "cache" | "forge" | "boss";
 export type Phase =
-  | "title"
-  | "map"
-  | "battle"
-  | "reward"
-  | "relic"
-  | "forge"
-  | "won"
-  | "lost";
+  "title" | "map" | "battle" | "reward" | "relic" | "forge" | "won" | "lost";
 
 export interface NetworkNode {
   id: string;
@@ -36,10 +58,14 @@ export interface NetworkNode {
   fixed?: boolean;
   shielded?: boolean;
   upgraded?: boolean;
+  amplified?: boolean;
+  configured?: boolean;
 }
 export interface NetworkLink {
   a: string;
   b: string;
+  armored?: boolean;
+  boosted?: boolean;
 }
 export interface Topology {
   nodes: NetworkNode[];
@@ -75,6 +101,11 @@ export interface RunState {
   deck: CardId[];
   drawPile: CardId[];
   discardPile: CardId[];
+  exhaustPile: CardId[];
+  block: number;
+  packetBoost: number;
+  reserveEnergy: number;
+  cardsPlayed: number;
   hand: CardId[];
   relics: RelicId[];
   energy: number;

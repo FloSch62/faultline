@@ -6,9 +6,11 @@ import {
   type RunRecord,
 } from "./core/expedition.ts";
 import { reachableRooms } from "./core/map.ts";
-import { costFor, damageFromPath, intentFor, signalPaths } from "./core/run.ts";
+import { combatPreview, costFor, intentFor, signalPaths } from "./core/run.ts";
 import type { CardId, MapRoom, RunState } from "./core/types.ts";
 import type { AudioSettings } from "./audio.ts";
+import type { Preferences } from "./preferences.ts";
+import { chapterForFloor, enemyStory, ARCHETYPE_STORIES, sanctuaryStory, OUTCOMES } from "./story.ts";
 export const asset = (path: string) => `${import.meta.env.BASE_URL}${path}`;
 export const esc = (s: unknown) =>
   String(s).replace(
@@ -64,8 +66,18 @@ const artIds: CardId[] = [
   "firmware",
 ];
 export function artStyle(id: string) {
-  if (id === "containerlab" || id === "clabernetes")
+  if (id === "containerlab" || id === "clabernetes" || id === "wireshark")
     return `--card-image:url('${asset(`art/${id}.png`)}');--art-size:cover;--art-x:50%;--art-y:50%`;
+  const toolsAtlas: Record<string, number> = { "startup-config": 0, "linux-bridge": 1, vxlan: 2, inspect: 3 };
+  if (id in toolsAtlas) {
+    const i = toolsAtlas[id];
+    return `--card-image:url('${asset("art/containerlab-tools-atlas.png")}');--art-size:200% 200%;--art-x:${(i % 2) * 100}%;--art-y:${Math.floor(i / 2) * 100}%`;
+  }
+  const expansion: Record<string, number> = { guard: 0, pulse: 1, diagnostic: 2, reroute: 3, barrier: 4, capacitor: 5, relay: 6, "hardened-router": 7, bastion: 8, duplex: 9, "armored-fiber": 10, conduit: 11, salvage: 12, mirror: 13, "zero-day": 14, compression: 15, rebuild: 3, emergency: 12, protocol: 4 };
+  if (id in expansion) {
+    const i = expansion[id];
+    return `--card-image:url('${asset("art/alpha-card-atlas.png")}');--art-size:400% 400%;--art-x:${(i % 4) * 100 / 3}%;--art-y:${Math.floor(i / 4) * 100 / 3}%`;
+  }
   const i = Math.max(0, artIds.indexOf(id as CardId));
   return `--art-x:${(i % 3) * 50}%;--art-y:${Math.floor(i / 3) * 50}%`;
 }
@@ -80,11 +92,11 @@ export function cardMarkup(
     cost = variant === "hand" && run ? costFor(run, index) : c.cost;
   const central =
     variant === "hand" && run ? index - (run.hand.length - 1) / 2 : 0;
-  return `<button class="game-card rarity-${c.rarity} ${selected ? "selected" : ""} ${run && cost > run.energy && variant === "hand" ? "unplayable" : ""}" data-${variant}="${variant === "hand" ? index : id}" data-card-id="${id}" style="${artStyle(id)};--card-color:${c.color};--angle:${Math.max(-10, Math.min(10, central * 3))}deg;--lift:${Math.min(15, Math.abs(central) * 5)}px;--order:${index}" aria-label="${c.name}, ${cost} energy. ${c.rules}" ${variant === "collection" ? 'tabindex="-1"' : ""}><span class="card-image"></span><span class="card-etch"></span><span class="card-cost">${cost}</span><span class="card-heading">${c.name}</span><span class="card-copy"><span class="card-type">${c.subtitle.split(" / ")[1]}</span><span class="card-rule">${c.rules}</span></span><span class="card-footer"><span>${c.rarity}</span><span class="card-gem">◆</span><span>${variant === "hand" ? `<kbd>${index + 1}</kbd>` : "CLAB"}</span></span></button>`;
+  return `<button class="game-card rarity-${c.rarity} ${selected ? "selected" : ""} ${run && cost > run.energy && variant === "hand" ? "unplayable" : ""}" data-${variant}="${variant === "hand" ? index : id}" data-card-id="${id}" style="${artStyle(id)};--card-color:${c.color};--angle:${Math.max(-10, Math.min(10, central * 3))}deg;--lift:${Math.min(15, Math.abs(central) * 5)}px;--order:${index}" aria-label="${c.name}, ${cost} energy. ${c.rules}" ><span class="card-image"></span><span class="card-etch"></span><span class="card-cost">${cost}</span><span class="card-heading">${c.name}</span><span class="card-copy"><span class="card-type">${c.subtitle.split(" / ")[1]}${c.exhaust ? " · EXHAUST" : ""}</span><span class="card-rule">${c.rules}</span></span><span class="card-footer"><span>${c.rarity}</span><span class="card-gem">◆</span><span>${variant === "hand" ? `<kbd>${index === 9 ? "0" : index + 1}</kbd>` : "CLAB"}</span></span></button>`;
 }
 export function titleMarkup(saved: Expedition | null, records: RunRecord[]) {
   const canContinue = saved && !["won", "lost"].includes(saved.run.phase);
-  return `<section class="title-screen"><div class="title-copy"><div class="eyebrow title-eyebrow"><i></i>A CONTAINERLAB ODYSSEY</div><h1>FAULTLINE</h1><div class="title-subtitle"><span></span>Every connection matters.<span></span></div><p>At the edge of a silent world,<br>one signal is still alive.</p><nav class="title-menu" aria-label="Main menu">${canContinue ? `<button class="menu-primary" data-action="continue"><span><small>SECTOR ${saved.run.floor + 1} · ${ARCHETYPES[saved.archetype].name.toUpperCase()}</small>Continue expedition</span>${icon("arrow", 22)}</button>` : ""}<button class="${canContinue ? "menu-link" : "menu-primary"}" data-action="new"><span>${canContinue ? "" : "<small>THE SIGNAL IS CALLING</small>"}New expedition</span>${icon("arrow", 22)}</button><button class="menu-link" data-action="daily"><span>Daily expedition</span><small>A NEW SIGNAL. EVERY DAY.</small></button><button class="menu-link" data-action="collection"><span>Card archive</span><small>${String(Object.keys(CARDS).length).padStart(2, "0")} DISCOVERIES</small></button><button class="menu-link" data-action="help"><span>Field guide</span>${icon("book", 16)}</button></nav><div class="title-progress">${records.length ? `${records.filter((r) => r.won).length} BACKBONES RESTORED <span>·</span> BEST ${Math.max(...records.map((r) => r.score))}` : "BUILD YOUR DECK <span>·</span> DEFEND THE NETWORK"}</div></div><div class="world-caption"><span>01 / THE SUNKEN RELAY</span><p>Some things are worth reconnecting.</p><i></i></div><div class="title-bottom"><span>STRATEGY. CONSEQUENCE. CONNECTION.</span><span>HEADPHONES RECOMMENDED ${icon("sound", 14)}</span></div></section>`;
+  return `<section class="title-screen"><div class="title-copy"><div class="eyebrow title-eyebrow"><i></i>A CONTAINERLAB ODYSSEY</div><h1>FAULTLINE</h1><div class="title-subtitle"><span></span>Every connection matters.<span></span></div><p>At the edge of a silent world,<br>one signal is still alive.</p><nav class="title-menu" aria-label="Main menu">${canContinue ? `<button class="menu-primary" data-action="continue"><span><small>SECTOR ${saved.run.floor + 1} · ${ARCHETYPES[saved.archetype].name.toUpperCase()}</small>Continue expedition</span>${icon("arrow", 22)}</button>` : ""}<button class="${canContinue ? "menu-link" : "menu-primary"}" data-action="new"><span>${canContinue ? "" : "<small>THE SIGNAL IS CALLING</small>"}New expedition</span>${icon("arrow", 22)}</button><button class="menu-link" data-action="daily"><span>Daily expedition</span><small>A NEW SIGNAL. EVERY DAY.</small></button><button class="menu-link" data-action="collection"><span>Card archive</span><small>${String(Object.keys(CARDS).length).padStart(2, "0")} DISCOVERIES</small></button><button class="menu-link" data-action="tutorial"><span>Learn to play</span><small>OPTIONAL · 3 MINUTES</small></button><button class="menu-link" data-action="help"><span>Field guide</span>${icon("book", 16)}</button></nav><div class="title-progress">${records.length ? `${records.filter((r) => r.won).length} BACKBONES RESTORED <span>·</span> BEST ${Math.max(...records.map((r) => r.score))}` : "BUILD YOUR DECK <span>·</span> DEFEND THE NETWORK"}</div></div><div class="world-caption"><span>01 / THE SUNKEN RELAY</span><p>Some things are worth reconnecting.</p><i></i></div><div class="title-bottom"><span>ALPHA 0.3 · STRATEGY. CONSEQUENCE. CONNECTION.</span><span>HEADPHONES RECOMMENDED ${icon("sound", 14)}</span></div></section>`;
 }
 export function selectMarkup(
   selected: Archetype,
@@ -96,11 +108,11 @@ export function selectMarkup(
   )
     .map((id, i) => {
       const a = ARCHETYPES[id];
-      return `<button class="archetype ${selected === id ? "chosen" : ""}" data-archetype="${id}" aria-pressed="${selected === id}" style="${artStyle(a.art)};--accent:${a.color}"><span class="archetype-art"></span><span class="archetype-number">0${i + 1}</span><span class="archetype-copy"><small>${a.title}</small><strong>${a.name}</strong><span>${a.story}</span><span class="archetype-relic">${icon("elite", 18)} ${RELICS[a.relic].name}</span><em>${RELICS[a.relic].rules}</em><span class="archetype-health">${icon("heart", 14)} ${a.integrity} INTEGRITY</span></span><span class="selection-tick">${icon("check", 16)}</span></button>`;
+      return `<button class="archetype ${selected === id ? "chosen" : ""}" data-archetype="${id}" aria-pressed="${selected === id}" style="${artStyle(a.art)};--accent:${a.color}"><span class="archetype-art"></span><span class="archetype-number">0${i + 1}</span><span class="archetype-copy"><small>${a.title}</small><strong>${a.name}</strong><span>${ARCHETYPE_STORIES[id].story}</span><span class="archetype-relic">${icon("elite", 18)} ${RELICS[a.relic].name}</span><em>${RELICS[a.relic].rules}</em><span class="archetype-health">${icon("heart", 14)} ${a.integrity} INTEGRITY</span></span><span class="selection-tick">${icon("check", 16)}</span></button>`;
     })
     .join(
       "",
-    )}</div><button class="gold-button embark" data-action="embark">Enter the Faultline ${icon("arrow", 20)}</button><p class="selection-note">${replace ? "Starting this expedition replaces your current saved run." : daily ? "A shared daily seed. Progress saves automatically." : "Seven sectors. A branching route. Progress saves automatically."}</p></section>`;
+    )}</div><button class="text-button loadout-button" data-action="loadout">Examine starting deck ${icon("deck", 14)}</button><button class="gold-button embark" data-action="embark">Enter the Faultline ${icon("arrow", 20)}</button><p class="selection-note">${replace ? "Starting this expedition replaces your current saved run." : daily ? "A shared daily seed. Progress saves automatically." : "Seven sectors. A branching route. Progress saves automatically."}</p></section>`;
 }
 export const roomNames: Record<MapRoom["type"], string> = {
   battle: "Hostile signal",
@@ -146,7 +158,7 @@ export function mapMarkup(e: Expedition) {
         }),
     )
     .join("");
-  return `<section class="map-screen"><aside class="map-story"><span class="eyebrow">ACT I · THE FRACTURED BACKBONE</span><div class="chapter-sigil">${icon("map", 46)}</div><h1>${chapters[Math.min(r.floor, 6)]}</h1><p>The old routes have gone dark. Follow the surviving relays. Choose what is worth the risk.</p><div class="map-condition"><span>${icon("heart")} Integrity <strong>${r.integrity}<small> / ${r.maxIntegrity}</small></strong></span><span>${icon("deck")} Your deck <strong>${r.deck.length}<small> cards</small></strong></span></div><div class="map-relics"><span class="eyebrow">RELICS CARRIED</span>${r.relics.map((id) => `<span class="carried-relic" title="${RELICS[id].rules}">${icon("elite", 16)} ${RELICS[id].name}</span>`).join("")}</div><button class="text-button" data-action="deck">Examine deck ${icon("arrow", 16)}</button></aside><div class="route-scroll"><div class="route-chart"><div class="map-rings" aria-hidden="true"></div><svg class="map-paths" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${lines}</svg>${r.map
+  return `<section class="map-screen"><aside class="map-story"><span class="eyebrow">ACT I · THE FRACTURED BACKBONE</span><div class="chapter-sigil">${icon("map", 46)}</div><h1>${chapters[Math.min(r.floor, 6)]}</h1><p>${chapterForFloor(r.floor).description}</p><blockquote class="story-fragment">“${chapterForFloor(r.floor).fragment}”</blockquote><div class="map-condition"><span>${icon("heart")} Integrity <strong>${r.integrity}<small> / ${r.maxIntegrity}</small></strong></span><span>${icon("deck")} Your deck <strong>${r.deck.length}<small> cards</small></strong></span></div><div class="map-relics"><span class="eyebrow">RELICS CARRIED</span>${r.relics.map((id) => `<span class="carried-relic" data-tooltip="${RELICS[id].rules}">${icon("elite", 16)} ${RELICS[id].name}</span>`).join("")}</div><button class="text-button" data-action="deck">Examine deck ${icon("arrow", 16)}</button></aside><div class="route-scroll"><div class="route-chart"><div class="map-rings" aria-hidden="true"></div><svg class="map-paths" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${lines}</svg>${r.map
     .map((n) => {
       const p = pos(n),
         available = reachable.has(n.id);
@@ -171,7 +183,7 @@ export function headerMarkup(
   inTitle: boolean,
   settings: AudioSettings,
 ) {
-  return `<div class="brand"><img src="${asset("containerlab-mark.svg")}" alt="Containerlab"/><span>${inTitle ? "CONTAINERLAB" : "FAULTLINE"}<small>${inTitle ? "TRANSMISSIONS FROM THE EDGE" : "A CONTAINERLAB ODYSSEY"}</small></span></div>${!inTitle && e ? `<div class="run-stats"><span class="integrity-stat" title="Integrity persists between encounters">${icon("heart", 17)} <b>${e.run.integrity}</b><small>/${e.run.maxIntegrity}</small></span><span class="stat-divider"></span><button data-action="deck" title="View your deck">${icon("deck", 17)} ${e.run.deck.length}</button><span class="stat-divider"></span><span class="sector-stat">SECTOR <b>${String(Math.min(e.run.floor + 1, 7)).padStart(2, "0")}</b> / 07</span></div>` : ""}<nav class="header-controls" aria-label="Game controls"><button data-action="sound" aria-label="${settings.muted ? "Enable" : "Mute"} audio" title="${settings.muted ? "Enable" : "Mute"} audio">${icon(settings.muted ? "mute" : "sound")}</button><button data-action="fullscreen" aria-label="Toggle fullscreen" title="Fullscreen">${icon("full")}</button><button data-action="settings" aria-label="Open settings" title="Settings">${icon("settings", 20)}</button></nav>`;
+  return `<div class="brand"><img src="${asset("containerlab-mark.svg")}" alt="Containerlab"/><span>${inTitle ? "CONTAINERLAB" : "FAULTLINE"}<small>${inTitle ? "TRANSMISSIONS FROM THE EDGE" : "A CONTAINERLAB ODYSSEY"}</small></span></div>${!inTitle && e ? `<div class="run-stats"><span class="integrity-stat" data-tooltip="Integrity persists between encounters">${icon("heart", 17)} <b>${e.run.integrity}</b><small>/${e.run.maxIntegrity}</small></span><span class="stat-divider"></span><button data-action="deck" data-tooltip="View your deck">${icon("deck", 17)} ${e.run.deck.length}</button><span class="stat-divider"></span><span class="sector-stat">SECTOR <b>${String(Math.min(e.run.floor + 1, 7)).padStart(2, "0")}</b> / 07</span></div>` : ""}<nav class="header-controls" aria-label="Game controls"><button data-action="sound" aria-label="${settings.muted ? "Enable" : "Mute"} audio" data-tooltip="${settings.muted ? "Enable" : "Mute"} audio">${icon(settings.muted ? "mute" : "sound")}</button><button data-action="fullscreen" aria-label="Toggle fullscreen" data-tooltip="Fullscreen">${icon("full")}</button><button data-action="settings" aria-label="Open settings" data-tooltip="Settings">${icon("settings", 20)}</button></nav>`;
 }
 export function battleMarkup(
   e: Expedition,
@@ -185,10 +197,12 @@ export function battleMarkup(
     enemy = r.enemy!,
     intent = intentFor(r)!,
     paths = signalPaths(r),
-    damage = paths[0] ? damageFromPath(r, paths[0]) : 0;
+    preview = combatPreview(r),
+    damage = preview.packetDamage,
+    enraged = enemy.id === "core" && enemy.hp <= enemy.maxHp / 2;
   const target = selected === null ? null : CARDS[r.hand[selected]];
   const hint = !target
-    ? "Choose a card to shape the network."
+    ? "Choose a card · Right-click to inspect its rules."
     : target.target === "ground"
       ? "Choose an empty point on the table."
       : target.target === "link"
@@ -200,12 +214,12 @@ export function battleMarkup(
           : "Choose a device to upgrade.";
   const guide =
     r.topology.nodes.length < 3
-      ? "Play Containerlab for a ready route, or build one with a router and two links."
+      ? "Place a Core Router. Connect ALPHA → router → OMEGA with two links."
       : r.topology.links.length < 2
         ? "Play Optic Fiber. Connect ALPHA → router → OMEGA."
         : paths.length
           ? "Your route is alive. Transmit to strike the threat."
-          : "Your route has a fault. Use Hot Patch, or build another path.";
+          : r.faultNode || r.faultLink ? "Your route has a fault. Use Hot Patch, or build another path." : "Complete ALPHA → router → OMEGA. Every section needs a link.";
   const intentName = {
     strike: "Integrity strike",
     sever: "Sever a cable",
@@ -216,7 +230,7 @@ export function battleMarkup(
     <div class="encounter-heading">
       <span class="eyebrow">${chapters[r.floor].toUpperCase()}</span>
       <h2>${esc(enemy.name.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()))}</h2>
-      <span class="enemy-flavor">${esc(enemy.title)}</span>
+      <span class="enemy-flavor">${esc(enemy.name === "TRAINING ECHO" ? enemy.title : enemyStory(enemy.id)?.title ?? enemy.title)}</span>
       <div class="enemy-health"><span style="width:${(enemy.hp / enemy.maxHp) * 100}%"></span></div>
       <div class="enemy-health-label"><span>HOSTILE INTEGRITY</span><strong>${enemy.hp} <small>/ ${enemy.maxHp}</small></strong></div>
     </div>
@@ -227,17 +241,23 @@ export function battleMarkup(
       <div class="signal-readout ${damage ? "online" : ""}">
         <span>${damage ? "A living connection" : "The signal sleeps"}</span>
         <strong>${damage}<small>signal damage</small></strong>
-        <p>${damage ? "Your packets are ready. Make the connection count." : "Connect both terminals through a router."}</p>
+        ${damage ? `<div class="damage-equation" aria-label="Damage calculation">${preview.damageTerms.slice(0, 4).map(t => `<span><span>${esc(t.label)}</span><b>${t.amount >= 0 ? "+" : ""}${t.amount}</b></span>`).join("")}${preview.damageTerms.length > 4 ? `<span class="equation-extra">${preview.damageTerms.length - 4} more modifiers · inspect</span>` : ""}</div>` : `<p>Connect ALPHA to OMEGA through a router.</p>`}
+        <button class="formula-button" data-action="combat-details">${icon("book", 12)} Inspect calculation</button>
       </div>
-      <div class="battle-relics">${r.relics.map((id) => `<span title="${RELICS[id].name}: ${RELICS[id].rules}">${icon("elite", 15)}<small>${RELICS[id].name}</small></span>`).join("")}</div>
-      <button class="text-button undo-button" data-action="undo" ${!undo || busy ? "disabled" : ""}>${icon("undo", 14)} Undo last card <kbd>Z</kbd></button>
+      <div class="battle-relics">${r.relics.slice(0, 3).map((id) => `<span tabindex="0" data-tooltip="${RELICS[id].name}: ${RELICS[id].rules}">${icon("elite", 15)}<small>${RELICS[id].name}</small></span>`).join("")}</div>
+      <button class="formula-button devices-button" data-action="devices">${icon("map", 12)} Devices & placement</button>
+      <button class="text-button undo-button" data-action="undo" ${!undo || busy ? "disabled" : ""}>${icon("undo", 14)} Undo last action <kbd>Z</kbd></button>
     ${tutorial ? `<div class="tutorial-callout"><span>${icon("book", 15)} Field note</span><p>${guide}</p><button data-action="dismiss-tutorial" aria-label="Dismiss field note">${icon("close", 14)}</button></div>` : ""}
     </aside>
     <aside class="battle-right battle-plate" aria-label="Enemy intent">
-      <span class="plate-heading">Enemy intent</span>
+      <span class="plate-heading">Enemy intent</span><button class="trait-badge" data-action="enemy-dossier" data-tooltip="${esc(preview.traitDescription)}">${({leech:"SIPHON",wraith:"CABLE HUNTER",storm:"BAND SUPPRESSION",sentinel:"ARMORED GATE",core:"QUARANTINE"} as Record<string,string>)[enemy.id]}</button>
       <div class="intent-emblem">${icon(intent.kind === "strike" || intent.kind === "breach" ? "sword" : intent.kind === "jam" ? "bolt" : "link", 28)}</div>
       <strong>${intentName}</strong>
-      <p>${intent.amount ? `Deals ${intent.amount} integrity damage after you transmit.` : intent.kind === "sever" ? "One cable falls silent for your next turn." : "One unshielded device falls silent for your next turn."}</p>
+      ${intent.pressure || enraged ? `<span class="pressure-warning">${enraged ? "ENRAGED" : ""}${enraged && intent.pressure ? " · " : ""}${intent.pressure ? `PRESSURE +${intent.pressure}` : ""}</span>` : ""}
+      <p class="intent-description">${preview.lethal ? "Defeated before it can act." : preview.faultTarget ? `${intent.kind === "sever" ? "Severs" : "Jams"} ${esc(preview.faultTarget.toUpperCase().replaceAll("::", " ↔ "))} for one turn.${preview.incomingRaw ? ` Also deals ${preview.incomingRaw} damage.` : ""}` : ["jam", "sever"].includes(intent.kind) ? preview.incomingRaw ? `No fault target. ${preview.incomingRaw} damage to the backbone.` : preview.hazardZone ? "No eligible device in the targeted band. The jam will fail." : "Protected network. This fault will fail." : `${preview.incomingRaw} damage after your transmission.`}</p>
+      ${preview.hazardZone ? `<span class="hazard-caption">${preview.hazardZone.toUpperCase()} BAND TARGETED</span>` : ""}${preview.enemyHealing ? `<span class="hazard-caption">Restores ${preview.enemyHealing} health this turn</span>` : ""}
+      <div class="defense-equation" aria-label="Incoming damage forecast"><span>Incoming <b>${preview.incomingRaw}</b></span><span class="shield-value">${icon("shield", 12)} Blocked <b>${Math.min(preview.incomingRaw, preview.shield)}</b></span><span class="forecast-net ${preview.incoming ? "danger" : "safe"}">Integrity loss <b>${preview.incoming}</b></span></div>
+      <button class="formula-button" data-action="combat-details">Why this damage? ${icon("arrow", 12)}</button>
       <div class="plate-divider" aria-hidden="true"><span>◆</span></div>
       <span class="intent-caption">Your next strike</span>
       <span class="intent-preview ${damage >= enemy.hp ? "lethal" : ""}">${damage ? `${damage} damage` : "No live route"}</span>
@@ -245,7 +265,7 @@ export function battleMarkup(
     </aside>
     <div class="battle-bottom">
       <div class="energy-orb"><strong>${r.energy}</strong><span>ENERGY</span></div>
-      <div class="draw-piles"><button data-action="draw-pile">${icon("deck", 22)}<span>${r.drawPile.length}<small>DRAW</small></span></button><button data-action="discard-pile">${icon("deck", 19)}<span>${r.discardPile.length}<small>DISCARD</small></span></button></div>
+      <div class="draw-piles"><button data-action="draw-pile">${icon("deck", 22)}<span>${r.drawPile.length}<small>DRAW</small></span></button><button data-action="discard-pile">${icon("deck", 19)}<span>${r.discardPile.length}<small>DISCARD</small></span></button><button data-action="exhaust-pile" class="exhaust-pile" data-tooltip="Exhausted cards return next encounter">${icon("bolt", 16)}<span>${r.exhaustPile.length}<small>EXHAUST</small></span></button></div>
       <div class="target-hint ${selected !== null ? "active" : ""}">${selected !== null ? icon("arrow", 15) : ""}${hint}${selected !== null ? '<button data-action="cancel">ESC ×</button>' : ""}</div>
       <button class="transmit-button ${damage ? "ready" : ""} ${busy ? "transmitting" : ""}" data-action="transmit" aria-label="Transmit · ${damage} damage · End turn" ${busy ? "disabled" : ""}>
         <span class="transmit-dial" aria-hidden="true"></span>
@@ -253,9 +273,10 @@ export function battleMarkup(
         <span class="transmit-label">${busy ? "Transmitting" : "Transmit"}</span>
         <span class="transmit-shortcut">End turn <span>·</span> <kbd>SPACE</kbd></span>
       </button>
-      <button class="battle-guide" data-action="help">${icon("book", 14)} Field guide</button>
+      <button class="battle-guide" data-action="enemy-dossier">${icon("book", 14)} Know your enemy</button>
     </div>
-    <div class="combat-log" aria-live="polite">${esc(r.log[0] || "")}</div>`;
+    <div class="network-status"><span>${icon("shield", 12)} ${preview.shield} shield available</span><span>${icon("bolt", 12)} +${r.packetBoost} burst</span>${r.reserveEnergy ? `<span>+${r.reserveEnergy} energy next turn</span>` : ""}${r.faultNode || r.faultLink ? `<span class="status-fault">${icon("link", 12)} Active fault · ${esc((r.faultNode || r.faultLink || "").toUpperCase().replaceAll("::", " ↔ "))}</span>` : `<span>${preview.independent ? "Independent routes" : preview.signalPath.length ? "Single route" : "No live route"}</span>`}</div>
+    <button class="combat-log" data-action="combat-log" aria-label="Open combat history" aria-live="polite">${esc(r.log[0] || "")} <span>↗</span></button>`;
 }
 export function handMarkup(run: RunState, selected: number | null) {
   return `<div class="card-fan" style="--hand-size:${run.hand.length}">${run.hand.map((id, i) => cardMarkup(id, i, "hand", run, selected === i)).join("")}</div>`;
@@ -268,32 +289,14 @@ export function relicMarkup(r: RunState) {
   return `<section class="relic-screen full-screen"><span class="eyebrow">A FRAGMENT OF THE OLD WORLD</span><h1>Power that stays with you.</h1><p>Choose one relic. Its effect lasts for the expedition.</p><div class="relic-options">${r.relicRewards.map((id, i) => `<button class="relic-option" data-relic="${id}" style="--accent:${RELICS[id].color};${artStyle(["firmware", "shield", "surge"][i])}"><span class="relic-art"></span><small>${RELICS[id].subtitle}</small><strong>${RELICS[id].name}</strong><span>${RELICS[id].rules}</span>${icon("arrow", 18)}</button>`).join("")}</div></section>`;
 }
 export function forgeMarkup(r: RunState) {
-  return `<section class="forge-screen full-screen"><div class="reward-emblem">${icon("forge", 34)}</div><span class="eyebrow">SANCTUARY · NO HOSTILE SIGNALS</span><h1>Even the signal needs rest.</h1><p>A forgotten maintenance bay. The lights still work.</p><div class="forge-options"><button data-forge="repair" style="${artStyle("patch")}"><span class="forge-art"></span><span class="eyebrow">REPAIR</span><strong>Mend the backbone</strong><span>Restore ${Math.min(4, r.maxIntegrity - r.integrity)} integrity.</span><small>${r.integrity} / ${r.maxIntegrity} CURRENT INTEGRITY</small></button><button data-forge="relic" style="${artStyle("firmware")}"><span class="forge-art"></span><span class="eyebrow">SALVAGE</span><strong>Unearth a relic</strong><span>Discover a permanent upgrade.</span><small>CHOOSE ONE OF THREE RELICS</small></button></div></section>`;
+  const story = sanctuaryStory(r.floor, r.map.find(n => n.id === r.currentRoom)?.lane);
+  return `<section class="forge-screen full-screen"><div class="reward-emblem">${icon("forge", 34)}</div><span class="eyebrow">SANCTUARY · NO HOSTILE SIGNALS</span><h1>${story.title}.</h1><p>${story.description}</p><div class="forge-options"><button data-forge="repair" style="${artStyle("patch")}"><span class="forge-art"></span><span class="eyebrow">REPAIR</span><strong>Mend the backbone</strong><span>Restore ${Math.min(4, r.maxIntegrity - r.integrity)} integrity.</span><small>${r.integrity} / ${r.maxIntegrity} CURRENT INTEGRITY</small></button><button data-forge="relic" style="${artStyle("firmware")}"><span class="forge-art"></span><span class="eyebrow">SALVAGE</span><strong>Unearth a relic</strong><span>Discover a permanent upgrade.</span><small>CHOOSE ONE OF THREE RELICS</small></button><button data-action="refine" style="${artStyle("crosslink")}"><span class="forge-art"></span><span class="eyebrow">REFINE</span><strong>Travel a little lighter</strong><span>Remove one card from your deck.</span><small>ONE SERVICE · CHOOSE CAREFULLY</small></button></div></section>`;
 }
 export function outcomeMarkup(e: Expedition) {
   const r = e.run,
-    won = r.phase === "won";
-  return `<section class="outcome-screen full-screen ${won ? "victory" : ""}"><div class="outcome-symbol">${icon(won ? "crown" : "link", 54)}</div><span class="eyebrow">${won ? "THE BACKBONE LIVES AGAIN" : "THE LAST SIGNAL FADES"}</span><h1>${won ? "And then, an answer." : "Not every route makes it home."}</h1><p>${won ? "Across the broken relays, a thousand little lights return. You were never the only one listening." : "The Faultline keeps its secrets. There is another route. There is always another route."}</p><div class="outcome-stats"><span><strong>${r.score.toLocaleString()}</strong>SCORE</span><span><strong>${r.floor} / 7</strong>SECTORS</span><span><strong>${r.deck.length}</strong>CARDS</span></div><button class="gold-button" data-action="new">Another expedition ${icon("arrow")}</button><button class="text-button" data-action="title">Return to the relay</button></section>`;
+    won = r.phase === "won", story = OUTCOMES[won ? "won" : "lost"];
+  return `<section class="outcome-screen full-screen ${won ? "victory" : ""}"><div class="outcome-symbol">${icon(won ? "crown" : "link", 54)}</div><span class="eyebrow">${story.eyebrow}</span><h1>${story.title}</h1><p>${story.description}${won ? ` ${ARCHETYPE_STORIES[e.archetype].epilogue}` : ""}</p><div class="outcome-stats"><span><strong>${r.score.toLocaleString()}</strong>SCORE</span><span><strong>${r.floor} / 7</strong>SECTORS</span><span><strong>${r.deck.length}</strong>CARDS</span></div><button class="gold-button" data-action="new">Another expedition ${icon("arrow")}</button><button class="text-button" data-action="title">Return to the relay</button></section>`;
 }
-export function settingsMarkup(s: AudioSettings, inRun: boolean) {
-  return `<div class="settings-content"><span class="eyebrow">TAKE A BREATH</span><h2>At your frequency.</h2><label class="setting-slider"><span>Music <output>${Math.round(s.music * 100)}%</output></span><input type="range" min="0" max="100" value="${s.music * 100}" data-setting="music" aria-label="Music volume"/></label><label class="setting-slider"><span>Sound effects <output>${Math.round(s.effects * 100)}%</output></span><input type="range" min="0" max="100" value="${s.effects * 100}" data-setting="effects" aria-label="Sound effects volume"/></label><label class="setting-toggle"><span>Motion & screen shake</span><input type="checkbox" data-setting="motion" ${s.motion ? "checked" : ""}/><i></i></label><div class="settings-actions"><button class="gold-button" data-action="close">${inRun ? "Return to expedition" : "Return"} ${icon("arrow")}</button>${inRun ? '<button class="text-button" data-action="save-exit">Save & return to title</button>' : ""}<button class="text-button" data-action="credits">Art & soundtrack credits</button></div></div>`;
-}
-export function helpMarkup() {
-  return `<span class="eyebrow">THE ARCHITECT'S FIELD GUIDE</span><h2>Your network is your weapon.</h2><p class="modal-intro">Build a route. Read the threat. Keep the signal alive.</p><div class="guide-grid"><div><b>01</b><h3>Build the backbone</h3><p>Play a <strong>Core Router</strong> on the table. Play two <strong>Optic Fiber</strong> cards to connect <strong>ALPHA → router → OMEGA</strong>. Click each end of a cable. Or play <strong>Containerlab</strong> to deploy an overclocked route in one card.</p></div><div><b>02</b><h3>Transmit the signal</h3><p>A live route deals <strong>5 damage</strong> each transmission. End your turn to strike. If the enemy survives, its displayed intent executes.</p></div><div><b>03</b><h3>Design for failure</h3><p>Faults last one turn. <strong>Hot Patch</strong> clears them. <strong>Clabernetes</strong> copies a router and its links, then shields both routers. Independent router paths add <strong>2 damage</strong>. Overclock adds <strong>2</strong>; a firewall adds <strong>1</strong> and blocks up to <strong>3 breach damage</strong>.</p></div><div><b>04</b><h3>Keep something for later</h3><p>Energy resets to <strong>5</strong>; your hand is discarded and redrawn. Hardware stays for the battle. Deck, relics and integrity carry between sectors.</p></div></div><div class="control-legend"><span><kbd>1–9</kbd> Select card</span><span><kbd>Space / Enter</kbd> Transmit</span><span><kbd>Z</kbd> Undo</span><span><kbd>Esc</kbd> Cancel / pause</span><span>Drag hardware to place · Drag devices to move · Drag empty table to orbit</span></div><button class="text-button" data-action="export">${icon("download", 16)} Export this network for Containerlab</button>`;
-}
-export function deckMarkup(
-  r: RunState,
-  mode: "deck" | "draw-pile" | "discard-pile" | "collection",
-) {
-  const cards =
-    mode === "collection"
-      ? (Object.keys(CARDS) as CardId[])
-      : mode === "draw-pile"
-        ? r.drawPile
-        : mode === "discard-pile"
-          ? r.discardPile
-          : r.deck;
-  const counts = new Map<CardId, number>();
-  for (const id of cards) counts.set(id, (counts.get(id) || 0) + 1);
-  return `<span class="eyebrow">${mode === "collection" ? "THE CARD ARCHIVE" : "EVERY CARD IS A POSSIBILITY"}</span><h2>${{ deck: "What you carry.", "draw-pile": "Waiting in the draw pile.", "discard-pile": "Spent, but not forgotten.", collection: "Tools of the last architects." }[mode]}</h2><p class="modal-intro">${cards.length} cards${mode === "draw-pile" ? " · Grouped by type; draw order is hidden." : mode === "discard-pile" ? " · These return when your draw pile runs out." : ""}</p><div class="collection-grid">${[...counts].map(([id, n], i) => `<div class="collection-entry">${cardMarkup(id, i, "collection")}<span>${mode === "collection" ? CARDS[id].rarity : `× ${n} IN ${mode === "deck" ? "DECK" : "PILE"}`}</span></div>`).join("") || '<p class="empty-pile">Nothing here yet.</p>'}</div>`;
+export function settingsMarkup(s: AudioSettings, inRun: boolean, preferences: Preferences) {
+  return `<div class="settings-content"><span class="eyebrow">TAKE A BREATH</span><h2>At your frequency.</h2><label class="setting-slider"><span>Music <output>${Math.round(s.music * 100)}%</output></span><input type="range" min="0" max="100" value="${s.music * 100}" data-setting="music" aria-label="Music volume"/></label><label class="setting-slider"><span>Sound effects <output>${Math.round(s.effects * 100)}%</output></span><input type="range" min="0" max="100" value="${s.effects * 100}" data-setting="effects" aria-label="Sound effects volume"/></label><label class="setting-toggle"><span>Motion & screen shake</span><input type="checkbox" data-setting="motion" ${s.motion ? "checked" : ""}/><i></i></label><label class="setting-toggle"><span>Contextual field notes</span><input type="checkbox" data-preference="tips" ${preferences.tips ? "checked" : ""}/><i></i></label><label class="setting-toggle"><span>Quick transmissions</span><input type="checkbox" data-preference="fast" ${preferences.fast ? "checked" : ""}/><i></i></label><div class="settings-actions"><button class="gold-button" data-action="close">${inRun ? "Return to expedition" : "Return"} ${icon("arrow")}</button>${inRun ? '<button class="text-button" data-action="save-exit">Save & return to title</button>' : ""}<button class="text-button" data-action="credits">Art & soundtrack credits</button></div></div>`;
 }

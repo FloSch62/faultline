@@ -14,7 +14,20 @@ test("each archetype has its promised starting resources and survives a save rou
   for (const id of ["architect", "warden", "ghost"] as const) {
     const e = newExpedition(id, 1234);
     assert.equal(e.run.relics.length, 1);
-    assert.equal(e.run.integrity, { architect: 14, warden: 18, ghost: 12 }[id]);
+    assert.equal(e.run.deck.length, 19);
+    if (id === "architect")
+      assert.ok(e.run.deck.includes("relay") && e.run.deck.includes("duplex"));
+    if (id === "warden")
+      assert.ok(
+        e.run.deck.includes("bastion") &&
+          e.run.deck.includes("barrier") &&
+          e.run.deck.includes("hardened-router"),
+      );
+    if (id === "ghost")
+      assert.ok(
+        e.run.deck.includes("diagnostic") && e.run.deck.includes("pulse"),
+      );
+    assert.equal(e.run.integrity, { architect: 14, warden: 16, ghost: 12 }[id]);
     assert.equal(chooseRoom(e.run, "0-1").ok, true);
     assert.ok(e.run.hand.includes("router"));
     assert.ok(e.run.hand.filter((c) => c === "fiber").length >= 2);
@@ -62,7 +75,7 @@ test("the displayed damage preview equals actual damage for independent and upgr
   assert.equal(endTurn(r).packetDamage, damage);
 });
 
-test("older expeditions receive the new cards exactly once without losing their battle", () => {
+test("older expeditions preserve state without injecting rare or legendary cards", () => {
   const e = newExpedition("architect", 88);
   chooseRoom(e.run, "0-1");
   delete e.cardSet;
@@ -72,13 +85,10 @@ test("older expeditions receive the new cards exactly once without losing their 
     );
   const previous = structuredClone(e.run);
   const restored = parseExpedition(JSON.stringify(e))!;
-  assert.equal(restored.cardSet, 2);
+  assert.equal(restored.cardSet, undefined);
   assert.deepEqual(restored.run.hand, previous.hand);
   assert.deepEqual(restored.run.topology, previous.topology);
-  assert.equal(restored.run.deck.length, previous.deck.length + 2);
-  assert.deepEqual(restored.run.drawPile.slice(-2), [
-    "containerlab",
-    "clabernetes",
-  ]);
+  assert.deepEqual(restored.run.deck, previous.deck);
+  assert.deepEqual(restored.run.drawPile, previous.drawPile);
   assert.deepEqual(parseExpedition(JSON.stringify(restored)), restored);
 });

@@ -1,0 +1,15 @@
+{
+  "source": "../../instrumental-v2/the-last-relay/audio.flac",
+  "separation_model": "htdemucs_ft",
+  "included_stems": [
+    "drums",
+    "bass",
+    "other"
+  ],
+  "excluded_stems": [
+    "vocals"
+  ],
+  "instrumental_rms": 0.177829772233963,
+  "removed_vocal_rms": 0.1281033456325531,
+  "sample_rate": 44100
+}

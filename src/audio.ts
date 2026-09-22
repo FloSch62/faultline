@@ -1,13 +1,19 @@
-export type ScoreScene = "explore" | "battle" | "boss";
+export type ScoreScene = "explore" | "battle" | "boss" | "shop" | "sanctuary" | "elite";
 const tracks: Record<ScoreScene, string> = {
   explore: "the-last-relay",
   battle: "signal-and-steel",
   boss: "the-blackout-core",
+  shop: "the-copper-market",
+  sanctuary: "a-light-left-on",
+  elite: "a-thousand-fractures",
 };
 export const TRACK_NAMES: Record<ScoreScene, string> = {
   explore: "The Last Relay",
   battle: "Signal & Steel",
   boss: "The Blackout Core",
+  shop: "The Copper Market",
+  sanctuary: "A Light Left On",
+  elite: "A Thousand Fractures",
 };
 export interface AudioSettings {
   music: number;
@@ -128,7 +134,11 @@ export class Soundscape {
       | "hurt"
       | "reward"
       | "error"
-      | "turn",
+      | "turn"
+      | "field"
+      | "cleanse"
+      | "corrupt"
+      | "move",
   ) {
     if (!this.ctx || this.settings.muted || !this.settings.effects) return;
     const ctx = this.ctx,
@@ -142,13 +152,17 @@ export class Soundscape {
       reward: [294, 440, 587, 880],
       error: [130, 123],
       turn: [147, 220, 294],
+      field: [196, 294, 392, 588],
+      cleanse: [523, 659, 784, 1047],
+      corrupt: [65, 69, 98, 103],
+      move: [220, 330, 440],
     };
     const duration =
-      kind === "reward" ? 0.9 : kind === "hit" || kind === "hurt" ? 0.5 : 0.18;
+      ["reward", "field", "cleanse"].includes(kind) ? 0.9 : ["hit", "hurt", "corrupt"].includes(kind) ? 0.5 : 0.18;
     tones[kind].forEach((frequency, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = kind === "hurt" ? "sawtooth" : "sine";
+      osc.type = kind === "hurt" || kind === "corrupt" ? "sawtooth" : "sine";
       osc.frequency.setValueAtTime(frequency, now);
       osc.frequency.exponentialRampToValueAtTime(
         frequency * (kind === "hit" ? 0.3 : 1),

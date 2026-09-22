@@ -150,6 +150,13 @@ export function parseExpedition(value: string | null): Expedition | null {
     r.packetBoost ??= 0;
     r.reserveEnergy ??= 0;
     r.cardsPlayed ??= 0;
+    r.zoneEffects ??= [];
+    if (!Array.isArray(r.zoneEffects) || r.zoneEffects.length > 6 || !r.zoneEffects.every(field =>
+      field && ["north", "center", "south"].includes(field.zone) &&
+      ["resonance", "aegis", "stasis", "corrosion", "suppression"].includes(field.kind) &&
+      Number.isInteger(field.turns) && field.turns >= 1 && field.turns <= 3)) return null;
+    const fieldSlots = r.zoneEffects.map(field => `${field.zone}:${["corrosion", "suppression"].includes(field.kind)}`);
+    if (new Set(fieldSlots).size !== fieldSlots.length) return null;
     if (
       ![r.block, r.packetBoost, r.reserveEnergy, r.cardsPlayed].every(
         (value) => Number.isFinite(value) && value >= 0,
@@ -218,7 +225,7 @@ export function parseExpedition(value: string | null): Expedition | null {
     if (
       r.phase === "battle" &&
       (!r.enemy ||
-        !["leech", "wraith", "storm", "sentinel", "core"].includes(
+        !["leech", "wraith", "storm", "sentinel", "core", "prophet", "widow", "colossus"].includes(
           r.enemy.id,
         ) ||
         ![r.enemy.hp, r.enemy.maxHp, r.enemy.turn].every(Number.isFinite))

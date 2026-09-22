@@ -1,18 +1,21 @@
 # FAULTLINE — original score
 
-Three original instrumental pieces, generated locally with **YuE2-3B** and **YuE2-Vae**, then mastered for the game. The active player only uses the `*-instrumental.ogg` files.
+Six original instrumental pieces, generated locally with **YuE2-3B** and **YuE2-Vae**, then mastered for the game. The active player only uses the `*-instrumental.ogg` files.
 
 | Track | Scene | Length | Score |
 | --- | --- | --- | --- |
 | The Last Relay | Title, map, rewards | 2:35.6 | D minor, 78 BPM; piano, cello, analog ambience |
 | Signal & Steel | Encounters | 1:58.0 | D minor, 108 BPM; electronic pulse, strings, industrial percussion |
 | The Blackout Core | Boss | 2:22.8 | D minor, 120 BPM; low drums, brass, urgent piano |
+| The Copper Market | Salvage exchange / shop scene | 1:08.9 | D minor, 92 BPM; plucked strings, marimba, brushed percussion |
+| A Light Left On | Sanctuary, relic discovery | 1:40.4 | D minor, 68 BPM; felt piano, cello, glass bells |
+| A Thousand Fractures | Elite encounters | 1:23.6 | D minor, 116 BPM; angular cello, broken beats, brass |
 
 ## Instrumental revision
 
 The first prompt-only drafts sometimes generated vocals. They were replaced after listening feedback. The new score plans leave the entire vocal part silent and contain no lyrics. Since a score alone does not guarantee instrumental output, the generated recordings were additionally separated with Demucs `htdemucs_ft`; only **drums + bass + other** were included in the final mix. The vocal stem is excluded and preserved separately in the local production workspace.
 
-An optional local Faster Whisper small check with voice activity detection returned no speech segments for all three delivered masters. The results are in `masters-v2/speech-check.json`. This is an automated check, not a claim that a human audition or perfect removal of every vocal timbre has been performed.
+An optional local Faster Whisper small check with voice activity detection returned no speech segments for all six delivered masters. The latest results are in `masters-v3/speech-check.json`; the original check remains in `masters-v2/speech-check.json`. This is an automated check, not a claim that a human audition or perfect removal of every vocal timbre has been performed.
 
 The game crossfades tracks over 1.6 seconds. Files use brief entrance/exit fades and loop through the browser audio player. These are full musical tracks, not sample-perfect seamless loops.
 
@@ -37,9 +40,10 @@ uv pip install --python .venv-score/bin/python \
   'git+https://github.com/multimodal-art-projection/YuE.git@3968a270be318e5fb74d27dabc0add2ebb07e77f' \
   'demucs==4.0.1' 'torchaudio==2.10.0' imageio-ffmpeg
 .venv-score/bin/python scripts/instrumental_score.py
+.venv-score/bin/python scripts/zone_score.py
 ```
 
-The exact prompts, original ABC music and seeds are in `scripts/instrumental_score.py`. It resumes when both native generation metadata and audio exist, or when separated WAV files already exist. The repository includes scores and metadata; native FLAC/WAV recordings and NumPy intermediates are created on the machine running the script. To make a new version, choose a new output directory and seeds rather than mixing new music with old intermediates. A fixed seed is recorded for traceability; output need not be bit-identical across different hardware or runtime versions.
+The exact prompts, original ABC music and seeds are in `scripts/instrumental_score.py` and `scripts/zone_score.py`. It resumes when both native generation metadata and audio exist, or when separated WAV files already exist. The repository includes scores and metadata; native FLAC/WAV recordings and NumPy intermediates are created on the machine running the script. To make a new version, choose a new output directory and seeds rather than mixing new music with old intermediates. A fixed seed is recorded for traceability; output need not be bit-identical across different hardware or runtime versions.
 
 Optional speech regression check:
 
@@ -56,6 +60,8 @@ uv pip install --python .venv-score/bin/python 'faster-whisper==1.2.1'
 - `masters-v2/<track>/removed-vocals.wav` — locally generated excluded vocal stem; ignored by Git.
 - `masters-v2/<track>/master.json` — stem selection and measured RMS values.
 - `generated/` and `rejected-v1/` — local first-pass drafts; excluded from the repository and never loaded by the game.
+- `instrumental-v3/` and `masters-v3/` — fieldcraft score plans, generation metadata and accompaniment-only masters for the three additional scenes.
+- `scripts/zone_score.py` — reproduces the three new tracks using separate seeds, arrangements and output paths.
 - `scripts/instrumental_score.py` — the current, reproducible score-production workflow.
 
 ## License provenance

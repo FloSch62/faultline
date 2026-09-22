@@ -34,7 +34,11 @@ export type CardId =
   | "linux-bridge"
   | "vxlan"
   | "inspect"
-  | "wireshark";
+  | "wireshark"
+  | "resonance-field"
+  | "aegis-field"
+  | "purge-field"
+  | "null-field";
 export type RelicId =
   | "cold-start"
   | "hot-swap"
@@ -46,6 +50,12 @@ export type RelicId =
   | "repair-drone"
   | "reserve-cell";
 export type Zone = "north" | "center" | "south";
+export type ZoneEffectKind = "resonance" | "aegis" | "stasis" | "corrosion" | "suppression";
+export interface ZoneEffect {
+  zone: Zone;
+  kind: ZoneEffectKind;
+  turns: number;
+}
 export type RoomType = "battle" | "elite" | "cache" | "forge" | "boss";
 export type Phase =
   "title" | "map" | "battle" | "reward" | "relic" | "forge" | "won" | "lost";
@@ -106,6 +116,7 @@ export interface RunState {
   packetBoost: number;
   reserveEnergy: number;
   cardsPlayed: number;
+  zoneEffects: ZoneEffect[];
   hand: CardId[];
   relics: RelicId[];
   energy: number;

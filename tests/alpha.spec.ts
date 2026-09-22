@@ -429,8 +429,10 @@ test("a full ten-card hand supports the final shortcut without covering transmit
   await page.mouse.move(500, 60);
   await expect(page.locator("[data-hand]")).toHaveCount(10);
   const dial = await page.locator('[data-action="transmit"]').boundingBox();
-  const lastCard = await page.locator("[data-hand]").last().boundingBox();
-  expect(lastCard!.x + lastCard!.width).toBeLessThan(dial!.x);
+  const hand = await page.locator("#hand-zone").boundingBox();
+  expect(hand!.x + hand!.width).toBeLessThan(dial!.x);
+  await page.getByRole("button", { name: "Next cards", exact: true }).click();
+  await expect.poll(() => page.locator(".card-fan").evaluate(el => el.scrollLeft)).toBeGreaterThan(0);
   await page.locator("body").press("0");
   await expect(page.locator("[data-hand]")).toHaveCount(9);
   expect(JSON.parse((await saved(page))!).run.block).toBe(4);
@@ -459,7 +461,7 @@ test("separated circuits defend even when a central route is first, and relocati
   await installSave(page, expedition);
   await page.locator('[data-action="continue"]').click();
   await expect(page.locator(".forecast-net b")).toHaveText("0");
-  await expect(page.locator(".shield-value b")).toHaveText("2");
+  await expect(page.locator(".shield-resource strong")).toHaveText("2");
   await page.locator('[data-action="combat-details"]').first().click();
   await expect(page.locator(".calculation-grid section").nth(1)).toContainText(
     "Separated circuits · north + south",
@@ -470,7 +472,7 @@ test("separated circuits defend even when a central route is first, and relocati
   await page.locator('[data-relocate-zone="center"]').click();
   await expect(page.locator(".energy-orb strong")).toHaveText("4");
   await expect(page.locator(".forecast-net b")).toHaveText("2");
-  await expect(page.locator(".shield-value b")).toHaveText("0");
+  await expect(page.locator(".shield-resource strong")).toHaveText("0");
   const moved = JSON.parse((await saved(page))!).run.topology.nodes.find(
     (node: { id: string }) => node.id === "router3",
   );
@@ -478,7 +480,7 @@ test("separated circuits defend even when a central route is first, and relocati
   await page.keyboard.press("z");
   await expect(page.locator(".energy-orb strong")).toHaveText("5");
   await expect(page.locator(".forecast-net b")).toHaveText("0");
-  await expect(page.locator(".shield-value b")).toHaveText("2");
+  await expect(page.locator(".shield-resource strong")).toHaveText("2");
   const restored = JSON.parse((await saved(page))!).run;
   expect(restored.topology).toEqual(run.topology);
 });
@@ -635,11 +637,14 @@ test("undo cancels a dragged hardware card so its later release cannot deploy st
   await page.mouse.move(720, 410, { steps: 6 });
   await expect(page.locator(".drag-ghost")).toHaveCount(1);
   await page.keyboard.press("Escape");
-  await expect(page.locator("dialog")).toBeVisible();
+  await expect(page.locator("dialog")).not.toBeVisible();
   await expect(page.locator(".drag-ghost")).toHaveCount(0);
   await page.mouse.up();
   expect(await saved(page)).toBe(afterUndo);
   await page.keyboard.press("Escape");
+  await expect(page.locator("dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("dialog")).not.toBeVisible();
 });
 
 test("the Core's final reward completes the story and records victory exactly once", async ({
@@ -744,8 +749,11 @@ test("a physical device drag cancelled by blur never spends energy or commits it
   await page.mouse.down();
   await page.mouse.move(x + 90, hitY! + 35, { steps: 6 });
   await expect(canvas).toHaveCSS("cursor", "grabbing");
+  await expect(page.locator("#movement-preview")).toContainText("RELOCATE ROUTER1");
+  await expect(page.locator("#movement-preview")).toContainText("Shield");
   await page.evaluate(() => window.dispatchEvent(new Event("blur")));
   await expect(canvas).toHaveCSS("cursor", "grab");
+  await expect(page.locator("#movement-preview")).toHaveCount(0);
   await page.mouse.move(x + 110, hitY! + 45);
   await page.mouse.up();
   expect(await saved(page)).toBe(before);

@@ -30,7 +30,7 @@ Integrity persists between rooms. Topology, faults, upgrades, protection, block,
 | Warden    |        16 | Shield Array   | One Router becomes Hardened Router; Firewall becomes Bastion; Surge becomes Barrier. 19 cards. | Read incoming attacks and build a lasting firewall boundary. |
 | Ghost     |        12 | Deep Cache     | Two Fibers become Crosslinks; Firewall becomes Pulse; one Patch becomes Deep Scan. 19 cards.   | Convert draw and limited burst into a quick decisive route.  |
 
-The standard deck is three Core Routers, one Edge Switch, one Trust Gate, six Optic Fibers, two Hot Patches, one Faraday Shell, one Power Surge, two Packet Guards, one Startup Config, and one Clab Inspect.
+The standard deck is three Core Routers, one Edge Switch, one Trust Gate, six Optic Fibers, one Hot Patch, one Purge Field, one Faraday Shell, one Power Surge, one Packet Guard, one Resonance Field, one Startup Config, and one Clab Inspect.
 
 Opening hands guarantee one Core Router and two Optic Fibers when those cards are present. Fill to six cards, or seven with Deep Cache. A basic router plus two fibers costs four before discounts and produces five damage. Containerlab and Clabernetes never start in a new deck and are never guaranteed draws, even after earning them. Ordinary construction, configuration, and placement are the foundation of the expedition; finding either signature orchestration card is a special reward.
 
@@ -50,7 +50,8 @@ Opening hands guarantee one Core Router and two Optic Fibers when those cards ar
 1. Compute and display the exact best signal route, damage terms, announced enemy action, disruption target and integrity forecast.
 2. Deal the packet damage. If it kills, cancel the entire enemy action and grant rewards. Repair Drone restores two integrity after the victory.
 3. Otherwise resolve any forecast Packet Leech healing, apply the announced action, clear old faults, install its new fault, and deduct the forecast integrity damage. A boss phase transition caused by this packet takes effect on the next displayed intent, never retroactively changes the attack the player saw.
-4. Discard the remaining hand; expire block and packet boosts; recharge and draw the next hand. Check integrity loss.
+4. Decrement existing zone fields, remove expired fields, then install any newly announced hostile field with its full two-turn lifetime.
+5. Discard the remaining hand; expire block and packet boosts; recharge and draw the next hand. Check integrity loss.
 
 Lethal forecasts show zero incoming damage and no disruption target. Preview calculation consumes no RNG and mutates no state. Resolution uses those same computed numbers and target.
 
@@ -71,6 +72,9 @@ A signal must travel from ALPHA to OMEGA through at least one router. Cables are
 | Parallel Core with independent routes                       |          +2 | Once                                         |
 | Packet Lens with a routed switch                            |          +1 | Once                                         |
 | Packet Burst, Mirror Protocol, Zero Day, Wireshark          | Card amount | Sum for this turn only                       |
+| Resonance on a band crossed by deployed route hardware      |          +3 | Once per active band                         |
+| Suppression on a band crossed by deployed route hardware     |          −3 | Once per active band                         |
+| Ferric Colossus armor, without two independent routes        |          −3 | Once                                         |
 | Sentinel plating, without a routed firewall                 |          −2 | Once                                         |
 
 Independent means the routes share no internal device; sharing ALPHA and OMEGA is allowed. Two paths that both pass through the same firewall or switch are not independent. A shared bottleneck is therefore a real strategic weakness.
@@ -100,6 +104,25 @@ Separated-circuit block is recalculated from the live board, not stored in the t
 
 Rare Containerlab automatically uses a free central socket. It gives an efficient overclocked route, but accessing separated-circuit block may still require paid relocation. Clabernetes preserves the source router's configuration, overclock and cable properties; its new physical socket changes cable lengths and band membership. Cloning does not automatically guarantee spatial defense.
 
+## Fields and hostile ground
+
+Each band can hold one allied field and one hostile field. Recasting replaces the field on that side; it never stacks duplicates. Allied fields count down over three transmissions. Hostile fields are installed after the current attack, then affect the next two player turns. Empty bands and fixed terminals do not activate field bonuses or penalties. Every field resets between encounters.
+
+| Card or hostile field | Effect |
+| --- | --- |
+| Resonance Field · 1 energy | +3 damage once for each active band crossed by deployed hardware on the chosen route. |
+| Aegis Field · 1 energy | +3 shield with a live route through deployed hardware in that band. |
+| Null Field · 1 energy | +2 shield while any deployed hardware occupies the band; no live route needed. |
+| Purge Field · 0 energy | Removes hostile fields and device jams in a selected band, preserves allied fields, and draws one card. Exhausts before drawing. |
+| Corrosion | +2 raw incoming damage while any deployed hardware occupies the band. Normal shields apply. |
+| Suppression | −3 route damage in the affected band, clamped to a minimum of zero after all damage terms. |
+
+Rust Prophet targets the most occupied band with corrosion; ties prefer Center, North, then South. Prism Widow counts deployed hardware on the best live route and targets its busiest band with suppression. Ferric Colossus alternates strikes, corrosion and breaches, and its armor absorbs three damage until two independent routes exist. Their exact targets are forecast without consuming randomness. A lethal transmission cancels the hostile field.
+
+Dragging hardware highlights the prospective destination and compares damage, shield and integrity loss before committing. A drop costs one energy; Escape, undo, blur, a cancelled pointer, or an out-of-grid drop restores the real board. Keyboard device controls provide the same paid relocation. Fields stay on the original ground. Field placement, corruption, cleansing and movement have distinct musical cues and expanding table rings; reduced motion keeps the feedback restrained.
+
+The player and enemy use separate painted frames. Integrity, available shield, burst, outgoing damage and all relics are grouped on the player side. Hostile integrity and its next intent are opposite. Three persistent field seals show buffs, debuffs, remaining turns and inbound threats. Long card descriptions reserve their own space; a crowded hand scrolls with explicit arrows and keeps 1–0 shortcuts.
+
 ## Why integrity damage is blocked
 
 Available block is a capacity, not necessarily the amount an enemy will hit. Actual prevented damage is the lesser of incoming raw damage and available block.
@@ -122,6 +145,9 @@ Normal health is `10 + 3 × zero-based sector`; elite health is `30 + 2 × zero-
 | Cable Wraith  | Sever → strike 3 → jam            | Severs the longest eligible cable; if it exceeds 6 units, also deals 1 damage. Choose shorter physical spans or protected cables.                                                                      |
 | Null Storm    | Jam → strike 2 → sever            | Its jam affects only the announced band, cycling North → Center → South once per jam cycle. Place, protect, or pay to move important hardware out of the band.                                         |
 | Gate Sentinel | Breach 4 → sever → strike 3       | Plating absorbs 2 packet damage unless the chosen route contains a firewall. A basic route still deals 3, so this is not a rare-card lock. A routed firewall improves both offense and breach defense. |
+| Rust Prophet | Corrupt → strike 2 → breach 3 | Corrodes the busiest occupied band for two turns. Occupied corrosion adds 2 incoming damage per band. Cleanse it or move hardware. |
+| Prism Widow | Corrupt → sever → strike 3 | Suppresses the busiest band in the chosen live route for two turns. That band subtracts 3 route damage; cleanse or route elsewhere. |
+| Ferric Colossus | Strike 3 → corrupt → breach 4 | Absorbs 3 packet damage until two independent routes are live, and lays corrosion in the busiest occupied band. |
 | Blackout Core | Sever → breach 4 → jam → strike 4 | At half health, enrages for +3 strike/breach and 2 chip damage alongside jam/sever. Redundancy, separation, burst timing and defense all matter.                                                       |
 
 Pressure is `floor(enemy actions already taken / 3)`. Add it to strike and breach damage. The first three actions have no pressure bonus; later cycles grow progressively dangerous.
@@ -175,10 +201,14 @@ There are five rare cards and one legendary. Before the offer's no-duplicate con
 | VXLAN Tunnel       |    2 | uncommon  | link    | Connect two devices with a sever-immune cable that adds +1 route damage (maximum +2 amplified cables).   |
 | Clab Inspect       |    0 | common    | instant | Draw 2 if a router route is live; otherwise draw 1. Exhaust.                                             |
 | Wireshark          |    1 | uncommon  | instant | Capture a live route. Draw 2. Gain +1 damage this turn per hardware type on that route (max 3). Exhaust. |
+| Resonance Field | 1 | common | zone | Routes through hardware in the chosen band gain +3 damage for 3 turns. |
+| Aegis Field | 1 | uncommon | zone | A live route through the chosen band grants 3 shield for 3 turns. |
+| Null Field | 1 | uncommon | zone | Any non-terminal device in the chosen band grants 2 shield for 3 turns, even offline. |
+| Purge Field | 0 | common | zone | Clear hostile fields and device jams in the chosen band. Draw 1. Exhaust. |
 
 Wireshark snapshots the currently chosen best live route before the card is consumed. Distinct router, switch and firewall roles each contribute one burst damage; terminals and hardware elsewhere on the table do not count. Repeated devices of the same role do not increase the bonus. A missing route rejects the action without spending the card or energy. The normal ten-card hand cap applies, and the journal records the captured roles, burst amount and actual number drawn.
 
-Ground cards place devices; link cards select two different devices without an existing cable; node cards select a valid device; instant cards resolve immediately. Overclock requires an unmodified router. Compression requires an unamplified switch. Startup Config requires an unconfigured router; configuration contributes only once per route. Faraday Shell requires an unprotected non-terminal device. Clabernetes requires a router and free table socket, preserves its overclock, startup configuration and cable properties, and protects/unjams both original and replica. Mirror Protocol requires two live independent routes. Salvage requires at least one discarded link card and recovers the most recently discarded links first. Invalid targets spend neither energy nor cards.
+Zone cards select a band via its field seal or the table. Ground cards place devices; link cards select two different devices without an existing cable; node cards select a valid device; instant cards resolve immediately. Overclock requires an unmodified router. Compression requires an unamplified switch. Startup Config requires an unconfigured router; configuration contributes only once per route. Faraday Shell requires an unprotected non-terminal device. Clabernetes requires a router and free table socket, preserves its overclock, startup configuration and cable properties, and protects/unjams both original and replica. Mirror Protocol requires two live independent routes. Salvage requires at least one discarded link card and recovers the most recently discarded links first. Invalid targets spend neither energy nor cards.
 
 ## Relics
 
@@ -220,7 +250,7 @@ Motion should explain causality: installation, a cable becoming live, a packet t
 
 ## Save compatibility and deterministic behavior
 
-Storage remains expedition version 2. Existing runs receive empty exhausted piles and zero temporary block, boost, reserve energy and played-card counts. Cards already present in an older run, including signature cards, remain intact. Loading an old run never inserts missing Containerlab or Clabernetes cards; this prevents save-version flags from bypassing rarity. Oversized legacy hands are reduced to ten by moving overflow to discard. Invalid card IDs, bad topology references and invalid numeric combat values are rejected. Saves preserve RNG, topology, piles and faults so reload cannot reroll an enemy action.
+Storage remains expedition version 2. Older saves receive an empty zone-effect list; existing decks are preserved. Field kinds, bands, durations and unique allied/hostile slots are validated on load. Existing runs receive empty exhausted piles and zero temporary block, boost, reserve energy and played-card counts. Cards already present in an older run, including signature cards, remain intact. Loading an old run never inserts missing Containerlab or Clabernetes cards; this prevents save-version flags from bypassing rarity. Oversized legacy hands are reduced to ten by moving overflow to discard. Invalid card IDs, bad topology references and invalid numeric combat values are rejected. Saves preserve RNG, topology, piles and faults so reload cannot reroll an enemy action.
 
 Daily seeds derive from the UTC date. Player choices still change subsequent RNG consumption and rewards; identical seed, archetype and decisions repeat the expedition. There is no remote leaderboard or multiplayer authority in this alpha.
 
@@ -242,6 +272,11 @@ Careless manual-route play won zero runs in every scenario. On elite routes, Arc
 
 Spatial defense is not automatically optimal: on the safe route the aggressive Architect policy won 81%, while the adaptive policy won 80%. The greedy adaptive policy sometimes spends movement energy when a faster kill would have been better. This is a useful regression signal about opportunity cost, not proof that players should ignore positioning. Mesh and burst priorities remain viable without starting with either signature orchestration card.
 
-The harness does not search full tactical lines, guarantee optimal switch/firewall placement, model learning or measure enjoyment. It favors simple direct routes and only greedily values relocation, so it is not an optimal spatial solver; it also knows the rules perfectly. Human sessions should measure first-run comprehension, avoidable versus unavoidable damage, reward skips, route diversity, boss duration and whether the same cards dominate choices. One act, five enemy types, 35 cards and three archetypes are the complete alpha scope; more acts, metaprogression and competitive balance are future work, not hidden systems.
+The harness does not search full tactical lines, guarantee optimal switch/firewall placement, model learning or measure enjoyment. It favors simple direct routes and only greedily values relocation, so it is not an optimal spatial solver; it also knows the rules perfectly. Human sessions should measure first-run comprehension, avoidable versus unavoidable damage, reward skips, route diversity, boss duration and whether the same cards dominate choices. One act, eight enemy types, 39 cards and three archetypes are the complete alpha scope; more acts, metaprogression and competitive balance are future work, not hidden systems.
 
-The core tests verify formula/resolution agreement, forecast purity, best-route selection, bounded draws, exhaustion, temporary effects, protected disruptions, boss pressure, relic timing, card targets, repair, rewards, removal and version-2 migration, rare/legendary availability, paid relocation, spatial independence, all enemy traits, signed armor/healing forecasts, and Wireshark capture scope, distinct roles, bounded draw, exhaustion and atomic failure. Browser acceptance covers the integrated flows separately.
+The core tests verify formula/resolution agreement, forecast purity, best-route selection, bounded draws, exhaustion, temporary effects, protected disruptions, boss pressure, relic timing, card targets, repair, rewards, removal and version-2 migration, rare/legendary availability, paid relocation, spatial independence, all enemy traits, signed armor/healing forecasts, and Wireshark capture scope, distinct roles, bounded draw, exhaustion and atomic failure, field expiration, hostile targeting, cleansing, relocation out of corruption, and old-save field migration. Browser acceptance covers the integrated flows separately.
+
+
+## Fieldcraft balance probe
+
+The additional seeded probe is in [balance-fields.json](balance-fields.json): 150 seeds for each of three archetypes and three policies (1,350 runs). The adaptive and aggressive bots now evaluate field cards using the shared forecast. This updates the encounter/card mix and includes all eight enemy types; the earlier alpha report remains a historical baseline. The harness still does not model human comprehension or every possible tactical line.

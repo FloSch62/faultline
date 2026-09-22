@@ -9,13 +9,33 @@ export interface CardDefinition {
   rarity: "basic" | "common" | "uncommon" | "rare" | "legendary";
   exhaust?: boolean;
   keyword?: string;
-  target: "ground" | "link" | "node" | "instant";
+  target: "ground" | "link" | "node" | "instant" | "zone";
   role?: Role;
   art: "hardware" | "cable" | "defense" | "program";
   color: string;
 }
 
 export const CARDS: Record<CardId, CardDefinition> = {
+  "resonance-field": {
+    id: "resonance-field", name: "Resonance Field", subtitle: "FIELD / AMPLIFY",
+    rules: "Choose a zone. Routes through its hardware deal +3 damage for 3 turns.",
+    cost: 1, rarity: "common", target: "zone", art: "program", color: "#e9c47c",
+  },
+  "aegis-field": {
+    id: "aegis-field", name: "Aegis Field", subtitle: "FIELD / FORTIFY",
+    rules: "Choose a zone. A live route through its hardware grants 3 shield for 3 turns.",
+    cost: 1, rarity: "uncommon", target: "zone", art: "defense", color: "#91d5c4",
+  },
+  "purge-field": {
+    id: "purge-field", name: "Purge Field", subtitle: "FIELD / CLEANSE",
+    rules: "Cleanse a zone of hostile fields and device jams. Draw 1 card. Exhaust.",
+    cost: 0, rarity: "common", exhaust: true, target: "zone", art: "program", color: "#d1eee2",
+  },
+  "null-field": {
+    id: "null-field", name: "Null Field", subtitle: "FIELD / DAMPEN",
+    rules: "Choose a zone. While your hardware occupies it, gain 2 shield for 3 turns.",
+    cost: 1, rarity: "uncommon", target: "zone", art: "defense", color: "#b5a6e1",
+  },
   router: {
     id: "router",
     name: "Core Router",
@@ -452,11 +472,11 @@ export const STARTER_DECK: CardId[] = [
   "fiber",
   "fiber",
   "patch",
-  "patch",
+  "purge-field",
   "shield",
   "surge",
   "guard",
-  "guard",
+  "resonance-field",
   "startup-config",
   "inspect",
 ];

@@ -34,8 +34,8 @@ function cast(run: RunState, card: CardId) {
   return playInstant(run, 0);
 }
 
-test("alpha collection has 35 distinct playable cards and 9 distinct relics", () => {
-  assert.equal(Object.keys(CARDS).length, 35);
+test("alpha collection has 39 distinct playable cards and 9 distinct relics", () => {
+  assert.equal(Object.keys(CARDS).length, 39);
   assert.equal(Object.keys(RELICS).length, 9);
   assert.ok(
     Object.values(CARDS).every(

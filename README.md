@@ -34,17 +34,20 @@ Playing requires no API keys, GPU music model, Containerlab daemon, or external 
 
 ## Inside the alpha
 
-- One complete seven-sector act with a branching route, recovered messages, five distinct hostile mechanics, elite rewards, sanctuaries and a two-phase Blackout Core.
+- One complete seven-sector act with a branching route, recovered messages, eight distinct hostiles, elite rewards, sanctuaries and a two-phase Blackout Core.
 - Three distinct starter decks: the Architect builds efficient routes, the Warden absorbs mistakes, and the Ghost trades protection for card flow and bursts.
-- **35 cards and nine persistent relics.** Common through legendary rewards support redundant networks, fortified circuits and burst turns. Powerful effects exhaust until the next encounter.
+- **39 cards and nine persistent relics.** Common through legendary rewards support redundant networks, fortified circuits, persistent zone fields and burst turns. Powerful effects exhaust until the next encounter.
 - Router placement matters. Independent north/south circuits grant shield; moving installed hardware costs energy. A Wraith hunts your longest exposed cable; a Null Storm threatens a visible band.
 - Exact damage and shield calculations, signed enemy armor modifiers, displayed fault targets, highlighted signal routes and a combat journal. Forecast and resolution use the same rules.
 - An optional seven-step practice encounter that never replaces your expedition. Undo, card inspection, searchable rarity filters, starting-deck previews, quick transmissions, reduced motion and keyboard device management.
 - Local autosave, continuation, a shared UTC daily seed and local run records. Existing version-2 saves retain their progress and receive defaults for the new combat resources.
-- Expanded painted artwork, a new sanctuary scene, device deployment and shield effects, and three original instrumental tracks.
+- Distinct painted player and enemy frames. Player integrity, shield, damage, burst and every carried relic stay together; enemy health and next intent live opposite. Card rules have reserved space, with a scrollable hand and arrow controls for more than six cards.
+- Four field cards: Resonance, Aegis, Purge and Null. Allied fields last three transmissions; enemy corrosion and suppression last two. Cleanse a hostile band or relocate your hardware, with a destination and damage/shield forecast before dropping. Field actions have sound and table effects.
+- Rust Prophet, Prism Widow and Ferric Colossus join the hostiles with corrosion, suppression and armor that rewards independent routes. New expeditions include Resonance Field and Purge Field.
+- Expanded painted artwork, a sanctuary, the Copper Market salvage exchange, and **six original instrumental tracks**, including dedicated music for sanctuary, salvage and elite encounters.
 - A Containerlab topology exporter. Combat is a browser simulation; exported labs need suitable images and real device configuration before they can route traffic.
 
-Read the [complete implemented game design](docs/game-design.md), [story and world](docs/narrative.md), and [measured balance results](docs/balance-alpha.json). Simulated win rates are regression probes; human playtesting remains necessary to tune difficulty and enjoyment.
+Read the [complete implemented game design](docs/game-design.md), [story and world](docs/narrative.md), and [current fieldcraft balance probe](docs/balance-fields.json). Simulated win rates are regression probes; human playtesting remains necessary to tune difficulty and enjoyment.
 
 ### Discover the signature cards
 
@@ -70,22 +73,26 @@ These are discoveries, **not starter cards**. Opening hands provide a Core Route
 | Replicate / upgrade / shield | Play the card, then choose a valid device |
 | Relocate hardware | Drag a placed device, or use Devices & placement; costs 1 energy |
 | Orbit the table | Drag empty table space |
+| Apply a field | Play a field card, then click a band on the table or its field seal |
+| Browse a large hand | Hand arrows or horizontal scrolling; 1–0 still selects any card |
 | Transmit / end turn | Brass dial, Space or Enter; focused buttons retain normal keyboard behavior |
 | Undo before transmitting | Z |
 | Cancel selection / settings | Escape |
 
 Faults last one player turn. Hot Patch clears them immediately. Energy returns to five plus reserves and the hand is redrawn after each transmission. Temporary shield and burst expire; hardware remains until the encounter ends. Exhausted cards return next encounter. Integrity carries between sectors.
 
+Fields belong to the ground: moving hardware changes which effects apply immediately. Each band holds one allied and one hostile field; another allied field replaces yours. Corrosion adds 2 incoming damage while any deployed hardware occupies its band. Suppression removes 3 damage from a route through its band. Fixed ALPHA/OMEGA terminals do not activate fields. Purge Field removes hostile fields and device jams in the chosen band, preserves allied fields, draws one card and exhausts.
+
 ## Project guide
 
 - `src/core/` — deterministic rules, topology graph, expeditions, persistence and YAML export.
 - `src/three/World.ts` — table, devices, cables, painted enemies, lighting and packet animation.
-- `src/ui.ts`, `src/alpha-ui.ts`, `src/style.css`, `src/alpha.css` — illustrated cards, painted instruments, inspection and tutorials.
+- `src/ui.ts`, `src/alpha-ui.ts`, `src/style.css`, `src/alpha.css`, `src/polish.css` — illustrated cards, painted instruments, inspection and tutorials.
 - `src/story.ts` — chapters, enemy motivations, sanctuary discoveries and endings.
 - `src/main.ts` — input, view transitions, targeting, undo and autosave.
 - `src/audio.ts` — music playback, crossfades and synthesized interaction effects.
-- `public/art/` — finished game artwork; [prompts and art direction](docs/art-prompts.md).
-- `public/audio/` — the three final instrumental Ogg masters.
+- `public/art/` — finished game artwork; [original art direction](docs/art-prompts.md) and [fieldcraft artwork prompts](docs/art-polish-prompts.md).
+- `public/audio/` — the six final instrumental Ogg masters.
 - `soundtrack/` — prompts, original scores, generation metadata, provenance and licenses. Large production recordings and intermediate arrays are generated locally and ignored by Git.
 - [Soundtrack production](soundtrack/README.md) — exact model versions and reproduction steps.
 - [Third-party notices](THIRD_PARTY_NOTICES.md).
@@ -109,4 +116,6 @@ Project code and project-created assets are available under the [MIT license](LI
 
 Artwork was created with OpenAI image generation. The instrumental score was generated locally with YuE2, with vocal stems removed using Demucs. Prompts, score plans and production details are included.
 
-![A live network encounter](docs/screenshots/battle.png)
+![Battle layout with active fields](docs/screenshots/battle.png)
+
+The presentation fixture above displays all nine relics to exercise the crowded layout. [View the Copper Market](docs/screenshots/market.png). To reproduce the visual review against the dev server: `FAULTLINE_ORIGIN=http://127.0.0.1:5174 node scripts/capture-polish.mjs`.

@@ -490,7 +490,7 @@ strong {
     ),
     linear-gradient(0deg, #080e16 0%, #080e1600 35%, #080e1600 75%, #080e167a);
 }
-.game-root:not([data-view="title"]):not([data-view="battle"]) .scene-backdrop {
+.game-root:where(:not([data-view="title"]):not([data-view="battle"])) .scene-backdrop {
   filter: brightness(0.4) saturate(0.55);
   transform: scale(1.025);
 }
@@ -3922,6 +3922,7 @@ input[type="range"]::-webkit-slider-thumb {
   *:before,
   *:after {
     animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
@@ -3931,6 +3932,7 @@ input[type="range"]::-webkit-slider-thumb {
 .reduced-motion *:before,
 .reduced-motion *:after {
   animation-duration: 0.001ms !important;
+  animation-delay: 0ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0.001ms !important;
 }

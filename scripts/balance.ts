@@ -14,6 +14,8 @@ import {
   playNode,
   playGround,
   playLink,
+  playZone,
+  ZONES,
   costFor,
   combatPreview,
   endTurn,
@@ -41,6 +43,10 @@ const balancedPriorities: CardId[] = [
   "clabernetes",
   "containerlab",
   "startup-config",
+  "resonance-field",
+  "aegis-field",
+  "purge-field",
+  "null-field",
   "wireshark",
   "zero-day",
   "protocol",
@@ -143,6 +149,16 @@ function turn(r: RunState, policy: Policy) {
         continue;
     }
     if (policy === "careless") return;
+    // Evaluate field cards with the same forecast as the player. Avoid replacing
+    // an existing allied field unless this transmission improves.
+    const fieldOptions = r.hand.flatMap((id,index) => CARDS[id].target === "zone" && costFor(r,index) <= r.energy ? ZONES.map(zone => {
+      const copy = structuredClone(r);
+      const result = playZone(copy,index,zone);
+      const after = combatPreview(copy);
+      const benefit = result.ok ? after.packetDamage - p.packetDamage + (policy === "adaptive" ? (p.incoming - after.incoming) * 2 : 0) : -1;
+      return { index, zone, benefit };
+    }) : []).sort((a,b)=>b.benefit-a.benefit);
+    if (fieldOptions[0]?.benefit > 0 && playZone(r,fieldOptions[0].index,fieldOptions[0].zone).ok) continue;
     if (r.energy <= 3 && instant(r, "surge")) continue;
     if (r.hand.length <= 7 && instant(r, "inspect")) continue;
     if (r.maxIntegrity - r.integrity >= 3 && instant(r, "emergency")) continue;

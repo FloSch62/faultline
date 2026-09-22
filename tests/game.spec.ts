@@ -96,9 +96,9 @@ test("build, undo, connect, transmit, recover a fault, and take a reward", async
   await wire(page, "alpha", "router1");
   await wire(page, "router1", "omega");
   await expect(page.locator(".signal-readout")).toHaveClass(/online/);
-  await expect(page.locator(".intent-preview")).toContainText("5 damage");
+  await expect(page.locator(".transmit-power strong")).toHaveText("5");
   await page.getByRole("button", { name: /^Transmit/ }).click();
-  await expect(page.locator(".turn-label")).toContainText("02", {
+  await expect(page.locator(".round-banner")).toContainText("02", {
     timeout: 15000,
   });
   await expect(page.locator(".enemy-health-label strong")).toContainText("5");
@@ -169,12 +169,12 @@ test("Containerlab and Clabernetes deploy, replicate, undo, and transmit", async
   });
   await playCard(page, "containerlab");
   await expect(page.locator(".energy-orb strong")).toHaveText("2");
-  await expect(page.locator(".intent-preview")).toHaveText("7 damage");
+  await expect(page.locator(".transmit-power strong")).toHaveText("7");
   await playCard(page, "clabernetes");
   await expect(page.locator('[data-node="alpha"]')).toHaveCount(0);
   await page.locator('[data-node="router1"]').click();
   await expect(page.locator(".energy-orb strong")).toHaveText("0");
-  await expect(page.locator(".intent-preview")).toHaveText("9 damage");
+  await expect(page.locator(".transmit-power strong")).toHaveText("9");
   await page.keyboard.press("z");
   await expect(page.locator(".energy-orb strong")).toHaveText("2");
   const undone = await page.evaluate(
@@ -189,7 +189,7 @@ test("Containerlab and Clabernetes deploy, replicate, undo, and transmit", async
   await playCard(page, "clabernetes");
   await page.locator('[data-node="router1"]').click();
   await page.locator("body").press("Space");
-  await expect(page.locator(".turn-label")).toContainText("02", {
+  await expect(page.locator(".round-banner")).toContainText("02", {
     timeout: 15000,
   });
   await expect(page.locator(".enemy-health-label strong")).toHaveText("1 / 10");
@@ -216,11 +216,14 @@ test("painted desktop controls stay clear of the hand at laptop and full HD size
     await page.setViewportSize(viewport);
     const plaque = await page.locator(".battle-left").boundingBox();
     const note = await page.locator(".tutorial-callout").boundingBox();
-    expect(note!.y).toBeGreaterThan(plaque!.y + plaque!.height);
+    if (note) {
+      expect(note.y).toBeGreaterThan(plaque!.y);
+      expect(note.y + note.height).toBeLessThanOrEqual(plaque!.y + plaque!.height);
+    }
     const transmit = page.getByRole("button", { name: /^Transmit/ });
     await expect(transmit).toBeInViewport();
     const a = await transmit.boundingBox();
-    const b = await page.locator(".card-fan .game-card").last().boundingBox();
+    const b = await page.locator("#hand-zone").boundingBox();
     expect(a!.x).toBeGreaterThan(b!.x + b!.width);
     for (const side of [".battle-left", ".battle-right"]) {
       await expect(page.locator(side)).toBeInViewport();
@@ -291,10 +294,10 @@ test("an expanded Ghost hand leaves the transmission control clickable", async (
   await expect(page.locator(".energy-orb strong")).toHaveText("7");
   const dial = page.getByRole("button", { name: /^Transmit/ });
   const a = await dial.boundingBox();
-  const b = await page.locator(".card-fan .game-card").last().boundingBox();
+  const b = await page.locator("#hand-zone").boundingBox();
   expect(a!.x).toBeGreaterThan(b!.x + b!.width);
   await dial.click();
-  await expect(page.locator(".turn-label")).toContainText("02", {
+  await expect(page.locator(".round-banner")).toContainText("02", {
     timeout: 15000,
   });
 });

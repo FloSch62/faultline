@@ -11,4 +11,4 @@ for path in sorted((ROOT/'public'/'audio').glob('*-instrumental.ogg')):
     entries=[{'start':s.start,'end':s.end,'text':s.text,'avg_logprob':s.avg_logprob,'no_speech_prob':s.no_speech_prob} for s in segments]
     report[path.name]={'model':'Systran/faster-whisper-small','language':info.language,'language_probability':info.language_probability,'segments':entries}
     print(json.dumps(report[path.name]),flush=True)
-(ROOT/'soundtrack'/'masters-v2'/'speech-check.json').write_text(json.dumps(report,indent=2)+'\n')
+(ROOT/'soundtrack'/'masters-v3'/'speech-check.json').write_text(json.dumps(report,indent=2)+'\n')

@@ -9,7 +9,7 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { FXAAShader } from "three/addons/shaders/FXAAShader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { linkKey } from "../core/graph.ts";
-import type { Enemy, NetworkNode, Role, Topology, Zone } from "../core/types.ts";
+import type { Enemy, NetworkNode, Role, Topology, Zone, ZoneEffect } from "../core/types.ts";
 
 export type WorldPoint = { x: number; z: number };
 export type BoardZone = Zone;
@@ -17,7 +17,7 @@ export interface WorldCallbacks {
   onGround: (point: WorldPoint) => void;
   onNode: (id: string) => void;
   onLink: (key: string) => void;
-  onMove: (id: string, point: WorldPoint, finished: boolean) => void;
+  onMove: (id: string, point: WorldPoint | null, finished: boolean) => void;
 }
 type DeviceGroup = THREE.Group & {
   userData: {
@@ -128,6 +128,7 @@ export class World {
   private enemySprite!: THREE.Sprite;
   private enemyTexture!: THREE.Texture;
   private enemyAlphaTexture!: THREE.Texture;
+  private enemyFieldTexture!: THREE.Texture;
   private readonly canvas: HTMLCanvasElement;
   private readonly callbacks: WorldCallbacks;
   private readonly raycaster = new THREE.Raycaster();
@@ -155,6 +156,10 @@ export class World {
     color: number;
   }>();
   private forecastZone: BoardZone | null = null;
+  private zoneEffects: ZoneEffect[] = [];
+  private previewZone: BoardZone | null = null;
+  private previewZoneBlocked = false;
+  private targetingZone = false;
   private readonly cableBeads: {
     bead: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
     curve: THREE.Curve<THREE.Vector3>;
@@ -587,6 +592,9 @@ export class World {
     this.enemyAlphaTexture.colorSpace = THREE.SRGBColorSpace;
     this.enemyAlphaTexture.repeat.set(1 / 2, 1);
     this.enemyAlphaTexture.offset.set(0, 0);
+    this.enemyFieldTexture = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}art/hostiles-zones.png`);
+    this.enemyFieldTexture.colorSpace = THREE.SRGBColorSpace;
+    this.enemyFieldTexture.repeat.set(1 / 3, 1);
     this.enemySprite = new THREE.Sprite(
       new THREE.SpriteMaterial({
         map: this.enemyTexture,
@@ -624,7 +632,7 @@ export class World {
     context.lineWidth = 2;
     context.stroke();
     context.fillStyle = "#effcff";
-    context.font = "600 32px Barlow Condensed, sans-serif";
+    context.font = "600 44px Barlow Condensed, sans-serif";
     context.textAlign = "center";
     context.textBaseline = "middle";
     context.fillText(name.slice(0, 26), 256, 57, 428);
@@ -960,8 +968,9 @@ export class World {
     this.enemyGroup.visible = Boolean(enemy);
     if (enemy) {
       const expansion = enemy.id === "wraith" || enemy.id === "storm";
-      const texture = expansion ? this.enemyAlphaTexture : this.enemyTexture;
-      const variant = expansion ? Number(enemy.id === "storm") : enemy.id === "core" ? 2 : enemy.id === "sentinel" ? 1 : 0;
+      const fieldIndex = ["prophet", "widow", "colossus"].indexOf(enemy.id);
+      const texture = fieldIndex >= 0 ? this.enemyFieldTexture : expansion ? this.enemyAlphaTexture : this.enemyTexture;
+      const variant = fieldIndex >= 0 ? fieldIndex : expansion ? Number(enemy.id === "storm") : enemy.id === "core" ? 2 : enemy.id === "sentinel" ? 1 : 0;
       texture.offset.x = variant / (expansion ? 2 : 3);
       if (this.enemySprite.material.map !== texture) {
         this.enemySprite.material.map = texture;
@@ -1023,14 +1032,39 @@ export class World {
 
   /** Marks the announced storm band without motion or geometry replacement. */
   setForecastZone(zone: BoardZone | null) {
-    if (zone === this.forecastZone) return;
     this.forecastZone = zone;
+    this.refreshZones();
+  }
+  setZoneEffects(effects: ZoneEffect[]) {
+    this.zoneEffects = effects;
+    this.refreshZones();
+  }
+  setZonePreview(zone: BoardZone | null, blocked = false) {
+    this.previewZone = zone;
+    this.previewZoneBlocked = blocked;
+    this.refreshZones();
+  }
+  setZoneTargeting(enabled: boolean) {
+    this.targetingZone = enabled;
+    if (!enabled) this.setZonePreview(null);
+  }
+  pulseZone(zone: BoardZone, kind: "field" | "cleanse" | "corrupt" | "move") {
+    const color = { field: 0xe5c581, cleanse: 0xb9ffdf, corrupt: 0xd97780, move: 0x8bd5c5 }[kind];
+    const z = { north: -3, center: 0, south: 3 }[zone];
+    for (const x of [-5, 0, 5]) this.pulseAt(x, z, color, 2.2);
+  }
+  private refreshZones() {
+    const colors = { resonance: 0xddb46b, aegis: 0x65c8b4, stasis: 0xab98df, corrosion: 0xd96755, suppression: 0xa77cdb };
     for (const [id, visual] of this.zoneVisuals) {
-      const danger = id === zone;
-      visual.fill.color.setHex(danger ? 0xc35e4d : visual.color);
-      visual.fill.opacity = danger ? 0.18 : 0.045;
-      visual.label.color.setHex(danger ? 0xffb39a : visual.color);
-      visual.label.opacity = danger ? 1 : 0.72;
+      const danger = id === this.forecastZone;
+      const fields = this.zoneEffects.filter(effect=>effect.zone === id);
+      const field = fields.find(effect=>effect.kind === "corrosion" || effect.kind === "suppression") ?? fields[0];
+      const preview = id === this.previewZone;
+      const color = preview ? this.previewZoneBlocked ? 0xe66455 : 0x9edde0 : field ? colors[field.kind] : danger ? 0xc35e4d : visual.color;
+      visual.fill.color.setHex(color);
+      visual.fill.opacity = preview ? 0.28 : field ? 0.18 : danger ? 0.14 : 0.045;
+      visual.label.color.setHex(color);
+      visual.label.opacity = preview || danger || field ? 1 : 0.72;
       visual.warning.visible = danger;
     }
   }
@@ -1149,12 +1183,18 @@ export class World {
       y: event.clientY,
       moved: false,
     };
-    if (hit.node && !this.placementRole && !this.linkSource) {
+    if ((hit.node || this.targetingZone) && !this.placementRole && !this.linkSource) {
       this.controls.enabled = false;
       this.canvas.setPointerCapture(event.pointerId);
     }
   };
   private onPointerMove = (event: PointerEvent) => {
+    if (this.targetingZone) {
+      const point = this.pointFromScreen(event.clientX,event.clientY);
+      this.setZonePreview(point ? point.z < -1.3 ? "north" : point.z > 1.3 ? "south" : "center" : null);
+      this.canvas.style.cursor = point ? "crosshair" : "default";
+      return;
+    }
     if (
       this.pointerDown &&
       Math.hypot(
@@ -1171,7 +1211,7 @@ export class World {
       if (distance > 5) this.pointerDown.moved = true;
       if (this.pointerDown.moved) {
         const point = this.pointFromScreen(event.clientX, event.clientY);
-        if (point) this.callbacks.onMove(this.pointerDown.id, point, false);
+        this.callbacks.onMove(this.pointerDown.id, point, false);
         this.canvas.style.cursor = "grabbing";
       }
       return;
@@ -1186,13 +1226,13 @@ export class World {
     this.controls.enabled = true;
     if (down?.moved && down.id) {
       const point = this.pointFromScreen(event.clientX, event.clientY);
-      if (point) this.callbacks.onMove(down.id, point, true);
+      this.callbacks.onMove(down.id, point, true);
       return;
     }
     if (!down || (down.moved && !down.id)) return;
     const hit = this.hit(event);
     if (hit.node) this.callbacks.onNode(hit.node);
-    else if (hit.link) this.callbacks.onLink(hit.link);
+    else if (hit.link && !this.targetingZone) this.callbacks.onLink(hit.link);
     else {
       const point = this.pointFromScreen(event.clientX, event.clientY);
       if (point) this.callbacks.onGround(point);
@@ -1434,6 +1474,7 @@ export class World {
     this.enemySprite.material.map = null;
     this.enemyTexture.dispose();
     this.enemyAlphaTexture.dispose();
+    this.enemyFieldTexture.dispose();
     this.disposeObject(this.scene);
     this.scene.clear();
     this.hitObjects.length = 0;

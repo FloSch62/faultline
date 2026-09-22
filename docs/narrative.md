@@ -32,6 +32,10 @@ The hostile systems now reward distinct responses. Leeches recover when a transm
 
 ## Delivery and tone
 
+Three further maintenance systems have outlived their jobs. Rust Prophet is a corroded maintenance beacon that broadcasts the failures it once diagnosed. Prism Widow is an optical repair automaton weaving perfect isolation webs around live traffic. Ferric Colossus is a smelter guardian that recognizes redundant safety circuits. Their corrosion, suppression and armor are forecast mechanical effects with cleansing or rerouting as counterplay.
+
+The Copper Market gives salvage caches a human-scale refuge: a quiet exchange where the keeper offers one tool for the road. It retains the existing free choice of one card; there is no hidden currency or paid shop economy. Its plucked, clockwork score contrasts with the sanctuary's sparse piano and the elite encounters' sharper percussion.
+
 `src/story.ts` exports typed `CHAPTERS`, `ENEMY_STORIES`, `ARCHETYPE_STORIES`, `SANCTUARY_STORIES`, and `OUTCOMES`. The small selectors `chapterForFloor`, `enemyStory`, and `sanctuaryStory` support the existing floor and enemy IDs. Sanctuary selection follows the map's early branch and two late branches. No story content mutates a run, saves progress, or gates an action.
 
 Show two-sentence chapter descriptions on the map, short enemy motives in the combat-detail view, one telegraph beside the actual intent, and brief sanctuary descriptions above the services. Recovered fragments are optional secondary copy. Keep them out of essential damage calculations and target controls. The Ghost's epilogue echoes an earlier recovered fragment, giving an attentive player a small personal resolution without a lore screen.

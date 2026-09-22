@@ -59,7 +59,7 @@ export function chapterForFloor(floor: number): ChapterStory {
   return CHAPTERS[Math.max(0, Math.min(CHAPTERS.length - 1, index))];
 }
 
-export type StoryEnemyId = "leech" | "wraith" | "storm" | "sentinel" | "core";
+export type StoryEnemyId = "leech" | "wraith" | "storm" | "sentinel" | "core" | "prophet" | "widow" | "colossus";
 
 export interface EnemyStory {
   name: string;
@@ -73,6 +73,30 @@ export interface EnemyStory {
 }
 
 export const ENEMY_STORIES: Record<StoryEnemyId, EnemyStory> = {
+  prophet: {
+    name: "Rust Prophet", title: "The ground remembers every failure",
+    motive: "Once a maintenance beacon, it now broadcasts the corrosion it was built to prevent. Every answered signal spreads another bloom of rust.",
+    pattern: ["corrupt", "strike", "breach"],
+    telegraphs: { corrupt: "Its censer tilts toward your busiest band. Rust is taking root.", strike: "Oxide gathers at the transmitter's eye.", breach: "The beacon discharges its poisoned reserve." },
+    counterplay: "Corrosion lasts two turns and adds 2 incoming damage while your hardware occupies the band. Purge Field cleanses it immediately. Moving every deployed device out of that band also avoids the damage.",
+    defeated: "The censer cools. Clean light returns to the copper.",
+  },
+  widow: {
+    name: "Prism Widow", title: "A beautiful silence, carefully woven",
+    motive: "An optical repair automaton keeps weaving isolation webs around the last working signals. Its glass threads are flawless. Nothing gets through.",
+    pattern: ["corrupt", "sever", "strike"],
+    telegraphs: { corrupt: "Violet threads converge on a band in your strongest route.", sever: "A glass limb draws tight against an exposed cable.", strike: "The prism gathers a painful flash of stored light." },
+    counterplay: "Suppression reduces routes through the marked band by 3 damage for two turns. Cleanse it, move the affected hardware, or complete a stronger route through another band.",
+    defeated: "The glass web unravels. Light takes the long way home.",
+  },
+  colossus: {
+    name: "Ferric Colossus", title: "The furnace that never stopped",
+    motive: "A smelter guardian still protects its cold industrial heart. It trusts only the iron around it and the redundant safety circuits its makers left behind.",
+    pattern: ["strike", "corrupt", "breach"],
+    telegraphs: { strike: "A vast iron fist rises above the table.", corrupt: "The furnace vents over your busiest band.", breach: "Its armored gates open on a final surge of heat." },
+    counterplay: "Two independent routes bypass its 3 armor. Cleanse scorched ground or evacuate the band to avoid corrosion's extra damage. Shields and a routed firewall soften its heavy attacks.",
+    defeated: "The furnace door settles. Even iron can learn to rest.",
+  },
   leech: {
     name: "Packet Leech",
     title: "A collector with nowhere to deliver",

@@ -7,7 +7,26 @@
   "mastering": "-19 LUFS target, -2 dBTP, 48 kHz stereo Vorbis quality 5",
   "tracks": [
     {
+      "file": "public/audio/a-light-left-on-instrumental.ogg",
+      "scene": "Sanctuary and relics",
+      "duration_seconds": 100.4,
+      "sample_rate": 48000,
+      "channels": 2,
+      "bytes": 1581833,
+      "sha256": "94e9a82ca7eeea2dcd8234984eb00814556a28c09e32ec2a0c7813cf4b89bc58"
+    },
+    {
+      "file": "public/audio/a-thousand-fractures-instrumental.ogg",
+      "scene": "Elite encounters",
+      "duration_seconds": 83.6,
+      "sample_rate": 48000,
+      "channels": 2,
+      "bytes": 1459216,
+      "sha256": "a09945c56bcba8d6f9413d822093d9c51144f618451140b0e3b2304754414e7e"
+    },
+    {
       "file": "public/audio/signal-and-steel-instrumental.ogg",
+      "scene": "Encounters",
       "duration_seconds": 118.0,
       "sample_rate": 48000,
       "channels": 2,
@@ -16,6 +35,7 @@
     },
     {
       "file": "public/audio/the-blackout-core-instrumental.ogg",
+      "scene": "Boss",
       "duration_seconds": 142.8,
       "sample_rate": 48000,
       "channels": 2,
@@ -23,7 +43,17 @@
       "sha256": "8cc564a67bd4449ffa9ade480fb71545c8215893d4d6d1b54a6342d0f15cd9de"
     },
     {
+      "file": "public/audio/the-copper-market-instrumental.ogg",
+      "scene": "Salvage exchange",
+      "duration_seconds": 68.9,
+      "sample_rate": 48000,
+      "channels": 2,
+      "bytes": 1127346,
+      "sha256": "308500e747b4d7758373316bf0a20cb781a6c516712cbe06ab5f899c68ef7eb7"
+    },
+    {
       "file": "public/audio/the-last-relay-instrumental.ogg",
+      "scene": "Title, map, rewards",
       "duration_seconds": 155.6,
       "sample_rate": 48000,
       "channels": 2,

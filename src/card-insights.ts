@@ -2,6 +2,10 @@ import type { CardId } from "./core/types.ts";
 
 /** Player-facing connections between rules, without revealing a reward roll. */
 export const CARD_INSIGHTS: Partial<Record<CardId, string>> = {
+  "resonance-field": "A band contributes +3 once per route, even with several devices in it. Keep the route in that band for up to three transmissions. Recasting an allied field in the same band replaces it.",
+  "aegis-field": "The shield renews while a live route crosses hardware in this band. A severed route loses this protection. Combine it with armored links and Faraday Shell, or use Null Field when the network is offline.",
+  "purge-field": "Cleanses hostile ground without removing your own field. It also clears a jam on hardware in that band. It exhausts for the encounter. Corrosion and suppression stay on the ground when you move away; they never follow the device.",
+  "null-field": "Grants shield even without a complete signal route, as long as a deployed device occupies the band. Fixed ALPHA and OMEGA terminals never count as occupied hardware.",
   router: "Build a second route with its own router to earn +2 signal. If independent routes have routers in both outer bands, they also grant 2 shield.",
   "hardened-router": "Jam protection answers the Null Storm. A separate router route keeps you transmitting when the other route loses a cable.",
   fiber: "A direct ALPHA–OMEGA cable cannot attack without a router. Hot Swap makes the first Optic Fiber each turn free.",

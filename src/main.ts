@@ -1,5 +1,6 @@
 import "./style.css";
 import "./alpha.css";
+import "./polish.css";
 import { Soundscape, TRACK_NAMES, type ScoreScene } from "./audio.ts";
 import { CARDS } from "./core/cards.ts";
 import {
@@ -14,6 +15,8 @@ import {
 import { topologyYaml } from "./core/export.ts";
 import {
   relocateNode,
+  playZone,
+  zoneDescription,
   zoneForNode,
   canTargetNode,
   combatPreview,
@@ -32,7 +35,7 @@ import {
   signalPaths,
   type ActionResult,
 } from "./core/run.ts";
-import type { CardId, RelicId, RunState } from "./core/types.ts";
+import type { CardId, RelicId, RunState, Zone } from "./core/types.ts";
 import { World, type WorldPoint } from "./three/World.ts";
 import * as ui from "./ui.ts";
 import * as alpha from "./alpha-ui.ts";
@@ -114,6 +117,9 @@ function toast(message: string, kind = "normal") {
   toastTimer = window.setTimeout(() => (el.className = ""), 3500);
 }
 function audioScene(): ScoreScene {
+  if (view === "run" && (run.phase === "forge" || run.phase === "relic")) return "sanctuary";
+  if (view === "run" && run.phase === "reward" && run.map.find(room => room.id === run.currentRoom)?.type === "cache") return "shop";
+  if (view === "run" && run.phase === "battle" && run.map.find(room => room.id === run.currentRoom)?.type === "elite") return "elite";
   return view === "run" && run.phase === "battle"
     ? run.enemy?.id === "core"
       ? "boss"
@@ -146,6 +152,9 @@ function clearSelection() {
   selectedNode = null;
   world?.setPlacement(null);
   world?.setSelected(null);
+  world?.setZoneTargeting(false);
+  world?.setZonePreview(null);
+  document.getElementById("movement-preview")?.remove();
 }
 function playable() {
   return view === "run" && run.phase === "battle" && !busy && !dialog.open;
@@ -154,6 +163,7 @@ function render(rebuild = true) {
   const battle = view === "run" && run.phase === "battle";
   root.dataset.view = view === "run" ? run.phase : view;
   root.classList.toggle("is-battle", battle);
+  root.classList.toggle("in-market", view === "run" && run.phase === "reward" && run.map.find(room=>room.id===run.currentRoom)?.type === "cache");
   root.classList.toggle("busy", busy);
   root.classList.toggle("is-practice", !!practice);
   root.dataset.lesson = practice ? String(practice.step) : "";
@@ -171,6 +181,7 @@ function render(rebuild = true) {
     world?.setSignalRoute(forecast.signalPath, forecast.alternatePath);
     world?.setForecastTarget(forecast.faultTarget);
     world?.setForecastZone(forecast.hazardZone);
+    world?.setZoneEffects(run.zoneEffects);
   }
   world?.setVisible(battle);
   let screen = "";
@@ -202,7 +213,9 @@ function render(rebuild = true) {
     ? `${run.currentRoom}|${run.turn}|${run.energy}|${run.firstFiberPlayed}|${run.hand.join(",")}`
     : "";
   if (signature !== handKey) {
+    const scroll = document.querySelector(".card-fan")?.scrollLeft ?? 0;
     $("#hand-zone").innerHTML = battle ? ui.handMarkup(run, selected) : "";
+    document.querySelector(".card-fan")?.scrollTo({left:scroll});
     handKey = signature;
   } else if (battle)
     document
@@ -210,15 +223,17 @@ function render(rebuild = true) {
       .forEach((el) =>
         el.classList.toggle("selected", Number(el.dataset.hand) === selected),
       );
+  if (selected !== null) document.querySelector(`[data-hand="${selected}"]`)?.scrollIntoView({block:"nearest",inline:"nearest"});
   renderTargetDock();
   if (selected !== null && run.hand[selected])
     world?.setPlacement(CARDS[run.hand[selected]].role ?? null, source);
   else world?.setPlacement(null);
   world?.setSelected(source ?? selectedNode);
+  world?.setZoneTargeting(selected !== null && CARDS[run.hand[selected]]?.target === "zone");
   const scene = audioScene();
   sound.setScene(scene);
   $("#now-playing").innerHTML =
-    `<span class="music-bars"><i></i><i></i><i></i></span><span>${TRACK_NAMES[scene]}<small>ORIGINAL SCORE · YuE2</small></span>`;
+    `<span class="music-bars"><i></i><i></i><i></i></span><span>${TRACK_NAMES[scene]}<small>ORIGINAL SOUNDTRACK</small></span>`;
   $("#now-playing").classList.toggle("muted", sound.settings.muted);
   if (
     expedition &&
@@ -251,6 +266,8 @@ function renderTargetDock() {
       const c = CARDS[run.hand[selected]];
       if (c?.target === "ground")
         markup = `<div class="target-options"><span>PLACE ON THE TABLE OR</span><button data-action="auto-place">${ui.icon("cache", 14)} Deploy in a free socket</button>${practice ? "" : (["north", "center", "south"] as const).map(zone => `<button data-deploy-zone="${zone}">${zone.toUpperCase()} BAND</button>`).join("")}</div>`;
+      else if (c?.target === "zone")
+        markup = `<div class="target-options"><span>${ui.esc(c.name.toUpperCase())} · SELECT A FIELD SEAL</span></div>`;
       else if (c?.target === "link" || c?.target === "node")
         markup = `<div class="target-options"><span>${source ? "CONNECT TO" : "CHOOSE DEVICE"}</span>${run.topology.nodes
           .filter(
@@ -278,7 +295,8 @@ function openModal(type: string) {
   clearSelection();
   render(false);
   const content = $("#dialog-content");
-  if (type === "settings")
+  if (type === "relic-journal") content.innerHTML = alpha.relicJournalMarkup(run);
+  else if (type === "settings")
     content.innerHTML = ui.settingsMarkup(sound.settings, view === "run", preferences);
   else if (type === "help") content.innerHTML = alpha.guideMarkup();
   else if (type === "combat-details") content.innerHTML = alpha.combatDetailsMarkup(run);
@@ -294,7 +312,7 @@ function openModal(type: string) {
     content.innerHTML = alpha.libraryMarkup(libraryRun, libraryMode);
   }
   else if (type === "credits")
-    content.innerHTML = `<span class="eyebrow">THE PEOPLE & TOOLS BEHIND THE SIGNAL</span><h2>From an idea to an odyssey.</h2><div class="credits-copy"><h3>The Containerlab universe</h3><p>Inspired by Containerlab and the networks we build together. FAULTLINE is an independent fan project. The Containerlab mark is used under its original license.</p><h3>Original art</h3><p>Relay cathedral, sanctuary, ruined chamber, an expanded illustrated card collection, hostile creatures and painted interface pieces created for this game using OpenAI image generation. Typography: Cinzel and Barlow, under the SIL Open Font License.</p><h3>Original score · YuE2</h3><p>The Last Relay · Signal & Steel · The Blackout Core. Generated locally with the official YuE2 model and listening decoder. The score uses instrumental arrangements; vocal stems were removed with Demucs. Generation prompts and provenance are included in the project.</p><h3>A real network, in miniature</h3><p>Packets and faults are simulated in your browser. You can export the topology to Containerlab; real routing requires device configuration and container images.</p></div>`;
+    content.innerHTML = `<span class="eyebrow">THE PEOPLE & TOOLS BEHIND THE SIGNAL</span><h2>From an idea to an odyssey.</h2><div class="credits-copy"><h3>The Containerlab universe</h3><p>Inspired by Containerlab and the networks we build together. FAULTLINE is an independent fan project. The Containerlab mark is used under its original license.</p><h3>Original art</h3><p>Relay cathedral, sanctuary, ruined chamber, an expanded illustrated card collection, hostile creatures and painted interface pieces created for this game using OpenAI image generation. Typography: Cinzel and Barlow, under the SIL Open Font License.</p><h3>Original score · YuE2</h3><p>The Last Relay · Signal & Steel · The Blackout Core · The Copper Market · A Light Left On · A Thousand Fractures. Generated locally with the official YuE2 model and listening decoder. The score uses instrumental arrangements; vocal stems were removed with Demucs. Generation prompts and provenance are included in the project.</p><h3>A real network, in miniature</h3><p>Packets and faults are simulated in your browser. You can export the topology to Containerlab; real routing requires device configuration and container images.</p></div>`;
   else if (type === "replace")
     content.innerHTML = `<span class="eyebrow">AN EXPEDITION IS ALREADY IN PROGRESS</span><h2>Leave this route behind?</h2><p class="modal-intro">Beginning a new expedition replaces your current saved run in sector ${run.floor + 1}.</p><div class="confirm-actions"><button class="gold-button" data-action="confirm-replace">Begin a new expedition ${ui.icon("arrow")}</button><button class="text-button" data-action="close">Keep my current expedition</button></div>`;
   dialog.className = [
@@ -342,7 +360,7 @@ function begin() {
   render();
   sound.effect("reward");
 }
-function playAction(action: () => ActionResult) {
+function playAction(action: () => ActionResult, cue?: "field" | "cleanse") {
   if (!playable()) return false;
   const before = structuredClone(run),
     result = action();
@@ -363,7 +381,10 @@ function playAction(action: () => ActionResult) {
   clearSelection();
   save();
   render();
-  sound.effect(connected ? "connect" : "card");
+  if (cue) {
+    sound.effect(cue);
+    toast(result.message);
+  } else sound.effect(connected ? "connect" : "card");
   return true;
 }
 function chooseCard(index: number) {
@@ -393,6 +414,15 @@ function onGround(point: WorldPoint) {
   const index = selected;
   if (CARDS[run.hand[index]]?.target === "ground")
     playAction(() => playGround(run, index, point.x, point.z));
+  else if (CARDS[run.hand[index]]?.target === "zone") castZone(zoneForNode(point));
+}
+function castZone(zone: Zone) {
+  if (!playable() || selected === null || CARDS[run.hand[selected]]?.target !== "zone") {
+    if (playable()) toast(`${zone.toUpperCase()} · ${zoneDescription(run,zone)}`);
+    return;
+  }
+  const index = selected, cleanse = run.hand[index] === "purge-field";
+  if (playAction(() => playZone(run,index,zone),cleanse ? "cleanse" : "field")) world?.pulseZone(zone,cleanse ? "cleanse" : "field");
 }
 function onNode(id: string) {
   if (!playable()) return;
@@ -400,6 +430,11 @@ function onNode(id: string) {
     const index = selected,
       c = CARDS[run.hand[index]];
     if (!c) return;
+    if (c.target === "zone") {
+      const node = run.topology.nodes.find(n=>n.id===id);
+      if (node) castZone(zoneForNode(node));
+      return;
+    }
     if (c.target === "link") {
       if (source === id) {
         source = null;
@@ -427,17 +462,40 @@ function onNode(id: string) {
   selectedNode = id;
   render(false);
 }
-function onMove(id: string, point: WorldPoint, finished: boolean) {
+function onMove(id: string, point: WorldPoint | null, finished: boolean) {
   if (!playable() || selected !== null) return;
   const node = run.topology.nodes.find(n => n.id === id);
   if (!node || node.fixed) return;
+  if (!point) {
+    if (finished) { deviceDragging = false; clearSelection(); render(); }
+    else {
+      const preview=document.getElementById("movement-preview");
+      if(preview) { preview.className="blocked"; preview.textContent="Outside the build grid · release to cancel"; }
+      world?.setZonePreview(null);
+    }
+    return;
+  }
   if (practice) { if (finished) { render(); toast("Keep the training router in place for this lesson."); } return; }
   if (finished) {
     deviceDragging = false;
-    if (!playAction(() => relocateNode(run, id, point.x, point.z))) render();
+    const destination = zoneForNode(point), origin = zoneForNode(node);
+    if (!playAction(() => relocateNode(run, id, point.x, point.z))) { clearSelection(); render(); }
+    else if (origin !== destination) { sound.effect("move"); world?.pulseZone(destination,"move"); toast(`${id.toUpperCase()} · ${origin.toUpperCase()} → ${destination.toUpperCase()} · 1 energy`); }
     return;
   }
-  if (run.energy < 1 || run.topology.nodes.some(n => n.id !== id && Math.hypot(n.x - point.x, n.z - point.z) < 1.55)) return;
+  const blocked = run.energy < 1 ? "Not enough energy" : run.topology.nodes.some(n => n.id !== id && Math.hypot(n.x - point.x, n.z - point.z) < 1.55) ? "Socket occupied" : "";
+  const origin = zoneForNode(node), destination = zoneForNode(point);
+  const next = structuredClone(run);
+  const nextNode = next.topology.nodes.find(n=>n.id===id)!;
+  nextNode.x=point.x; nextNode.z=point.z;
+  const before = combatPreview(run), after = combatPreview(next);
+  let preview = document.getElementById("movement-preview");
+  if (!preview) { preview = document.createElement("div"); preview.id="movement-preview"; preview.setAttribute("role","status"); root.append(preview); }
+  preview.className=blocked ? "blocked" : "";
+  preview.innerHTML=`<span class="move-caption">RELOCATE ${ui.esc(id.toUpperCase())}</span><strong>${origin.toUpperCase()} ${ui.icon("arrow",16)} ${destination.toUpperCase()}</strong><span>${blocked || "Release to move · 1 energy"}</span><div><span>Damage <b>${before.packetDamage} → ${after.packetDamage}</b></span><span>Shield <b>${before.shield} → ${after.shield}</b></span><span>Life lost <b>${before.incoming} → ${after.incoming}</b></span></div><small>${ui.esc(zoneDescription(run,destination))}</small>`;
+  world?.setZonePreview(destination, !!blocked);
+  deviceDragging = true;
+  if (blocked) return;
   // A drag previews geometry; only the drop pays energy and mutates the run.
   deviceDragging = true;
   const topology = structuredClone(run.topology);
@@ -452,7 +510,11 @@ function relocateToZone(zone: "north" | "center" | "south") {
   const z = { north: -2.5, center: 0, south: 2.5 }[zone];
   const x = [node.x, 0, -2.5, 2.5, -4.5, 4.5].find(x => run.topology.nodes.every(n => n.id === id || Math.hypot(n.x - x, n.z - z) >= 1.55));
   if (x === undefined) { toast("No free socket in that band.", "error"); return; }
-  playAction(() => relocateNode(run, id, x, z));
+  if (Math.hypot(node.x-x,node.z-z) < 0.01) { toast(`${id.toUpperCase()} is already in this socket.`); return; }
+  if (!playAction(() => relocateNode(run, id, x, z))) return;
+  sound.effect("move");
+  world?.pulseZone(zone,"move");
+  toast(`${id.toUpperCase()} → ${zone.toUpperCase()} · 1 energy · ${zoneDescription(run,zone)}`);
 }
 
 function autoPlace(zone?: "north" | "center" | "south") {
@@ -515,7 +577,7 @@ function transmit() {
       world?.impact(0xfbd69a, 36);
       sound.effect("hit");
       floatText(`−${result.packetDamage}`, true);
-    } else toast("No live route. The signal could not reach OMEGA.", "error");
+    } else toast(result.signalPath.length ? "The signal was absorbed. Check armor and hostile fields." : "No live route. The signal could not reach OMEGA.", "error");
     window.setTimeout(() => {
       if (generation !== battleGeneration) return;
       run = next;
@@ -530,6 +592,7 @@ function transmit() {
       }
       save();
       render();
+      if (forecast.zoneThreat && !result.defeated) { world?.pulseZone(forecast.zoneThreat.zone,"corrupt"); sound.effect("corrupt"); }
       if (result.defeated) {
         sound.effect("reward");
         return;
@@ -573,6 +636,11 @@ function exportNetwork() {
   toast("Containerlab topology exported.");
 }
 async function action(name: string) {
+  if (name === "hand-left" || name === "hand-right") {
+    document.querySelector(".card-fan")?.scrollBy({left:(name === "hand-left" ? -1 : 1) * 340,behavior:sound.settings.motion ? "smooth" : "instant"});
+    sound.effect("hover");
+    return;
+  }
   if (name === "close") {
     closeModal();
     return;
@@ -607,6 +675,7 @@ async function action(name: string) {
     name === "enemy-dossier" ||
     name === "combat-details" ||
     name === "combat-log" ||
+    name === "relic-journal" ||
     name === "refine" ||
     name === "exhaust-pile" ||
     name === "settings" ||
@@ -700,6 +769,8 @@ document.addEventListener("click", (event) => {
   }
   const managedNode = target.closest<HTMLElement>("[data-manage-node]")?.dataset.manageNode;
   if (managedNode && modal === "devices") { closeModal(); onNode(managedNode); return; }
+  const fieldZone = target.closest<HTMLElement>("[data-field-zone]")?.dataset.fieldZone as Zone | undefined;
+  if (fieldZone && !dialog.open && !busy) { castZone(fieldZone); return; }
   const deployZone = target.closest<HTMLElement>("[data-deploy-zone]")?.dataset.deployZone as "north" | "center" | "south" | undefined;
   if (deployZone) { autoPlace(deployZone); return; }
   const relocateZone = target.closest<HTMLElement>("[data-relocate-zone]")?.dataset.relocateZone as "north" | "center" | "south" | undefined;
@@ -861,6 +932,8 @@ window.addEventListener("pointermove", (event) => {
   }
 });
 function cancelDrag() {
+  document.getElementById("movement-preview")?.remove();
+  world?.setZonePreview(null);
   const restorePreview = deviceDragging;
   deviceDragging = false;
   cardDrag?.ghost?.remove();
@@ -872,7 +945,7 @@ function cancelDrag() {
 window.addEventListener("pointercancel", cancelDrag);
 window.addEventListener("blur", cancelDrag);
 window.addEventListener("pointerup", (event) => {
-  if (deviceDragging) { deviceDragging = false; render(); }
+  if (deviceDragging) { deviceDragging = false; document.getElementById("movement-preview")?.remove(); world?.setZonePreview(null); render(); }
   if (!cardDrag) return;
   const d = cardDrag;
   cardDrag = null;
@@ -894,7 +967,7 @@ document.addEventListener("keydown", (event) => {
   }
   if (event.key === "Escape") {
     event.preventDefault();
-    if (selected !== null) {
+    if (selected !== null || selectedNode || deviceDragging || cardDrag) {
       clearSelection();
       render(false);
     } else if (view === "run") openModal("settings");

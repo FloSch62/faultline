@@ -6,7 +6,7 @@ import {
   type RunRecord,
 } from "./core/expedition.ts";
 import { reachableRooms } from "./core/map.ts";
-import { combatPreview, costFor, intentFor, signalPaths } from "./core/run.ts";
+import { combatPreview, costFor, intentFor, signalPaths, FIELD_RULES, ZONES, zoneDescription } from "./core/run.ts";
 import type { CardId, MapRoom, RunState } from "./core/types.ts";
 import type { AudioSettings } from "./audio.ts";
 import type { Preferences } from "./preferences.ts";
@@ -50,6 +50,12 @@ export function icon(name: string, size = 18): string {
     book: '<path d="M12 5C8 2 4 2 2 3v16c4-1 7 0 10 2 3-2 6-3 10-2V3c-2-1-6-1-10 2Zm0 0v16"/>',
     undo: '<path d="M4 4v7h7M4 11c3-9 16-7 16 2a7 7 0 0 1-7 7"/>',
     play: '<path d="m7 4 13 8-13 8V4Z"/>',
+    field: '<path d="m12 2 9 5v10l-9 5-9-5V7l9-5Zm0 5 5 3v5l-5 3-5-3v-5l5-3Z"/><path d="M12 2v5m9 0-4 3m4 7-4-2m-5 7v-4m-9-1 4-2M3 7l4 3"/>',
+    cleanse: '<path d="m12 2 2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5L12 2Z"/>',
+    eye: '<circle cx="11" cy="10" r="7"/><circle cx="11" cy="10" r="3"/><path d="m16 15 5 6M11 1v3M2 10h3m12 0h3"/>',
+    battery: '<path d="M8 3h8v3h3v15H5V6h3V3Z"/><path d="m13 8-4 6h4l-1 4 4-6h-4l1-4Z"/>',
+    anchor: '<path d="M12 7v14M3 13l2 5 7 4 7-4 2-5M7 10h10"/><circle cx="12" cy="4" r="3"/>',
+    coins: '<path d="m12 3 8 5v8l-8 5-8-5V8l8-5Z"/><path d="m12 7 4 3v4l-4 3-4-3v-4l4-3Z"/>',
     crown: '<path d="m2 6 5 4 5-7 5 7 5-4-3 14H5L2 6Z"/>',
   };
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p[name] || p.bolt}</svg>`;
@@ -68,6 +74,11 @@ const artIds: CardId[] = [
 export function artStyle(id: string) {
   if (id === "containerlab" || id === "clabernetes" || id === "wireshark")
     return `--card-image:url('${asset(`art/${id}.png`)}');--art-size:cover;--art-x:50%;--art-y:50%`;
+  const fields = ["resonance-field", "aegis-field", "purge-field", "null-field"];
+  if (fields.includes(id)) {
+    const i = fields.indexOf(id);
+    return `--card-image:url('${asset("art/zone-card-atlas.png")}');--art-size:200% 200%;--art-x:${i % 2 * 100}%;--art-y:${Math.floor(i / 2) * 100}%`;
+  }
   const toolsAtlas: Record<string, number> = { "startup-config": 0, "linux-bridge": 1, vxlan: 2, inspect: 3 };
   if (id in toolsAtlas) {
     const i = toolsAtlas[id];
@@ -186,104 +197,65 @@ export function headerMarkup(
   return `<div class="brand"><img src="${asset("containerlab-mark.svg")}" alt="Containerlab"/><span>${inTitle ? "CONTAINERLAB" : "FAULTLINE"}<small>${inTitle ? "TRANSMISSIONS FROM THE EDGE" : "A CONTAINERLAB ODYSSEY"}</small></span></div>${!inTitle && e ? `<div class="run-stats"><span class="integrity-stat" data-tooltip="Integrity persists between encounters">${icon("heart", 17)} <b>${e.run.integrity}</b><small>/${e.run.maxIntegrity}</small></span><span class="stat-divider"></span><button data-action="deck" data-tooltip="View your deck">${icon("deck", 17)} ${e.run.deck.length}</button><span class="stat-divider"></span><span class="sector-stat">SECTOR <b>${String(Math.min(e.run.floor + 1, 7)).padStart(2, "0")}</b> / 07</span></div>` : ""}<nav class="header-controls" aria-label="Game controls"><button data-action="sound" aria-label="${settings.muted ? "Enable" : "Mute"} audio" data-tooltip="${settings.muted ? "Enable" : "Mute"} audio">${icon(settings.muted ? "mute" : "sound")}</button><button data-action="fullscreen" aria-label="Toggle fullscreen" data-tooltip="Fullscreen">${icon("full")}</button><button data-action="settings" aria-label="Open settings" data-tooltip="Settings">${icon("settings", 20)}</button></nav>`;
 }
 export function battleMarkup(
-  e: Expedition,
-  selected: number | null,
-  source: string | null,
-  busy: boolean,
-  tutorial: boolean,
-  undo: boolean,
+  e: Expedition, selected: number | null, source: string | null,
+  busy: boolean, tutorial: boolean, undo: boolean,
 ) {
-  const r = e.run,
-    enemy = r.enemy!,
-    intent = intentFor(r)!,
-    paths = signalPaths(r),
-    preview = combatPreview(r),
-    damage = preview.packetDamage,
-    enraged = enemy.id === "core" && enemy.hp <= enemy.maxHp / 2;
+  const r = e.run, enemy = r.enemy!, intent = intentFor(r)!, p = combatPreview(r);
   const target = selected === null ? null : CARDS[r.hand[selected]];
-  const hint = !target
-    ? "Choose a card · Right-click to inspect its rules."
-    : target.target === "ground"
-      ? "Choose an empty point on the table."
-      : target.target === "link"
-        ? source
-          ? "Choose the second device."
-          : "Choose the first device."
-        : target.id === "clabernetes"
-          ? "Choose a router to replicate."
-          : "Choose a device to upgrade.";
-  const guide =
-    r.topology.nodes.length < 3
-      ? "Place a Core Router. Connect ALPHA → router → OMEGA with two links."
-      : r.topology.links.length < 2
-        ? "Play Optic Fiber. Connect ALPHA → router → OMEGA."
-        : paths.length
-          ? "Your route is alive. Transmit to strike the threat."
-          : r.faultNode || r.faultLink ? "Your route has a fault. Use Hot Patch, or build another path." : "Complete ALPHA → router → OMEGA. Every section needs a link.";
-  const intentName = {
-    strike: "Integrity strike",
-    sever: "Sever a cable",
-    jam: "Jam a device",
-    breach: "Security breach",
-  }[intent.kind];
+  const hint = !target ? "Choose your next move" : target.target === "zone" ? "Choose a band on the table or a field seal below" : target.target === "ground" ? "Choose an empty socket on the table" : target.target === "link" ? source ? "Choose the second device" : "Choose the first device" : "Choose a device";
+  const intentName = { strike: "Integrity strike", sever: "Sever a cable", jam: "Jam a device", breach: "Security breach", corrupt: "Corrupt a zone" }[intent.kind];
+  const trait = ({ leech: "SIPHON", wraith: "CABLE HUNTER", storm: "BAND SUPPRESSION", sentinel: "ARMORED GATE", core: "QUARANTINE", prophet: "CORROSION", widow: "NULL WEAVER", colossus: "FERRIC ARMOR" } as Record<string,string>)[enemy.id];
+  const intentCopy = p.lethal ? "Your transmission defeats it before it can act." : p.zoneThreat ? `${FIELD_RULES[p.zoneThreat.kind].name} takes root in ${p.zoneThreat.zone.toUpperCase()} for 2 turns. Cleanse it or move your hardware.${p.incomingRaw ? ` Also deals ${p.incomingRaw} damage.` : ""}` : p.faultTarget ? `${intent.kind === "sever" ? "Severs" : "Jams"} ${p.faultTarget.toUpperCase().replaceAll("::", " ↔ ")} for one turn.${p.incomingRaw ? ` Also deals ${p.incomingRaw} damage.` : ""}` : ["jam", "sever"].includes(intent.kind) ? p.incomingRaw ? `No fault target. ${p.incomingRaw} damage to the backbone.` : "No exposed target. This fault will fail." : `${p.incomingRaw} damage after your transmission.`;
   return `
-    <div class="encounter-heading">
-      <span class="eyebrow">${chapters[r.floor].toUpperCase()}</span>
-      <h2>${esc(enemy.name.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()))}</h2>
-      <span class="enemy-flavor">${esc(enemy.name === "TRAINING ECHO" ? enemy.title : enemyStory(enemy.id)?.title ?? enemy.title)}</span>
-      <div class="enemy-health"><span style="width:${(enemy.hp / enemy.maxHp) * 100}%"></span></div>
-      <div class="enemy-health-label"><span>HOSTILE INTEGRITY</span><strong>${enemy.hp} <small>/ ${enemy.maxHp}</small></strong></div>
-    </div>
-    <aside class="battle-left battle-plate" aria-label="Your network">
-      <span class="plate-heading">${ARCHETYPES[e.archetype].name}</span>
-      <div class="turn-label">Turn <strong>${String(r.turn).padStart(2, "0")}</strong></div>
-      <div class="plate-divider" aria-hidden="true"><span>◆</span></div>
-      <div class="signal-readout ${damage ? "online" : ""}">
-        <span>${damage ? "A living connection" : "The signal sleeps"}</span>
-        <strong>${damage}<small>signal damage</small></strong>
-        ${damage ? `<div class="damage-equation" aria-label="Damage calculation">${preview.damageTerms.slice(0, 4).map(t => `<span><span>${esc(t.label)}</span><b>${t.amount >= 0 ? "+" : ""}${t.amount}</b></span>`).join("")}${preview.damageTerms.length > 4 ? `<span class="equation-extra">${preview.damageTerms.length - 4} more modifiers · inspect</span>` : ""}</div>` : `<p>Connect ALPHA to OMEGA through a router.</p>`}
-        <button class="formula-button" data-action="combat-details">${icon("book", 12)} Inspect calculation</button>
+    <div class="encounter-heading"><span class="eyebrow">${chapters[r.floor].toUpperCase()}</span><span class="round-banner"><i></i> TURN ${String(r.turn).padStart(2,"0")} <i></i></span></div>
+    <aside class="battle-left battle-plate player-plate" aria-label="Your network">
+      <div class="combatant-identity"><span class="combatant-seal">${icon("shield", 25)}</span><div><span class="plate-kicker">SIGNAL KEEPER</span><span class="plate-heading">${ARCHETYPES[e.archetype].name}</span></div></div>
+      <div class="vital-heading"><span>${icon("heart", 15)} Integrity</span><strong>${r.integrity}<small> / ${r.maxIntegrity}</small></strong></div>
+      <div class="vital-bar player-health" role="meter" aria-label="Your integrity" aria-valuenow="${r.integrity}" aria-valuemin="0" aria-valuemax="${r.maxIntegrity}"><i style="width:${r.integrity / r.maxIntegrity * 100}%"></i>${p.incoming ? `<span class="health-risk" style="left:${Math.max(0,r.integrity-p.incoming)/r.maxIntegrity*100}%;width:${Math.min(r.integrity,p.incoming)/r.maxIntegrity*100}%"></span>` : ""}</div>
+      <div class="survival-forecast forecast-net ${p.incoming ? "danger" : "safe"}"><b>${p.incoming}</b> ${p.incoming ? "integrity at risk" : p.lethal ? "retaliation · finishing blow" : "integrity lost · protected"}</div>
+      <div class="player-resources">
+        <div class="shield-resource" tabindex="0" data-tooltip="Available shield: ${esc(p.shieldTerms.map(t=>`${t.label} +${t.amount}`).join("; ") || "Play defense cards or route through protected fields.")}">${icon("shield", 22)}<strong>${p.shield}</strong><span>SHIELD</span></div>
+        <div class="signal-readout ${p.packetDamage ? "online" : ""}">${icon("sword", 22)}<strong>${p.packetDamage}<small>signal damage</small></strong><span>DAMAGE</span></div>
+        <div class="burst-resource" tabindex="0" data-tooltip="Extra route damage for this transmission. Burst expires after your turn.">${icon("bolt", 22)}<strong>+${r.packetBoost}</strong><span>BURST</span></div>
       </div>
-      <div class="battle-relics">${r.relics.slice(0, 3).map((id) => `<span tabindex="0" data-tooltip="${RELICS[id].name}: ${RELICS[id].rules}">${icon("elite", 15)}<small>${RELICS[id].name}</small></span>`).join("")}</div>
-      <button class="formula-button devices-button" data-action="devices">${icon("map", 12)} Devices & placement</button>
-      <button class="text-button undo-button" data-action="undo" ${!undo || busy ? "disabled" : ""}>${icon("undo", 14)} Undo last action <kbd>Z</kbd></button>
-    ${tutorial ? `<div class="tutorial-callout"><span>${icon("book", 15)} Field note</span><p>${guide}</p><button data-action="dismiss-tutorial" aria-label="Dismiss field note">${icon("close", 14)}</button></div>` : ""}
+
+      <div class="perk-heading"><span>RELICS & PERKS</span><small>${r.relics.length} carried</small></div>
+      <div class="battle-relics">${r.relics.map(id=>`<button class="relic-token" data-action="relic-journal" data-tooltip="${esc(RELICS[id].name+": "+RELICS[id].rules)}" aria-label="${esc(RELICS[id].name+": "+RELICS[id].rules)}" style="--relic-color:${RELICS[id].color}">${icon(({"hot-swap":"link","cold-start":"bolt","shield-array":"shield","deep-cache":"deck","parallel-core":"field","grounded-core":"anchor","packet-lens":"eye","repair-drone":"heart","reserve-cell":"battery"} as Record<string,string>)[id],20)}<small>${RELICS[id].name}</small></button>`).join("")}</div>
+      ${r.reserveEnergy ? `<span class="reserve-note">${icon("bolt",12)} +${r.reserveEnergy} energy next turn</span>` : ""}
+      <div class="player-tools"><button class="formula-button" data-action="combat-details">${icon("book",14)} Details</button><button class="formula-button devices-button" data-action="devices" aria-label="Devices & placement">${icon("map",14)} Devices</button><button class="text-button undo-button" data-action="undo" ${!undo || busy ? "disabled" : ""}>${icon("undo",14)} Undo <kbd>Z</kbd></button></div>
+      ${tutorial ? `<div class="tutorial-callout"><span>FIELD NOTE</span><p>${p.signalPath.length ? "Your route is alive. Fields and independent circuits make it stronger." : "Build ALPHA → router → OMEGA, then transmit."}</p><button data-action="dismiss-tutorial" aria-label="Dismiss field note">${icon("close",12)}</button></div>` : ""}
     </aside>
-    <aside class="battle-right battle-plate" aria-label="Enemy intent">
-      <span class="plate-heading">Enemy intent</span><button class="trait-badge" data-action="enemy-dossier" data-tooltip="${esc(preview.traitDescription)}">${({leech:"SIPHON",wraith:"CABLE HUNTER",storm:"BAND SUPPRESSION",sentinel:"ARMORED GATE",core:"QUARANTINE"} as Record<string,string>)[enemy.id]}</button>
-      <div class="intent-emblem">${icon(intent.kind === "strike" || intent.kind === "breach" ? "sword" : intent.kind === "jam" ? "bolt" : "link", 28)}</div>
-      <strong>${intentName}</strong>
-      ${intent.pressure || enraged ? `<span class="pressure-warning">${enraged ? "ENRAGED" : ""}${enraged && intent.pressure ? " · " : ""}${intent.pressure ? `PRESSURE +${intent.pressure}` : ""}</span>` : ""}
-      <p class="intent-description">${preview.lethal ? "Defeated before it can act." : preview.faultTarget ? `${intent.kind === "sever" ? "Severs" : "Jams"} ${esc(preview.faultTarget.toUpperCase().replaceAll("::", " ↔ "))} for one turn.${preview.incomingRaw ? ` Also deals ${preview.incomingRaw} damage.` : ""}` : ["jam", "sever"].includes(intent.kind) ? preview.incomingRaw ? `No fault target. ${preview.incomingRaw} damage to the backbone.` : preview.hazardZone ? "No eligible device in the targeted band. The jam will fail." : "Protected network. This fault will fail." : `${preview.incomingRaw} damage after your transmission.`}</p>
-      ${preview.hazardZone ? `<span class="hazard-caption">${preview.hazardZone.toUpperCase()} BAND TARGETED</span>` : ""}${preview.enemyHealing ? `<span class="hazard-caption">Restores ${preview.enemyHealing} health this turn</span>` : ""}
-      <div class="defense-equation" aria-label="Incoming damage forecast"><span>Incoming <b>${preview.incomingRaw}</b></span><span class="shield-value">${icon("shield", 12)} Blocked <b>${Math.min(preview.incomingRaw, preview.shield)}</b></span><span class="forecast-net ${preview.incoming ? "danger" : "safe"}">Integrity loss <b>${preview.incoming}</b></span></div>
-      <button class="formula-button" data-action="combat-details">Why this damage? ${icon("arrow", 12)}</button>
-      <div class="plate-divider" aria-hidden="true"><span>◆</span></div>
-      <span class="intent-caption">Your next strike</span>
-      <span class="intent-preview ${damage >= enemy.hp ? "lethal" : ""}">${damage ? `${damage} damage` : "No live route"}</span>
-      ${damage >= enemy.hp ? '<span class="lethal-caption">A finishing blow</span>' : ""}
+    <aside class="battle-right battle-plate enemy-plate" aria-label="Enemy intent">
+      <div class="combatant-identity"><span class="combatant-seal">${icon(enemy.id === "core" ? "boss" : "sword",25)}</span><div><span class="plate-kicker">HOSTILE SIGNAL</span><h2>${esc(enemy.name.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()))}</h2></div></div>
+      <span class="enemy-flavor">${esc(enemyStory(enemy.id)?.title ?? enemy.title)}</span>
+      <div class="vital-heading enemy-health-label"><span>Hostile integrity</span><strong>${enemy.hp}<small> / ${enemy.maxHp}</small></strong></div>
+      <div class="enemy-health vital-bar" role="meter" aria-label="Hostile integrity" aria-valuenow="${enemy.hp}" aria-valuemin="0" aria-valuemax="${enemy.maxHp}" data-tooltip="${p.packetDamage} damage on your next transmission"><span style="width:${enemy.hp/enemy.maxHp*100}%"></span>${p.packetDamage ? `<i class="health-risk" style="left:${Math.max(0,enemy.hp-p.packetDamage)/enemy.maxHp*100}%;width:${Math.min(enemy.hp,p.packetDamage)/enemy.maxHp*100}%"></i>` : ""}</div>
+      <button class="trait-badge" data-action="enemy-dossier" data-tooltip="${esc(p.traitDescription)}">${icon("elite",13)} ${trait}</button>
+      <div class="intent-heading"><span>NEXT INTENT</span>${intent.pressure ? `<span class="pressure-warning">PRESSURE +${intent.pressure}</span>` : ""}</div>
+      <div class="intent-medallion ${p.lethal ? "lethal" : ""}"><span class="intent-emblem">${icon(intent.kind === "corrupt" ? "field" : intent.kind === "jam" ? "bolt" : intent.kind === "sever" ? "link" : "sword",30)}</span><strong>${p.lethal ? "CANCELLED" : p.incomingRaw || ""}<small>${intentName}</small></strong></div>
+      <p class="intent-description">${esc(intentCopy)}</p>
+      ${p.hazardZone ? `<span class="hazard-caption">${icon("field",13)} ${p.hazardZone.toUpperCase()} BAND TARGETED</span>` : ""}${p.enemyHealing ? `<span class="hazard-caption">Restores ${p.enemyHealing} health this turn</span>` : ""}
     </aside>
+    <div class="field-strip" aria-label="Battlefield zones">${ZONES.map(zone=>{
+      const effects = r.zoneEffects.filter(effect=>effect.zone===zone);
+      const threatened = p.hazardZone === zone;
+      return `<button class="field-seal ${effects.some(effect=>FIELD_RULES[effect.kind].hostile) ? "corrupted" : effects.length ? "empowered" : ""} ${threatened ? "threatened" : ""} ${target?.target === "zone" ? "targetable" : ""}" data-field-zone="${zone}" data-tooltip="${esc(zoneDescription(r,zone))}${threatened ? ". Enemy targets this band next." : ""}" aria-label="${zone} zone: ${esc(zoneDescription(r,zone))}${threatened ? ". Threatened next turn" : ""}"><span class="field-name">${icon("field",16)} ${zone.toUpperCase()} ${threatened ? '<i class="threat-mark">!</i>' : ""}</span><span class="field-effects">${effects.length ? effects.map(effect=>`<span class="${FIELD_RULES[effect.kind].hostile ? "hostile-field" : "allied-field"}">${FIELD_RULES[effect.kind].name} <b>${effect.turns}t</b></span>`).join("") : `<span>${threatened ? "THREAT INBOUND" : "CLEAR GROUND"}</span>`}</span></button>`;
+    }).join("")}</div>
     <div class="battle-bottom">
-      <div class="energy-orb"><strong>${r.energy}</strong><span>ENERGY</span></div>
-      <div class="draw-piles"><button data-action="draw-pile">${icon("deck", 22)}<span>${r.drawPile.length}<small>DRAW</small></span></button><button data-action="discard-pile">${icon("deck", 19)}<span>${r.discardPile.length}<small>DISCARD</small></span></button><button data-action="exhaust-pile" class="exhaust-pile" data-tooltip="Exhausted cards return next encounter">${icon("bolt", 16)}<span>${r.exhaustPile.length}<small>EXHAUST</small></span></button></div>
-      <div class="target-hint ${selected !== null ? "active" : ""}">${selected !== null ? icon("arrow", 15) : ""}${hint}${selected !== null ? '<button data-action="cancel">ESC ×</button>' : ""}</div>
-      <button class="transmit-button ${damage ? "ready" : ""} ${busy ? "transmitting" : ""}" data-action="transmit" aria-label="Transmit · ${damage} damage · End turn" ${busy ? "disabled" : ""}>
-        <span class="transmit-dial" aria-hidden="true"></span>
-        <span class="transmit-power" aria-hidden="true"><strong>${busy ? "· · ·" : damage}</strong><small>${busy ? "sending" : "damage"}</small></span>
-        <span class="transmit-label">${busy ? "Transmitting" : "Transmit"}</span>
-        <span class="transmit-shortcut">End turn <span>·</span> <kbd>SPACE</kbd></span>
-      </button>
-      <button class="battle-guide" data-action="enemy-dossier">${icon("book", 14)} Know your enemy</button>
+      <div class="energy-orb" aria-label="${r.energy} energy available"><strong>${r.energy}</strong><span>ENERGY</span></div>
+      <div class="draw-piles">${([['draw-pile',r.drawPile.length,'DRAW'],['discard-pile',r.discardPile.length,'DISCARD'],['exhaust-pile',r.exhaustPile.length,'EXHAUST']] as const).map(([action,count,label])=>`<button data-action="${action}" class="${action}" data-tooltip="${label === 'EXHAUST' ? 'Exhausted cards return next encounter' : `Inspect your ${label.toLowerCase()} pile`}">${icon("deck",18)}<span>${count}<small>${label}</small></span></button>`).join("")}</div>
+      <div class="target-hint ${selected !== null ? "active" : ""}">${hint}${selected !== null ? '<button data-action="cancel">CANCEL · ESC</button>' : `<span>1–0 to play · Right-click to inspect${r.hand.length > 6 ? " · Scroll to see your hand" : ""}</span>`}</div>
+      <button class="transmit-button ${p.packetDamage ? "ready" : ""} ${busy ? "transmitting" : ""}" data-action="transmit" aria-label="Transmit · ${p.packetDamage} damage · End turn" ${busy ? "disabled" : ""}><span class="transmit-dial" aria-hidden="true"></span><span class="transmit-power" aria-hidden="true"><strong>${busy ? "· · ·" : p.packetDamage}</strong><small>${busy ? "sending" : "damage"}</small></span><span class="transmit-label">${busy ? "Transmitting" : "Transmit"}</span><span class="transmit-shortcut">End turn · <kbd>SPACE</kbd></span></button>
     </div>
-    <div class="network-status"><span>${icon("shield", 12)} ${preview.shield} shield available</span><span>${icon("bolt", 12)} +${r.packetBoost} burst</span>${r.reserveEnergy ? `<span>+${r.reserveEnergy} energy next turn</span>` : ""}${r.faultNode || r.faultLink ? `<span class="status-fault">${icon("link", 12)} Active fault · ${esc((r.faultNode || r.faultLink || "").toUpperCase().replaceAll("::", " ↔ "))}</span>` : `<span>${preview.independent ? "Independent routes" : preview.signalPath.length ? "Single route" : "No live route"}</span>`}</div>
-    <button class="combat-log" data-action="combat-log" aria-label="Open combat history" aria-live="polite">${esc(r.log[0] || "")} <span>↗</span></button>`;
+    <div class="network-status">${r.faultNode || r.faultLink ? `<span class="status-fault">${icon("link",12)} Active fault · ${esc((r.faultNode || r.faultLink || "").toUpperCase().replaceAll("::"," ↔ "))}</span>` : `<span>${icon("link",12)} ${p.independent ? "Independent circuits" : p.signalPath.length ? "Signal connected" : "Awaiting a live route"}</span>`}</div>
+    <button class="combat-log" data-action="combat-log" aria-label="Open combat history">${icon("book",12)} ${esc(r.log[0] || "")} <span>↗</span></button>`;
 }
 export function handMarkup(run: RunState, selected: number | null) {
-  return `<div class="card-fan" style="--hand-size:${run.hand.length}">${run.hand.map((id, i) => cardMarkup(id, i, "hand", run, selected === i)).join("")}</div>`;
+  return `${run.hand.length > 6 ? `<button class="hand-scroll hand-scroll-left" data-action="hand-left" aria-label="Previous cards">${icon("back",18)}</button><button class="hand-scroll hand-scroll-right" data-action="hand-right" aria-label="Next cards">${icon("arrow",18)}</button>` : ""}<div class="card-fan" data-count="${run.hand.length}" style="--hand-size:${run.hand.length}">${run.hand.map((id, i) => cardMarkup(id, i, "hand", run, selected === i)).join("")}</div>`;
 }
 export function rewardMarkup(r: RunState) {
   const cache = r.map.find((n) => n.id === r.currentRoom)?.type === "cache";
-  return `<section class="reward-screen full-screen"><div class="reward-emblem">${icon(cache ? "cache" : "crown", 36)}</div><span class="eyebrow">${cache ? "A SIGNAL FROM THE PAST" : "HOSTILE SIGNAL SILENCED"}</span><h1>${cache ? "Something worth salvaging." : "A connection restored."}</h1><p>Choose a card to carry into the next sector.</p><div class="reward-cards">${r.cardRewards.map((id, i) => cardMarkup(id, i, "reward")).join("")}</div><button class="text-button" data-action="skip-reward">Leave these behind ${icon("arrow", 16)}</button><span class="reward-footer">YOUR DECK · ${r.deck.length} CARDS</span></section>`;
+  return `<section class="reward-screen full-screen"><div class="reward-emblem">${icon(cache ? "cache" : "crown", 36)}</div><span class="eyebrow">${cache ? "THE SALVAGE EXCHANGE" : "HOSTILE SIGNAL SILENCED"}</span><h1>${cache ? "The Copper Market." : "A connection restored."}</h1><p>${cache ? "A tool for the road, signal keeper. Take one with you." : "Choose a card to carry into the next sector."}</p><div class="reward-cards">${r.cardRewards.map((id, i) => cardMarkup(id, i, "reward")).join("")}</div><button class="text-button" data-action="skip-reward">Leave these behind ${icon("arrow", 16)}</button><span class="reward-footer">YOUR DECK · ${r.deck.length} CARDS</span></section>`;
 }
 export function relicMarkup(r: RunState) {
   return `<section class="relic-screen full-screen"><span class="eyebrow">A FRAGMENT OF THE OLD WORLD</span><h1>Power that stays with you.</h1><p>Choose one relic. Its effect lasts for the expedition.</p><div class="relic-options">${r.relicRewards.map((id, i) => `<button class="relic-option" data-relic="${id}" style="--accent:${RELICS[id].color};${artStyle(["firmware", "shield", "surge"][i])}"><span class="relic-art"></span><small>${RELICS[id].subtitle}</small><strong>${RELICS[id].name}</strong><span>${RELICS[id].rules}</span>${icon("arrow", 18)}</button>`).join("")}</div></section>`;

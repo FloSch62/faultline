@@ -16,6 +16,8 @@ import type {
   RelicId,
   RunState,
   Zone,
+  ZoneEffect,
+  ZoneEffectKind,
 } from "./types.ts";
 
 export type { Zone } from "./types.ts";
@@ -34,7 +36,7 @@ export interface TurnResult {
   lost: boolean;
 }
 export interface Intent {
-  kind: "strike" | "sever" | "jam" | "breach";
+  kind: "strike" | "sever" | "jam" | "breach" | "corrupt";
   label: string;
   amount: number;
   pressure: number;
@@ -42,6 +44,9 @@ export interface Intent {
 }
 
 const ENEMIES: Record<string, Omit<Enemy, "hp" | "maxHp" | "turn">> = {
+  prophet: { id: "prophet", name: "RUST PROPHET", title: "Corrupts the ground beneath you", color: 0xe49b72 },
+  widow: { id: "widow", name: "PRISM WIDOW", title: "Silences your strongest circuit", color: 0xbba0e8 },
+  colossus: { id: "colossus", name: "FERRIC COLOSSUS", title: "An iron wall against a single route", color: 0xd9b079 },
   leech: {
     id: "leech",
     name: "PACKET LEECH",
@@ -162,6 +167,7 @@ export function createRun(seed = Date.now() >>> 0): RunState {
     packetBoost: 0,
     reserveEnergy: 0,
     cardsPlayed: 0,
+    zoneEffects: [],
     hand: [],
     relics: [],
     energy: 5,
@@ -211,8 +217,8 @@ function beginBattle(run: RunState, room: MapRoom) {
       : room.type === "elite"
         ? room.lane === 0
           ? "sentinel"
-          : "storm"
-        : ["leech", "wraith", "storm"][Math.floor(random(run) * 3)];
+          : ["storm", "colossus", "prophet"][Math.floor(random(run) * 3)]
+        : ["leech", "wraith", "storm", "prophet", "widow", "colossus"][Math.floor(random(run) * 6)];
   const template = ENEMIES[enemyId];
   const hp =
     room.type === "boss"
@@ -235,6 +241,7 @@ function beginBattle(run: RunState, room: MapRoom) {
   run.packetBoost = 0;
   run.reserveEnergy = 0;
   run.cardsPlayed = 0;
+  run.zoneEffects = [];
   run.hand = [];
   run.firstFiberPlayed = false;
   run.shieldArrayUsed = false;
@@ -248,6 +255,21 @@ function beginBattle(run: RunState, room: MapRoom) {
 export function intentFor(run: RunState): Intent | null {
   if (!run.enemy) return null;
   const patterns: Record<string, Omit<Intent, "pressure">[]> = {
+    prophet: [
+      { kind: "corrupt", label: "SEED CORROSION", amount: 0 },
+      { kind: "strike", label: "RUST STRIKE", amount: 2 },
+      { kind: "breach", label: "OXIDE BREACH", amount: 3 },
+    ],
+    widow: [
+      { kind: "corrupt", label: "WEAVE NULL FIELD", amount: 0 },
+      { kind: "sever", label: "CUT A CABLE", amount: 0 },
+      { kind: "strike", label: "PRISM STRIKE", amount: 3 },
+    ],
+    colossus: [
+      { kind: "strike", label: "IRON FIST", amount: 3 },
+      { kind: "corrupt", label: "SCORCH THE GROUND", amount: 0 },
+      { kind: "breach", label: "FURNACE BREACH", amount: 4 },
+    ],
     leech: [
       { kind: "strike", label: "INTEGRITY STRIKE", amount: 2 },
       { kind: "sever", label: "CUT A CABLE", amount: 0 },
@@ -309,7 +331,7 @@ export function costFor(run: RunState, index: number): number {
 function canPlay(
   run: RunState,
   index: number,
-  target: "ground" | "link" | "node" | "instant",
+  target: "ground" | "link" | "node" | "instant" | "zone",
 ): ActionResult {
   if (run.phase !== "battle")
     return { ok: false, message: "Cards are played during encounters." };
@@ -351,6 +373,41 @@ function freeSocket(run: RunState): { x: number; z: number } | null {
 export function zoneForNode(node: Pick<NetworkNode, "z">): Zone {
   return node.z < -1.3 ? "north" : node.z > 1.3 ? "south" : "center";
 }
+export const ZONES: readonly Zone[] = ["north", "center", "south"];
+export const FIELD_RULES: Record<ZoneEffectKind, { name: string; rules: string; hostile: boolean }> = {
+  resonance: { name: "Resonance", rules: "+3 damage on routes through this zone", hostile: false },
+  aegis: { name: "Aegis", rules: "+3 shield with a live route through this zone", hostile: false },
+  stasis: { name: "Null field", rules: "+2 shield while your hardware occupies this zone", hostile: false },
+  corrosion: { name: "Corrosion", rules: "+2 incoming damage while your hardware occupies this zone", hostile: true },
+  suppression: { name: "Suppression", rules: "−3 damage on routes through this zone", hostile: true },
+};
+export function zoneDescription(run: RunState, zone: Zone): string {
+  const fields = run.zoneEffects.filter(effect => effect.zone === zone);
+  return fields.map(effect => `${FIELD_RULES[effect.kind].name}: ${FIELD_RULES[effect.kind].rules} · ${effect.turns} turn${effect.turns === 1 ? "" : "s"}`).join(". ") || "Clear ground · no active fields";
+}
+function installField(run: RunState, effect: ZoneEffect) {
+  // Each band holds one allied and one hostile field. Recasting replaces that side.
+  run.zoneEffects = run.zoneEffects.filter(existing => existing.zone !== effect.zone || FIELD_RULES[existing.kind].hostile !== FIELD_RULES[effect.kind].hostile);
+  run.zoneEffects.push(effect);
+}
+export function playZone(run: RunState, index: number, zone: Zone): ActionResult {
+  const ready = canPlay(run, index, "zone");
+  if (!ready.ok) return ready;
+  if (!ZONES.includes(zone)) return { ok: false, message: "Choose North, Center, or South." };
+  const card = run.hand[index];
+  if (card === "purge-field") {
+    run.zoneEffects = run.zoneEffects.filter(effect => effect.zone !== zone || !FIELD_RULES[effect.kind].hostile);
+    if (run.topology.nodes.some(node => node.id === run.faultNode && zoneForNode(node) === zone)) run.faultNode = null;
+  } else {
+    const kind = card === "resonance-field" ? "resonance" : card === "aegis-field" ? "aegis" : "stasis";
+    installField(run, { zone, kind, turns: 3 });
+  }
+  consume(run, index);
+  if (card === "purge-field") draw(run, 1);
+  const message = `${CARDS[card].name} · ${zone.toUpperCase()}${card === "purge-field" ? " cleansed" : " · 3 turns"}.`;
+  log(run, message);
+  return { ok: true, message };
+}
 export function relocateNode(
   run: RunState,
   id: string,
@@ -379,14 +436,15 @@ export function relocateNode(
     )
   )
     return { ok: false, message: "Device sockets need more space." };
+  const origin = zoneForNode(node);
   node.x = x;
   node.z = z;
   run.energy--;
   log(
     run,
-    `${id.toUpperCase()} relocated to ${zoneForNode(node).toUpperCase()} for 1 energy.`,
+    `${id.toUpperCase()}: ${origin.toUpperCase()} → ${zoneForNode(node).toUpperCase()} · 1 energy.`,
   );
-  return { ok: true, message: "Device relocated · 1 energy." };
+  return { ok: true, message: `${id.toUpperCase()} · ${origin.toUpperCase()} → ${zoneForNode(node).toUpperCase()} · 1 energy.` };
 }
 export function playGround(
   run: RunState,
@@ -673,7 +731,7 @@ export function signalPaths(run: RunState): string[][] {
   );
   const ranked = candidates.map((path) => ({
     path,
-    damage: sumTerms(damageTerms(run, path, independent, amplifiedLinks)),
+    damage: Math.max(0, sumTerms(damageTerms(run, path, independent, amplifiedLinks))),
     firewall: Number(roleInPath(path, run.topology, "firewall")),
   }));
   return ranked
@@ -709,6 +767,7 @@ export interface CombatPreview {
   rawPacketDamage: number;
   incomingTerms: CombatTerm[];
   traitDescription: string;
+  zoneThreat: ZoneEffect | null;
 }
 
 function damageTerms(
@@ -724,6 +783,13 @@ function damageTerms(
   if (!signal.length || !roleInPath(signal, run.topology, "router")) return [];
   const nodes = run.topology.nodes.filter((node) => signal.includes(node.id));
   const terms: CombatTerm[] = [{ label: "Live router route", amount: 5 }];
+  const routedZones = new Set(nodes.filter(node => !node.fixed).map(zoneForNode));
+  for (const field of run.zoneEffects) {
+    if (routedZones.has(field.zone) && ["resonance", "suppression"].includes(field.kind))
+      terms.push({ label: `${field.zone.toUpperCase()} · ${FIELD_RULES[field.kind].name}`, amount: field.kind === "resonance" ? 3 : -3 });
+  }
+  if (run.enemy?.id === "colossus" && !independent)
+    terms.push({ label: "Ferric armor · needs independent routes", amount: -3 });
   if (nodes.some((node) => node.role === "firewall"))
     terms.push({ label: "Firewall routing", amount: 1 });
   if (nodes.some((node) => node.configured))
@@ -763,13 +829,13 @@ function damageTerms(
 const sumTerms = (terms: CombatTerm[]) =>
   terms.reduce((sum, term) => sum + term.amount, 0);
 export function damageFromPath(run: RunState, signal: string[]): number {
-  return sumTerms(
+  return Math.max(0, sumTerms(
     damageTerms(
       run,
       signal,
       !!independentRouterPaths(run.topology, signalPaths(run)),
     ),
-  );
+  ));
 }
 
 function separatedCircuits(run: RunState, candidates: string[][]): boolean {
@@ -800,6 +866,9 @@ function separatedCircuits(run: RunState, candidates: string[][]): boolean {
   return north.some((a) => south.some((b) => (a.mask & b.mask) === 0));
 }
 const TRAITS: Record<string, string> = {
+  prophet: "Rust Prophet corrupts the busiest band for 2 turns. Hardware in that band adds 2 incoming damage. Cleanse the field or relocate to clear ground.",
+  widow: "Prism Widow suppresses a band on your live route for 2 turns: routes through it lose 3 damage. Cleanse it or reroute through another band.",
+  colossus: "Ferric Colossus absorbs 3 damage unless you have two independent routes. It also scorches occupied ground with 2-turn corrosion.",
   leech:
     "Packet Leech restores up to 3 health when your transmission deals no damage.",
   wraith:
@@ -819,6 +888,7 @@ export function combatPreview(run: RunState): CombatPreview {
   const terms = damageTerms(run, signalPath, independent);
   const packetDamage = Math.max(0, sumTerms(terms));
   const rawPacketDamage = sumTerms(terms.filter((term) => term.amount > 0));
+  if (sumTerms(terms) < 0) terms.push({ label: "Minimum signal damage", amount: -sumTerms(terms) });
   const intent = intentFor(run);
   const lethal = !!run.enemy && packetDamage >= run.enemy.hp;
   const shields: CombatTerm[] = [];
@@ -827,12 +897,26 @@ export function combatPreview(run: RunState): CombatPreview {
       ? [{ label: intent.label, amount: intent.amount }]
       : [];
   let raw = intent?.amount ?? 0;
-  const hazardZone: Zone | null =
+  let hazardZone: Zone | null =
     run.enemy?.id === "storm" && intent?.kind === "jam"
       ? (["north", "center", "south"] as Zone[])[
           Math.floor(run.enemy.turn / 3) % 3
         ]
       : null;
+  let zoneThreat: ZoneEffect | null = null;
+  if (intent?.kind === "corrupt") {
+    const eligible = run.topology.nodes.filter(node => !node.fixed && (run.enemy?.id !== "widow" || signalPath.includes(node.id)));
+    hazardZone = (["center", "north", "south"] as Zone[]).sort((a,b) => eligible.filter(node => zoneForNode(node) === b).length - eligible.filter(node => zoneForNode(node) === a).length)[0];
+    zoneThreat = { zone: hazardZone, kind: run.enemy?.id === "widow" ? "suppression" : "corrosion", turns: 2 };
+  }
+  for (const field of run.zoneEffects) {
+    const occupied = run.topology.nodes.some(node => !node.fixed && zoneForNode(node) === field.zone);
+    const routed = run.topology.nodes.some(node => !node.fixed && zoneForNode(node) === field.zone && signalPath.includes(node.id));
+    const label = `${field.zone.toUpperCase()} · ${FIELD_RULES[field.kind].name}`;
+    if (field.kind === "corrosion" && occupied) { raw += 2; incomingTerms.push({ label, amount: 2 }); }
+    if (field.kind === "aegis" && routed) shields.push({ label, amount: 3 });
+    if (field.kind === "stasis" && occupied) shields.push({ label, amount: 2 });
+  }
   let faultTarget: string | null = null;
   if (intent?.kind === "sever") {
     // Attack the best live route first; equivalent choices use stable topology order.
@@ -907,6 +991,7 @@ export function combatPreview(run: RunState): CombatPreview {
     });
   return {
     signalPath,
+    zoneThreat: lethal ? null : zoneThreat,
     hazardZone: lethal ? null : hazardZone,
     enemyHealing:
       !lethal && run.enemy?.id === "leech" && packetDamage === 0
@@ -958,8 +1043,8 @@ export function endTurn(run: RunState): TurnResult {
   log(
     run,
     preview.packetDamage
-      ? `Signal dealt ${preview.packetDamage}: ${preview.damageTerms.map((term) => `${term.label} +${term.amount}`).join(" · ")}.`
-      : "No live router route. No signal damage.",
+      ? `Signal dealt ${preview.packetDamage}: ${preview.damageTerms.map((term) => `${term.label} ${term.amount >= 0 ? "+" : ""}${term.amount}`).join(" · ")}.`
+      : preview.signalPath.length ? "The live signal was absorbed by armor or hostile fields. No damage." : "No live router route. No signal damage.",
   );
   if (preview.lethal) {
     result.defeated = true;
@@ -970,6 +1055,7 @@ export function endTurn(run: RunState): TurnResult {
     run.cardRewards = cardRewards(run);
     run.block = 0;
     run.packetBoost = 0;
+    run.zoneEffects = [];
     log(run, `${run.enemy.name} neutralized. Its intent is cancelled.`);
     return result;
   }
@@ -985,6 +1071,8 @@ export function endTurn(run: RunState): TurnResult {
   }
   run.faultNode = null;
   run.faultLink = null;
+  run.zoneEffects = run.zoneEffects.map(field => ({ ...field, turns: field.turns - 1 })).filter(field => field.turns > 0);
+  if (preview.zoneThreat) installField(run, preview.zoneThreat);
   const intent = preview.intent!;
   if (intent.kind === "sever") run.faultLink = preview.faultTarget;
   if (intent.kind === "jam") run.faultNode = preview.faultTarget;
@@ -995,7 +1083,7 @@ export function endTurn(run: RunState): TurnResult {
   const fault = preview.faultTarget
     ? `${intent.kind === "jam" ? "jammed" : "severed"} ${preview.faultTarget.toUpperCase().replace("::", " ↔ ")}; `
     : "";
-  result.enemyAction = `${run.enemy.name} ${fault}dealt ${preview.incoming} integrity damage${preview.shield ? ` (${Math.min(preview.incomingRaw, preview.shield)} blocked)` : ""}.`;
+  result.enemyAction = `${run.enemy.name} ${preview.zoneThreat ? `cast ${FIELD_RULES[preview.zoneThreat.kind].name} on ${preview.zoneThreat.zone.toUpperCase()} for 2 turns; ` : ""}${fault}dealt ${preview.incoming} integrity damage${preview.shield ? ` (${Math.min(preview.incomingRaw, preview.shield)} blocked)` : ""}.`;
   log(run, result.enemyAction);
   run.enemy.turn++;
   run.turn++;
@@ -1025,6 +1113,7 @@ function advanceRoom(run: RunState) {
   run.floor = room.floor + 1;
   run.currentRoom = null;
   run.enemy = null;
+  run.zoneEffects = [];
   run.faultNode = null;
   run.faultLink = null;
   run.phase = run.floor >= 7 ? "won" : "map";

@@ -1,0 +1,9 @@
+{
+  "style": "Instrumental peaceful sanctuary soundtrack inside an abandoned orbital cathedral. Delicate felt piano, warm long cello notes, airy glass bells, very soft analog pads, long reverb, reassuring and contemplative, gentle bittersweet hope. No drums, spacious and quiet. Entirely instrumental, empty vocal part, no singing, no choir, no humming, no speech. D minor, 68 BPM.",
+  "lyrics": "",
+  "cot": "full",
+  "seed": 918332,
+  "abc": "X:1\nT:\nM:4/4\nL:1/32\nQ:1/4=68\nV: Vocal clef=treble name=\"Vocal Melody\" snm=\"Vocal\"\nV: Ins clef=treble name=\"Ins Melody\" snm=\"Inst.\"\nK:Dm\n% instrumental\nV: Vocal\n\"Dm\"z32|\"C\"z32|\"Bb\"z32|\"A\"z32|\nV: Ins\nD16 A16|c16 G16|B,16 F16|A,16 E16|\n% instrumental\nV: Vocal\n\"Dm\"z32|\"C\"z32|\"Bb\"z32|\"A\"z32|\nV: Ins\nD16 A8 d8|c16 G8 e8|B,16 F8 d8|A,16 E8 ^C8|\n% instrumental\nV: Vocal\n\"Dm\"z32|\"C\"z32|\"Bb\"z32|\"A\"z32|\nV: Ins\nD16 A8 d8|c16 G8 e8|B,16 F8 d8|A,16 E8 ^C8|\n% instrumental\nV: Vocal\n\"Dm\"z32|\"C\"z32|\"Bb\"z32|\"A\"z32|\nV: Ins\nD16 A8 d8|c16 G8 e8|B,16 F8 d8|A,16 E8 ^C8|\n% instrumental\nV: Vocal\n\"Dm\"z32|\"C\"z32|\"Bb\"z32|\"A\"z32|\nV: Ins\nD16 A8 d8|c16 G8 e8|B,16 F8 d8|A,16 E8 ^C8|\n% instrumental\nV: Vocal\n\"Dm\"z32|\"C\"z32|\"Bb\"z32|\"A\"z32|\nV: Ins\nD8 A8 d16|c8 G8 e16|B,8 F8 d16|D32|\n",
+  "cfg_scale": null,
+  "id": "a-light-left-on-instrumental-v3"
+}

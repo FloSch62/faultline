@@ -18,7 +18,7 @@ async function buildFirstRoute(page: Page): Promise<string> {
   return router;
 }
 
-test("a new expedition: title → archetype and ascension → map → first battle, forecast equals resolution", async ({ page }) => {
+test("a new expedition: title → archetype and ascension → map → first battle, forecast equals resolution", { tag: "@smoke" }, async ({ page }) => {
   await install(page, null, { storage: { "faultline-progress-v1": JSON.stringify({ cleared: { warden: 0 } }) } });
   await expect(page.locator('[data-action="continue"]')).toHaveCount(0);
   await page.locator('[data-action="new"]').click();
@@ -54,7 +54,7 @@ test("a new expedition: title → archetype and ascension → map → first batt
   }
 });
 
-test("save → reload restores the exact expedition and the same battle screen", async ({ page }) => {
+test("save → reload restores the exact expedition and the same battle screen", { tag: "@smoke" }, async ({ page }) => {
   const e = battle({ ...route("router1"), hand: ["guard", "pulse", "fiber", "switch"], enemy: "wraith" });
   await install(page, e);
   await playCard(page, "guard");

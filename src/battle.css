@@ -385,6 +385,9 @@
 
 /* ------------------------------------------------------------ console targeting */
 .is-battle .target-options.console-targets > span:first-child { color: #bff3f8; }
+/* A cable to this device would cross wreckage and fray. */
+.target-options button.frays { border-color: #d08a5288; color: #f0b98a; background: #d08a5214; }
+.target-options button.frays:hover { border-color: #ffa860; background: #d08a5230; }
 .is-buffering .signal-readout strong { color: #bff5fb; }
 
 /* ------------------------------------------------------------ Field Training dock

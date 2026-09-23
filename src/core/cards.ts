@@ -21,6 +21,8 @@ export const RULES = {
   overclockDamage: 2,
   compressionDamage: 2,
   amplifiedCableDamage: 1,
+  /** Unarmored cable whose span crosses a wreck's scorched ring. */
+  frayedCableDamage: 1,
   resonanceDamage: 3,
   suppressionPenalty: 3,
   // Network terms
@@ -227,8 +229,8 @@ const BASE: Record<BaseCardId, BaseDefinition> = {
   },
   "armored-fiber": {
     name: "Armored Fiber", subtitle: "UNCOMMON / LINK", cost: 1, rarity: "uncommon", target: "link", art: "cable", color: "#b7c4ca",
-    rules: "Connect two devices with a cable immune to cuts.",
-    upgrade: { cost: 0, rules: "Connect two devices with a cable immune to cuts." },
+    rules: "Connect two devices with a cable immune to cuts and fraying.",
+    upgrade: { cost: 0, rules: "Connect two devices with a cable immune to cuts and fraying." },
   },
   conduit: {
     name: "Amplified Fiber", subtitle: "UNCOMMON / LINK", cost: 1, rarity: "uncommon", target: "link", art: "cable", color: "#f0b086",
@@ -237,13 +239,13 @@ const BASE: Record<BaseCardId, BaseDefinition> = {
   },
   vxlan: {
     name: "VXLAN Tunnel", subtitle: "CONTAINERLAB / OVERLAY", cost: 2, rarity: "uncommon", target: "link", art: "cable", color: "#bba3e3",
-    rules: `Connect two devices with a cut-immune cable that adds +${R.amplifiedCableDamage} on your primary route.`,
-    upgrade: { cost: 1, rules: `Connect two devices with a cut-immune cable that adds +${R.amplifiedCableDamage} on your primary route.` },
+    rules: `Connect two devices with a cut- and fray-proof cable that adds +${R.amplifiedCableDamage} on your primary route.`,
+    upgrade: { cost: 1, rules: `Connect two devices with a cut- and fray-proof cable that adds +${R.amplifiedCableDamage} on your primary route.` },
   },
   "dark-fiber": {
     name: "Dark Fiber", subtitle: "GHOST / HIDDEN LINK", cost: 0, rarity: "uncommon", target: "link", art: "cable", color: "#7d8fb8", exhaust: true, archetype: "ghost",
-    rules: "Connect two devices with a cut-immune cable. Exhaust.",
-    upgrade: { rules: "Connect two devices with a cut-immune cable. Draw 1. Exhaust.", values: { draw: 1 } },
+    rules: "Connect two devices with a cut- and fray-proof cable. Exhaust.",
+    upgrade: { rules: "Connect two devices with a cut- and fray-proof cable. Draw 1. Exhaust.", values: { draw: 1 } },
   },
   // ---------------------------------------------------------------- node upgrades
   shield: {

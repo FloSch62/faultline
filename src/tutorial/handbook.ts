@@ -71,6 +71,7 @@ const CHAPTER_BODIES: Record<string, () => string> = {
       ["Startup Config · Overclock", `+${R.configuredDamage} · +${R.overclockDamage} per router`, "Routers on the primary route"],
       ["Packet Compression", `+${R.compressionDamage} per switch`, "Compressed switches on the primary route"],
       ["Amplified cable", `+${R.amplifiedCableDamage} each`, "Amplified cables on the primary route"],
+      ["Frayed cable", `−${R.frayedCableDamage} each`, "Unarmored primary-route cables crossing wreckage"],
       ["Resonance · Suppression", `+${R.resonanceDamage} · −${R.suppressionPenalty} per band`, "Bands crossed by primary-route hardware"],
       ["Bandwidth", `+${R.bandwidthPerChannel} per channel beyond the first`, "Whole network"],
       ["Load Balancer", `+${R.balancerPerChannel} per channel, each`, "Online balancers"],
@@ -137,7 +138,7 @@ const CHAPTER_BODIES: Record<string, () => string> = {
       <section><h4>${icon("field", 16)} Crowd: clusters</h4><p>A band with ${strong(R.clusterThreshold)} or more online devices is a cluster: ${strong(`+${R.clusterDamage}`)} damage per clustered band. But crowded bands are what corrosion, storms and ash target first.</p></section>
       <section><h4>${icon("shield", 16)} Spread: separated circuits</h4><p>Channels with a router in the North and a different channel with a router in the South grant ${strong(`+${R.separatedCircuitShield}`)} shield every enemy action — and a band attack can only reach one of them.</p></section>
       <section><h4>${icon("bolt", 16)} Band attacks</h4><p>Null Storm and Ash Moth announce a band and jam unprotected hardware inside it, cycling North → Center → South. Empty bands dodge for free. Widow suppresses the busiest band of your route.</p></section>
-      <section><h4>${icon("map", 16)} Moving</h4><p>Drag a placed device, or select it and choose a band: ${strong(R.relocateCost)} energy. The preview shows damage, shield and life lost before you drop it. Wreckage blocks some sockets on most battlefields.</p></section>
+      <section><h4>${icon("map", 16)} Moving</h4><p>Drag a placed device, or select it and choose a band: ${strong(R.relocateCost)} energy. The preview shows damage, shield and life lost before you drop it. Wreckage blocks some sockets on most battlefields, and an unarmored cable across its scorched ring frays: ${strong(`−${R.frayedCableDamage}`)} damage on your primary route. Move a device and its cables fray or mend with it.</p></section>
     </div>`,
 
   rerouting: () => `

@@ -1,3 +1,4 @@
+import { RULES } from "./cards.ts";
 import type { NetworkLink, NetworkNode, Topology } from "./types.ts";
 
 export function linkKey(a: string, b: string): string {
@@ -13,25 +14,30 @@ export function canLink(topology: Topology, a: string, b: string): boolean {
   );
 }
 
-/** A simple ALPHA → OMEGA path, its visited device set and amplified cables. */
+/** A simple ALPHA → OMEGA path, its visited device set and cable modifiers. */
 export interface Route {
   path: string[];
   /** Bit mask over topology.nodes indices, terminals included. */
   mask: number;
   /** Amplified cables along the path. */
   boosted: number;
+  /** Frayed cables along the path. */
+  frayed: number;
 }
 
 let powerBuffer = new Int16Array(0);
 let previousBuffer = new Int8Array(0);
+const UNREACHED = -0x8000;
 
 /** One strongest representative per visited device set. The subset search
  * cannot miss a better route behind a dense branch: fourteen sockets bound it
- * to 2^14 states per endpoint. Amplified cables are counted without a cap. */
+ * to 2^14 states per endpoint. Amplified and frayed cables are counted without
+ * a cap; for one device set the path with the best cable signal wins. */
 export function routes(
   topology: Topology,
   excludedNodes: ReadonlySet<string> = new Set(),
   excludedLinks: ReadonlySet<string> = new Set(),
+  frayedLinks: ReadonlySet<string> = new Set(),
 ): Route[] {
   if (excludedNodes.has("alpha") || excludedNodes.has("omega")) return [];
   const nodes = topology.nodes;
@@ -41,9 +47,10 @@ export function routes(
   const alpha = index.get("alpha"),
     omega = index.get("omega");
   if (alpha === undefined || omega === undefined) return [];
-  // Bitmask adjacency: neighbours and amplified cables per device.
+  // Bitmask adjacency: neighbours, amplified and frayed cables per device.
   const adjacency = new Int32Array(n),
-    amplified = new Int32Array(n);
+    amplified = new Int32Array(n),
+    frayed = new Int32Array(n);
   let excluded = 0;
   nodes.forEach((node, i) => {
     if (excludedNodes.has(node.id)) excluded |= 1 << i;
@@ -59,6 +66,10 @@ export function routes(
       amplified[a] |= 1 << b;
       amplified[b] |= 1 << a;
     }
+    if (frayedLinks.has(linkKey(link.a, link.b))) {
+      frayed[a] |= 1 << b;
+      frayed[b] |= 1 << a;
+    }
   }
   for (let i = 0; i < n; i++) adjacency[i] &= ~excluded;
   const size = (1 << n) * n;
@@ -68,7 +79,7 @@ export function routes(
   }
   const power = powerBuffer,
     previous = previousBuffer;
-  power.fill(-1, 0, size);
+  power.fill(UNREACHED, 0, size);
   const alphaBit = 1 << alpha;
   power[alphaBit * n + alpha] = 0;
   previous[alphaBit * n + alpha] = -1;
@@ -78,7 +89,7 @@ export function routes(
     const row = mask * n;
     for (let end = 0; end < n; end++) {
       const value = power[row + end];
-      if (value < 0) continue;
+      if (value === UNREACHED) continue;
       if (end === omega) {
         found.push(mask);
         continue;
@@ -89,7 +100,9 @@ export function routes(
         free ^= bit;
         const next = 31 - Math.clz32(bit);
         const key = (mask | bit) * n + next;
-        const candidate = value + (amplified[end] & bit ? 1 : 0);
+        const candidate = value
+          + (amplified[end] & bit ? RULES.amplifiedCableDamage : 0)
+          - (frayed[end] & bit ? RULES.frayedCableDamage : 0);
         if (candidate > power[key]) {
           power[key] = candidate;
           previous[key] = end;
@@ -100,20 +113,25 @@ export function routes(
   const result: (Route & { size: number })[] = found.map((mask) => {
     const path: string[] = [];
     let current = omega,
-      visited = mask;
-    const boosted = power[mask * n + omega];
+      visited = mask,
+      boosted = 0,
+      worn = 0;
     while (current >= 0) {
       path.push(nodes[current].id);
       const before = previous[visited * n + current];
+      if (before >= 0) {
+        if (amplified[before] & (1 << current)) boosted++;
+        if (frayed[before] & (1 << current)) worn++;
+      }
       visited ^= 1 << current;
       current = before;
     }
     path.reverse();
-    return { path, mask, boosted, size: path.length };
+    return { path, mask, boosted, frayed: worn, size: path.length };
   });
   // Stable order: fewer devices first, then earlier-installed devices (mask order).
   result.sort((a, b) => a.size - b.size || a.mask - b.mask);
-  return result.map(({ path, mask, boosted }) => ({ path, mask, boosted }));
+  return result.map(({ path, mask, boosted, frayed }) => ({ path, mask, boosted, frayed }));
 }
 
 /** Compatibility: the path list of every representative route. */

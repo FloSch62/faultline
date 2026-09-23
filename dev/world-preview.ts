@@ -62,6 +62,8 @@ if (scene === "devices" || scene === "terrain") {
 }
 if (scene === "terrain") {
   terrain = { name: "Collapsed rack row", description: "Wreckage blocks two sockets.", debris: [{ x: -1.2, z: -1.6 }, { x: 4, z: 1.6 }] };
+  // Two unarmored spans across the wrecks: they fray.
+  topology.links.push({ a: "router1", b: "firewall5" }, { a: "honeypot9", b: "omega" });
   malware = [{ id: "malware1", x: 0.8, z: 1.7 }];
   forecast = { x: -4.1, z: -1.4 };
 }
@@ -75,8 +77,8 @@ const world = new World(document.querySelector<HTMLCanvasElement>("#world")!, {
 });
 function caption(text: string) { document.querySelector("#caption")!.textContent = text; }
 function apply() {
-  world.setBattle(topology, scene === "empty" && params.get("enemy") === null ? null : enemy, params.get("fault") ?? null, null);
   world.setTerrain(terrain);
+  world.setBattle(topology, scene === "empty" && params.get("enemy") === null ? null : enemy, params.get("fault") ?? null, null);
   world.setMalware(malware, forecast);
   if (params.get("online") !== "0") world.setOnline(online);
   world.setChannels(channels);

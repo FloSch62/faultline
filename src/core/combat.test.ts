@@ -4,6 +4,7 @@ import { CARDS, RULES, baseCard, canUpgrade, isUpgraded, upgraded } from "./card
 import { newExpedition } from "./expedition.ts";
 import {
   beginBattle,
+  cableFrays,
   chooseRoom,
   combatPreview,
   consoleState,
@@ -21,7 +22,7 @@ import {
   scrubMalware,
   useConsole,
 } from "./run.ts";
-import { terrainFor } from "./terrain.ts";
+import { crossesWreckage, terrainFor } from "./terrain.ts";
 import type { Archetype, CardId, NetworkNode, RelicId, RunState } from "./types.ts";
 
 /** A clean first-fight table: only terminals, a chosen hostile and intent index. */
@@ -356,6 +357,60 @@ test("terrain is deterministic, calm on the first fight, and blocks wreckage soc
   assert.equal(r.hand.length, 1);
   device(r, "r1", "router", 0, 0);
   assert.equal(relocateNode(r, "r1", 2.5, 2.4).ok, false);
+});
+
+test("unarmored cables across wreckage fray and cost signal on the primary route", () => {
+  const r = table();
+  r.terrain = { name: "Test", description: "", debris: [{ x: -2.5, z: -2.4 }] };
+  route(r, "r1", -2.4);
+  let p = combatPreview(r);
+  assert.equal(p.packetDamage, RULES.baseRouteDamage - RULES.frayedCableDamage);
+  assert.ok(p.damageTerms.some(term => /Frayed cables ×1/.test(term.label)));
+  // Armor shrugs off the wreck.
+  r.topology.links.find(link => link.b === "r1")!.armored = true;
+  assert.equal(combatPreview(r).packetDamage, RULES.baseRouteDamage);
+  r.topology.links.find(link => link.b === "r1")!.armored = false;
+  // A clean channel becomes the primary route; the frayed one still adds bandwidth.
+  route(r, "r2", 0);
+  p = combatPreview(r);
+  assert.deepEqual(p.signalPath, ["alpha", "r2", "omega"]);
+  assert.equal(p.packetDamage, RULES.baseRouteDamage + RULES.bandwidthPerChannel);
+  // Fraying follows the devices: relocating mends the cable.
+  const s = table();
+  s.terrain = r.terrain;
+  route(s, "r1", -2.4);
+  assert.ok(relocateNode(s, "r1", 0, 2.4).ok);
+  assert.equal(combatPreview(s).packetDamage, RULES.baseRouteDamage);
+});
+
+test("for one device set the route search prefers the path without frayed cables", () => {
+  const r = table();
+  device(r, "sw", "switch", -2.5, -2.4);
+  device(r, "r1", "router", 2.5, 2.4);
+  wire(r, "alpha", "sw", "r1", "omega");
+  wire(r, "alpha", "r1");
+  wire(r, "sw", "omega");
+  assert.deepEqual(combatPreview(r).signalPath, ["alpha", "r1", "sw", "omega"]);
+  // A wreck under ALPHA ↔ R1 frays only that path: the same devices route the other way.
+  r.terrain = { name: "Test", description: "", debris: [{ x: -1.4, z: 1.2 }] };
+  const p = combatPreview(r);
+  assert.deepEqual(p.signalPath, ["alpha", "sw", "r1", "omega"]);
+  assert.equal(p.packetDamage, RULES.baseRouteDamage + RULES.switchDamage);
+});
+
+test("the classic opener never frays, and link targeting forecasts fraying", () => {
+  for (let seed = 1; seed < 200; seed++) {
+    const { debris } = terrainFor(seed * 7919, seed % 3, "4-1", false).terrain;
+    assert.ok(!crossesWreckage({ x: -5.3, z: 0 }, { x: 0, z: 0 }, debris));
+    assert.ok(!crossesWreckage({ x: 0, z: 0 }, { x: 5.3, z: 0 }, debris));
+  }
+  const r = table();
+  r.terrain = { name: "Test", description: "", debris: [{ x: -2.5, z: -2.4 }] };
+  device(r, "r1", "router", 0, -2.4);
+  assert.equal(cableFrays(r, "alpha", "r1", "fiber"), true);
+  assert.equal(cableFrays(r, "alpha", "r1", null), true);
+  assert.equal(cableFrays(r, "alpha", "r1", "armored-fiber+"), false);
+  assert.equal(cableFrays(r, "r1", "omega", "fiber"), false);
 });
 
 test("permanent terrain fields never tick down and can be purged when hostile", () => {

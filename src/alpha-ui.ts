@@ -3,6 +3,8 @@ import { CARDS, RELICS, RULES, baseCard, canUpgrade, isUpgraded, upgraded, BASE_
 import { ENEMIES } from "./core/enemies.ts";
 import { enemyStory } from "./story.ts";
 import { combatPreview, consoleState, FIELD_RULES, zoneForNode } from "./core/run.ts";
+import { frayedLinks } from "./core/terrain.ts";
+import { linkKey } from "./core/graph.ts";
 import type { CardId, RunState } from "./core/types.ts";
 import { cardMarkup, esc, icon } from "./ui.ts";
 import { INTENT_NAMES } from "./battle-ui.ts";
@@ -88,12 +90,13 @@ const ROLE_COPY: Record<string, string> = {
 };
 export function devicesMarkup(run: RunState) {
   const p = combatPreview(run);
+  const frayed = frayedLinks(run.topology, run.terrain);
   return `<span class="eyebrow">CONTAINERLAB · DEVICE INVENTORY</span><h2>A place for every device.</h2><p class="modal-intro">Select hardware to relocate it for ${RULES.relocateCost} energy. <b>Online</b> devices sit on a live route and use their ability; offline devices do nothing. Bands with ${RULES.clusterThreshold}+ online devices form a cluster (+${RULES.clusterDamage}); routers in opposite outer bands on separate channels grant ${RULES.separatedCircuitShield} shield.</p><div class="device-inventory">${run.topology.nodes.map(n => {
     const online = n.fixed || p.online.includes(n.id);
     return `<button data-manage-node="${n.id}" class="${online ? "is-online" : "is-offline"}"><strong>${esc(n.id.toUpperCase())}</strong><span>${esc(ROLE_COPY[n.role] ?? n.role)} · ${zoneForNode(n).toUpperCase()}</span><small>${[n.fixed ? "Fixed terminal" : online ? "ONLINE" : "OFFLINE · connect it to a live route", n.fixed ? "" : `Relocate: ${RULES.relocateCost} energy`, n.shielded ? "Jam protected" : "", n.upgraded ? `Overclocked +${RULES.overclockDamage}` : "", n.configured ? `Startup Config +${RULES.configuredDamage}` : "", n.amplified ? `Compressed +${RULES.compressionDamage}` : "", n.stateful ? "Stateful · blocks double" : "", n.salvage ? "Salvaged" : ""].filter(Boolean).join(" · ")}</small></button>`;
   }).join("")}</div>${run.malware.length ? `<div class="cable-inventory malware-inventory"><h3>${icon("malware", 16)} Malware</h3>${run.malware.map(m => `<p><span>${esc(m.id.toUpperCase())} · ${zoneForNode(m).toUpperCase()} · −${RULES.malwarePenalty} damage</span><button class="text-button" data-scrub="${m.id}" ${run.energy < RULES.scrubCost ? "disabled" : ""}>Scrub · ${RULES.scrubCost} energy</button></p>`).join("")}</div>` : ""}<div class="cable-inventory"><h3>Connections</h3>${run.topology.links.map(l => {
     const a = run.topology.nodes.find(n => n.id === l.a)!, b = run.topology.nodes.find(n => n.id === l.b)!;
-    const length = Math.hypot(a.x - b.x, a.z - b.z);
-    return `<p><span>${esc(l.a.toUpperCase())} ↔ ${esc(l.b.toUpperCase())}</span><b class="${length > RULES.cableExposureLength && !l.armored ? "danger" : ""}">${length.toFixed(1)} units${l.armored ? " · CUT-PROOF" : ""}${l.boosted ? ` · +${RULES.amplifiedCableDamage} SIGNAL` : ""}</b></p>`;
-  }).join("") || "<p>No cables yet.</p>"}</div>${run.terrain ? `<p class="modal-intro">${icon("terrain", 14)} <b>${esc(run.terrain.name)}</b> · ${esc(run.terrain.description)}${run.terrain.debris.length ? ` ${run.terrain.debris.length} wrecked socket${run.terrain.debris.length === 1 ? "" : "s"} block placement.` : ""}</p>` : ""}`;
+    const length = Math.hypot(a.x - b.x, a.z - b.z), worn = frayed.has(linkKey(l.a, l.b));
+    return `<p><span>${esc(l.a.toUpperCase())} ↔ ${esc(l.b.toUpperCase())}</span><b class="${(length > RULES.cableExposureLength && !l.armored) || worn ? "danger" : ""}">${length.toFixed(1)} units${l.armored ? " · CUT-PROOF" : ""}${l.boosted ? ` · +${RULES.amplifiedCableDamage} SIGNAL` : ""}${worn ? ` · FRAYED −${RULES.frayedCableDamage} SIGNAL` : ""}</b></p>`;
+  }).join("") || "<p>No cables yet.</p>"}</div>${run.terrain ? `<p class="modal-intro">${icon("terrain", 14)} <b>${esc(run.terrain.name)}</b> · ${esc(run.terrain.description)}${run.terrain.debris.length ? ` ${run.terrain.debris.length} wreck${run.terrain.debris.length === 1 ? "" : "s"} block${run.terrain.debris.length === 1 ? "s" : ""} placement. Unarmored cables that cross a scorched ring fray: −${RULES.frayedCableDamage} damage each on your primary route.` : ""}</p>` : ""}`;
 }

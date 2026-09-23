@@ -14,8 +14,9 @@ import { grantVictory } from "./meta.ts";
 import { random, shuffle, log } from "./util.ts";
 import { ENEMIES } from "./enemies.ts";
 import { STAGES } from "./stages.ts";
-import { terrainFor } from "./terrain.ts";
+import { crossesWreckage, frayedLinks, terrainFor } from "./terrain.ts";
 import type {
+  BaseCardId,
   CardId,
   ConsoleId,
   Malware,
@@ -383,6 +384,16 @@ export function relocateNode(run: RunState, id: string, x: number, z: number): A
   log(run, message);
   return { ok: true, message };
 }
+/** Link cards that lay armored cable: cut-proof and fray-proof. */
+const ARMORED_CABLES: readonly BaseCardId[] = ["armored-fiber", "vxlan", "dark-fiber"];
+export const laysArmoredCable = (id: CardId | null) => !!id && ARMORED_CABLES.includes(baseCard(id));
+/** Whether a new cable from `a` to `b` would fray over wreckage. `cardId` is the
+ * link card in hand, or null for the Patch Cable console. */
+export function cableFrays(run: RunState, a: string, b: string, cardId: CardId | null): boolean {
+  if (laysArmoredCable(cardId)) return false;
+  const from = run.topology.nodes.find((node) => node.id === a), to = run.topology.nodes.find((node) => node.id === b);
+  return !!from && !!to && !!run.terrain && crossesWreckage(from, to, run.terrain.debris);
+}
 function linked(run: RunState, a: string, b: string) {
   return run.topology.links.some(link => linkKey(link.a, link.b) === linkKey(a, b));
 }
@@ -427,7 +438,7 @@ export function playLink(run: RunState, index: number, a: string, b: string): Ac
   run.topology.links.push({
     a,
     b,
-    ...(["armored-fiber", "vxlan", "dark-fiber"].includes(base) ? { armored: true } : {}),
+    ...(ARMORED_CABLES.includes(base) ? { armored: true } : {}),
     ...(["conduit", "vxlan"].includes(base) ? { boosted: true } : {}),
   });
   consume(run, index);
@@ -683,7 +694,12 @@ function fieldBands(run: RunState, kind: ZoneEffectKind): Map<Zone, number> {
 }
 function analyze(run: RunState, faultNode: string | null, faultLink: string | null, light = false): Network {
   const nodes = run.topology.nodes;
-  const all = enumerateRoutes(run.topology, faultNode ? new Set([faultNode]) : new Set(), faultLink ? new Set([faultLink]) : new Set());
+  const all = enumerateRoutes(
+    run.topology,
+    faultNode ? new Set([faultNode]) : new Set(),
+    faultLink ? new Set([faultLink]) : new Set(),
+    frayedLinks(run.topology, run.terrain),
+  );
   const zoneBit: Record<Zone, number> = { north: 1, center: 2, south: 4 };
   const lens = has(run, "packet-lens");
   const contribution = nodes.map(node =>
@@ -699,7 +715,7 @@ function analyze(run: RunState, faultNode: string | null, faultLink: string | nu
   const scored: ScoredRoute[] = [];
   for (const route of all) {
     if (!(route.mask & routerMask)) continue;
-    let score = RULES.baseRouteDamage + route.boosted * RULES.amplifiedCableDamage, bands = 0;
+    let score = RULES.baseRouteDamage + route.boosted * RULES.amplifiedCableDamage - route.frayed * RULES.frayedCableDamage, bands = 0;
     for (let m = route.mask, i = 0; m; m >>= 1, i++) {
       if (!(m & 1)) continue;
       score += contribution[i];
@@ -810,6 +826,7 @@ function transmissionTerms(run: RunState, network: Network, primary: ScoredRoute
   const compressed = count(node => node.role === "switch" && !!node.amplified);
   if (compressed) route.push({ label: `Packet Compression ×${compressed}`, amount: compressed * RULES.compressionDamage });
   if (primary.boosted) route.push({ label: `Amplified cables ×${primary.boosted}`, amount: primary.boosted * RULES.amplifiedCableDamage });
+  if (primary.frayed) route.push({ label: `Frayed cables ×${primary.frayed} · crossing wreckage`, amount: -primary.frayed * RULES.frayedCableDamage });
   const bands = new Set(nodes.filter(node => !node.fixed).map(zoneForNode));
   for (const zone of ZONES) {
     if (!bands.has(zone)) continue;

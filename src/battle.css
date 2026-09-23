@@ -1,0 +1,594 @@
+/* FAULTLINE v3 battle layer: console, protocols, network ledger, card states.
+   Built on the fieldcraft layout variables (--rail, --hand-height, --hand-edge,
+   --field-bottom) so it follows every breakpoint of the existing battle table. */
+
+.is-battle {
+  --v3-gold: #e2c182;
+  --v3-gold-soft: #c9ae7a;
+  --v3-cyan: #74e0ec;
+  --v3-teal: #8fd9c0;
+  --v3-danger: #ef8f86;
+  --v3-violet: #b99cf0;
+  --v3-ink: #08111b;
+  --dock-bottom: calc(var(--hand-height) + 38px);
+  --dock-width: clamp(238px, 20cqw, 318px);
+}
+
+/* ------------------------------------------------------------ command docks
+   One row between the field seals and the hand (≈54px at every size): the console
+   command left beside the energy, armed protocols right beside Transmit. */
+.command-dock {
+  position: absolute;
+  bottom: var(--dock-bottom);
+  z-index: 6;
+  width: var(--dock-width);
+  pointer-events: auto;
+}
+.command-left { left: calc(var(--hand-edge) + 38px); }
+.command-right { right: calc(var(--hand-edge) + 38px); }
+.is-battle .target-hint { left: calc(var(--hand-edge) + var(--dock-width) + 50px); right: calc(var(--hand-edge) + var(--dock-width) + 50px); }
+
+.console-control { display: flex; align-items: stretch; gap: 6px; }
+.console-button {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 9px;
+  height: 50px;
+  padding: 4px 8px 4px 6px;
+  color: #efe3c6;
+  text-align: left;
+  cursor: pointer;
+  background:
+    linear-gradient(90deg, #d3b27418, transparent 38%),
+    linear-gradient(135deg, #243431f2, #0e1920f5 55%, #111a22f5);
+  border: 1px solid #b89b6488;
+  border-radius: 4px 14px 4px 4px;
+  box-shadow: inset 0 0 0 2px #0a141b, inset 0 0 0 3px #d9bd8520, 0 8px 18px #0009;
+  transition: transform .18s, box-shadow .18s, border-color .18s, filter .18s;
+}
+.console-button::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 35%, #fff4d31c 48%, transparent 60%) -120% 0 / 240% 100% no-repeat;
+}
+.console-button.is-ready::after { animation: console-sheen 5.5s ease-in-out infinite; }
+@keyframes console-sheen { 0%, 65% { background-position: -120% 0; } 100% { background-position: 140% 0; } }
+.console-button:not(:disabled):hover, .console-button:focus-visible {
+  transform: translateY(-2px);
+  border-color: #efd497;
+  box-shadow: inset 0 0 0 2px #0a141b, inset 0 0 0 3px #e9ce9433, 0 0 22px #e0bd7a33, 0 10px 22px #000b;
+}
+.console-button:disabled { cursor: default; filter: saturate(.55) brightness(.78); }
+.console-glyph {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: #f3dca6;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 30%, #5d5033, #1c1f1f 72%);
+  border: 1px solid #d8bd85aa;
+  box-shadow: 0 0 0 3px #0c161d, 0 0 14px #d6b57433;
+}
+.console-copy { display: grid; min-width: 0; line-height: 1.12; }
+.console-copy small { font: 600 8px var(--condensed); letter-spacing: .16em; color: #b9a67d; white-space: nowrap; }
+.console-copy small kbd { font: inherit; padding: 0 3px; border: 1px solid #8e7a52; border-radius: 2px; color: #e9d3a2; }
+.console-copy strong { font: 600 15px var(--display); letter-spacing: .04em; color: #f6e7c4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.console-copy em { font: italic 11px Barlow, sans-serif; color: #bfc9bd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.console-cost {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 32px;
+  font: 600 17px var(--condensed);
+  color: #ffe4a1;
+  background: linear-gradient(#3b3222, #1b1a18);
+  border: 1px solid #c9a86a99;
+  clip-path: polygon(50% 0, 100% 22%, 100% 78%, 50% 100%, 0 78%, 0 22%);
+}
+.console-cost b { line-height: 1; }
+.console-cost small { font-size: 7px; margin-top: -3px; color: #d9bf83; }
+.console-button.is-active, .console-button.is-targeting {
+  border-color: var(--v3-cyan);
+  background: linear-gradient(90deg, #74e0ec22, transparent 50%), linear-gradient(135deg, #16353af2, #0b1a22f5);
+  box-shadow: inset 0 0 0 2px #0a141b, 0 0 0 1px #74e0ec55, 0 0 26px #5fd4e244, 0 10px 22px #000b;
+}
+.console-button.is-active .console-glyph, .console-button.is-targeting .console-glyph {
+  color: #dffbff;
+  background: radial-gradient(circle at 40% 30%, #2f7580, #0f2329 72%);
+  border-color: #9aeef6;
+  animation: console-pulse 1.6s ease-in-out infinite;
+}
+@keyframes console-pulse { 50% { box-shadow: 0 0 0 3px #0c161d, 0 0 24px #74e0ec88; } }
+.console-button.is-spent .console-copy small { color: #8d8f86; }
+
+.engine-badge {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  width: 66px;
+  height: 50px;
+  padding: 2px 4px;
+  cursor: help;
+  color: #d8e3d9;
+  background: linear-gradient(160deg, #13262ae8, #0a141be8);
+  border: 1px solid #8fd9c044;
+  border-radius: 4px 4px 12px 4px;
+  box-shadow: inset 0 0 0 2px #0a141b, 0 8px 18px #0009;
+}
+.engine-badge strong { font: 600 21px/1 var(--condensed); color: #f0e2bd; font-variant-numeric: tabular-nums; }
+.engine-badge small { display: flex; align-items: center; gap: 3px; margin-top: 3px; font: 600 7.5px var(--condensed); letter-spacing: .12em; color: #9fc7b8; white-space: nowrap; }
+.engine-badge.is-active { border-color: #74e0ec88; box-shadow: inset 0 0 0 2px #0a141b, 0 0 16px #74e0ec33, 0 8px 18px #0009; }
+.engine-badge.is-active strong { color: #c9f7fc; text-shadow: 0 0 12px #74e0ec88; }
+.console-control:has(.console-harden) .engine-badge.is-active { border-color: #f0b46e88; }
+.console-control:has(.console-harden) .engine-badge.is-active strong { color: #ffd7a0; text-shadow: 0 0 12px #f0b46e77; }
+.engine-badge.at-risk { border-color: #ef8f86; background: linear-gradient(160deg, #3a1818ee, #1a0e12ee); animation: engine-risk 1.4s ease-in-out infinite; }
+.engine-badge.at-risk strong { color: #ffd0c9; }
+.engine-badge.at-risk small { color: #ffb2a8; }
+@keyframes engine-risk { 50% { box-shadow: inset 0 0 0 2px #1a0e12, 0 0 20px #ef8f8677; } }
+
+/* ------------------------------------------------------------ protocol dock */
+.protocol-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.protocol-slot {
+  position: relative;
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  align-items: center;
+  gap: 7px;
+  height: 50px;
+  min-width: 0;
+  padding: 4px 8px 4px 6px;
+  text-align: left;
+  color: #e9e0cc;
+  border-radius: 12px 3px 3px 3px;
+  background: linear-gradient(135deg, #2b2327ee, #15131bee);
+  border: 1px solid #a8807055;
+  box-shadow: inset 0 0 0 2px #120e14, 0 6px 14px #0008;
+}
+.protocol-slot > span { min-width: 0; }
+.protocol-slot i { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; color: #f0c7ae; background: #1a1117; border: 1px solid #c79a8166; font-style: normal; }
+.protocol-slot strong { display: block; font: 600 13px var(--condensed); letter-spacing: .02em; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.protocol-slot small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font: 9px/1.2 Barlow, sans-serif; color: #b6aa9c; }
+.protocol-slot small svg { vertical-align: -1px; }
+.protocol-slot.empty { color: #8a8580; background: repeating-linear-gradient(135deg, #14141acc 0 6px, #19181fcc 6px 12px); border-style: dashed; border-color: #6d5f5a66; box-shadow: none; }
+.protocol-slot.empty i { color: #6f6660; border-color: #5a4e4a66; }
+.protocol-slot.empty small { display: block; font: 600 8px/1.35 var(--condensed); letter-spacing: .14em; color: #8a817a; }
+.protocol-slot.empty small span { font: 9px Barlow; letter-spacing: 0; color: #6f6b67; }
+.protocol-slot.armed { cursor: help; border-color: #d59f8488; }
+.protocol-slot.armed::before { content: ""; position: absolute; inset: 3px; border-radius: 10px 2px 2px 2px; border: 1px solid #e2b49a22; pointer-events: none; }
+.protocol-slot.will-trigger {
+  border-color: #9aeef6;
+  background: linear-gradient(135deg, #173a40f2, #10202af2);
+  box-shadow: inset 0 0 0 2px #0a171d, 0 0 0 1px #74e0ec66, 0 0 22px #74e0ec44;
+  animation: protocol-ready 1.8s ease-in-out infinite;
+}
+.protocol-slot.will-trigger i { color: #e4fdff; border-color: #9aeef6; background: #0f3036; }
+.protocol-slot.will-trigger small { color: #bff3f8; font-weight: 600; }
+@keyframes protocol-ready { 50% { box-shadow: inset 0 0 0 2px #0a171d, 0 0 0 1px #9aeef6aa, 0 0 30px #74e0ec77; } }
+
+/* ------------------------------------------------------------ network ledger */
+.is-battle .network-ledger { left: calc(var(--rail) + 30px); right: calc(var(--rail) + 30px); gap: 6px; pointer-events: none; }
+.network-ledger .ledger-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  font: 600 9.5px var(--condensed);
+  letter-spacing: .1em;
+  color: #c9d5c7;
+  background: #0a1820c4;
+  border: 1px solid #89a79733;
+  border-radius: 20px;
+  pointer-events: auto;
+  white-space: nowrap;
+}
+.network-ledger .ledger-chip.is-channels { color: #d7ecdf; }
+.network-ledger .ledger-chip.is-strong { color: #c7f6fb; border-color: #74e0ec66; box-shadow: 0 0 12px #74e0ec22; }
+.network-ledger .ledger-chip.is-offline { color: #e5b5a6; border-color: #c9887566; }
+.network-ledger .ledger-chip.has-offline { color: #e0c9a1; }
+.network-ledger .ledger-chip.is-fault { color: #f0a597; border-color: #c96f6399; background: #2a1414cc; }
+.network-ledger .ledger-chip.is-cluster { color: #f4dfae; border-color: #d4b06f77; }
+.network-ledger .ledger-chip.is-terrain { color: #c7bda8; font-weight: 500; letter-spacing: .06em; }
+.network-ledger .ledger-chip.is-next { color: #b9cfc7; }
+.network-ledger .ledger-chip.is-malware {
+  cursor: pointer;
+  color: #f7c9ff;
+  border-color: #c77adf99;
+  background: linear-gradient(90deg, #3a1740d9, #1a0f22d9);
+  box-shadow: 0 0 14px #b85ad044;
+}
+.network-ledger .ledger-chip.is-malware b { color: #fff; padding-left: 5px; border-left: 1px solid #c77adf66; }
+.network-ledger .ledger-chip.is-malware:hover { border-color: #f0b6ff; box-shadow: 0 0 18px #d07ae877; }
+.network-ledger .ledger-chip.is-malware:disabled { cursor: default; opacity: .6; }
+
+/* ------------------------------------------------------------ field seals */
+.field-seal { position: relative; }
+.field-seal .cluster-mark {
+  margin-left: auto;
+  padding: 1px 6px;
+  font: 600 8px var(--condensed);
+  letter-spacing: .12em;
+  font-style: normal;
+  color: #1f1a10;
+  background: linear-gradient(#f3d796, #c79d57);
+  border-radius: 2px;
+  box-shadow: 0 0 10px #e7c27a66;
+}
+.field-seal.clustered { box-shadow: inset 0 0 0 1px #e2c18255, 0 0 18px #e2c18222; }
+.field-seal .band-meta { display: flex; align-items: center; gap: 4px; margin-top: 3px; font: 9px Barlow, sans-serif; letter-spacing: .06em; color: #8ea69b; }
+.field-seal .band-meta svg { color: #d58aeb; }
+
+/* ------------------------------------------------------------ intent extras */
+.intent-extras { display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.intent-extras:empty { display: none; }
+.hazard-caption.is-trap { color: #9aeef6; }
+.hazard-caption.is-counter { color: #bff3f8; }
+.hazard-caption.is-infect { color: #e5a8f7; }
+.hazard-caption.is-junk { color: #c9c3b6; }
+.intent-medallion.intent-infect .intent-emblem { color: #e5a8f7; }
+
+/* ------------------------------------------------------------ transmit states */
+.transmit-button.buffering .transmit-dial { filter: hue-rotate(155deg) saturate(1.2); }
+.transmit-button.buffering .transmit-power strong { color: #c9f7fc; text-shadow: 0 0 18px #74e0ecaa; }
+.transmit-button.buffering .transmit-label { color: #c9f7fc; }
+.transmit-button.buffering::after {
+  content: "";
+  position: absolute;
+  inset: 12% 14% auto;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px dashed #74e0ec88;
+  pointer-events: none;
+  animation: buffer-orbit 9s linear infinite;
+}
+@keyframes buffer-orbit { to { transform: rotate(360deg); } }
+
+/* ------------------------------------------------------------ cards: art, upgrades, junk */
+.game-card .card-image { filter: var(--art-filter, none); }
+.card-sigil {
+  position: absolute;
+  z-index: 1;
+  top: 6px;
+  left: 6px;
+  right: 6px;
+  height: var(--picture-height, 105px);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  color: color-mix(in srgb, var(--card-color, #e8c67e) 70%, #fff6dc);
+  background: radial-gradient(ellipse at 50% 55%, #050a10aa 0 26%, #050a1044 45%, transparent 70%);
+  border-radius: 4px 4px 0 0;
+}
+.card-sigil svg {
+  width: min(62%, calc(var(--picture-height, 105px) * .82));
+  height: auto;
+  filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 7px color-mix(in srgb, var(--card-color, #e8c67e) 80%, transparent));
+  overflow: visible;
+}
+.card-inspect .card-sigil, dialog .card-sigil { height: var(--picture-height, 111px); }
+.game-card.kind-protocol { border-color: #9ed7cf; }
+.game-card.kind-protocol .card-type { color: #9fe3dd; }
+.game-card.kind-protocol .card-gem { color: #9fe3dd; }
+
+.card-upgrade-mark {
+  position: absolute;
+  z-index: 3;
+  top: 7px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  font: 700 17px/1 var(--condensed);
+  color: #1d1708;
+  background: radial-gradient(circle at 40% 30%, #fff2c7, #d8ac5a 70%);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #0c1119, 0 0 14px #f1cf8a99;
+}
+.game-root .game-card.upgraded, dialog .game-card.upgraded {
+  border-color: #efd290;
+  box-shadow: inset 0 0 0 3px #080f1b, inset 0 0 0 4px #efd29033, 0 0 18px #e7c27a2e, 0 5px 14px #000a;
+}
+.game-card.upgraded .card-heading { color: #fbe6b2; text-shadow: 0 0 10px #e7c27a55; }
+.game-card.upgraded::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 38%, #fff5d629 48%, transparent 58%) -140% 0 / 260% 100% no-repeat;
+  animation: upgraded-gleam 6.5s ease-in-out infinite;
+}
+@keyframes upgraded-gleam { 0%, 72% { background-position: -140% 0; } 100% { background-position: 160% 0; } }
+
+.game-root .game-card.junk-card, dialog .game-card.junk-card {
+  border-color: #6f7780;
+  background: radial-gradient(ellipse at 10% 0, #3a3f46, #1a1e24 45%, #0d1015 100%);
+}
+.game-card.junk-card .card-heading { font-family: "Courier New", ui-monospace, monospace; letter-spacing: .02em; color: #d0d6dc; }
+.game-card.junk-card .card-image::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: repeating-linear-gradient(0deg, #ffffff0d 0 1px, transparent 1px 3px);
+  mix-blend-mode: screen;
+}
+.game-card.junk-card .card-sigil { color: #d7dde4; animation: junk-glitch 3.2s steps(1) infinite; }
+.game-card.curse-card { border-color: #b0677d !important; }
+.game-card.curse-card .card-sigil { color: #ffb4c6; }
+.game-card.curse-card .card-heading { color: #f3c1cd; }
+@keyframes junk-glitch {
+  0%, 86%, 100% { transform: none; filter: none; }
+  88% { transform: translate(-2px, 1px); filter: drop-shadow(2px 0 #ff4d6d) drop-shadow(-2px 0 #4de1ff); }
+  91% { transform: translate(2px, -1px); }
+  94% { transform: none; filter: drop-shadow(-1px 0 #ff4d6d) drop-shadow(1px 0 #4de1ff); }
+}
+.card-cost.no-cost { color: #c5ccd3; font-size: 16px; background: radial-gradient(circle at 40% 20%, #4a4f57, #1b1e22); border-color: #8d949c; }
+
+/* ------------------------------------------------------------ relic tokens (v3 emblems) */
+.battle-relics .relic-token .relic-emblem { display: grid; place-items: center; }
+.battle-relics .relic-token.tier-boss { border-color: #f0b46e88; }
+/* More relics than the plate holds fold into one token that opens the journal. */
+.battle-relics .relic-more > strong { display: grid; place-items: center; width: 25px; height: 25px; border: 1px solid #dec58366; border-radius: 50%; background: radial-gradient(#70634660, #172522); color: #f1e2b8; font: 600 11px/1 var(--condensed); filter: drop-shadow(0 2px 2px #000); }
+.battle-relics .relic-more:hover > strong, .battle-relics .relic-more:focus-visible > strong { color: #fff1c7; border-color: #dec583; }
+
+/* ------------------------------------------------------------ terrain title card */
+.terrain-title {
+  position: absolute;
+  z-index: 30;
+  top: 34%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-width: 320px;
+  padding: 16px 44px 18px;
+  text-align: center;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, #07101acc 0 55%, transparent 75%);
+  animation: terrain-title 3.9s ease forwards;
+  transition: opacity .25s;
+}
+.terrain-title.leaving { opacity: 0 !important; }
+/* The title owns the table for its beat; the log line and ledger step back. */
+.game-root:has(.terrain-title:not(.leaving)) .combat-log,
+.game-root:has(.terrain-title:not(.leaving)) .network-ledger { opacity: 0; transition: opacity .25s; }
+.game-root .combat-log, .game-root .network-ledger { transition: opacity .35s; }
+.terrain-title span { display: flex; align-items: center; gap: 7px; font: 600 10px var(--condensed); letter-spacing: .32em; color: #b8a47a; }
+.terrain-title strong { font: 500 34px var(--display); letter-spacing: .06em; color: #f6e8c6; text-shadow: 0 2px 18px #000, 0 0 30px #e2c18244; }
+.terrain-title p { margin: 0; max-width: 460px; font: italic 15px Barlow, sans-serif; color: #cbd2c8; text-shadow: 0 2px 8px #000; }
+.terrain-title::before, .terrain-title::after { content: ""; width: 180px; height: 1px; background: linear-gradient(90deg, transparent, #cdb07a, transparent); }
+@keyframes terrain-title {
+  0% { opacity: 0; transform: translate(-50%, -44%); letter-spacing: .1em; }
+  12%, 72% { opacity: 1; transform: translate(-50%, -50%); }
+  100% { opacity: 0; transform: translate(-50%, -54%); }
+}
+/* Reduced motion keeps the card still: shown, then removed by the game after a few seconds. */
+.reduced-motion .terrain-title { animation: none !important; opacity: 1; transform: translate(-50%, -50%); }
+@media (prefers-reduced-motion: reduce) { .terrain-title { animation: none !important; opacity: 1; transform: translate(-50%, -50%); } }
+
+/* ------------------------------------------------------------ floating numbers */
+.damage-number.buffer { color: #bff5fb; text-shadow: 0 0 16px #74e0ec; }
+.damage-number.trap, .damage-number.protocol { color: #c8f8fd; text-shadow: 0 0 18px #74e0ecbb; }
+.damage-number.protocol { font-size: 22px; letter-spacing: .06em; }
+.damage-number.malware { color: #f1b9ff; text-shadow: 0 0 16px #c060e0; }
+.damage-number.scrub { color: #e5ffe9; text-shadow: 0 0 14px #8fd9c0; }
+
+/* ------------------------------------------------------------ console targeting */
+.is-battle .target-options.console-targets > span:first-child { color: #bff3f8; }
+.is-buffering .signal-readout strong { color: #bff5fb; }
+
+/* ------------------------------------------------------------ Field Training dock
+   In training the coach takes the top of the left column and your plate folds into
+   a compact vitals card beneath it, just above the hand. The board, the hostile,
+   the intent plate and the hand stay clear; targeting controls sit above the coach. */
+@container game (min-width: 901px) {
+  .is-battle.is-practice #lesson-layer .training-panel {
+    top: 84px;
+    left: 16px;
+    transform: none;
+    width: calc(var(--rail) + 64px);
+    max-height: var(--training-room, 320px);
+    padding: 12px 14px 10px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    /* A visible thumb tells the player a long coach note continues below. */
+    scrollbar-color: #c3a26a99 #0a141a66;
+    scrollbar-gutter: stable;
+    animation-name: training-dock;
+  }
+  /* Docked coach: compact type; finished goals fold away except the latest one. */
+  .is-practice #lesson-layer .training-head { gap: 9px; }
+  .is-practice #lesson-layer .training-seal { width: 30px; height: 30px; }
+  .is-practice #lesson-layer .training-kicker { font-size: 7.5px; letter-spacing: .16em; }
+  .is-practice #lesson-layer .training-head h3 { font-size: 15px; line-height: 1.15; }
+  .is-practice #lesson-layer .training-meter { margin: 9px 0 8px; }
+  .is-practice #lesson-layer .training-goals { gap: 3px; margin-bottom: 8px; }
+  .is-practice #lesson-layer .training-goals li { font-size: 11.5px; gap: 7px; grid-template-columns: 18px 1fr; }
+  .is-practice #lesson-layer .training-goals li i { width: 18px; height: 18px; }
+  .is-practice #lesson-layer .training-panel:not(.is-complete) .training-goals li.done:not(:has(+ li.current)) { display: none; }
+  .is-practice #lesson-layer .training-coach p { font-size: 12px; line-height: 1.45; }
+  .is-practice #lesson-layer .training-panel.is-complete .training-goals { display: none; }
+  .is-practice #lesson-layer .training-foot { flex-wrap: wrap; row-gap: 4px; }
+  .is-battle.is-practice #lesson-layer .training-panel.is-collapsed { max-height: none; }
+  .is-battle.is-practice .battle-left { top: auto; bottom: calc(var(--hand-height) + 22px); padding-top: 14px; padding-bottom: 14px; }
+  .is-battle.is-practice .battle-left .combatant-identity,
+  .is-battle.is-practice .battle-left .perk-heading,
+  .is-battle.is-practice .battle-left .battle-relics,
+  .is-battle.is-practice .battle-left .reserve-note { display: none; }
+  .is-battle.is-practice .command-left { left: calc(var(--rail) + 32px); }
+  .is-battle.is-practice .target-hint { left: calc(var(--rail) + var(--dock-width) + 58px); }
+  .is-battle.is-practice .tutorial-callout { display: none; }
+  .is-battle.is-practice #target-dock, .is-battle.is-practice .network-ledger, .is-battle.is-practice .combat-log { z-index: 26; }
+}
+@keyframes training-dock { from { opacity: 0; transform: translateY(-8px); } }
+.lesson-debrief .transmit-button, .lesson-debrief .console-button { pointer-events: none; opacity: .6; }
+
+/* ------------------------------------------------------------ smaller tables */
+/* Short screens: the painted plates reach down to the dock row, so the docks start
+   past the rails instead of at the hand's edge. */
+@container game (min-width: 901px) and (max-height: 800px) {
+  .command-left { left: calc(var(--rail) + 26px); }
+  .command-right { right: calc(var(--rail) + 26px); }
+  .is-battle .target-hint { left: calc(var(--rail) + var(--dock-width) + 36px); right: calc(var(--rail) + var(--dock-width) + 36px); }
+  .is-battle .target-hint:not(.active) > span { display: none; }
+}
+@container game (max-width: 1250px) and (min-width: 901px) {
+  .is-battle { --dock-width: 236px; }
+  .console-copy em { font-size: 10px; }
+  .engine-badge { width: 56px; }
+}
+@container game (max-width: 1100px) and (min-width: 901px) {
+  .is-battle { --dock-width: 214px; }
+  .console-copy em, .protocol-slot small { display: none; }
+}
+@container game (max-width: 900px) {
+  .is-battle { --dock-bottom: calc(var(--hand-height) + 8px); --dock-width: calc(50% - 20px); }
+  .command-left { left: 12px; }
+  .command-right { right: 12px; }
+  .console-copy em, .protocol-slot small, .engine-badge small { display: none; }
+  .console-button, .protocol-slot, .engine-badge { height: 40px; }
+  .console-button { grid-template-columns: 28px 1fr auto; }
+  .console-glyph { width: 28px; height: 28px; }
+  .engine-badge { width: 44px; }
+  .network-ledger .ledger-chip.is-terrain, .network-ledger .ledger-chip.is-next { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .console-button::after, .game-card.upgraded::after, .protocol-slot.will-trigger, .transmit-button.buffering::after, .game-card.junk-card .card-sigil, .engine-badge.at-risk { animation: none; }
+}
+.reduced-motion .console-button::after, .reduced-motion .game-card.upgraded::after, .reduced-motion .protocol-slot.will-trigger, .reduced-motion .transmit-button.buffering::after, .reduced-motion .game-card.junk-card .card-sigil, .reduced-motion .engine-badge.at-risk { animation: none; }
+
+/* ------------------------------------------------------------ art-direction pass
+   Plate kickers part around the painted crest jewel instead of running under it. */
+.plate-kicker > span:not(.visually-hidden) + .visually-hidden + span { margin-left: .45em; }
+@container game (min-width: 901px) {
+  .is-battle .battle-plate .plate-kicker { display: grid; grid-template-columns: 1fr 38px 1fr; align-items: center; }
+  .is-battle .battle-plate .plate-kicker > span:first-child { grid-column: 1; text-align: right; }
+  .is-battle .battle-plate .plate-kicker > span:last-child { grid-column: 3; margin: 0; text-align: left; }
+}
+
+/* The painted thorns reach well inside the hostile plate's lower edge: the last
+   intent line keeps clear of them at every rail width. */
+@container game (min-width: 901px) {
+  .is-battle .battle-plate.enemy-plate { padding-bottom: max(36px, calc(var(--rail) * .175)); }
+}
+
+/* The console reads in full: the cost sits on the glyph like a card's cost gem,
+   so the command name and its effect get the whole face of the button. */
+.console-button { grid-template-columns: 38px minmax(0, 1fr); gap: 10px; padding: 4px 10px 4px 7px; }
+.console-glyph { position: relative; width: 38px; height: 38px; }
+.console-cost {
+  position: absolute; left: 29px; top: 27px; z-index: 1;
+  width: 20px; height: 22px; font-size: 12.5px;
+  box-shadow: 0 0 0 2px #0a141b;
+}
+.console-cost small { display: none; }
+.console-copy strong { font-size: 14px; letter-spacing: .03em; overflow: visible; text-overflow: clip; }
+.console-copy em { overflow: visible; text-overflow: clip; font-size: 11px; }
+@container game (max-width: 1250px) and (min-width: 901px) {
+  .console-copy strong { font-size: 13px; letter-spacing: .01em; }
+  .console-copy em { font-size: 10.5px; }
+}
+@container game (max-width: 900px) {
+  .console-button { grid-template-columns: 30px minmax(0, 1fr); }
+  .console-glyph { width: 30px; height: 30px; }
+  .console-cost { left: 21px; top: 19px; width: 17px; height: 19px; font-size: 11px; }
+}
+
+/* Field Training: the coach and a compact vitals card form one quiet column, both
+   exactly as wide as the rail so nothing reaches the field seals or the console.
+   The painted frame steps aside in practice; the card keeps a one-line identity. */
+@container game (min-width: 901px) {
+  .is-battle.is-practice #lesson-layer .training-panel { width: calc(var(--rail) + 12px); }
+  .is-battle.is-practice .player-plate {
+    left: 16px; width: calc(var(--rail) + 12px); padding: 10px 14px 9px;
+    filter: drop-shadow(0 10px 22px #000b);
+  }
+  .is-battle.is-practice .player-plate::before {
+    inset: 0; z-index: -1;
+    background: radial-gradient(120% 90% at 0% 0%, #2a3a3d55, transparent 60%), linear-gradient(160deg, #142229f2, #0a141af4 70%);
+    border: 1px solid #c3a26a8c; outline: 3px double #b8955322; outline-offset: 3px;
+  }
+  .is-battle.is-practice .battle-left .combatant-identity { display: flex; min-height: 0; margin: 0 0 6px; }
+  .is-battle.is-practice .battle-left .combatant-identity > div { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; text-align: left; }
+  .is-battle.is-practice .battle-left .plate-kicker { display: block; margin: 0; font-size: 8px; color: #c6ab77; }
+  .is-battle.is-practice .battle-left .plate-kicker > span:last-child { margin-left: .45em; }
+  .is-battle.is-practice .battle-left .plate-heading { font-size: 12.5px; }
+  .is-battle.is-practice .battle-left .vital-heading { margin-bottom: 5px; }
+  .is-battle.is-practice .battle-left .vital-heading strong { font-size: 19px; }
+  .is-battle.is-practice .survival-forecast { margin: 4px 0 5px; }
+  .is-battle.is-practice .player-resources { padding: 4px 0; margin-bottom: 4px; }
+  .is-battle.is-practice .player-resources > div { grid-template-columns: auto auto; column-gap: 5px; place-content: center; }
+  .is-battle.is-practice .player-resources > div > svg { width: 16px; height: 16px; }
+  .is-battle.is-practice .player-resources strong { font-size: 20px !important; }
+  .is-battle.is-practice .player-resources > div > span { grid-column: 1 / -1; font-size: 8px; }
+  .is-battle.is-practice .player-tools { padding-top: 4px; }
+  .is-battle.is-practice .command-left { left: calc(var(--rail) + 44px); }
+}
+/* Docked coach: the words come first. The seal steps aside, the kicker keeps to one
+   line, and the title stays compact so the coach's advice is visible without scrolling. */
+@container game (min-width: 901px) {
+  .is-battle.is-practice #lesson-layer .training-seal { display: none; }
+  .is-battle.is-practice #lesson-layer .training-head { gap: 6px; grid-template-columns: minmax(0, 1fr) auto; }
+  .is-battle.is-practice #lesson-layer .training-titles { min-width: 0; }
+  .is-battle.is-practice #lesson-layer .training-kicker { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .is-battle.is-practice #lesson-layer .training-head h3 { font-size: 14px; }
+}
+@container game (min-width: 901px) and (max-height: 900px) {
+  /* Only the goal in hand is listed; the meter shows how far the lesson has come. */
+  .is-battle.is-practice #lesson-layer .training-panel:not(.is-complete) .training-goals li:not(.current) { display: none; }
+}
+/* Short tables: the card keeps only what a lesson needs (integrity and the three
+   numbers), so the coach has room to speak. */
+@container game (min-width: 901px) and (max-height: 800px) {
+  .is-battle.is-practice .battle-left .combatant-identity,
+  .is-battle.is-practice .survival-forecast,
+  .is-battle.is-practice .player-tools { display: none; }
+  .is-battle.is-practice .player-resources { margin: 5px 0 0; border-bottom: 0; }
+}
+
+/* Big hands overlap to fit instead of scrolling (Slay the Spire style): every card
+   stays in view, later cards sit on top, and the hovered or selected card rises. */
+@container game (min-width: 901px) {
+  .is-battle .card-fan,
+  .is-battle .card-fan:has(.game-card:nth-child(7)) {
+    justify-content: center; overflow: visible; height: 100%; transform: none; padding: 0; gap: 0;
+  }
+  .is-battle .card-fan .game-card + .game-card {
+    margin-left: min(8px, calc((100cqw - 2 * var(--hand-edge) - 8px - var(--hand-size) * var(--card-width)) / (var(--hand-size) - 1)));
+  }
+  .is-battle .card-fan .game-card { position: relative; }
+  .is-battle .card-fan .game-card.selected { z-index: 40; }
+  .is-battle .card-fan:has(.game-card:nth-child(7)) .game-card:not(:hover):not(:focus-visible):not(.selected) { box-shadow: -10px 0 16px -8px #000c, inset 0 0 0 3px #080f1b; }
+  .is-battle .hand-scroll { display: none; }
+}
+
+/* In battle the hostile owns the top of the screen: messages speak from the
+   narration line on the table instead, briefly replacing the log line. */
+@container game (min-width: 901px) {
+  .is-battle #toast { top: auto; bottom: calc(var(--field-bottom) + 90px); max-width: min(620px, calc(100cqw - 2 * var(--rail) - 120px)); transform: translate(-50%, 8px); }
+  .is-battle #toast.show { transform: translate(-50%, 0); }
+  .game-root.is-battle:has(#toast.show) .combat-log { opacity: 0; }
+}
+
+/* Short desktop windows (≤ 800px tall): a long intent — field, fault and itemized
+   extra damage — must still end above the Transmit dial and the hand. Tighten the
+   hostile plate's vertical rhythm instead of hiding any of its text. */
+@container game (min-width: 901px) and (max-height: 800px) {
+  .is-battle .battle-plate { top: 108px; }
+  .is-battle .enemy-plate .combatant-identity { margin-bottom: 4px; }
+  .is-battle .enemy-plate .trait-badge { margin-block: 4px; }
+  .is-battle .enemy-plate .intent-heading { margin-top: 2px; }
+  .is-battle .enemy-plate .intent-medallion { margin-block: 2px; }
+  .is-battle .enemy-plate .intent-description { font-size: 10.5px; line-height: 1.32; margin-bottom: 4px; }
+  .is-battle .enemy-plate .hazard-caption { margin-top: 2px; }
+}

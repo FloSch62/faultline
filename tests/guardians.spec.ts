@@ -1,4 +1,6 @@
-import { test, expect, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+// Every test also fails on any page or console error (see helpers.ts).
+import { expect, test } from "./helpers.ts";
 import { newExpedition } from "../src/core/expedition.ts";
 import { chooseRoom } from "../src/core/run.ts";
 import { ENEMIES } from "../src/core/enemies.ts";

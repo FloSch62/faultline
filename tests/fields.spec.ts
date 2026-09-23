@@ -1,4 +1,6 @@
-import { test, expect, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+// Every test also fails on any page or console error (see helpers.ts).
+import { expect, test } from "./helpers.ts";
 import { newExpedition } from "../src/core/expedition.ts";
 import { chooseRoom } from "../src/core/run.ts";
 import { RELICS } from "../src/core/cards.ts";
@@ -54,7 +56,9 @@ test("player vitals, every relic, fields and full card rules fit without collisi
   await start(page,true);
   for(const viewport of [{width:1366,height:768},{width:1440,height:900},{width:1920,height:1080}]){
     await page.setViewportSize(viewport);await page.mouse.move(0,0);
-    await expect(page.locator('.relic-token')).toHaveCount(9);
+    // Two rows of five fit the plate; the rest fold into a "+N" token that opens the journal.
+    await expect(page.locator('.relic-token')).toHaveCount(Math.min(10, Object.keys(RELICS).length));
+    await expect(page.locator('.relic-more')).toContainText(`+${Object.keys(RELICS).length - 9}`);
     const measurements=await page.evaluate(()=>{
       const panel=document.querySelector('.player-plate')!.getBoundingClientRect();
       const enemy=document.querySelector('.enemy-plate')!.getBoundingClientRect();
@@ -74,7 +78,7 @@ test("player vitals, every relic, fields and full card rules fit without collisi
   }
   await page.locator('.relic-token').first().click();
   await expect(page.getByRole('heading',{name:'Power that stays with you.'})).toBeVisible();
-  await expect(page.locator('dialog .relic-ledger p')).toHaveCount(9);
+  await expect(page.locator('dialog .relic-ledger p')).toHaveCount(Object.keys(RELICS).length);
   await expect(page.locator('dialog .history-list')).toHaveCount(0);
   await page.screenshot({path:'artifacts/relic-journal.png',animations:'disabled'});
   await page.keyboard.press('Escape');

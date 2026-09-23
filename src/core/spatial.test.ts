@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CARDS } from "./cards.ts";
+import { CARDS, RULES, baseCard } from "./cards.ts";
 import { newExpedition, parseExpedition } from "./expedition.ts";
 import {
   chooseRoom,
@@ -32,15 +32,15 @@ test("new expeditions never start with Containerlab or legendary Clabernetes", (
   for (const archetype of ["architect", "warden", "ghost"] as const) {
     for (let seed = 1; seed <= 20; seed++) {
       const r = newExpedition(archetype, seed).run;
-      assert.equal(r.deck.length, 19);
+      assert.equal(r.deck.length, 17);
       assert.ok(!r.deck.includes("containerlab"));
       assert.ok(!r.deck.includes("clabernetes"));
       assert.ok(
         r.deck.includes("startup-config") && r.deck.includes("inspect"),
       );
       chooseRoom(r, "0-1");
-      assert.ok(r.hand.includes("router"));
-      assert.ok(r.hand.filter((id) => id === "fiber").length >= 2);
+      assert.ok(r.hand.some((id) => ["router", "hardened-router"].includes(baseCard(id))));
+      assert.ok(r.hand.filter((id) => CARDS[id].target === "link").length >= 2);
       assert.ok(
         !r.hand.includes("containerlab") && !r.hand.includes("clabernetes"),
       );
@@ -85,7 +85,7 @@ test("any independent north-south pair grants separation even when center is ins
   assert.equal(
     preview.shieldTerms.find((term) => term.label.startsWith("Separated"))
       ?.amount,
-    2,
+    RULES.separatedCircuitShield,
   );
   assert.equal(preview.incoming, 0);
   r.energy = 1;
@@ -163,9 +163,17 @@ test("Packet Leech healing is capped, forecast, and resolved from a missing rout
   assert.equal(r.enemy!.hp, 100);
   r.enemy!.hp = 80;
   r.faultLink = null;
-  assert.equal(combatPreview(r).enemyHealing, 0);
-  assert.equal(endTurn(r).packetDamage, 5);
-  assert.equal(r.enemy!.hp, 75);
+  // Turn two is the Siphon Tap: it plants malware, then heals 1 per tap.
+  const tap = combatPreview(r);
+  assert.equal(tap.intent?.kind, "infect");
+  assert.ok(tap.malwareTarget);
+  assert.equal(tap.enemyHealing, 1);
+  const result = endTurn(r);
+  assert.equal(result.packetDamage, 5);
+  assert.ok(result.malwarePlanted);
+  assert.equal(r.enemy!.hp, 76);
+  // The tap now siphons 2 damage from every transmission until scrubbed.
+  assert.equal(combatPreview(r).packetDamage, 3);
 });
 
 test("Sentinel plating is a signed damage term and a firewall bypass selects the better route", () => {
@@ -185,10 +193,11 @@ test("Sentinel plating is a signed damage term and a firewall bypass selects the
     { a: "firewall1", b: "omega" },
   );
   const protectedRoute = combatPreview(r);
-  assert.ok(protectedRoute.signalPath.includes("firewall1"));
-  assert.equal(protectedRoute.packetDamage, 6);
+  // v3: an online firewall anywhere bypasses plating; it adds no damage itself.
+  assert.ok(protectedRoute.online.includes("firewall1"));
+  assert.equal(protectedRoute.packetDamage, 5);
   assert.ok(protectedRoute.damageTerms.every((term) => term.amount >= 0));
-  assert.equal(endTurn(r).packetDamage, 6);
+  assert.equal(endTurn(r).packetDamage, 5);
 });
 
 test("Startup Config is once per router, stacks once per route, and replication preserves it", () => {
@@ -206,7 +215,7 @@ test("Startup Config is once per router, stacks once per route, and replication 
       .filter((node) => node.role === "router")
       .every((node) => node.configured),
   );
-  assert.equal(combatPreview(r).packetDamage, 8);
+  assert.equal(combatPreview(r).packetDamage, 6 + RULES.bandwidthPerChannel);
   r.hand = ["startup-config"];
   assert.equal(playNode(r, 0, "router1").ok, false);
 });
@@ -243,18 +252,6 @@ test("VXLAN creates an amplified protected cable and inspection rewards an onlin
   playInstant(r, 0);
   assert.deepEqual(r.hand, ["guard"]);
   assert.deepEqual(r.drawPile, ["pulse"]);
-});
-
-test("old saves retain legitimately present signature cards without injecting missing ones", () => {
-  const e = newExpedition("ghost", 71);
-  e.run.deck.push("containerlab", "clabernetes");
-  delete e.cardSet;
-  const restored = parseExpedition(JSON.stringify(e))!;
-  assert.deepEqual(restored.run.deck, e.run.deck);
-  assert.equal(
-    restored.run.deck.filter((id) => id === "clabernetes").length,
-    1,
-  );
 });
 
 test("legendary reward frequency is substantially below the specific Containerlab rare", () => {

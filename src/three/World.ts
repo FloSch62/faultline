@@ -9,10 +9,13 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { FXAAShader } from "three/addons/shaders/FXAAShader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { linkKey } from "../core/graph.ts";
-import type { Enemy, NetworkNode, Role, Topology, Zone, ZoneEffect } from "../core/types.ts";
+import type { Enemy, Malware, NetworkNode, Role, Terrain, Topology, Zone, ZoneEffect } from "../core/types.ts";
 import type { Intent } from "../core/run.ts";
 import { ENEMIES } from "../core/enemies.ts";
 import { EnemyActor } from "./EnemyActor.ts";
+import { cylinder, glow, mat, ring } from "./materials.ts";
+import { COLORS, addRoleBody, addSalvageScrap, animateDevice, newDeviceGroup, type DeviceGroup } from "./devices.ts";
+import { MALWARE_COLOR, animateProp, buildDebris, buildMalware, buildMalwareGhost, type PropGroup } from "./props.ts";
 
 export type WorldPoint = { x: number; z: number };
 export type BoardZone = Zone;
@@ -21,14 +24,11 @@ export interface WorldCallbacks {
   onNode: (id: string) => void;
   onLink: (key: string) => void;
   onMove: (id: string, point: WorldPoint | null, finished: boolean) => void;
+  /** A planted malware node was clicked (scrub it). */
+  onMalware?: (id: string) => void;
 }
-type DeviceGroup = THREE.Group & {
-  userData: {
-    nodeId: string;
-    rings: THREE.Object3D[];
-    floaters: THREE.Object3D[];
-  };
-};
+/** Anything that may appear in an enemy intent, including kinds added by later rules. */
+type ActionKind = Intent["kind"] | "infect";
 interface FlyingPacket {
   mesh: THREE.Group;
   routes: THREE.Curve<THREE.Vector3>[];
@@ -42,10 +42,18 @@ interface Spark {
   life: number;
 }
 interface SignalPulse {
-  mesh: THREE.Mesh<THREE.TorusGeometry, THREE.MeshBasicMaterial>;
+  mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
   life: number;
   duration: number;
   scale: number;
+  delay: number;
+}
+interface Bolt {
+  mesh: THREE.Group;
+  curve: THREE.Curve<THREE.Vector3>;
+  start: number;
+  duration: number;
+  done: () => void;
 }
 interface CableVisual {
   body: THREE.MeshPhysicalMaterial;
@@ -56,69 +64,13 @@ interface CableVisual {
   source: string;
 }
 
-const COLORS: Record<Role, number> = {
-  client: 0xe2c184,
-  router: 0x91c9bf,
-  switch: 0xa0b8ca,
-  firewall: 0xda9e69,
-};
+/** Primary route is gold; every other independent channel is cyan. */
+export const CHANNEL_COLORS = { primary: 0xf2c46d, secondary: 0x6fe0f0 } as const;
+/** The hostile rises from behind the far rail: the table hides its lower body and its
+ * crown reaches the header band. Sized so the head stays on screen from 1280×720 up. */
+const ENEMY_HOME = new THREE.Vector3(0, 0.7, -10.6);
+const enemyHome = (size: number) => ENEMY_HOME.clone().setY(ENEMY_HOME.y - (size - 10.5) * 0.3);
 const snap = (n: number) => Math.round(n * 2) / 2;
-
-function mat(
-  color: number,
-  emissive = 0x000000,
-  intensity = 0,
-): THREE.MeshPhysicalMaterial {
-  return new THREE.MeshPhysicalMaterial({
-    color,
-    metalness: 0.64,
-    roughness: 0.53,
-    clearcoat: 0.12,
-    clearcoatRoughness: 0.48,
-    emissive,
-    emissiveIntensity: intensity,
-  });
-}
-function glow(color: number, opacity = 1): THREE.MeshBasicMaterial {
-  return new THREE.MeshBasicMaterial({
-    color,
-    transparent: opacity < 1,
-    opacity,
-    depthWrite: opacity === 1,
-  });
-}
-function cylinder(
-  radiusTop: number,
-  radiusBottom: number,
-  height: number,
-  sides: number,
-  material: THREE.Material,
-  y: number,
-): THREE.Mesh {
-  const mesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(radiusTop, radiusBottom, height, sides),
-    material,
-  );
-  mesh.position.y = y;
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  return mesh;
-}
-function ring(
-  radius: number,
-  tube: number,
-  color: number,
-  y: number,
-  opacity = 1,
-): THREE.Mesh {
-  const mesh = new THREE.Mesh(
-    new THREE.TorusGeometry(radius, tube, 6, 64),
-    glow(color, opacity),
-  );
-  mesh.rotation.x = Math.PI / 2;
-  mesh.position.y = y;
-  return mesh;
-}
 
 export class World {
   readonly scene = new THREE.Scene();
@@ -135,10 +87,15 @@ export class World {
   private enemyFieldTexture!: THREE.Texture;
   private enemyExpeditionTexture!: THREE.Texture;
   private guardianTexture!: THREE.Texture;
-  private enemySize = 4.3;
+  private enemyLight!: THREE.PointLight;
+  private enemyUnderLight!: THREE.PointLight;
+  private enemySize = 10.5;
+  /** World units the hostile sinks behind the far rail so its head stays in frame. */
+  private enemyDrop = 0;
+  private enemyBoss = false;
   private enemyHitAt = 0;
   private enemyAction: {
-    kind: Intent["kind"]; start: number; duration: number;
+    kind: ActionKind; start: number; duration: number;
     effect: THREE.Group; target: THREE.Vector3; origin: THREE.Vector3;
     impacted: boolean; done: () => void; onImpact: () => void;
   } | null = null;
@@ -151,15 +108,30 @@ export class World {
   private readonly resizeObserver: ResizeObserver;
   private readonly board = new THREE.Group();
   private readonly dynamic = new THREE.Group();
+  private readonly terrainGroup = new THREE.Group();
+  private readonly malwareGroup = new THREE.Group();
   private readonly enemyGroup = new THREE.Group();
   private readonly ambiance = new THREE.Group();
+  private motes!: THREE.Points;
+  private readonly shafts: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>[] = [];
   private readonly hitObjects: THREE.Object3D[] = [];
+  private readonly malwareHits: THREE.Object3D[] = [];
   private readonly devices = new Map<string, DeviceGroup>();
   private readonly cableCurves = new Map<string, THREE.Curve<THREE.Vector3>>();
   private readonly cableVisuals = new Map<string, CableVisual>();
-  private readonly signalSources = new Map<string, string>();
-  private readonly alternateSources = new Map<string, string>();
+  /** linkKey → { travel direction source, channel index (0 = primary) } */
+  private readonly channelSources = new Map<string, { source: string; channel: number }>();
+  private readonly channelNodes = new Map<string, number>();
+  private channelPaths: string[][] = [];
   private routeSignature = "";
+  private online: Set<string> | null = null;
+  private terrainSignature = "";
+  private malwareSignature = "";
+  private terrain: Terrain | null = null;
+  private malware: Malware[] = [];
+  private malwareForecast: { x: number; z: number } | null = null;
+  /** Last known malware positions, so a scrub effect can play after removal. */
+  private readonly malwareSpots = new Map<string, WorldPoint>();
   private forecastTarget: string | null = null;
   private readonly forecastMarker = new THREE.Group();
   private readonly zoneVisuals = new Map<BoardZone, {
@@ -183,13 +155,13 @@ export class World {
     routed: boolean;
   }[] = [];
   private readonly placement: THREE.Group;
+  private placementMaterials: THREE.MeshBasicMaterial[] = [];
   private scanMaterial!: THREE.ShaderMaterial;
-  private readonly enemyCore: THREE.Group;
-  private readonly enemyShell: THREE.Group;
   private readonly light: THREE.PointLight;
   private packets: FlyingPacket[] = [];
   private sparks: Spark[] = [];
   private pulses: SignalPulse[] = [];
+  private bolts: Bolt[] = [];
   private readonly deviceStates = new Map<string, string>();
   private battleIdentity: string | null = null;
   private topology: Topology = { nodes: [], links: [] };
@@ -210,6 +182,8 @@ export class World {
   private visible = true;
   private frame = 0;
   private impactEndsAt = 0;
+  private shake = { until: 0, power: 0, duration: 1 };
+  private readonly cameraRest = new THREE.Vector3();
 
   constructor(canvas: HTMLCanvasElement, callbacks: WorldCallbacks) {
     this.canvas = canvas;
@@ -219,7 +193,7 @@ export class World {
     );
     backdrop.colorSpace = THREE.SRGBColorSpace;
     this.scene.background = backdrop;
-    this.scene.backgroundIntensity = 0.65;
+    this.scene.backgroundIntensity = 0.62;
     this.camera.position.set(0, 12.8, 18.8);
     this.camera.lookAt(0, 0.2, -0.4);
     this.renderer = new THREE.WebGLRenderer({
@@ -231,7 +205,7 @@ export class World {
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.94;
+    this.renderer.toneMappingExposure = 0.96;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.setClearColor(0x000000, 0);
@@ -239,7 +213,7 @@ export class World {
     const roomEnvironment = new RoomEnvironment();
     this.environment = pmrem.fromScene(roomEnvironment, 0.04);
     this.scene.environment = this.environment.texture;
-    this.scene.environmentIntensity = 0.35;
+    this.scene.environmentIntensity = 0.38;
     roomEnvironment.dispose();
     pmrem.dispose();
     this.controls = new OrbitControls(this.camera, canvas);
@@ -254,7 +228,7 @@ export class World {
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.composer.addPass(
-      new UnrealBloomPass(new THREE.Vector2(1, 1), 0.37, 0.28, 0.95),
+      new UnrealBloomPass(new THREE.Vector2(1, 1), 0.38, 0.3, 0.95),
     );
     this.composer.addPass(new OutputPass());
     this.antialias = new ShaderPass(FXAAShader);
@@ -283,9 +257,9 @@ export class World {
     this.scene.add(this.placement);
     this.buildForecastMarker();
     this.scene.add(this.forecastMarker);
+    this.scene.add(this.terrainGroup);
+    this.scene.add(this.malwareGroup);
     this.scene.add(this.dynamic);
-    this.enemyCore = new THREE.Group();
-    this.enemyShell = new THREE.Group();
     this.buildEnemy();
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(canvas.parentElement ?? canvas);
@@ -360,10 +334,10 @@ export class World {
     this.scanMaterial = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
-      uniforms: { uTime: { value: 0 }, uAlpha: { value: 0.44 } },
+      uniforms: { uTime: { value: 0 }, uAlpha: { value: 0.44 }, uThreat: { value: new THREE.Color(0x000000) } },
       vertexShader: `varying vec2 vUv; void main(){vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
       fragmentShader: `
-        uniform float uTime; uniform float uAlpha; varying vec2 vUv;
+        uniform float uTime; uniform float uAlpha; uniform vec3 uThreat; varying vec2 vUv;
         float line(vec2 p){ vec2 g=abs(fract(p)-.5); vec2 w=fwidth(p)*1.2; return 1.-min(1.,min(g.x/w.x,g.y/w.y)); }
         void main(){
           vec2 uv=vUv; vec2 centered=(uv-.5)*vec2(1.62,1.0);
@@ -375,6 +349,9 @@ export class World {
           vec3 base=vec3(.023,.030,.033);
           vec3 teal=vec3(.25,.25,.19);
           vec3 color=base+teal*(grid*.14+major*.15+sweep*.015+rings*.01+lane*.2);
+          // The hostile's presence bleeds across the far rail of the table.
+          float far=smoothstep(.55,1.,uv.y);
+          color+=uThreat*far*far*(.55+.45*sin(uTime*1.3));
           float fade=smoothstep(0.,.06,uv.x)*smoothstep(0.,.06,uv.y)*smoothstep(0.,.06,1.-uv.x)*smoothstep(0.,.06,1.-uv.y);
           gl_FragColor=vec4(color,fade*uAlpha);
         }`,
@@ -518,7 +495,7 @@ export class World {
       "position",
       new THREE.Float32BufferAttribute(motes, 3),
     );
-    const points = new THREE.Points(
+    this.motes = new THREE.Points(
       geometry,
       new THREE.PointsMaterial({
         color: 0x9fc7e1,
@@ -529,7 +506,7 @@ export class World {
         depthWrite: false,
       }),
     );
-    this.ambiance.add(points);
+    this.ambiance.add(this.motes);
     const under = new THREE.PointLight(0x52c6ef, 42, 16, 2);
     under.position.set(0, -2.1, 0);
     this.ambiance.add(under);
@@ -549,15 +526,52 @@ export class World {
       tower.add(antenna);
       this.ambiance.add(tower);
     }
+    // Faint light shafts fall through the relay hall behind the hostile.
+    const shaftCanvas = document.createElement("canvas");
+    shaftCanvas.width = 64;
+    shaftCanvas.height = 256;
+    const shaft = shaftCanvas.getContext("2d")!;
+    const across = shaft.createLinearGradient(0, 0, 64, 0);
+    across.addColorStop(0, "rgba(255,255,255,0)");
+    across.addColorStop(0.5, "rgba(255,255,255,1)");
+    across.addColorStop(1, "rgba(255,255,255,0)");
+    shaft.fillStyle = across;
+    shaft.fillRect(0, 0, 64, 256);
+    shaft.globalCompositeOperation = "destination-in";
+    const down = shaft.createLinearGradient(0, 0, 0, 256);
+    down.addColorStop(0, "rgba(0,0,0,.9)");
+    down.addColorStop(0.7, "rgba(0,0,0,.35)");
+    down.addColorStop(1, "rgba(0,0,0,0)");
+    shaft.fillStyle = down;
+    shaft.fillRect(0, 0, 64, 256);
+    const shaftTexture = new THREE.CanvasTexture(shaftCanvas);
+    shaftTexture.colorSpace = THREE.SRGBColorSpace;
+    for (const [x, width, tilt] of [[-6.5, 3.2, 0.2], [-1.2, 4.6, 0.08], [5.4, 3.6, -0.16]] as const) {
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(width, 19),
+        new THREE.MeshBasicMaterial({
+          map: shaftTexture, color: 0xffe3b0, transparent: true, opacity: 0.06,
+          depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false,
+        }),
+      );
+      mesh.position.set(x, 6.5, -15.5);
+      mesh.rotation.z = tilt;
+      mesh.renderOrder = -1;
+      this.shafts.push(mesh);
+      this.ambiance.add(mesh);
+    }
     this.scene.add(this.ambiance);
   }
 
   private buildPlacement(): THREE.Group {
     const group = new THREE.Group();
-    group.add(ring(0.84, 0.022, 0x80ffe6, 0.65, 0.9));
-    group.add(ring(0.59, 0.012, 0x80ffe6, 0.67, 0.55));
-    const disc = cylinder(0.57, 0.57, 0.015, 32, glow(0x72eedd, 0.1), 0.66);
-    group.add(disc);
+    const add = (mesh: THREE.Mesh) => {
+      this.placementMaterials.push(mesh.material as THREE.MeshBasicMaterial);
+      group.add(mesh);
+    };
+    add(ring(0.84, 0.022, 0x80ffe6, 0.65, 0.9));
+    add(ring(0.59, 0.012, 0x80ffe6, 0.67, 0.55));
+    add(cylinder(0.57, 0.57, 0.015, 32, glow(0x72eedd, 0.1), 0.66));
     for (let i = 0; i < 4; i++) {
       const dash = new THREE.Mesh(
         new THREE.BoxGeometry(0.23, 0.025, 0.04),
@@ -569,7 +583,7 @@ export class World {
         Math.sin((i * Math.PI) / 2) * 0.97,
       );
       dash.rotation.y = (-i * Math.PI) / 2;
-      group.add(dash);
+      add(dash);
     }
     group.visible = false;
     return group;
@@ -592,7 +606,7 @@ export class World {
   }
 
   private buildEnemy() {
-    this.enemyGroup.position.set(0, 1.2, -6.4);
+    this.enemyGroup.position.copy(ENEMY_HOME);
     this.enemyTexture = new THREE.TextureLoader().load(
       `${import.meta.env.BASE_URL}art/hostiles.png`,
     );
@@ -612,11 +626,19 @@ export class World {
     this.enemyExpeditionTexture.colorSpace = THREE.SRGBColorSpace;
     this.guardianTexture = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}art/stage-guardians.png`);
     this.guardianTexture.colorSpace = THREE.SRGBColorSpace;
+    for (const texture of [this.enemyTexture, this.enemyAlphaTexture, this.enemyFieldTexture, this.enemyExpeditionTexture, this.guardianTexture])
+      texture.anisotropy = 4;
     this.enemySprite.material.map = this.enemyTexture;
-    this.enemySprite.scale.set(4.3, 4.3, 1);
+    this.enemySprite.scale.setScalar(this.enemySize);
     this.enemyGroup.add(this.enemySprite);
-    const enemyLight = new THREE.PointLight(0xe9a05c, 20, 9, 2);
-    this.enemyGroup.add(enemyLight);
+    this.enemyGroup.add(this.enemyActor.embers);
+    // A coloured spill across the far rail, and a low glow that lifts the body from below.
+    this.enemyLight = new THREE.PointLight(0xe9a05c, 26, 13, 1.6);
+    this.enemyLight.position.set(0, 0.2, 3.8);
+    this.enemyGroup.add(this.enemyLight);
+    this.enemyUnderLight = new THREE.PointLight(0xe9a05c, 18, 8, 2);
+    this.enemyUnderLight.position.set(0, -1.6, 1.4);
+    this.enemyGroup.add(this.enemyUnderLight);
     this.scene.add(this.enemyGroup);
     this.enemyGroup.visible = false;
   }
@@ -659,9 +681,36 @@ export class World {
     return sprite;
   }
 
+  private isOnline(node: NetworkNode) {
+    // A honeypot works offline: any cable makes it a live decoy.
+    if (node.role === "honeypot") return this.isCabled(node);
+    return node.fixed || !this.online || this.online.has(node.id);
+  }
+
+  private isCabled(node: NetworkNode) {
+    return this.topology.links.some((link) => link.a === node.id || link.b === node.id);
+  }
+
+  private deviceLabel(node: NetworkNode): THREE.Sprite {
+    const online = this.isOnline(node);
+    const jammed = node.id === this.faultNode;
+    const status = jammed ? " · JAMMED"
+      : !online && node.salvage ? " · SALVAGE"
+      : node.role === "honeypot" ? online ? " · DECOY" : " · UNCABLED"
+      : !online ? " · OFFLINE"
+      : node.upgraded ? " · UPGRADED"
+      : node.amplified ? " · AMPLIFIED"
+      : node.stateful ? " · STATEFUL"
+      : node.shielded ? " · GUARDED" : "";
+    const color = jammed ? 0xff6880 : !online ? node.salvage ? 0xc9874a : 0x7f898d : COLORS[node.role];
+    const label = this.makeLabel(`${node.id.toUpperCase()}${status}`, color);
+    label.position.y = node.role === "client" ? 3.0 : node.role === "power" ? 3.05 : 2.86;
+    if (!online) label.material.opacity = 0.78;
+    return label;
+  }
+
   private createDevice(node: NetworkNode): DeviceGroup {
-    const group = new THREE.Group() as DeviceGroup;
-    group.userData = { nodeId: node.id, rings: [], floaters: [] };
+    const group = newDeviceGroup(node);
     group.position.set(node.x, -0.42, node.z);
     const color = COLORS[node.role];
     const dark = mat(0x242c2f, color, 0.06);
@@ -700,98 +749,7 @@ export class World {
     aura.position.y = 0.78;
     group.add(aura);
 
-    if (node.role === "client") {
-      group.add(cylinder(0.46, 0.54, 0.48, 8, dark, 1.2));
-      group.add(cylinder(0.49, 0.49, 0.07, 8, trim, 1.48));
-      for (let i = 0; i < 4; i++) {
-        const fin = new THREE.Mesh(
-          new THREE.BoxGeometry(0.08, 0.54, 0.24),
-          mat(0x5b7187),
-        );
-        const angle = (i * Math.PI) / 2;
-        fin.position.set(Math.sin(angle) * 0.4, 1.29, Math.cos(angle) * 0.4);
-        fin.rotation.y = angle;
-        group.add(fin);
-      }
-      const orb = new THREE.Mesh(
-        new THREE.OctahedronGeometry(0.32, 1),
-        luminous,
-      );
-      orb.position.y = 1.89;
-      group.add(orb);
-      group.userData.floaters.push(orb);
-      const halo = ring(0.5, 0.023, color, 1.72, 0.75);
-      group.add(halo);
-      group.userData.rings.push(halo);
-      group.add(cylinder(0.08, 0.08, 0.37, 8, luminous, 1.68));
-    } else if (node.role === "router") {
-      group.add(cylinder(0.53, 0.59, 0.5, 6, dark, 1.23));
-      group.add(cylinder(0.51, 0.51, 0.075, 6, luminous, 1.52));
-      const floatingRing = ring(0.62, 0.047, color, 1.85, 0.92);
-      group.add(floatingRing);
-      group.userData.rings.push(floatingRing);
-      const spindle = new THREE.Mesh(
-        new THREE.OctahedronGeometry(0.25, 0),
-        luminous,
-      );
-      spindle.position.y = 1.9;
-      group.add(spindle);
-      group.userData.floaters.push(spindle);
-      for (let i = 0; i < 6; i++) {
-        const angle = (i * Math.PI) / 3;
-        const port = new THREE.Mesh(
-          new THREE.BoxGeometry(0.17, 0.09, 0.04),
-          glow(i % 2 ? 0x62fce3 : 0x1f98ac),
-        );
-        port.position.set(Math.sin(angle) * 0.52, 1.22, Math.cos(angle) * 0.52);
-        port.rotation.y = angle;
-        group.add(port);
-      }
-    } else if (node.role === "switch") {
-      const chassis = new THREE.Mesh(
-        new THREE.BoxGeometry(1.0, 0.38, 0.68),
-        dark,
-      );
-      chassis.position.y = 1.21;
-      chassis.castShadow = true;
-      group.add(chassis);
-      const lip = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.05, 0.7), trim);
-      lip.position.y = 1.42;
-      group.add(lip);
-      for (let i = 0; i < 5; i++) {
-        const led = new THREE.Mesh(
-          new THREE.BoxGeometry(0.1, 0.055, 0.02),
-          glow(i === 4 ? 0xf1b478 : color),
-        );
-        led.position.set(-0.35 + i * 0.175, 1.18, 0.35);
-        group.add(led);
-      }
-      const plate = new THREE.Mesh(
-        new THREE.BoxGeometry(0.7, 0.018, 0.46),
-        glow(color, 0.45),
-      );
-      plate.position.y = 1.46;
-      group.add(plate);
-    } else {
-      const body = cylinder(0.48, 0.57, 0.61, 5, dark, 1.25);
-      body.rotation.y = Math.PI / 5;
-      group.add(body);
-      const shield = new THREE.Mesh(
-        new THREE.IcosahedronGeometry(0.48, 0),
-        mat(0x593c39, color, 0.65),
-      );
-      shield.position.y = 1.73;
-      group.add(shield);
-      group.userData.floaters.push(shield);
-      const field = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.63, 0.63, 1.18, 6, 1, true),
-        glow(color, 0.11),
-      );
-      field.position.y = 1.43;
-      group.add(field);
-      group.add(ring(0.66, 0.035, color, 1.02, 0.65));
-      group.add(ring(0.61, 0.03, color, 1.95, 0.65));
-    }
+    addRoleBody(group, node, { color, dark, trim, luminous });
 
     if (node.shielded) {
       const shell = new THREE.Mesh(
@@ -819,6 +777,7 @@ export class World {
       group.add(amplifier);
       group.userData.rings.push(amplifier);
     }
+    if (node.salvage) addSalvageScrap(group);
     if (node.id === this.faultNode) {
       const warning = ring(1.07, 0.055, 0xff526b, 0.68, 1);
       group.add(warning);
@@ -826,12 +785,22 @@ export class World {
       red.position.y = 1.5;
       group.add(red);
     }
-    const label = this.makeLabel(
-      `${node.id.toUpperCase()}${node.id === this.faultNode ? " · JAMMED" : node.upgraded ? " · UPGRADED" : node.amplified ? " · AMPLIFIED" : node.shielded ? " · GUARDED" : ""}`,
-      node.id === this.faultNode ? 0xff6880 : color,
-    );
-    label.position.y = node.role === "client" ? 3.0 : 2.86;
+    // Remember every material's lit state so offline hardware can dim without a rebuild.
+    group.traverse((child) => {
+      if (!(child instanceof THREE.Mesh || child instanceof THREE.LineSegments) || child === skirt) return;
+      const material = child.material as THREE.Material;
+      if (material instanceof THREE.MeshPhysicalMaterial || material instanceof THREE.MeshBasicMaterial)
+        group.userData.tinted.push({
+          material,
+          color: material.color.clone(),
+          emissive: material instanceof THREE.MeshPhysicalMaterial ? material.emissive.clone() : null,
+          emissiveIntensity: material instanceof THREE.MeshPhysicalMaterial ? material.emissiveIntensity : 0,
+          opacity: material.opacity,
+        });
+    });
+    const label = this.deviceLabel(node);
     group.add(label);
+    group.userData.label = label;
     const hit = new THREE.Mesh(
       new THREE.CylinderGeometry(0.94, 0.94, 1.85, 12),
       new THREE.MeshBasicMaterial({
@@ -844,7 +813,61 @@ export class World {
     hit.userData.nodeId = node.id;
     group.add(hit);
     this.hitObjects.push(hit);
+    this.applyOnline(group, node);
     return group;
+  }
+
+  /** Offline hardware is desaturated and quiet; salvage stays weathered until it joins a route. */
+  private applyOnline(group: DeviceGroup, node: NetworkNode) {
+    const online = this.isOnline(node);
+    const data = group.userData;
+    const changed = data.online !== online;
+    data.online = online;
+    const gray = new THREE.Color();
+    const rust = new THREE.Color(0x6b4a33);
+    for (const entry of data.tinted) {
+      const material = entry.material;
+      if (online) {
+        material.color.copy(entry.color);
+        if (material instanceof THREE.MeshPhysicalMaterial && entry.emissive) {
+          material.emissive.copy(entry.emissive);
+          material.emissiveIntensity = entry.emissiveIntensity;
+        }
+        if (material.transparent || entry.opacity < 1) material.opacity = entry.opacity;
+      } else {
+        const luminance = entry.color.r * 0.3 + entry.color.g * 0.59 + entry.color.b * 0.11;
+        gray.setRGB(luminance, luminance, luminance).multiplyScalar(0.62);
+        material.color.copy(entry.color).lerp(node.salvage ? rust : gray, node.salvage ? 0.55 : 0.72);
+        if (material instanceof THREE.MeshPhysicalMaterial) {
+          material.emissiveIntensity = entry.emissiveIntensity * 0.12;
+        } else {
+          material.transparent = true;
+          material.opacity = entry.opacity * 0.38;
+        }
+      }
+    }
+    for (const scrap of data.scrap) scrap.visible = !online;
+    if (changed && data.label) {
+      group.remove(data.label);
+      this.disposeObject(data.label);
+      data.label = this.deviceLabel(node);
+      group.add(data.label);
+    }
+    this.refreshSkirt(group);
+  }
+
+  private refreshSkirt(group: DeviceGroup) {
+    const skirt = group.userData.rings[0] as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | undefined;
+    if (!skirt) return;
+    const id = group.userData.nodeId;
+    const active = id === this.selected || id === this.linkSource;
+    const channel = this.channelNodes.get(id);
+    const color = channel === undefined || group.userData.role === "client"
+      ? group.userData.skirtColor
+      : channel === 0 ? CHANNEL_COLORS.primary : CHANNEL_COLORS.secondary;
+    skirt.material.color.setHex(color);
+    skirt.scale.setScalar(active ? 1.15 : 1);
+    skirt.material.opacity = active ? 1 : group.userData.online ? channel === undefined ? 0.8 : 1 : 0.35;
   }
 
   private addCable(a: string, b: string) {
@@ -921,7 +944,8 @@ export class World {
           ? child.material
           : [child.material];
         for (const material of childMaterials) {
-          if ("map" in material && material.map instanceof THREE.Texture)
+          // Shared decal textures (scorch, infection) outlive any single prop.
+          if ("map" in material && material.map instanceof THREE.Texture && !material.map.userData.shared)
             textures.add(material.map);
           materials.add(material);
         }
@@ -943,7 +967,10 @@ export class World {
     const identity = enemy ? `${enemy.id}:${enemy.maxHp}` : null;
     const sameBattle = this.battleIdentity === identity && enemy !== null;
     const previousFault = this.faultNode;
-    if (!sameBattle) this.deviceStates.clear();
+    if (!sameBattle) {
+      this.deviceStates.clear();
+      this.online = null;
+    }
     this.battleIdentity = identity;
     this.topology = topology;
     this.enemy = enemy;
@@ -977,8 +1004,8 @@ export class World {
       if (!topology.nodes.some((node) => node.id === id)) this.deviceStates.delete(id);
     this.enemyGroup.visible = Boolean(enemy);
     if (enemy) {
-      if (!sameBattle) this.enemyActor.enter(enemy.id);
       const { art, boss } = ENEMIES[enemy.id];
+      if (!sameBattle) this.enemyActor.enter(enemy.id, !!boss);
       const texture = ({ "hostiles": this.enemyTexture, "hostiles-alpha": this.enemyAlphaTexture,
         "hostiles-zones": this.enemyFieldTexture, "hostiles-expedition": this.enemyExpeditionTexture,
         "stage-guardians": this.guardianTexture })[art.file]!;
@@ -988,11 +1015,18 @@ export class World {
         this.enemySprite.material.map = texture;
         this.enemySprite.material.needsUpdate = true;
       }
-      this.enemySize = boss ? 5.2 : enemy.id === "storm" ? 4.6 : 4.3;
+      this.enemyBoss = !!boss;
+      // Hostiles loom over the far rail; guardians fill the hall.
+      this.enemySize = boss ? 11.6 : enemy.id === "storm" || enemy.id === "moth" ? 10.9 : 10.5;
       this.enemySprite.scale.setScalar(this.enemySize);
-      (this.enemyGroup.children[1] as THREE.PointLight).color.setHex(
-        enemy.color,
-      );
+      this.frameEnemy();
+      this.enemyLight.color.setHex(enemy.color);
+      this.enemyUnderLight.color.setHex(enemy.color);
+      this.scene.backgroundIntensity = boss ? 0.48 : 0.6;
+      for (const shaft of this.shafts) shaft.material.color.setHex(enemy.color).lerp(new THREE.Color(0xffe3b0), 0.6);
+      (this.scanMaterial.uniforms.uThreat.value as THREE.Color).setHex(enemy.color).multiplyScalar(boss ? 0.075 : 0.05);
+    } else {
+      (this.scanMaterial.uniforms.uThreat.value as THREE.Color).setHex(0x000000);
     }
     this.refreshSelection();
     this.refreshSignalRoute();
@@ -1001,39 +1035,107 @@ export class World {
 
   /** Emphasizes the forecast's chosen routes without rebuilding cable geometry. */
   setSignalRoute(path: string[], alternate: string[] = []) {
-    const signature = JSON.stringify([path, alternate]);
+    this.setChannels([path, alternate].filter((route) => route.length > 1));
+  }
+
+  /** Every live channel: paths[0] is the primary (gold) route, the rest are cyan. */
+  setChannels(paths: string[][]) {
+    const signature = JSON.stringify(paths);
     if (signature === this.routeSignature) return;
     this.routeSignature = signature;
-    this.signalSources.clear();
-    this.alternateSources.clear();
-    for (let index = 0; index < path.length - 1; index++)
-      this.signalSources.set(linkKey(path[index], path[index + 1]), path[index]);
-    for (let index = 0; index < alternate.length - 1; index++)
-      this.alternateSources.set(linkKey(alternate[index], alternate[index + 1]), alternate[index]);
+    this.channelPaths = paths.map((path) => [...path]);
+    this.channelSources.clear();
+    this.channelNodes.clear();
+    paths.forEach((path, channel) => {
+      for (let index = 0; index < path.length - 1; index++) {
+        const key = linkKey(path[index], path[index + 1]);
+        if (!this.channelSources.has(key)) this.channelSources.set(key, { source: path[index], channel });
+      }
+      for (const id of path.slice(1, -1))
+        if (!this.channelNodes.has(id)) this.channelNodes.set(id, channel);
+    });
     this.refreshSignalRoute();
   }
 
   private refreshSignalRoute() {
-    const hasRoute = this.signalSources.size > 0;
+    const hasRoute = this.channelSources.size > 0;
     for (const [key, visual] of this.cableVisuals) {
-      const primary = this.signalSources.has(key);
-      const alternate = this.alternateSources.has(key);
-      const color = visual.faulty ? 0xec755d : primary ? 0x91e5ce : alternate ? 0x96accd : visual.color;
+      const route = this.channelSources.get(key);
+      const primary = route?.channel === 0;
+      const secondary = route !== undefined && !primary;
+      const color = visual.faulty ? 0xec755d : primary ? CHANNEL_COLORS.primary : secondary ? CHANNEL_COLORS.secondary : visual.color;
       visual.body.emissive.setHex(color);
-      visual.body.emissiveIntensity = visual.faulty ? 0.18 : primary ? 0.75 : alternate ? 0.45 : hasRoute ? 0.15 : 0.34;
+      visual.body.emissiveIntensity = visual.faulty ? 0.18 : primary ? 0.85 : secondary ? 0.6 : hasRoute ? 0.15 : 0.34;
       visual.filament.color.setHex(color);
-      visual.filament.opacity = visual.faulty ? 0.4 : primary ? 1 : alternate ? 0.85 : hasRoute ? 0.38 : 0.95;
+      visual.filament.opacity = visual.faulty ? 0.4 : primary ? 1 : secondary ? 0.92 : hasRoute ? 0.38 : 0.95;
       visual.haze.color.setHex(color);
-      visual.haze.opacity = visual.faulty ? 0.075 : primary ? 0.13 : alternate ? 0.07 : hasRoute ? 0.025 : 0.055;
+      visual.haze.opacity = visual.faulty ? 0.075 : primary ? 0.16 : secondary ? 0.1 : hasRoute ? 0.025 : 0.055;
     }
     for (const item of this.cableBeads) {
       const visual = this.cableVisuals.get(item.key)!;
-      const source = this.signalSources.get(item.key) ?? this.alternateSources.get(item.key);
-      item.routed = source !== undefined;
-      item.reversed = source !== undefined && source !== visual.source;
+      const route = this.channelSources.get(item.key);
+      item.routed = route !== undefined;
+      item.reversed = route !== undefined && route.source !== visual.source;
       item.bead.material.color.copy(visual.filament.color);
       item.bead.material.opacity = visual.faulty ? 0.12 : item.routed ? 0.95 : hasRoute ? 0.25 : 0.8;
     }
+    for (const group of this.devices.values()) this.refreshSkirt(group);
+  }
+
+  /** Devices on at least one live route. Terminals are always lit. `null` restores "all online". */
+  setOnline(ids: string[] | null) {
+    const next = ids ? new Set(ids) : null;
+    const previous = this.online;
+    const same = previous === next || (!!previous && !!next && previous.size === next.size && [...next].every((id) => previous.has(id)));
+    if (same) return;
+    this.online = next;
+    for (const node of this.topology.nodes) {
+      const group = this.devices.get(node.id);
+      if (!group) continue;
+      const wasOnline = group.userData.online;
+      this.applyOnline(group, node);
+      // Coming online is a small event: the device lights up with a gold ring.
+      if (!wasOnline && group.userData.online && previous) this.pulseAt(node.x, node.z, CHANNEL_COLORS.primary, 1.1);
+    }
+  }
+
+  /** Wreckage in blocked sockets. Rebuilt only when the layout changes. */
+  setTerrain(terrain: Terrain | null) {
+    const signature = JSON.stringify(terrain?.debris ?? null);
+    this.terrain = terrain;
+    if (signature === this.terrainSignature) return;
+    this.terrainSignature = signature;
+    for (const item of [...this.terrainGroup.children]) {
+      this.terrainGroup.remove(item);
+      this.disposeObject(item);
+    }
+    terrain?.debris.forEach((spot, index) => this.terrainGroup.add(buildDebris(spot.x, spot.z, index + 1 + Math.round(spot.x * 7 + spot.z * 13))));
+  }
+
+  /** Planted malware and the forecast socket where the enemy will plant next. */
+  setMalware(malware: Malware[], forecast: { x: number; z: number } | null) {
+    const signature = JSON.stringify([malware, forecast]);
+    if (signature === this.malwareSignature) return;
+    const previous = new Set(this.malware.map((item) => item.id));
+    this.malwareSignature = signature;
+    this.malware = malware.map((item) => ({ ...item }));
+    this.malwareForecast = forecast ? { ...forecast } : null;
+    for (const item of [...this.malwareGroup.children]) {
+      this.malwareGroup.remove(item);
+      this.disposeObject(item);
+    }
+    this.malwareHits.length = 0;
+    for (const item of malware) {
+      this.malwareSpots.set(item.id, { x: item.x, z: item.z });
+      const { group, hit } = buildMalware(item.x, item.z, item.id, this.makeLabel("MALWARE · SCRUB", MALWARE_COLOR));
+      this.malwareGroup.add(group);
+      this.malwareHits.push(hit);
+      if (this.visible && this.battleIdentity && !previous.has(item.id)) {
+        this.pulseAt(item.x, item.z, MALWARE_COLOR, 1.6);
+        this.burst(new THREE.Vector3(item.x, 1, item.z), MALWARE_COLOR, 14, 3);
+      }
+    }
+    if (forecast) this.malwareGroup.add(buildMalwareGhost(forecast.x, forecast.z));
   }
 
   /** Static segmented coral marker: distinct from a fault that has already happened. */
@@ -1103,21 +1205,92 @@ export class World {
       matchMedia("(prefers-reduced-motion: reduce)").matches;
   }
 
-  private pulseAt(x: number, z: number, color: number, scale = 1) {
+  private pulseAt(x: number, z: number, color: number, scale = 1, delay = 0, geometry?: THREE.BufferGeometry) {
     const mesh = new THREE.Mesh(
-      new THREE.TorusGeometry(0.7, 0.027, 6, 56),
+      geometry ?? new THREE.TorusGeometry(0.7, 0.027, 6, 56),
       glow(color, 0.8),
     );
     mesh.rotation.x = Math.PI / 2;
     mesh.position.set(x, 0.3, z);
+    mesh.visible = delay <= 0;
     this.scene.add(mesh);
     const duration = this.reducedMotion() ? 0.2 : 0.85;
-    this.pulses.push({ mesh, life: duration, duration, scale });
+    this.pulses.push({ mesh, life: duration, duration, scale, delay: this.reducedMotion() ? 0 : delay });
+  }
+
+  /** Sparks thrown from a point; the shared language for impacts, traps and scrubs. */
+  private burst(origin: THREE.Vector3, color: number, count: number, speed: number) {
+    if (this.reducedMotion()) return;
+    for (let i = 0; i < count; i++) {
+      const mesh = new THREE.Mesh(
+        new THREE.TetrahedronGeometry(0.035 + Math.random() * 0.065),
+        glow(color),
+      );
+      mesh.position.copy(origin);
+      this.scene.add(mesh);
+      const velocity = new THREE.Vector3(
+        (Math.random() - 0.5) * speed * 2,
+        Math.random() * speed * 1.2 + speed * 0.3,
+        (Math.random() - 0.5) * speed * 2,
+      );
+      this.sparks.push({ mesh, velocity, life: 0.45 + Math.random() * 0.45 });
+    }
+  }
+
+  private shakeCamera(power: number, milliseconds: number) {
+    if (this.reducedMotion()) return;
+    const now = performance.now();
+    if (now + milliseconds > this.shake.until || power > this.shake.power)
+      this.shake = { until: now + milliseconds, power: Math.max(power, now < this.shake.until ? this.shake.power : 0), duration: milliseconds };
   }
 
   pulseNetwork(effect: "shield" | "repair" | "surge") {
     const color = effect === "shield" ? 0xffd590 : effect === "repair" ? 0x83eec7 : 0x8ce6ef;
     for (const node of this.topology.nodes) this.pulseAt(node.x, node.z, color);
+  }
+
+  /**
+   * Local event on one device (or a malware id for "scrub"):
+   * - trap: a honeypot absorbed a disruption; an amber bolt strikes the hostile.
+   * - trigger: an armed protocol fired from this device.
+   * - scrub: malware dissolves.
+   */
+  pulseNode(id: string, kind: "trap" | "trigger" | "scrub") {
+    const node = this.topology.nodes.find((item) => item.id === id);
+    const spot = node ? { x: node.x, z: node.z } : this.malwareSpots.get(id);
+    if (!spot) return;
+    const color = { trap: 0xffa640, trigger: 0x9ff3ff, scrub: 0xb8ffd9 }[kind];
+    const origin = new THREE.Vector3(spot.x, 1.3, spot.z);
+    if (kind === "trigger") {
+      // A hexagonal protocol seal expands twice.
+      this.pulseAt(spot.x, spot.z, color, 1.2, 0, new THREE.TorusGeometry(0.8, 0.035, 4, 6));
+      this.pulseAt(spot.x, spot.z, 0xffffff, 1.6, 0.12, new THREE.TorusGeometry(0.8, 0.02, 4, 6));
+      this.burst(origin, color, 10, 2.4);
+    } else if (kind === "scrub") {
+      this.pulseAt(spot.x, spot.z, color, 1.4);
+      this.pulseAt(spot.x, spot.z, MALWARE_COLOR, 0.9, 0.1);
+      this.burst(origin, color, 20, 3.2);
+      this.burst(origin, MALWARE_COLOR, 10, 2.2);
+    } else {
+      this.pulseAt(spot.x, spot.z, color, 1.6);
+      this.pulseAt(spot.x, spot.z, 0xffe0a0, 1.1, 0.14);
+      this.burst(origin, color, 16, 3);
+      this.launchBolt(origin, color, () => this.impact(color, 16));
+    }
+  }
+
+  /** An arcing projectile from the table into the hostile's body. */
+  private launchBolt(from: THREE.Vector3, color: number, done: () => void) {
+    if (this.reducedMotion() || !this.enemy) { done(); return; }
+    const to = this.enemyGroup.position.clone().add(new THREE.Vector3(0, this.enemySize * 0.08, 0));
+    const middle = from.clone().lerp(to, 0.5);
+    middle.y += 4.5;
+    const mesh = new THREE.Group();
+    mesh.add(new THREE.Mesh(new THREE.OctahedronGeometry(0.16), glow(0xfff1d0)));
+    mesh.add(new THREE.Mesh(new THREE.SphereGeometry(0.36, 12, 10), glow(color, 0.3)));
+    mesh.position.copy(from);
+    this.scene.add(mesh);
+    this.bolts.push({ mesh, curve: new THREE.QuadraticBezierCurve3(from, middle, to), start: performance.now(), duration: 520, done });
   }
 
   setPlacement(role: Role | null, linkSource: string | null = null) {
@@ -1136,14 +1309,7 @@ export class World {
     this.refreshSelection();
   }
   private refreshSelection() {
-    for (const [id, group] of this.devices) {
-      const active = id === this.selected || id === this.linkSource;
-      const skirt = group.userData.rings[0] as THREE.Mesh;
-      if (skirt) {
-        skirt.scale.setScalar(active ? 1.15 : 1);
-        (skirt.material as THREE.MeshBasicMaterial).opacity = active ? 1 : 0.8;
-      }
-    }
+    for (const group of this.devices.values()) this.refreshSkirt(group);
   }
 
   private updateRay(
@@ -1172,18 +1338,29 @@ export class World {
     if (Math.abs(position.x) > 7.35 || Math.abs(position.z) > 4.85) return null;
     return { x: snap(position.x), z: snap(position.z) };
   }
+  /** Mirrors the placement rules: device spacing 1.55, wreckage and malware 1.3. */
+  private socketBlocked(point: WorldPoint) {
+    return this.topology.nodes.some((node) => Math.hypot(node.x - point.x, node.z - point.z) < 1.55) ||
+      (this.terrain?.debris ?? []).some((spot) => Math.hypot(spot.x - point.x, spot.z - point.z) < 1.3) ||
+      this.malware.some((item) => Math.hypot(item.x - point.x, item.z - point.z) < 1.3);
+  }
   previewAt(clientX: number, clientY: number) {
     const point = this.pointFromScreen(clientX, clientY);
     this.placement.visible = Boolean(this.placementRole && point);
-    if (point) this.placement.position.set(point.x, 0, point.z);
+    if (point) {
+      this.placement.position.set(point.x, 0, point.z);
+      const blocked = this.socketBlocked(point);
+      for (const material of this.placementMaterials) material.color.setHex(blocked ? 0xf07a64 : 0x80ffe6);
+    }
   }
   private hit(event: PointerEvent) {
     this.updateRay(event);
-    const object = this.raycaster.intersectObjects(this.hitObjects, false)[0]
+    const object = this.raycaster.intersectObjects([...this.malwareHits, ...this.hitObjects], false)[0]
       ?.object;
     return {
       node: object?.userData.nodeId as string | undefined,
       link: object?.userData.linkKey as string | undefined,
+      malware: object?.userData.malwareId as string | undefined,
     };
   }
   private onPointerDown = (event: PointerEvent) => {
@@ -1230,8 +1407,10 @@ export class World {
       return;
     }
     this.previewAt(event.clientX, event.clientY);
-    if (!this.placementRole && !this.linkSource)
-      this.canvas.style.cursor = this.hit(event).node ? "pointer" : "grab";
+    if (!this.placementRole && !this.linkSource) {
+      const hit = this.hit(event);
+      this.canvas.style.cursor = hit.node || hit.malware ? "pointer" : "grab";
+    }
   };
   private onPointerUp = (event: PointerEvent) => {
     const down = this.pointerDown;
@@ -1244,7 +1423,8 @@ export class World {
     }
     if (!down || (down.moved && !down.id)) return;
     const hit = this.hit(event);
-    if (hit.node) this.callbacks.onNode(hit.node);
+    if (hit.malware && !this.placementRole && !this.linkSource && this.callbacks.onMalware) this.callbacks.onMalware(hit.malware);
+    else if (hit.node) this.callbacks.onNode(hit.node);
     else if (hit.link && !this.targetingZone) this.callbacks.onLink(hit.link);
     else {
       const point = this.pointFromScreen(event.clientX, event.clientY);
@@ -1269,7 +1449,7 @@ export class World {
     this.placement.visible = false;
   };
 
-  playPacket(path: string[], onDone?: () => void, color = 0x8affea) {
+  playPacket(path: string[], onDone?: () => void, color = 0x8affea, count?: number) {
     if (!this.active) return;
     const routes: THREE.Curve<THREE.Vector3>[] = [];
     for (let i = 0; i < path.length - 1; i++) {
@@ -1292,8 +1472,8 @@ export class World {
       return;
     }
     const reduced = this.reducedMotion();
-    const count = reduced ? 1 : 4;
-    for (let i = 0; i < count; i++) {
+    const total = reduced ? 1 : count ?? 4;
+    for (let i = 0; i < total; i++) {
       const group = new THREE.Group();
       const core = new THREE.Mesh(
         new THREE.SphereGeometry(i === 0 ? 0.12 : 0.085, 12, 12),
@@ -1311,10 +1491,24 @@ export class World {
         routes,
         speed: reduced ? routes.length / 0.2 : 2.3,
         start: performance.now() + i * 170,
-        done: i === count - 1 ? onDone : undefined,
+        done: i === total - 1 ? onDone : undefined,
       });
     }
   }
+
+  /** Packets race along every channel at once; `done` fires when the last one lands. */
+  playChannels(paths: string[][], done?: () => void) {
+    const routes = paths.filter((path) => path.length > 1);
+    if (!routes.length || !this.active) {
+      done?.();
+      return;
+    }
+    let remaining = routes.length;
+    const finished = () => { if (--remaining === 0) done?.(); };
+    routes.forEach((path, channel) =>
+      this.playPacket(path, finished, channel === 0 ? CHANNEL_COLORS.primary : CHANNEL_COLORS.secondary, channel === 0 ? 4 : 3));
+  }
+
   impact(color = 0xff7c91, count = 28) {
     this.enemyHitAt = performance.now();
     if (this.reducedMotion()) {
@@ -1323,93 +1517,123 @@ export class World {
     }
     const origin = this.enemyGroup.position
       .clone()
-      .add(new THREE.Vector3(0, 0.3, 0));
+      .add(new THREE.Vector3(0, this.enemySize * 0.08, 1.2));
     for (let i = 0; i < count; i++) {
       const mesh = new THREE.Mesh(
-        new THREE.TetrahedronGeometry(0.035 + Math.random() * 0.065),
+        new THREE.TetrahedronGeometry(0.05 + Math.random() * 0.09),
         glow(color),
       );
       mesh.position.copy(origin);
       this.scene.add(mesh);
       const velocity = new THREE.Vector3(
+        (Math.random() - 0.5) * 9,
         (Math.random() - 0.5) * 7,
-        (Math.random() - 0.5) * 5,
-        (Math.random() - 0.5) * 6,
+        (Math.random() - 0.3) * 7,
       );
       this.sparks.push({ mesh, velocity, life: 0.55 + Math.random() * 0.45 });
     }
     this.light.color.setHex(color);
     this.light.intensity = 70;
     this.impactEndsAt = performance.now() + 280;
+    this.shakeCamera(0.06, 180);
   }
   pulseThreat() {
     for (const node of this.topology.nodes)
       if (node.fixed) this.pulseAt(node.x, node.z, 0xff7869, 1.4);
   }
   /** A wind-up, an action-specific projectile, and an impact at the real target. */
-  playEnemyAction(kind: Intent["kind"], targetId: string | null, zone: Zone | null, done: () => void, quick = false, onImpact: () => void = () => {}) {
+  playEnemyAction(kind: ActionKind, targetId: string | null, zone: Zone | null, done: () => void, quick = false, onImpact: () => void = () => {}) {
     if (this.enemyAction) return;
     const targetNode = this.topology.nodes.find(node => node.id === targetId);
     const cable = targetId ? this.cableCurves.get(targetId) : undefined;
     const target = cable ? cable.getPoint(.5) : targetNode ? new THREE.Vector3(targetNode.x, 1.2, targetNode.z)
+      : kind === "infect" && this.malwareForecast ? new THREE.Vector3(this.malwareForecast.x, 1.2, this.malwareForecast.z)
       : kind === "strike" || kind === "breach" ? new THREE.Vector3(kind === "breach" ? 6 : -6, 1.2, 0)
       : zone ? new THREE.Vector3(0, .8, zone === "north" ? -2.5 : zone === "south" ? 2.5 : 0)
       : new THREE.Vector3(0, 1.2, 0);
-    const color = ({ strike: 0xf0ad76, breach: 0xf57968, sever: 0xf1d5a0, jam: 0xb59cec, corrupt: 0xb980c6, charge: 0xf6c486 })[kind];
+    const colors: Record<string, number> = { strike: 0xf0ad76, breach: 0xf57968, sever: 0xf1d5a0, jam: 0xb59cec, corrupt: 0xb980c6, charge: 0xf6c486, infect: MALWARE_COLOR };
+    const color = colors[kind] ?? 0xf0ad76;
     const effect = new THREE.Group();
     if (kind === "sever") {
       for (const angle of [-.65, .65]) {
-        const blade = new THREE.Mesh(new THREE.BoxGeometry(.08, 1.8, .07), glow(color));
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(.1, 2.2, .08), glow(color));
         blade.rotation.z = angle; effect.add(blade);
       }
     } else if (kind === "jam" || kind === "corrupt" || kind === "charge") {
       for (let i = 0; i < 3; i++) {
-        const halo = new THREE.Mesh(new THREE.TorusGeometry(.22 + i * .14, .025, 6, 40), glow(color, .85));
+        const halo = new THREE.Mesh(new THREE.TorusGeometry(.26 + i * .16, .03, 6, 40), glow(color, .85));
         halo.rotation.set(i * .6, i * .7, 0); effect.add(halo);
       }
+    } else if (kind === "infect") {
+      const shell = new THREE.MeshBasicMaterial({ color, toneMapped: false });
+      const a = new THREE.Mesh(new THREE.TetrahedronGeometry(.3), shell);
+      const b = new THREE.Mesh(new THREE.TetrahedronGeometry(.3), shell);
+      b.rotation.set(Math.PI / 2, 0, Math.PI / 2);
+      effect.add(a, b, new THREE.Mesh(new THREE.SphereGeometry(.5, 12, 10), glow(color, .25)));
     } else {
-      effect.add(new THREE.Mesh(new THREE.OctahedronGeometry(kind === "breach" ? .38 : .23), glow(color)));
+      effect.add(new THREE.Mesh(new THREE.OctahedronGeometry(kind === "breach" ? .46 : .3), glow(color)));
+      effect.add(new THREE.Mesh(new THREE.SphereGeometry(kind === "breach" ? .9 : .6, 12, 10), glow(color, .18)));
       for (let i = 0; i < (kind === "breach" ? 3 : 1); i++) {
-        const trail = new THREE.Mesh(new THREE.TorusGeometry(.25 + i * .1, .03, 5, 32), glow(color, .6));
-        trail.position.z = i * .22; effect.add(trail);
+        const trail = new THREE.Mesh(new THREE.TorusGeometry(.3 + i * .12, .035, 5, 32), glow(color, .6));
+        trail.position.z = i * .26; effect.add(trail);
       }
     }
-    const origin = this.enemyGroup.position.clone(); origin.y += .4;
+    const origin = this.enemyGroup.position.clone(); origin.y += this.enemySize * .06; origin.z += 1.4;
     if (kind === "charge") target.copy(origin);
     effect.position.copy(origin); effect.visible = false;
     this.scene.add(effect);
-    this.enemyAction = { kind, target, origin, effect, start: performance.now(), duration: quick || this.reducedMotion() ? 160 : kind === "breach" ? 1050 : 850, impacted: false, done, onImpact };
+    this.enemyAction = { kind, target, origin, effect, start: performance.now(), duration: quick || this.reducedMotion() ? 160 : kind === "breach" ? 1150 : 920, impacted: false, done, onImpact };
     this.canvas.dataset.enemyAction = kind;
   }
 
   private animateEnemy(now: number, time: number, reduced: boolean) {
     const action = this.enemyAction;
-    const hurt = this.enemyHitAt ? Math.max(0, 1 - (now - this.enemyHitAt) / 350) : 0;
+    const hurt = this.enemyHitAt ? Math.max(0, 1 - (now - this.enemyHitAt) / 420) : 0;
     const attack = action ? Math.min(1, (now - action.start) / action.duration) : null;
     const enraged = !!this.enemy && !!ENEMIES[this.enemy.id].enrages && this.enemy.hp <= this.enemy.maxHp / 2;
-    this.enemyGroup.position.set(0, 1.2, -6.4 - (reduced ? 0 : hurt * .3));
+    this.enemyGroup.position.copy(enemyHome(this.enemySize));
+    this.enemyGroup.position.y -= this.enemyDrop;
+    if (!reduced) this.enemyGroup.position.z -= hurt * .7;
     const state = this.enemyActor.update(this.camera, now, time, reduced, this.enemySize,
       this.enemy?.color ?? 0xffffff, enraged, hurt, attack, action?.kind);
     if (this.visible) this.canvas.dataset.enemyState = state;
     if (enraged) this.canvas.dataset.enemyEnraged = "true";
     else delete this.canvas.dataset.enemyEnraged;
+    // A slow heartbeat in its light; guardians beat harder.
+    const heartbeat = reduced ? 0 : Math.pow(Math.max(0, Math.sin(time * (this.enemyBoss ? 1.6 : 1.3))), 8);
+    this.enemyLight.intensity = (this.enemyBoss ? 34 : 24) * (1 + heartbeat * .6 + (enraged ? .35 : 0));
+    this.enemyUnderLight.intensity = (this.enemyBoss ? 26 : 18) * (1 + heartbeat * .4);
     if (!action) return;
     const t = Math.min(1, (now - action.start) / action.duration);
     const charge = Math.sin(Math.min(1, t / .5) * Math.PI / 2);
-    const lunge = Math.sin(Math.max(0, (t - .35) / .65) * Math.PI);
+    // Anticipation: it rears back and rises before committing.
+    const rear = Math.sin(Math.min(1, t / .36) * Math.PI);
+    const lunge = Math.sin(Math.max(0, (t - .36) / .64) * Math.PI);
     if (!reduced) {
-      if (action.kind === "strike" || action.kind === "breach") this.enemyGroup.position.z += lunge * (action.kind === "breach" ? 1.5 : .9);
-      else this.enemyGroup.position.y += Math.sin(t * Math.PI) * .45;
+      const heavy = action.kind === "breach" ? 1.35 : 1;
+      this.enemyGroup.position.z -= rear * .9 * heavy;
+      this.enemyGroup.position.y += rear * .45 * heavy;
+      if (action.kind === "strike" || action.kind === "breach") {
+        this.enemyGroup.position.z += lunge * (action.kind === "breach" ? 3.4 : 2.5);
+        this.enemyGroup.position.y -= lunge * .55;
+      } else if (action.kind === "sever") {
+        this.enemyGroup.position.z += lunge * 1.6;
+        this.enemyGroup.position.x += Math.sin(Math.max(0, (t - .36) / .64) * Math.PI * 2) * .7;
+      } else this.enemyGroup.position.y += Math.sin(t * Math.PI) * .6;
       action.effect.visible = t > .28 && t < .86;
       action.effect.position.lerpVectors(action.origin, action.target, Math.min(1, Math.max(0, (t - .28) / .5)));
       action.effect.rotation.set(t * 5, t * 7, action.kind === "sever" ? t * 2 : t * 6);
-      action.effect.scale.setScalar(.5 + charge * .65);
+      action.effect.scale.setScalar(.6 + charge * .8);
     }
     this.enemySprite.material.color.lerp(new THREE.Color(this.enemy?.color ?? 0xff9999), Math.sin(t * Math.PI) * .3);
     if (t >= .78 && !action.impacted) {
       action.impacted = true;
       action.onImpact();
-      if (action.kind !== "charge") this.pulseAt(action.target.x, action.target.z, this.enemy?.color ?? 0xff9999, action.kind === "breach" ? 2 : 1.4);
+      if (action.kind !== "charge") {
+        this.pulseAt(action.target.x, action.target.z, this.enemy?.color ?? 0xff9999, action.kind === "breach" ? 2 : 1.4);
+        this.burst(action.target.clone(), ({ strike: 0xf0ad76, breach: 0xf57968 } as Record<string, number>)[action.kind] ?? this.enemy?.color ?? 0xff9999, action.kind === "breach" ? 18 : 10, 2.6);
+      }
+      if (action.kind === "strike" || action.kind === "breach") this.shakeCamera(action.kind === "breach" ? .2 : .12, action.kind === "breach" ? 420 : 280);
       if (action.kind === "corrupt" && this.forecastZone) this.pulseZone(this.forecastZone, "corrupt");
     }
     if (t >= 1) {
@@ -1422,7 +1646,12 @@ export class World {
   playEnemyTransition(kind: "enrage" | "death" | "break", done: () => void, quick = false) {
     if (!this.enemy) { done(); return; }
     this.canvas.dataset.enemyState = kind;
-    this.pulseAt(0, -6.4, this.enemy.color, kind === "death" ? 3 : 2);
+    this.pulseAt(0, -5.3, this.enemy.color, kind === "death" ? 3.4 : 2.4);
+    if (kind === "enrage") this.shakeCamera(.14, 600);
+    if (kind === "death") {
+      this.shakeCamera(.1, 500);
+      this.burst(this.enemyGroup.position.clone().add(new THREE.Vector3(0, this.enemySize * .1, 1)), this.enemy.color, 36, 4);
+    }
     this.enemyActor.transitionTo(kind, done, quick || this.reducedMotion());
   }
   setVisible(visible: boolean) {
@@ -1444,7 +1673,7 @@ export class World {
     this.enemyActor.clear();
     delete this.canvas.dataset.enemyState;
     delete this.canvas.dataset.enemyEnraged;
-    for (const effect of [...this.packets, ...this.sparks, ...this.pulses]) {
+    for (const effect of [...this.packets, ...this.sparks, ...this.pulses, ...this.bolts]) {
       this.scene.remove(effect.mesh);
       this.disposeObject(effect.mesh);
     }
@@ -1452,7 +1681,9 @@ export class World {
     this.packets = [];
     this.sparks = [];
     this.pulses = [];
+    this.bolts = [];
     this.impactEndsAt = 0;
+    this.shake = { until: 0, power: 0, duration: 1 };
     this.light.color.setHex(0x4be7cf);
     this.light.intensity = 24;
   }
@@ -1460,6 +1691,20 @@ export class World {
     this.camera.position.set(0, 12.8, 18.8);
     this.controls.target.set(0, 0.15, -0.3);
     this.controls.update();
+  }
+
+  /** Short, wide tables crop the top of the canvas (it starts above the viewport and
+   * under the header). Lower the hostile just enough that its head stays visible. */
+  private frameEnemy() {
+    const rect = this.canvas.getBoundingClientRect();
+    if (!rect.height) return;
+    const limit = Math.max(0, -rect.top) / rect.height + 0.06;
+    const home = enemyHome(this.enemySize);
+    const crown = home.y + this.enemySize * 0.44;
+    this.camera.updateMatrixWorld();
+    const at = (y: number) => (1 - new THREE.Vector3(0, y, home.z).project(this.camera).y) / 2;
+    const top = at(crown), perUnit = at(crown - 1) - top;
+    this.enemyDrop = top >= limit || perUnit <= 0 ? 0 : Math.min(2.6, (limit - top) / perUnit);
   }
 
   private resize() {
@@ -1471,6 +1716,7 @@ export class World {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height, false);
     this.composer.setSize(width, height);
+    this.frameEnemy();
     const ratio = this.renderer.getPixelRatio();
     this.antialias.material.uniforms.resolution.value.set(
       1 / (width * ratio),
@@ -1493,17 +1739,9 @@ export class World {
     this.controls.update();
     this.scanMaterial.uniforms.uTime.value = reducedMotion ? 0 : time;
     this.placement.rotation.y += motion * 0.55;
-    for (const group of this.devices.values()) {
-      for (const [index, floater] of group.userData.floaters.entries()) {
-        floater.rotation.y += motion * (index % 2 ? -0.5 : 0.65);
-        floater.position.y +=
-          Math.sin(time * 2 + group.position.x + index) * motion * 0.035;
-      }
-      for (const [index, decorativeRing] of group.userData.rings.entries()) {
-        if (index > 0)
-          decorativeRing.rotation.z += motion * (index % 2 ? -0.35 : 0.35);
-      }
-    }
+    for (const group of this.devices.values()) animateDevice(group, time, motion, reducedMotion);
+    for (const group of this.terrainGroup.children) animateProp(group as PropGroup, time, motion, reducedMotion);
+    for (const group of this.malwareGroup.children) animateProp(group as PropGroup, time, motion, reducedMotion);
     for (const item of this.cableBeads) {
       if (item.active && !reducedMotion) {
         const progress = (time * (item.routed ? 0.28 : 0.15) + item.offset) % 1;
@@ -1512,13 +1750,19 @@ export class World {
         );
       }
     }
-    this.enemyShell.rotation.y += motion * 0.26;
-    this.enemyShell.rotation.z = reducedMotion ? 0 : Math.sin(time * 0.7) * 0.08;
-    this.enemyCore.rotation.y -= motion * 0.7;
-    this.enemyCore.scale.setScalar(reducedMotion ? 1 : 1 + Math.sin(time * 3.3) * 0.055);
+    this.motes.rotation.y += motion * 0.012;
+    this.motes.position.y = reducedMotion ? 0 : Math.sin(time * 0.17) * 0.35;
+    this.shafts.forEach((shaft, index) => {
+      shaft.material.opacity = reducedMotion ? 0.06 : 0.045 + Math.sin(time * 0.23 + index * 2.1) * 0.02;
+    });
     this.animateEnemy(performance.now(), time, reducedMotion);
     for (let i = this.pulses.length - 1; i >= 0; i--) {
       const pulse = this.pulses[i];
+      if (pulse.delay > 0) {
+        pulse.delay -= dt;
+        pulse.mesh.visible = pulse.delay <= 0;
+        continue;
+      }
       pulse.life -= dt;
       const progress = 1 - Math.max(0, pulse.life) / pulse.duration;
       pulse.mesh.material.opacity = (1 - progress) * 0.8;
@@ -1546,6 +1790,18 @@ export class World {
         packet.routes[step].getPoint(Math.min(1, position - step)),
       );
     }
+    for (let i = this.bolts.length - 1; i >= 0; i--) {
+      const bolt = this.bolts[i];
+      const t = Math.min(1, (performance.now() - bolt.start) / bolt.duration);
+      bolt.mesh.position.copy(bolt.curve.getPoint(t * t));
+      bolt.mesh.rotation.y += dt * 9;
+      if (t >= 1) {
+        this.scene.remove(bolt.mesh);
+        this.disposeObject(bolt.mesh);
+        this.bolts.splice(i, 1);
+        bolt.done();
+      }
+    }
     for (let i = this.sparks.length - 1; i >= 0; i--) {
       const spark = this.sparks[i];
       spark.life -= dt;
@@ -1558,7 +1814,18 @@ export class World {
         this.sparks.splice(i, 1);
       }
     }
+    // Camera shake is an offset applied only for this frame's render.
+    const now = performance.now();
+    const shaking = !reducedMotion && now < this.shake.until;
+    if (shaking) {
+      const fall = (this.shake.until - now) / this.shake.duration;
+      const power = this.shake.power * fall * fall;
+      this.cameraRest.copy(this.camera.position);
+      this.camera.position.x += (Math.random() - 0.5) * power * 2;
+      this.camera.position.y += (Math.random() - 0.5) * power * 2;
+    }
     this.composer.render();
+    if (shaking) this.camera.position.copy(this.cameraRest);
   };
   dispose() {
     if (!this.active) return;
@@ -1579,9 +1846,12 @@ export class World {
     this.enemyFieldTexture.dispose();
     this.enemyExpeditionTexture.dispose();
     this.guardianTexture.dispose();
+    this.enemyGroup.remove(this.enemySprite, this.enemyActor.embers);
+    this.enemyActor.dispose();
     this.disposeObject(this.scene);
     this.scene.clear();
     this.hitObjects.length = 0;
+    this.malwareHits.length = 0;
     this.devices.clear();
     this.deviceStates.clear();
     this.cableCurves.clear();

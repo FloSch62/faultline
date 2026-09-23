@@ -156,3 +156,69 @@ The implementation objective is complete and the alpha is ready for playtesting.
 
 Human sessions are still needed to assess comprehension and enjoyment; automated
 win rates and successful scripted expeditions cannot establish those properties.
+
+## v3 redesign: the network is your army
+
+### Why
+
+Playtesting the alpha exposed a structural problem rather than a tuning one. Only
+the single strongest route transmitted; a second route added a flat +2 and a third
+router added nothing, so alternative routes and extra hardware were rarely worth
+their energy. Nine of nineteen starter cards were routers or cables that went dead
+once the first route stood, every fight opened with the same router-plus-two-fibers
+turn, "once / max +2" caps prevented any build from scaling, several enemy traits
+were single-answer taxes, and the run layer offered no upgrades, market or events.
+
+### What changed
+
+- **Combat model.** Any live route counts toward **channels** (maximum routes sharing
+  no device); each extra channel adds **bandwidth**. Devices work while **online**
+  (on any live route): firewalls block from any route and stack. Caps are gone;
+  sockets, energy and disruption bound the ceiling. `RULES` in `cards.ts` holds every
+  tunable number and feeds card text, the HUD and the Handbook.
+- **New devices**: Honeypot (decoy), Cache Server (+draw), PoE Injector (+energy),
+  Load Balancer (+damage per channel). **Protocols** arm face down and fire on the
+  matching enemy action. **Clusters** versus **separated circuits** give bands a
+  crowd-or-spread tension.
+- **Archetype identity**: a console command per keeper (Patch Cable, Harden,
+  Buffer), Warden's **Backpressure** and Ghost's **buffer with packet loss**,
+  archetype-only cards, a 17-card starter deck with fewer cables.
+- **Encounter terrain** (wreckage, salvage devices, crystal veins, interference),
+  **malware** nodes, **junk** cards and **curses**; enemy rework (graded armor,
+  firewall-anywhere plating, Lockdown targeting firewalls, Leech taps, Choir and Core
+  injections).
+- **Card upgrades** for 58 of 61 cards; **credits**, a **market**, twelve
+  **events**, a four-service **sanctuary**, **boss relics** with drawbacks after the
+  first two guardians, and **ascension 0–10**.
+- **Save version 3.** Older expeditions are not continued.
+- **Presentation**: a battle HUD for channels, consoles, protocols, buffer and
+  backpressure; a 3D table with larger, more threatening hostiles, new device
+  models, online/offline states, channel colours, wreckage and malware; a rebuilt
+  expedition screen set; **Field Training** (11 interactive lessons) and an
+  illustrated **Handbook** with a Danger Playbook; a rebuilt 44-cue sound palette
+  in which lifting a card no longer sounds like a shuffle.
+
+### How it was verified
+
+- Core rule, meta and tutorial unit tests (`npm test`), including a randomized
+  160-board check that the forecast is pure and equals resolution, a forecast
+  timing test, map invariants over 2,400 maps, market/sanctuary/event flows, save
+  validation, and every Field Training lesson played to completion through the
+  real rules.
+- Seeded full-expedition bot probes recorded in `docs/balance-v3.json` (150 seeds
+  per archetype and policy, shipped numbers): tactical bots win 39 % / 35 % / 39 %
+  (Architect / Warden / Ghost) at ascension 0, careless bots never win. See the
+  game design's balance section.
+- Browser checks by the individual workstreams: audio decoding and cue order,
+  3D captures at 1280×720 through 1920×1080 (including the hostile-integrity
+  overlap fix), expedition screens at 390×844 through 1920×1080.
+
+### Open watchpoints
+
+- Ghost normal fights last about three turns, and Architect/Ghost guardian fights
+  five to seven, below the targets; guardian health was raised 20 % so more
+  fights reach the ultimate.
+- The browser e2e suite (`tests/*.spec.ts`) and `scripts/playthrough.ts` still
+  target pre-v3 selectors and bot actions and must be updated.
+- Human sessions must confirm comprehension of channels, online devices and
+  protocols, and whether the new systems stay readable at a glance.

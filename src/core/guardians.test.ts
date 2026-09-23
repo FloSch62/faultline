@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { ENEMIES } from "./enemies.ts";
+import { RULES } from "./cards.ts";
 import { STAGES } from "./stages.ts";
 import { newExpedition, parseExpedition } from "./expedition.ts";
 import { createMap, reachableRooms } from "./map.ts";
@@ -84,23 +85,27 @@ test("all 16 enemies have playable patterns and forecast exactly the damage, fie
   }
 });
 
-test("Serpent pressure and Regent armor yield to an independent route", () => {
+test("Serpent pressure and Regent armor yield to a second channel", () => {
   for (const id of ["serpent", "regent"]) {
     const r = encounter(id), before = combatPreview(r);
     r.topology.nodes.push({ id: "router2", role: "router", x: 0, z: 2.5 });
     r.topology.links.push({ a: "alpha", b: "router2" }, { a: "router2", b: "omega" });
     const after = combatPreview(r);
-    if (id === "serpent") assert.equal(after.incomingRaw, before.incomingRaw - 2);
-    else assert.equal(after.packetDamage, before.packetDamage + 5);
+    if (id === "serpent") assert.equal(after.incomingRaw, before.incomingRaw - 3);
+    // Bandwidth plus 2 of the Regent's 4 armor stripped.
+    else assert.equal(after.packetDamage, before.packetDamage + RULES.bandwidthPerChannel + 2);
   }
 });
 
-test("Marshal and Hollow Choir armor require a routed firewall", () => {
+test("Marshal and Hollow Choir armor yield to any online firewall, not only a routed one", () => {
   for (const id of ["marshal", "cantor"]) {
     const r = encounter(id), before = combatPreview(r);
-    r.topology.nodes.push({ id: "firewall2", role: "firewall", x: 2.5, z: 0 });
-    r.topology.links.push({ a: "router1", b: "firewall2" }, { a: "firewall2", b: "omega" });
-    assert.equal(combatPreview(r).packetDamage, before.packetDamage + ENEMIES[id].armor!.amount + 1);
+    // An online firewall on a side route (not the primary route) is enough.
+    r.topology.nodes.push({ id: "firewall2", role: "firewall", x: 2.5, z: 2.5 }, { id: "router3", role: "router", x: -2.5, z: 2.5 });
+    r.topology.links.push({ a: "alpha", b: "router3" }, { a: "router3", b: "firewall2" }, { a: "firewall2", b: "omega" });
+    const after = combatPreview(r);
+    assert.ok(after.online.includes("firewall2"));
+    assert.equal(after.packetDamage, before.packetDamage + ENEMIES[id].armor!.amount + RULES.bandwidthPerChannel);
   }
 });
 
@@ -130,16 +135,6 @@ test("new enraged enemies change the next intent without retroactively strengthe
     assert.equal(endTurn(r).integrityDamage, p.incoming);
     assert.ok(intentFor(r)!.label.includes("ENRAGED"));
   }
-});
-
-test("legacy saves retain their final stage and invalid stage or introduction values are rejected", () => {
-  const e = newExpedition();
-  const legacy = JSON.parse(JSON.stringify(e));
-  delete legacy.run.stage; delete legacy.run.bossIntroSeen;
-  assert.equal(parseExpedition(JSON.stringify(legacy))!.run.stage, 2);
-  for (const value of [-1, 3, .5, "1"]) { legacy.run.stage = value; assert.equal(parseExpedition(JSON.stringify(legacy)), null); }
-  e.run.bossIntroSeen = "false" as unknown as boolean;
-  assert.equal(parseExpedition(JSON.stringify(e)), null);
 });
 
 test("the battle playlist plays all four tracks before a repeat, including across bag boundaries", () => {

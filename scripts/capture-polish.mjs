@@ -88,10 +88,11 @@ try {
     await page.mouse.move(1, 1);
     await capture(page, id);
   }
-  for (const [name, floor, room] of [["market", 1, "1-1"], ["sanctuary", 2, "2-0"]]) {
+  for (const [name, type] of [["market", "shop"], ["sanctuary", "forge"], ["event", "event"]]) {
     const scene = newExpedition("architect", 293);
-    scene.run.floor = floor;
-    chooseRoom(scene.run, room);
+    const room = scene.run.map.find(item => item.type === type);
+    scene.run.floor = room.floor;
+    chooseRoom(scene.run, room.id);
     await page.evaluate(({ storage, scene }) => sessionStorage.setItem("faultline-capture-fixture", JSON.stringify(scene)), { storage, scene });
     await page.reload();
     await page.locator('[data-action="continue"]').click();

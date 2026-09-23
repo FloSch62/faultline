@@ -1,4 +1,6 @@
-import { test, expect, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+// Every test also fails on any page or console error (see helpers.ts).
+import { expect, test } from "./helpers.ts";
 import { newExpedition, type Expedition } from "../src/core/expedition.ts";
 import { chooseRoom, combatPreview } from "../src/core/run.ts";
 import { ENEMIES } from "../src/core/enemies.ts";
@@ -123,9 +125,10 @@ test("sanctuary states the permanent salvage cost and charges it only once", asy
   }, { e, storage });
   await page.goto("./");
   await page.locator('[data-action="continue"]').click();
-  await expect(page.locator('[data-forge="relic"]')).toContainText("Sacrifice 2 maximum integrity");
-  await expect(page.locator('[data-forge="relic"]')).toContainText("15 → 13");
-  await page.locator('[data-forge="relic"]').click();
+  const salvage = page.locator('[data-screen="forge-salvage"]');
+  await expect(salvage).toContainText("Sacrifice 2 maximum integrity");
+  await expect(salvage).toContainText("15 → 13");
+  await salvage.click();
   expect((await saved(page)).maxIntegrity).toBe(13);
   await page.reload();
   await page.locator('[data-action="continue"]').click();

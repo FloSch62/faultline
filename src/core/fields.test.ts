@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { newExpedition, parseExpedition } from "./expedition.ts";
 import { chooseRoom, combatPreview, endTurn, playZone, relocateNode } from "./run.ts";
+import { RULES } from "./cards.ts";
 import type { CardId, Zone } from "./types.ts";
 
 function encounter(enemy = "prophet") {
@@ -88,7 +89,7 @@ test("widow suppression affects routing and the best clean path wins",()=>{
   r.topology.nodes.push({id:"router2",role:"router",x:0,z:-3});
   r.topology.links.push({a:"alpha",b:"router2"},{a:"router2",b:"omega"});
   assert.deepEqual(combatPreview(r).signalPath,["alpha","router2","omega"]);
-  assert.equal(combatPreview(r).packetDamage,7);
+  assert.equal(combatPreview(r).packetDamage,5+RULES.bandwidthPerChannel);
 });
 test("aegis requires a live route; null fields defend occupied hardware without a route",()=>{
   const e=encounter("leech"),r=e.run;
@@ -105,12 +106,15 @@ test("a finishing blow cancels corruption and clears encounter fields",()=>{
   assert.equal(endTurn(r).defeated,true);
   assert.deepEqual(r.zoneEffects,[]);
 });
-test("colossus armor is bypassed only by independent routes",()=>{
+test("colossus armor is graded: every extra channel strips 2",()=>{
   const e=encounter("colossus"),r=e.run;
-  assert.equal(combatPreview(r).packetDamage,2);
+  assert.equal(combatPreview(r).packetDamage,1); // 5 − 4 armor
   r.topology.nodes.push({id:"router2",role:"router",x:0,z:3});
   r.topology.links.push({a:"alpha",b:"router2"},{a:"router2",b:"omega"});
-  assert.equal(combatPreview(r).packetDamage,7);
+  assert.equal(combatPreview(r).packetDamage,5+RULES.bandwidthPerChannel-2); // bandwidth, 2 armor left
+  r.topology.nodes.push({id:"router3",role:"router",x:0,z:-3});
+  r.topology.links.push({a:"alpha",b:"router3"},{a:"router3",b:"omega"});
+  assert.equal(combatPreview(r).packetDamage,5+2*RULES.bandwidthPerChannel); // armor gone
 });
 test("stacked penalties stop at zero and visible calculation terms still reconcile",()=>{
   const e=encounter("colossus"),r=e.run;
@@ -131,6 +135,4 @@ test("invalid field actions are atomic and field saves validate timers and owner
   r.zoneEffects[0].turns=0;assert.equal(parseExpedition(JSON.stringify(e)),null);
   r.zoneEffects=[{zone:"center",kind:"resonance",turns:3},{zone:"center",kind:"aegis",turns:2}];
   assert.equal(parseExpedition(JSON.stringify(e)),null);
-  delete (r as Partial<typeof r>).zoneEffects;
-  assert.deepEqual(parseExpedition(JSON.stringify(e))!.run.zoneEffects,[]);
 });

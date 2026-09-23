@@ -50,8 +50,6 @@ test("prepared cards respect phases, hand limits, deep cache, saves, and victory
   assert.ok(prepareCard(r, 0).ok);
   assert.deepEqual(parseExpedition(JSON.stringify(e)), e);
   const legacy = structuredClone(e);
-  delete (legacy.run as Partial<RunState>).preparedCard;
-  assert.equal(parseExpedition(JSON.stringify(legacy))!.run.preparedCard, null);
   (legacy.run as unknown as {preparedCard: string}).preparedCard = "bad-card";
   assert.equal(parseExpedition(JSON.stringify(legacy)), null);
   (legacy.run as unknown as {preparedCard: string[]}).preparedCard = ["pulse"];

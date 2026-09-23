@@ -27,8 +27,11 @@ YuE inference code is Apache-2.0. The official model-weight license is preserved
 ## Sound effects
 
 Kenney's [Impact Sounds](https://kenney.nl/assets/impact-sounds),
-[Casino Audio](https://kenney.nl/assets/casino-audio), and
-[Sci-fi Sounds](https://kenney.nl/assets/sci-fi-sounds) are Creative Commons Zero
+[Casino Audio](https://kenney.nl/assets/casino-audio),
+[Sci-fi Sounds](https://kenney.nl/assets/sci-fi-sounds),
+[Interface Sounds](https://kenney.nl/assets/interface-sounds),
+[UI Audio](https://kenney.nl/assets/ui-audio), and
+[RPG Audio](https://kenney.nl/assets/rpg-audio) are Creative Commons Zero
 (CC0-1.0). Selected source recordings and original licenses are retained in
 `soundtrack/effects/sources/`. The layered delivery masters are bundled in
 `public/audio/effects/`. Recipes, hashes and measured levels are recorded in

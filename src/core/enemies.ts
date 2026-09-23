@@ -1,5 +1,6 @@
 import type { Enemy } from "./types.ts";
 import type { Intent } from "./run.ts";
+import { RULES } from "./cards.ts";
 
 const TEMPLATES: Record<string, Omit<Enemy, "hp" | "maxHp" | "turn">> = {
   serpent: { id: "serpent", name: "COIL SERPENT", title: "One route is a perfect snare", color: 0x73c9a3 },
@@ -64,7 +65,7 @@ const PATTERNS: Record<string, Omit<Intent, "pressure">[]> = {
     choir: [
       { kind: "corrupt", label: "DISSONANT REFRAIN", amount: 0 },
       { kind: "strike", label: "SHATTER NOTE", amount: 2 },
-      { kind: "corrupt", label: "DISSONANT REFRAIN", amount: 0 },
+      { kind: "corrupt", label: "DISSONANT REFRAIN", amount: 0, junk: { card: "packet-loss", count: 2 } },
       { kind: "breach", label: "RESONANT BREACH", amount: 3 },
     ],
     weaver: [
@@ -87,7 +88,7 @@ const PATTERNS: Record<string, Omit<Intent, "pressure">[]> = {
     ],
     cantor: [
       { kind: "corrupt", label: "THE SILENCING", amount: 0 },
-      { kind: "jam", label: "STOLEN VOICE", amount: 0, field: "suppression" },
+      { kind: "jam", label: "STOLEN VOICE", amount: 0, field: "suppression", junk: { card: "packet-loss", count: 2 } },
       { kind: "corrupt", label: "THE SILENCING", amount: 0 },
       { kind: "breach", label: "CATHEDRAL FALL", amount: 4, field: "corrosion" },
       { kind: "charge", label: "ONE LAST BREATH", amount: 0 },
@@ -110,7 +111,7 @@ const PATTERNS: Record<string, Omit<Intent, "pressure">[]> = {
     ],
     leech: [
       { kind: "strike", label: "INTEGRITY STRIKE", amount: 2 },
-      { kind: "sever", label: "CUT A CABLE", amount: 0 },
+      { kind: "infect", label: "SIPHON TAP", amount: 0 },
       { kind: "breach", label: "BREACH", amount: 3 },
     ],
     wraith: [
@@ -129,7 +130,7 @@ const PATTERNS: Record<string, Omit<Intent, "pressure">[]> = {
       { kind: "strike", label: "INTEGRITY STRIKE", amount: 3 },
     ],
     core: [
-      { kind: "sever", label: "CUT A CABLE", amount: 0, field: "corrosion" },
+      { kind: "sever", label: "CUT A CABLE", amount: 0, field: "corrosion", junk: { card: "worm", count: 1 } },
       { kind: "breach", label: "SECURITY BREACH", amount: 4 },
       { kind: "jam", label: "JAM A DEVICE", amount: 0, field: "suppression" },
       { kind: "strike", label: "INTEGRITY STRIKE", amount: 4 },
@@ -139,26 +140,22 @@ const PATTERNS: Record<string, Omit<Intent, "pressure">[]> = {
   };
 
 const TRAITS: Record<string, string> = {
-  serpent: "Coil Serpent adds 2 strike damage unless your network has two independent router routes. Its venom leaves corrosion for 2 turns.",
+  serpent: `Coil Serpent strikes deal +${RULES.serpentBonus} while you have only one channel. A second route that shares no device loosens its grip. Its venom leaves corrosion.`,
   moth: "Ash Moth suppresses your busiest routed band, then jams and suppresses its announced band together. Protect hardware or move it before the jam. New fields start next turn.",
-  marshal: "Null Marshal absorbs 3 packet damage unless your live route includes a firewall. A routed firewall also softens its breach.",
-  choir: "Glass Choir alternates suppression and corrosion. Its first field weakens routed damage; its second punishes occupied ground. Cleanse or relocate before transmitting.",
-  weaver: "Wire Weaver severs a cable and suppresses a routed band together. Six or more cables also add 2 strike damage. Armor key cables and keep a compact route.",
+  marshal: "Null Marshal absorbs 3 packet damage unless a firewall is online. Its Lockdown jams an online firewall first — keep a second firewall, a Faraday Shell or a honeypot ready.",
+  choir: "Glass Choir alternates suppression and corrosion, and one refrain injects 2 Packet Loss into your draw pile. Cleanse or relocate before transmitting.",
+  weaver: `Wire Weaver cuts a cable and suppresses a routed band together. ${RULES.weaverCables} or more cables add +${RULES.weaverBonus} strike damage. Armor key cables and keep a compact route.`,
   reaver: "Grave Reaver breaches and seeds corrosion together. At half health: +2 strike and breach damage. New fields start next turn; cleanse, move or plan a finishing burst.",
-  regent: "Iron Regent absorbs 3 damage without independent routes. Gate closure severs a cable and seeds corrosion together. At half health: +2 strike/breach damage and 1 alongside faults and fields.",
-  cantor: "Hollow Choir absorbs 2 damage without a routed firewall. Jams also suppress a band; breaches seed corrosion. At half health: +2 breach damage and 1 alongside fields and jams. New fields start next turn.",
-  prophet: "Rust Prophet corrupts the busiest band for 2 turns. Hardware in that band adds 2 incoming damage. Cleanse the field or relocate to clear ground.",
-  widow: "Prism Widow suppresses a band on your live route for 2 turns: routes through it lose 3 damage. Cleanse it or reroute through another band.",
-  colossus: "Ferric Colossus absorbs 3 damage unless you have two independent routes. It also scorches occupied ground with 2-turn corrosion.",
-  leech:
-    "Packet Leech restores up to 3 health when your transmission deals no damage.",
-  wraith:
-    "Cable Wraith severs the longest unarmored cable. A target longer than 6 units also deals 1 damage.",
-  storm:
-    "Null Storm jams only its announced band. Keep critical hardware outside it or protect it from jams.",
-  sentinel:
-    "Gate Sentinel plating absorbs 2 packet damage unless the signal route includes a firewall.",
-  core: "Blackout Core severs with corrosion and jams with suppression. New fields start next turn. At half health: +3 strike/breach damage; jam and sever also deal 2 damage.",
+  regent: `Iron Regent's armor absorbs ${RULES.gradedArmorBase}, minus ${RULES.gradedArmorPerChannel} for every channel beyond the first. Gate closure cuts a cable and seeds corrosion. At half health: +2 strike/breach damage and 1 alongside faults and fields.`,
+  cantor: "Hollow Choir absorbs 2 damage unless a firewall is online. Its jams suppress a band and inject Packet Loss; breaches seed corrosion. At half health: +2 breach damage and 1 alongside fields and jams.",
+  prophet: `Rust Prophet corrupts the busiest band for 2 turns. Hardware in that band adds ${RULES.corrosionDamage} incoming damage. Cleanse the field or relocate to clear ground.`,
+  widow: `Prism Widow suppresses a band on your primary route for 2 turns: routes through it lose ${RULES.suppressionPenalty}. Cleanse it or reroute through another band.`,
+  colossus: `Ferric Colossus armor absorbs ${RULES.gradedArmorBase}, minus ${RULES.gradedArmorPerChannel} for every channel beyond the first — build width or hit hard. It also scorches occupied ground with corrosion.`,
+  leech: `Packet Leech plants a siphon tap (malware: −${RULES.malwarePenalty} damage) and heals ${RULES.leechTapHeal} per malware after it acts. A transmission that deals no damage lets it recover ${RULES.leechHeal}. Scrub taps for ${RULES.scrubCost} energy.`,
+  wraith: `Cable Wraith cuts the longest unarmored cable — it ignores honeypots. A target longer than ${RULES.cableExposureLength} units also deals 1 damage.`,
+  storm: "Null Storm jams only its announced band. Keep critical hardware outside it or protect it from jams.",
+  sentinel: "Gate Sentinel plating absorbs 2 packet damage unless a firewall is online.",
+  core: "Blackout Core cuts with corrosion and injects a Worm, jams with suppression. At half health: +2 strike/breach damage, jam and cut deal 1 damage, and its jam also plants malware.",
 };
 
 export interface EnemyDefinition extends Omit<Enemy, "hp" | "maxHp" | "turn"> {
@@ -166,7 +163,12 @@ export interface EnemyDefinition extends Omit<Enemy, "hp" | "maxHp" | "turn"> {
   trait: string;
   badge: string;
   art: { file: string; columns: number; rows: number; index: number };
-  armor?: { amount: number; bypass: "independent" | "firewall" };
+  /** "channels": graded, absorbs amount − perChannel × (channels − 1). "firewall": bypassed by any online firewall. */
+  armor?: { amount: number; bypass: "channels" | "firewall"; perChannel?: number };
+  /** Its jam prefers an online firewall (after honeypots). */
+  jamsFirewalls?: boolean;
+  /** When enraged, its jam also plants malware. */
+  enragedInfect?: boolean;
   corruption?: "corrosion" | "suppression" | "alternating";
   jamBands?: boolean;
   enrages?: { attacks: number; faults: number };
@@ -174,28 +176,28 @@ export interface EnemyDefinition extends Omit<Enemy, "hp" | "maxHp" | "turn"> {
 }
 
 const properties: Record<string, Partial<EnemyDefinition>> = {
-  leech: { badge: "SIPHON" }, wraith: { badge: "CABLE HUNTER" },
+  leech: { badge: "SIPHON TAP" }, wraith: { badge: "CABLE HUNTER" },
   storm: { badge: "BAND SUPPRESSION", jamBands: true },
   sentinel: { badge: "ARMORED GATE", armor: { amount: 2, bypass: "firewall" } },
   prophet: { badge: "CORROSION", corruption: "corrosion" },
   widow: { badge: "NULL WEAVER", corruption: "suppression" },
-  colossus: { badge: "FERRIC ARMOR", armor: { amount: 3, bypass: "independent" }, corruption: "corrosion" },
+  colossus: { badge: "FERRIC ARMOR", armor: { amount: RULES.gradedArmorBase, bypass: "channels", perChannel: RULES.gradedArmorPerChannel }, corruption: "corrosion" },
   serpent: { badge: "COIL PRESSURE", corruption: "corrosion" },
   moth: { badge: "ASHEN WINGS", corruption: "suppression", jamBands: true },
-  marshal: { badge: "COUNTERWEIGHT", armor: { amount: 3, bypass: "firewall" } },
+  marshal: { badge: "COUNTERWEIGHT", armor: { amount: 3, bypass: "firewall" }, jamsFirewalls: true },
   choir: { badge: "DISSONANCE", corruption: "alternating" },
   weaver: { badge: "TENSION TRAP" },
   reaver: { badge: "BLOOD PRICE", corruption: "corrosion", enrages: { attacks: 2, faults: 0 } },
   regent: {
-    badge: "SOVEREIGN ARMOR", armor: { amount: 3, bypass: "independent" }, corruption: "corrosion", enrages: { attacks: 2, faults: 1 },
-    boss: { entrance: "The copper gates close. Their keeper rises.", warning: "Independent routes bypass its armor. After the crown rises, deal 12 damage in one transmission to interrupt Crownfall. At half health, its attacks grow stronger.", breakDamage: 12 },
+    badge: "SOVEREIGN ARMOR", armor: { amount: RULES.gradedArmorBase, bypass: "channels", perChannel: RULES.gradedArmorPerChannel }, corruption: "corrosion", enrages: { attacks: 2, faults: 1 },
+    boss: { entrance: "The copper gates close. Their keeper rises.", warning: "Every extra channel strips 2 of its armor. After the crown rises, deal 12 damage in one transmission to interrupt Crownfall. At half health, its attacks grow stronger.", breakDamage: 12 },
   },
   cantor: {
     badge: "THE FINAL REFRAIN", armor: { amount: 2, bypass: "firewall" }, corruption: "alternating", enrages: { attacks: 2, faults: 1 },
-    boss: { entrance: "Every bell falls silent. One voice remains.", warning: "Route through a firewall. When the Choir draws its last breath, prepare 15 damage for the next transmission to interrupt Requiem.", breakDamage: 15 },
+    boss: { entrance: "Every bell falls silent. One voice remains.", warning: "Keep a firewall online. When the Choir draws its last breath, prepare 15 damage for the next transmission to interrupt Requiem.", breakDamage: 15 },
   },
   core: {
-    badge: "QUARANTINE", enrages: { attacks: 3, faults: 2 },
+    badge: "QUARANTINE", enrages: { attacks: 2, faults: 1 }, enragedInfect: true,
     boss: { entrance: "At the heart of the Blackout, the last light opens its eye.", warning: "At half health, the Core enters emergency mode. Event Horizon warns of Total Blackout: deal 18 damage on the following transmission to interrupt it, or build enough shield to survive.", breakDamage: 18 },
   },
 };

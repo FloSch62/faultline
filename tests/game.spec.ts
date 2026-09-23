@@ -1,4 +1,7 @@
-import { test, expect, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+// Every test also fails on any page or console error (see helpers.ts).
+import { expect, test } from "./helpers.ts";
+import { RULES } from "../src/core/cards.ts";
 import { newExpedition } from "../src/core/expedition.ts";
 import { chooseRoom } from "../src/core/run.ts";
 import type { CardId } from "../src/core/types.ts";
@@ -58,7 +61,7 @@ test("a new expedition has working loadouts, map, settings, and isolated saves",
     key,
   );
   expect(saved.run.integrity).toBe(15);
-  expect(saved.run.relics).toEqual(["shield-array"]);
+  expect(saved.run.relics).toEqual(["backpressure"]);
   await page.getByRole("button", { name: "Open settings" }).click();
   await page.getByRole("slider", { name: "Music volume" }).fill("24");
   await expect(page.locator('[data-setting="music"]')).toHaveValue("24");
@@ -165,7 +168,7 @@ test("Containerlab and Clabernetes deploy, replicate, undo, and transmit", async
   page.on("pageerror", (e) => errors.push(e.message));
   await startBattle(page, 8, "architect", {
     hand: ["router", "fiber", "fiber", "containerlab", "clabernetes", "guard"],
-    enemyHp: 10,
+    enemyHp: 11,
   });
   await playCard(page, "containerlab");
   await expect(page.locator(".energy-orb strong")).toHaveText("2");
@@ -174,7 +177,8 @@ test("Containerlab and Clabernetes deploy, replicate, undo, and transmit", async
   await expect(page.locator('[data-node="alpha"]')).toHaveCount(0);
   await page.locator('[data-node="router1"]').click();
   await expect(page.locator(".energy-orb strong")).toHaveText("0");
-  await expect(page.locator(".transmit-power strong")).toHaveText("9");
+  // Overclocked replica: a second channel adds bandwidth.
+  await expect(page.locator(".transmit-power strong")).toHaveText(String(7 + RULES.bandwidthPerChannel));
   await page.keyboard.press("z");
   await expect(page.locator(".energy-orb strong")).toHaveText("2");
   const undone = await page.evaluate(
@@ -192,7 +196,7 @@ test("Containerlab and Clabernetes deploy, replicate, undo, and transmit", async
   await expect(page.locator(".round-banner")).toContainText("02", {
     timeout: 15000,
   });
-  await expect(page.locator(".enemy-health-label strong")).toHaveText("1 / 10");
+  await expect(page.locator(".enemy-health-label strong")).toHaveText(`${11 - 7 - RULES.bandwidthPerChannel} / 11`);
   const saved = await page.evaluate(
     (key) => JSON.parse(localStorage.getItem(key)!),
     key,

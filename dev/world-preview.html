@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FAULTLINE · world preview (dev only)</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #05080d; color: #d8d2bf; font: 12px/1.4 system-ui, sans-serif; overflow: hidden; }
+      /* Mirrors the game's .world-stage inset (-25px 0 160px at 110 % zoom). */
+      #stage { position: fixed; top: -27.5px; left: 0; right: 0; bottom: 176px; }
+      #world { width: 100%; height: 100%; display: block; }
+      #caption { position: fixed; left: 12px; bottom: 10px; padding: 6px 10px; background: #0b1319cc; border: 1px solid #8a9b7155; pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <div id="stage"><canvas id="world"></canvas></div>
+    <div id="caption"></div>
+    <script type="module" src="./world-preview.ts"></script>
+  </body>
+</html>

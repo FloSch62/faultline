@@ -1,9 +1,11 @@
 import "./style.css";
 import "./alpha.css";
 import "./polish.css";
+import "./battle.css";
 import { Soundscape, type ScoreScene } from "./audio.ts";
+import type { EffectKind } from "./audio-effects.ts";
 import { ENEMIES } from "./core/enemies.ts";
-import { CARDS } from "./core/cards.ts";
+import { CARDS, RULES } from "./core/cards.ts";
 import {
   ARCHETYPES,
   dailySeed,
@@ -21,7 +23,6 @@ import {
   zoneForNode,
   canTargetNode,
   combatPreview,
-  removeDeckCard,
   chooseCardReward,
   chooseForge,
   chooseRelic,
@@ -35,19 +36,34 @@ import {
   playNode,
   prepareCard,
   releasePreparedCard,
-  signalPaths,
+  playProtocol,
+  playJunk,
+  scrubMalware,
+  useConsole,
+  consoleState,
+  isBlocked,
   type ActionResult,
+  type TurnResult,
 } from "./core/run.ts";
 import type { CardId, RelicId, RunState, Zone } from "./core/types.ts";
 import { World, type WorldPoint } from "./three/World.ts";
 import * as ui from "./ui.ts";
+import * as battleUi from "./battle-ui.ts";
+import * as screens from "./screens.ts";
 import * as alpha from "./alpha-ui.ts";
+import * as training from "./tutorial.ts";
 import { loadPreferences, storePreferences } from "./preferences.ts";
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) =>
   document.querySelector<T>(selector)!;
 const STORAGE = "faultline-expedition-v2";
 const sound = new Soundscape();
+/** Enemy intent → the cue heard on its contact frame. */
+const INTENT_CUES: Record<string, EffectKind> = {
+  strike: "strike", breach: "breach", sever: "sever", jam: "jam", corrupt: "corrupt", charge: "charge", infect: "malware",
+};
+/** Controls whose hover deserves a whisper; icon buttons and toolbars stay silent. */
+const HOVER_CUES = ".game-card:not(.drag-ghost), .route-room:not([disabled]), .archetype, .relic-option, [data-forge], .transmit-button, .console-button, .title-menu button, .gold-button, .field-seal.targetable, .lesson-card";
 let expedition: Expedition | null = null;
 let records: RunRecord[] = [];
 try {
@@ -80,7 +96,23 @@ let libraryRun: RunState | null = null;
 let libraryRarity = "all";
 let libraryQuery = "";
 let inspectReturn: alpha.LibraryMode | null = null;
-let practice: { step: number; expedition: Expedition | null; run: RunState; view: "title" | "select" | "run"; undo: RunState[] } | null = null;
+/** A running Field Training lesson. The real expedition is parked and restored on exit. */
+let practice: {
+  id: training.LessonId;
+  expedition: Expedition | null;
+  run: RunState;
+  view: "title" | "select" | "run";
+  undo: RunState[];
+  progress: training.LessonProgress | null;
+  last?: TurnResult;
+  showHint: boolean;
+  collapsed: boolean;
+} | null = null;
+let hintTimer = 0;
+/** Patch Cable (Architect console) is choosing its two devices. */
+let consoleTargeting = false;
+/** The encounter whose terrain title card has already been shown. */
+let terrainShown = "";
 let discardArmed = false;
 let battleGeneration = 0;
 let cardDrag: {
@@ -127,6 +159,8 @@ function toast(message: string, kind = "normal") {
 function audioScene(): ScoreScene {
   if (view === "run" && (run.phase === "forge" || run.phase === "relic")) return "sanctuary";
   if (view === "run" && run.phase === "reward" && run.map.find(room => room.id === run.currentRoom)?.type === "cache") return "shop";
+  if (view === "run" && run.phase === "shop") return "shop";
+  if (view === "run" && run.phase === "event") return "sanctuary";
   if (view === "run" && run.phase === "battle" && run.map.find(room => room.id === run.currentRoom)?.type === "elite") return "elite";
   return view === "run" && run.phase === "battle"
     ? run.enemy && ENEMIES[run.enemy.id].boss
@@ -142,6 +176,7 @@ function ensureWorld() {
       onNode,
       onLink: () => {},
       onMove,
+      onMalware: scrub,
     });
     world.setBattle(run.topology, run.enemy, run.faultNode, run.faultLink);
   } catch (error) {
@@ -158,6 +193,7 @@ function clearSelection() {
   selected = null;
   source = null;
   selectedNode = null;
+  consoleTargeting = false;
   world?.setPlacement(null);
   world?.setSelected(null);
   world?.setZoneTargeting(false);
@@ -169,15 +205,20 @@ function playable() {
 }
 function interfaceScale() { return Number.parseFloat(getComputedStyle($("#app")).zoom) || 1; }
 function render(rebuild = true) {
-  const battle = view === "run" && run.phase === "battle";
-  root.dataset.view = view === "run" ? run.phase : view;
+  // A finished training battle stays on its board: the coach panel carries the debrief.
+  const debrief = !!practice && view === "run" && run.phase !== "battle" && !!run.enemy;
+  const battle = view === "run" && (run.phase === "battle" || debrief);
+  root.dataset.view = view === "run" ? (debrief ? "battle" : run.phase) : view;
+  root.classList.toggle("lesson-debrief", debrief);
   root.classList.toggle("is-battle", battle);
   root.classList.toggle("in-market", view === "run" && run.phase === "reward" && run.map.find(room=>room.id===run.currentRoom)?.type === "cache");
   root.classList.toggle("busy", busy);
   root.classList.toggle("is-practice", !!practice);
-  root.dataset.lesson = practice ? String(practice.step) : "";
-  $("#lesson-layer").innerHTML = practice && battle ? alpha.lessonMarkup(practice.step) : "";
-  $("#header").innerHTML = ui.headerMarkup(
+  root.dataset.training = practice ? practice.id : "";
+  $("#lesson-layer").innerHTML = practice && battle && practice.progress
+    ? training.lessonPanelMarkup(practice.progress, { showHint: practice.showHint, collapsed: practice.collapsed })
+    : "";
+  $("#header").innerHTML = screens.headerMarkup(
     expedition,
     view === "title" || view === "select",
     sound.settings,
@@ -185,30 +226,39 @@ function render(rebuild = true) {
   if (battle) {
     ensureWorld();
     if (rebuild)
-      world?.setBattle(run.topology, run.enemy, run.faultNode, run.faultLink);
+      world?.setBattle(run.topology, debrief ? null : run.enemy, run.faultNode, run.faultLink);
     const forecast = combatPreview(run);
     root.dataset.guardianWindow = forecast.lethal ? "" : forecast.interrupted ? "break" : forecast.intent?.ultimate ? "ultimate" : forecast.intent?.kind === "charge" ? "charge" : run.enemy?.exposed ? "exposed" : "";
-    world?.setSignalRoute(forecast.signalPath, forecast.alternatePath);
+    root.classList.toggle("is-buffering", run.buffering);
+    world?.setTerrain?.(run.terrain);
+    world?.setMalware?.(run.malware, forecast.malwareTarget);
+    world?.setOnline?.(forecast.online);
+    if (world?.setChannels) world.setChannels(forecast.channelPaths);
+    else world?.setSignalRoute(forecast.signalPath, forecast.alternatePath);
     world?.setForecastTarget(forecast.faultTarget);
     world?.setForecastZone(forecast.hazardZone);
     world?.setZoneEffects(run.zoneEffects);
+    showTerrainTitle();
   }
   if (!battle) delete root.dataset.guardianWindow;
   world?.setVisible(battle);
   let screen = "";
-  if (view === "title") screen = ui.titleMarkup(expedition, records);
+  if (debrief) screen = "";
+  else if (view === "title") screen = screens.titleMarkup(expedition, records);
   else if (view === "select")
-    screen = ui.selectMarkup(
+    screen = screens.selectMarkup(
       archetype,
       daily,
       Boolean(expedition && !["won", "lost"].includes(run.phase)),
     );
-  else if (run.phase === "map") screen = ui.mapMarkup(expedition!);
-  else if (run.phase === "reward") screen = ui.rewardMarkup(run);
-  else if (run.phase === "relic") screen = ui.relicMarkup(run);
-  else if (run.phase === "forge") screen = ui.forgeMarkup(run);
+  else if (run.phase === "map") screen = screens.mapMarkup(expedition!);
+  else if (run.phase === "reward") screen = screens.rewardMarkup(run);
+  else if (run.phase === "relic") screen = screens.relicMarkup(run);
+  else if (run.phase === "forge") screen = screens.forgeMarkup(run);
+  else if (run.phase === "shop") screen = screens.shopMarkup(run);
+  else if (run.phase === "event") screen = screens.eventMarkup(run);
   else if (run.phase === "won" || run.phase === "lost")
-    screen = ui.outcomeMarkup(expedition!);
+    screen = screens.outcomeMarkup(expedition!);
   $("#screen").innerHTML = screen;
   if (view === "run" && run.phase === "map") {
     const chart = $<HTMLElement>(".route-scroll"), nextRoom = chart.querySelector<HTMLElement>(".route-room.available");
@@ -218,14 +268,15 @@ function render(rebuild = true) {
     }
   }
   $("#battle-hud").innerHTML = battle
-    ? ui.battleMarkup(
-        expedition!,
+    ? battleUi.battleMarkup(run, {
         selected,
         source,
         busy,
-        tutorial && !practice,
-        undoStack.length > 0,
-      )
+        tips: tutorial && !practice,
+        undo: undoStack.length > 0,
+        consoleTargeting,
+        training: !!practice,
+      })
     : "";
   const signature = battle
     ? `${run.currentRoom}|${run.turn}|${run.energy}|${run.firstFiberPlayed}|${run.hand.join(",")}`
@@ -234,7 +285,7 @@ function render(rebuild = true) {
   $("#hand-zone").hidden = !battle;
   if (!battle || signature !== handKey) {
     const scroll = document.querySelector(".card-fan")?.scrollLeft ?? 0;
-    $("#hand-zone").innerHTML = battle ? ui.handMarkup(run, selected) : "";
+    $("#hand-zone").innerHTML = battle ? battleUi.handMarkup(run, selected) : "";
     document.querySelector(".card-fan")?.scrollTo({left:scroll});
     handKey = signature;
   } else if (battle)
@@ -244,9 +295,12 @@ function render(rebuild = true) {
         el.classList.toggle("selected", Number(el.dataset.hand) === selected),
       );
   if (selected !== null) document.querySelector(`[data-hand="${selected}"]`)?.scrollIntoView({block:"nearest",inline:"nearest"});
+  if (practice && battle) fitLesson();
+  spotlightLesson();
   renderTargetDock();
   if (selected !== null && run.hand[selected])
     world?.setPlacement(CARDS[run.hand[selected]].role ?? null, source);
+  else if (consoleTargeting) world?.setPlacement(null, source);
   else world?.setPlacement(null);
   world?.setSelected(source ?? selectedNode);
   world?.setZoneTargeting(selected !== null && CARDS[run.hand[selected]]?.target === "zone");
@@ -267,7 +321,10 @@ function render(rebuild = true) {
       score: run.score,
       floor: run.stage * 7 + run.floor,
       at: Date.now(),
+      ascension: run.ascension,
     });
+    // A win unlocks the next ascension for this archetype; show it at once.
+    if (screens.recordOutcome(expedition) !== null) $("#screen").innerHTML = screens.outcomeMarkup(expedition);
     records = records.slice(0, 30);
     try {
       localStorage.setItem("faultline-records-v2", JSON.stringify(records));
@@ -279,7 +336,7 @@ function render(rebuild = true) {
   if (battle && !practice && !run.bossIntroSeen && run.enemy && ENEMIES[run.enemy.id].boss && !dialog.open) {
     modal = "boss-intro";
     dialog.className = "boss-intro";
-    $("#dialog-content").innerHTML = ui.bossIntroMarkup(run);
+    $("#dialog-content").innerHTML = screens.bossIntroMarkup(run);
     hideTooltip();
     dialog.showModal();
     sound.effect("boss");
@@ -288,10 +345,14 @@ function render(rebuild = true) {
 function renderTargetDock() {
   let markup = "";
   if (view === "run" && run.phase === "battle") {
-    if (selected !== null) {
+    if (consoleTargeting) {
+      markup = `<div class="target-options console-targets"><span>PATCH CABLE · ${source ? "CONNECT TO" : "CHOOSE DEVICE"}</span>${run.topology.nodes
+        .map(n => `<button data-node="${n.id}" class="${source === n.id ? "active" : ""}">${n.fixed ? n.id.toUpperCase() : n.id.toUpperCase()}</button>`)
+        .join("")}<button data-action="cancel">CANCEL ×</button></div>`;
+    } else if (selected !== null) {
       const c = CARDS[run.hand[selected]];
       if (c?.target === "ground")
-        markup = `<div class="target-options"><span>PLACE ON THE TABLE OR</span><button data-action="auto-place">${ui.icon("cache", 14)} Deploy in a free socket</button>${practice ? "" : (["north", "center", "south"] as const).map(zone => `<button data-deploy-zone="${zone}">${zone.toUpperCase()} BAND</button>`).join("")}</div>`;
+        markup = `<div class="target-options"><span>PLACE ON THE TABLE OR</span><button data-action="auto-place">${ui.icon("cache", 14)} Deploy in a free socket</button>${(["north", "center", "south"] as const).map(zone => `<button data-deploy-zone="${zone}">${zone.toUpperCase()} BAND</button>`).join("")}</div>`;
       else if (c?.target === "zone")
         markup = `<div class="target-options"><span>${ui.esc(c.name.toUpperCase())} · SELECT A FIELD SEAL</span></div>`;
       else if (c?.target === "link" || c?.target === "node")
@@ -308,7 +369,8 @@ function renderTargetDock() {
     }
     if (selected === null && selectedNode) {
       const node = run.topology.nodes.find(n => n.id === selectedNode);
-      if (node) markup = `<div class="target-options device-controls"><span>${ui.esc(node.id.toUpperCase())} · ${zoneForNode(node).toUpperCase()}${node.configured ? " · CONFIGURED" : ""}${node.shielded ? " · JAM PROTECTED" : ""}</span>${node.fixed || practice ? "" : `<span>RELOCATE · 1 ENERGY</span>${(["north", "center", "south"] as const).map(zone => `<button data-relocate-zone="${zone}" ${run.energy < 1 ? "disabled" : ""}>${zone.toUpperCase()}</button>`).join("")}`}<button data-action="cancel">CLOSE ×</button></div>`;
+      const online = node && !node.fixed && combatPreview(run).online.includes(node.id);
+      if (node) markup = `<div class="target-options device-controls"><span>${ui.esc(node.id.toUpperCase())} · ${zoneForNode(node).toUpperCase()}${node.fixed ? "" : online ? " · ONLINE" : " · OFFLINE"}${node.configured ? " · CONFIGURED" : ""}${node.upgraded ? " · OVERCLOCKED" : ""}${node.shielded ? " · JAM PROTECTED" : ""}${node.salvage ? " · SALVAGED" : ""}</span>${node.fixed ? "" : `<span>RELOCATE · ${RULES.relocateCost} ENERGY</span>${(["north", "center", "south"] as const).map(zone => `<button data-relocate-zone="${zone}" ${run.energy < RULES.relocateCost ? "disabled" : ""}>${zone.toUpperCase()}</button>`).join("")}`}<button data-action="cancel">CLOSE ×</button></div>`;
     }
     if (webglFailed)
       markup += `<div class="fallback-network">${run.topology.links.map((l) => `${ui.esc(l.a)} ↔ ${ui.esc(l.b)}`).join(" · ") || "ALPHA · No connections · OMEGA"}</div>`;
@@ -323,12 +385,12 @@ function openModal(type: string) {
   const content = $("#dialog-content");
   if (type === "relic-journal") content.innerHTML = alpha.relicJournalMarkup(run);
   else if (type === "settings")
-    content.innerHTML = ui.settingsMarkup(sound.settings, view === "run", preferences);
-  else if (type === "help") content.innerHTML = alpha.guideMarkup();
+    content.innerHTML = screens.settingsMarkup(sound.settings, view === "run", preferences);
+  else if (type === "help") content.innerHTML = training.handbookMarkup();
+  else if (type === "training") content.innerHTML = training.lessonMenuMarkup(training.loadCompletedLessons());
   else if (type === "combat-details") content.innerHTML = alpha.combatDetailsMarkup(run);
   else if (type === "enemy-dossier") content.innerHTML = alpha.enemyDossierMarkup(run);
   else if (type === "combat-log") content.innerHTML = alpha.historyMarkup(run);
-  else if (type === "refine") content.innerHTML = alpha.refineMarkup(run);
   else if (type === "devices") content.innerHTML = alpha.devicesMarkup(run);
   else if (type === "prepare") content.innerHTML = alpha.prepareMarkup(run);
   else if (["deck", "collection", "draw-pile", "discard-pile", "exhaust-pile", "loadout"].includes(type)) {
@@ -349,11 +411,11 @@ function openModal(type: string) {
     "discard-pile",
     "exhaust-pile",
     "combat-details",
-    "refine",
     "loadout",
     "help",
+    "training",
   ].includes(type)
-    ? "wide"
+    ? `wide${type === "help" ? " handbook-dialog" : type === "training" ? " training-dialog" : ""}`
     : "";
   hideTooltip();
   if (!dialog.open) dialog.showModal();
@@ -380,6 +442,7 @@ function begin() {
       ? dailySeed()
       : (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0,
     daily,
+    screens.chosenAscension(archetype),
   );
   run = expedition.run;
   view = "run";
@@ -390,64 +453,133 @@ function begin() {
   handKey = "";
   save();
   render();
-  sound.effect("reward");
+  sound.effect("navigate");
 }
-function playAction(action: () => ActionResult, cue?: "field" | "cleanse") {
+/** Log lines added between two states; the log is newest-first and capped. */
+function newLogLines(before: RunState, after: RunState): string[] {
+  if (!before.log.length) return after.log;
+  for (let n = 0; n <= after.log.length; n++)
+    if (before.log.slice(0, 3).every((line, i) => after.log[n + i] === line)) return after.log.slice(0, n);
+  return after.log;
+}
+/** True only when the discard pile was actually shuffled back into the draw pile. */
+function reshuffled(before: RunState, after: RunState) {
+  return newLogLines(before, after).some(line => /reshuffl/i.test(line));
+}
+function liveChannels(state: RunState) {
+  return state.phase === "battle" && state.enemy ? combatPreview(state).channels : 0;
+}
+/** The primary cue for a successful card or board action, chosen by its real effect. */
+function actionCue(before: RunState, after: RunState, card?: CardId): EffectKind {
+  if (after.topology.nodes.length > before.topology.nodes.length) return "deploy";
+  if (after.topology.links.length > before.topology.links.length) return "connect";
+  if (card && CARDS[card]?.target === "protocol") return "protocol";
+  if (after.malware.length < before.malware.length) return "scrub";
+  if (after.integrity > before.integrity || after.faultNode !== before.faultNode || after.faultLink !== before.faultLink) return "cleanse";
+  if (after.block > before.block) return "block";
+  if (card && (CARDS[card]?.junk || CARDS[card]?.curse)) return "scrub";
+  return card ? "instant" : "card";
+}
+function playAction(action: () => ActionResult, cue?: EffectKind, card?: CardId) {
   if (!playable()) return false;
   const before = structuredClone(run),
     result = action();
   if (!result.ok) {
     toast(result.message, "error");
     sound.effect("error");
+    if (practice) { practice.showHint = true; renderLesson(); }
     return false;
   }
   undoStack.push(before);
   if (undoStack.length > 20) undoStack.shift();
-  const connected = run.topology.links.length > before.topology.links.length;
   if (run.block > before.block) world?.pulseNetwork("shield");
   else if (run.faultNode !== before.faultNode || run.faultLink !== before.faultLink || run.integrity > before.integrity) world?.pulseNetwork("repair");
-  else if (run.energy > before.energy || run.packetBoost > before.packetBoost) world?.pulseNetwork("surge");
+  else if (run.energy > before.energy || run.packetBoost > before.packetBoost || run.buffer > before.buffer) world?.pulseNetwork("surge");
   if (run.block > before.block) floatText(`+${run.block - before.block} shield`, false, "shield");
   if (run.packetBoost > before.packetBoost) floatText(`+${run.packetBoost - before.packetBoost} burst`, true, "burst");
-  updateLesson();
+  if (run.buffer > before.buffer) floatText(`+${run.buffer - before.buffer} buffered`, true, "buffer");
+  if (run.backpressure > before.backpressure) floatText(`+${run.backpressure - before.backpressure} backpressure`, true, "burst");
   clearSelection();
+  updateLesson();
   save();
   render();
-  if (cue) {
-    sound.effect(cue);
-    toast(result.message);
-  } else sound.effect(run.topology.nodes.length > before.topology.nodes.length ? "deploy"
-    : connected ? "connect" : run.block > before.block ? "block"
-    : run.integrity > before.integrity || run.faultNode !== before.faultNode || run.faultLink !== before.faultLink ? "cleanse" : "card");
+  if (cue === "field" || cue === "cleanse") toast(result.message);
+  sound.effect(cue ?? actionCue(before, run, card));
+  // Follow-ups land just after the action itself: cards arriving, then the signal locking.
+  // A played card leaves the hand; anything beyond that arrived from the piles.
+  const arrived = card ? run.hand.length - (before.hand.length - 1) : 0;
+  if (reshuffled(before, run)) sound.effect("shuffle", { delay: .08 });
+  else if (arrived > 0) sound.effect("draw", { delay: .1 });
+  if (liveChannels(run) > liveChannels(before)) sound.effect("route", { delay: .18 });
   return true;
 }
 function chooseCard(index: number) {
   if (!playable() || !run.hand[index]) return;
+  const id = run.hand[index], c = CARDS[id];
+  if (c.unplayable) {
+    toast(c.curse ? `${c.name} is a curse: unplayable. Remove it at a Sanctuary or Market.` : `${c.name} is junk: unplayable. It vanishes at the end of your turn.`, "error");
+    sound.effect("error");
+    return;
+  }
   if (costFor(run, index) > run.energy) {
     toast("Not enough energy. Transmit to recharge.", "error");
     sound.effect("error");
     return;
   }
-  const c = CARDS[run.hand[index]];
-  if (practice) {
-    const expected = practice.step === 0 ? "router" : practice.step <= 2 ? "fiber" : practice.step === 4 ? "guard" : null;
-    if (c.id !== expected) { toast("Follow the field lesson, or leave practice to play freely."); return; }
-  }
+  consoleTargeting = false;
   if (c.target === "instant") {
-    playAction(() => playInstant(run, index));
+    playAction(() => playInstant(run, index), undefined, id);
+    return;
+  }
+  if (c.target === "protocol") {
+    if (playAction(() => playProtocol(run, index), "protocol", id)) toast(`${c.name} armed. It fires on ${c.protocol === "ultimate" ? "a charge or ultimate" : `the next matching ${c.protocol === "field" ? "hostile field" : c.protocol}`}.`);
+    return;
+  }
+  if (c.target === "junk") {
+    playAction(() => playJunk(run, index), "scrub", id);
     return;
   }
   selected = selected === index ? null : index;
   source = null;
   selectedNode = null;
   render(false);
-  sound.effect("select");
+  // Lifting a card is a single quiet paper gesture; putting it back is the reverse.
+  sound.effect(selected === null ? "undo" : "pickup");
+}
+/** Console command: Patch Cable enters link targeting; Harden and Buffer resolve at once. */
+function activateConsole() {
+  if (!playable()) return;
+  const state = consoleState(run);
+  if (consoleTargeting) { clearSelection(); render(false); sound.effect("undo"); return; }
+  if (!state.usable) { toast(state.reason || "Console unavailable.", "error"); sound.effect("error"); return; }
+  if (state.target === "link") {
+    selected = null;
+    source = null;
+    selectedNode = null;
+    consoleTargeting = true;
+    render(false);
+    sound.effect("console");
+    return;
+  }
+  const wasBuffering = run.buffering;
+  if (playAction(() => useConsole(run), "console")) {
+    if (state.id === "harden") sound.effect("block", { delay: .12 });
+    if (state.id === "buffer") toast(wasBuffering ? "Buffer cancelled. This turn transmits normally." : `Buffering: this transmission is stored ×${RULES.bufferMultiplier}. Transmit to store it.`);
+  }
+}
+function scrub(id: string) {
+  if (!playable()) return;
+  const target = run.malware.find(m => m.id === id);
+  if (playAction(() => scrubMalware(run, id), "scrub") && target) {
+    world?.pulseNode?.(id, "scrub");
+    floatText(`malware scrubbed`, true, "scrub");
+  }
 }
 function onGround(point: WorldPoint) {
   if (!playable() || selected === null) return;
   const index = selected;
   if (CARDS[run.hand[index]]?.target === "ground")
-    playAction(() => playGround(run, index, point.x, point.z));
+    playAction(() => playGround(run, index, point.x, point.z), undefined, run.hand[index]);
   else if (CARDS[run.hand[index]]?.target === "zone") castZone(zoneForNode(point));
 }
 function castZone(zone: Zone) {
@@ -460,6 +592,15 @@ function castZone(zone: Zone) {
 }
 function onNode(id: string) {
   if (!playable()) return;
+  if (consoleTargeting) {
+    if (source === id) { source = null; render(false); sound.effect("undo"); }
+    else if (!source) { source = id; render(false); sound.effect("select"); }
+    else {
+      const from = source;
+      if (playAction(() => useConsole(run, from, id), "connect")) sound.effect("console", { delay: .05 });
+    }
+    return;
+  }
   if (selected !== null) {
     const index = selected,
       c = CARDS[run.hand[index]];
@@ -473,26 +614,23 @@ function onNode(id: string) {
       if (source === id) {
         source = null;
         render(false);
+        sound.effect("undo");
       } else if (!source) {
         source = id;
         render(false);
-        sound.effect("hover");
+        sound.effect("select");
       } else {
         const from = source;
-        if (practice) {
-          const router = run.topology.nodes.find(n => n.role === "router")!.id;
-          const expected = practice.step === 1 ? ["alpha", router] : [router, "omega"];
-          if (![from, id].every(n => expected.includes(n))) { toast(`Connect ${expected.join(" → ").toUpperCase()} for this lesson.`); return; }
-        }
-        playAction(() => playLink(run, index, from, id));
+        playAction(() => playLink(run, index, from, id), undefined, run.hand[index]);
       }
       return;
     }
     if (c.target === "node") {
-      playAction(() => playNode(run, index, id));
+      playAction(() => playNode(run, index, id), undefined, run.hand[index]);
       return;
     }
   }
+  if (selectedNode !== id) sound.effect("select");
   selectedNode = id;
   render(false);
 }
@@ -509,15 +647,16 @@ function onMove(id: string, point: WorldPoint | null, finished: boolean) {
     }
     return;
   }
-  if (practice) { if (finished) { render(); toast("Keep the training router in place for this lesson."); } return; }
   if (finished) {
     deviceDragging = false;
     const destination = zoneForNode(point), origin = zoneForNode(node);
-    if (!playAction(() => relocateNode(run, id, point.x, point.z))) { clearSelection(); render(); }
-    else if (origin !== destination) { sound.effect("move"); world?.pulseZone(destination,"move"); toast(`${id.toUpperCase()} · ${origin.toUpperCase()} → ${destination.toUpperCase()} · 1 energy`); }
+    // One cue per drop: a real relocation slides the device; dropping it back in place is a soft return.
+    const moved = Math.hypot(node.x - point.x, node.z - point.z) >= .01;
+    if (!playAction(() => relocateNode(run, id, point.x, point.z), moved ? "move" : "undo")) { clearSelection(); render(); }
+    else if (origin !== destination) { world?.pulseZone(destination,"move"); toast(`${id.toUpperCase()} · ${origin.toUpperCase()} → ${destination.toUpperCase()} · ${RULES.relocateCost} energy`); }
     return;
   }
-  const blocked = run.energy < 1 ? "Not enough energy" : run.topology.nodes.some(n => n.id !== id && Math.hypot(n.x - point.x, n.z - point.z) < 1.55) ? "Socket occupied" : "";
+  const blocked = run.energy < RULES.relocateCost ? "Not enough energy" : isBlocked(run, point.x, point.z, id) ?? "";
   const origin = zoneForNode(node), destination = zoneForNode(point);
   const next = structuredClone(run);
   const nextNode = next.topology.nodes.find(n=>n.id===id)!;
@@ -526,7 +665,7 @@ function onMove(id: string, point: WorldPoint | null, finished: boolean) {
   let preview = document.getElementById("movement-preview");
   if (!preview) { preview = document.createElement("div"); preview.id="movement-preview"; preview.setAttribute("role","status"); root.append(preview); }
   preview.className=blocked ? "blocked" : "";
-  preview.innerHTML=`<span class="move-caption">RELOCATE ${ui.esc(id.toUpperCase())}</span><strong>${origin.toUpperCase()} ${ui.icon("arrow",16)} ${destination.toUpperCase()}</strong><span>${blocked || "Release to move · 1 energy"}</span><div><span>Damage <b>${before.packetDamage} → ${after.packetDamage}</b></span><span>Shield <b>${before.shield} → ${after.shield}</b></span><span>Life lost <b>${before.incoming} → ${after.incoming}</b></span></div><small>${ui.esc(zoneDescription(run,destination))}</small>`;
+  preview.innerHTML=`<span class="move-caption">RELOCATE ${ui.esc(id.toUpperCase())}</span><strong>${origin.toUpperCase()} ${ui.icon("arrow",16)} ${destination.toUpperCase()}</strong><span>${ui.esc(blocked || `Release to move · ${RULES.relocateCost} energy`)}</span><div><span>Damage <b>${before.packetDamage} → ${after.packetDamage}</b></span><span>Shield <b>${before.shield} → ${after.shield}</b></span><span>Life lost <b>${before.incoming} → ${after.incoming}</b></span>${after.channels !== before.channels ? `<span>Channels <b>${before.channels} → ${after.channels}</b></span>` : ""}</div><small>${ui.esc(zoneDescription(run,destination))}</small>`;
   world?.setZonePreview(destination, !!blocked);
   deviceDragging = true;
   if (blocked) return;
@@ -538,17 +677,19 @@ function onMove(id: string, point: WorldPoint | null, finished: boolean) {
   world?.setBattle(topology, run.enemy, run.faultNode, run.faultLink);
 }
 function relocateToZone(zone: "north" | "center" | "south") {
-  if (!selectedNode || !playable() || practice) return;
+  if (!selectedNode || !playable()) return;
   const id = selectedNode;
   const node = run.topology.nodes.find(n => n.id === id)!;
-  const z = { north: -2.5, center: 0, south: 2.5 }[zone];
-  const x = [node.x, 0, -2.5, 2.5, -4.5, 4.5].find(x => run.topology.nodes.every(n => n.id === id || Math.hypot(n.x - x, n.z - z) >= 1.55));
-  if (x === undefined) { toast("No free socket in that band.", "error"); return; }
-  if (Math.hypot(node.x-x,node.z-z) < 0.01) { toast(`${id.toUpperCase()} is already in this socket.`); return; }
-  if (!playAction(() => relocateNode(run, id, x, z))) return;
-  sound.effect("move");
+  if (zoneForNode(node) === zone) { toast(`${id.toUpperCase()} is already in ${zone.toUpperCase()}.`); return; }
+  let spot: WorldPoint | undefined;
+  for (const z of { north: [-2.5, -3.6, -1.8], center: [0, 0.9, -0.9], south: [2.5, 3.6, 1.8] }[zone])
+    for (const x of [node.x, 0, -1.25, 1.25, -2.5, 2.5, -3.75, 3.75, -4.5, 4.5])
+      if (!spot && !isBlocked(run, x, z, id)) spot = { x, z };
+  if (!spot) { toast("No free socket in that band.", "error"); return; }
+  const { x, z } = spot;
+  if (!playAction(() => relocateNode(run, id, x, z), "move")) return;
   world?.pulseZone(zone,"move");
-  toast(`${id.toUpperCase()} → ${zone.toUpperCase()} · 1 energy · ${zoneDescription(run,zone)}`);
+  toast(`${id.toUpperCase()} → ${zone.toUpperCase()} · ${RULES.relocateCost} energy · ${zoneDescription(run,zone)}`);
 }
 
 function autoPlace(zone?: "north" | "center" | "south") {
@@ -563,15 +704,19 @@ function autoPlace(zone?: "north" | "center" | "south") {
     { x: 0, z: 3.5 },
     { x: -4, z: 0 },
     { x: 4, z: 0 },
+    { x: -1.25, z: 1.2 },
+    { x: 1.25, z: -1.2 },
     { x: -4, z: -3 },
     { x: 4, z: 3 },
+    { x: -4, z: 3 },
+    { x: 4, z: -3 },
+    { x: -2.5, z: 0 },
+    { x: 2.5, z: 0 },
   ];
-  const point = spaces.find(
-    (p) =>
-      (!zone || zoneForNode(p) === zone) && !run.topology.nodes.some((n) => Math.hypot(n.x - p.x, n.z - p.z) < 1.55),
-  );
+  // Wreckage and malware block sockets too: ask the rules, not a local distance check.
+  const point = spaces.find((p) => (!zone || zoneForNode(p) === zone) && !isBlocked(run, p.x, p.z));
   if (point) onGround(point);
-  else toast("Place this hardware in an empty space on the table.");
+  else toast(zone ? `No free socket in ${zone.toUpperCase()}. Choose one on the table.` : "Place this hardware in an empty space on the table.", "error");
 }
 function undo() {
   if (!playable() || !undoStack.length) return;
@@ -579,12 +724,11 @@ function undo() {
   const prev = undoStack.pop()!;
   if (prev.currentRoom !== run.currentRoom || prev.turn !== run.turn) return;
   run = prev;
-  if (practice) practice.step = run.turn > 1 ? (run.block >= 4 ? 5 : 4) : run.topology.nodes.length < 3 ? 0 : run.topology.links.length === 0 ? 1 : signalPaths(run).length ? 3 : 2;
   expedition!.run = run;
   clearSelection();
   save();
   render();
-  sound.effect("card");
+  sound.effect("undo");
 }
 function floatText(text: string, good: boolean, kind = "") {
   const el = document.createElement("span");
@@ -593,9 +737,24 @@ function floatText(text: string, good: boolean, kind = "") {
   $("#impact-layer").append(el);
   window.setTimeout(() => el.remove(), 1500);
 }
+/** Where a honeypot or protocol answered the forecast action, for the trap flash. */
+function trapFocus(forecast: ReturnType<typeof combatPreview>): { id: string; kind: "trap" | "trigger" } | null {
+  const target = forecast.faultTarget;
+  const role = (id: string) => run.topology.nodes.find(n => n.id === id)?.role;
+  if (target) {
+    const ends = target.split("::");
+    const decoy = ends.find(id => role(id) === "honeypot");
+    if (decoy && forecast.enemyDamage) return { id: decoy, kind: "trap" };
+    if (forecast.protocolTriggers.length) return { id: ends.find(id => !["alpha", "omega"].includes(id)) ?? ends[0], kind: "trigger" };
+  }
+  if (forecast.protocolTriggers.length) {
+    const firewall = run.topology.nodes.find(n => n.role === "firewall" && forecast.online.includes(n.id));
+    return { id: firewall?.id ?? "omega", kind: "trigger" };
+  }
+  return null;
+}
 function transmit() {
   if (!playable()) return;
-  if (practice && ![3, 5].includes(practice.step)) { toast("Complete the current lesson before transmitting."); return; }
   const generation = ++battleGeneration;
   const forecast = combatPreview(run);
   clearSelection();
@@ -604,7 +763,13 @@ function transmit() {
   const next = structuredClone(run),
     result = endTurn(next);
   const becomesEnraged = !result.defeated && next.enemy && ENEMIES[next.enemy.id].enrages && run.enemy!.hp > run.enemy!.maxHp / 2 && next.enemy.hp <= next.enemy.maxHp / 2;
-  sound.effect("turn");
+  const reshuffle = reshuffled(run, next);
+  const trap = trapFocus(forecast);
+  if (result.buffered) sound.effect("buffer");
+  else {
+    sound.effect("transmit");
+    if (result.bufferReleased) sound.effect("release", { delay: .12 });
+  }
   render(false);
   const finish = () => {
     if (generation !== battleGeneration) return;
@@ -614,32 +779,36 @@ function transmit() {
       floatText(`−${result.packetDamage}`, true);
       // Show contact immediately while the already forecast enemy action remains
       // committed. The rule state advances only when the sequence completes.
+      const hp = Math.max(0, run.enemy!.hp - result.packetDamage);
       const health = $(".enemy-health");
-      health.setAttribute("aria-valuenow", String(next.enemy!.hp));
-      health.querySelector<HTMLElement>("span")!.style.width = `${next.enemy!.hp / next.enemy!.maxHp * 100}%`;
+      health.setAttribute("aria-valuenow", String(hp));
+      health.querySelector<HTMLElement>("span")!.style.width = `${hp / run.enemy!.maxHp * 100}%`;
       health.querySelector(".health-risk")?.remove();
-      $(".enemy-health-label strong").innerHTML = `${next.enemy!.hp}<small> / ${next.enemy!.maxHp}</small>`;
-    } else toast(result.signalPath.length ? "The signal was absorbed. Check armor and hostile fields." : "No live route. The signal could not reach OMEGA.", "error");
+      $(".enemy-health-label strong").innerHTML = `${hp}<small> / ${run.enemy!.maxHp}</small>`;
+    } else if (result.buffered) floatText(`+${result.buffered} buffered`, true, "buffer");
+    else if (!result.enemyDamage) toast(result.signalPath.length ? "The signal was absorbed. Check armor, malware and hostile fields." : "No live route. The signal could not reach OMEGA.", "error");
     const resolve = () => {
       if (generation !== battleGeneration) return;
       run = next;
       expedition!.run = run;
       busy = false;
       delete root.dataset.enemyAction;
-      if (practice) {
-        if (practice.step === 3) {
-          practice.step = 4;
-          run.hand = ["guard", "pulse", "patch"];
-          run.enemy!.turn = 0;
-        } else if (practice.step === 5) practice.step = 6;
-      }
+      if (practice) practice.last = result;
+      updateLesson();
       save();
       render();
-      if (forecast.zoneThreat && !result.defeated) { world?.pulseZone(forecast.zoneThreat.zone,"corrupt"); sound.effect("corrupt"); }
+      if (forecast.zoneThreat && !result.defeated) { world?.pulseZone(forecast.zoneThreat.zone,"corrupt"); if (forecast.intent?.kind !== "corrupt") sound.effect("corrupt", { delay: .1 }); }
+      if (result.junkAdded.length && !result.defeated) {
+        sound.effect("junk", { delay: .25 });
+        toast(`${result.junkAdded.length} ${CARDS[result.junkAdded[0]].name} shuffled into your draw pile.`, "error");
+      }
+      if (result.malwarePlanted && !result.defeated) floatText("malware planted", false, "malware");
+      if (result.backpressureStored) floatText(`+${result.backpressureStored} backpressure`, true, "burst");
       if (result.defeated) {
         sound.effect("reward");
         return;
       }
+      if (result.bufferLost) toast("Packet loss: no live route at the start of your turn. The buffer was lost.", "error");
       if (result.integrityDamage) {
         world?.pulseThreat();
         sound.effect(result.lost ? "defeat" : "hurt");
@@ -658,7 +827,12 @@ function transmit() {
       if (forecast.enemyHealing) floatText(`+${forecast.enemyHealing} siphoned`, true, "enemy-heal");
       if (result.interrupted) toast("Ultimate interrupted. The guardian is exposed for one transmission.");
       else if (becomesEnraged) toast(`${run.enemy!.name} awakens. Its attacks grow stronger.`, "error");
-      if (!result.lost) sound.effect("draw");
+      // The new hand arrives after the hit has landed; a reshuffle is heard only when it happened.
+      if (!result.lost) {
+        const delay = result.integrityDamage ? .45 : .15;
+        if (reshuffle) sound.effect("shuffle", { delay });
+        sound.effect("deal", { delay: reshuffle ? delay + .75 : delay });
+      }
       const flash = $("#battle-flash");
       flash.classList.remove("active");
       void flash.offsetWidth;
@@ -674,9 +848,17 @@ function transmit() {
     };
     window.setTimeout(() => {
       if (generation !== battleGeneration) return;
+      // Countermeasures fire on the same contact frame as the attack they answer.
+      const springTraps = () => {
+        if (!trap && !result.enemyDamage && !result.protocolsTriggered.length) return;
+        sound.effect("trigger", { delay: .06 });
+        if (trap) world?.pulseNode?.(trap.id, trap.kind);
+        if (result.enemyDamage) floatText(`−${result.enemyDamage} trap`, true, "trap");
+        if (result.protocolsTriggered.length) floatText(result.protocolsTriggered.map(id => CARDS[id].name).join(" · "), true, "protocol");
+      };
       if (result.interrupted) {
         root.dataset.enemyAction = "break";
-        sound.effect("cleanse");
+        sound.effect("trigger");
         floatText("INTERRUPTED", true, "burst");
         if (world) world.playEnemyTransition("break", afterEnemy, preferences.fast);
         else afterEnemy();
@@ -684,20 +866,26 @@ function transmit() {
         const kind = forecast.intent.kind;
         root.dataset.enemyAction = kind;
         if (kind === "breach" || kind === "charge") sound.effect("charge");
-        const impact = () => { if (kind !== "charge") sound.effect(kind, { pan: kind === "breach" ? .35 : kind === "strike" ? -.35 : 0, power: forecast.intent?.ultimate ? 1.2 : 1 }); };
+        const impact = () => {
+          if (kind !== "charge") sound.effect(INTENT_CUES[kind] ?? "strike", { pan: kind === "breach" ? .35 : kind === "strike" ? -.35 : 0, power: forecast.intent?.ultimate ? 1.2 : 1 });
+          if (forecast.intent?.infect && kind !== "infect") sound.effect("malware", { delay: .1 });
+          springTraps();
+        };
         if (world) world.playEnemyAction(kind, forecast.faultTarget, forecast.hazardZone, afterEnemy, preferences.fast, impact);
         else { impact(); window.setTimeout(afterEnemy, 160); }
       } else {
+        // Traps can finish the hostile as it moves: show them before it falls.
+        if (!result.packetDamage || result.enemyDamage) springTraps();
         sound.effect("death");
         if (world) world.playEnemyTransition("death", resolve, preferences.fast);
         else resolve();
       }
     }, preferences.fast || !sound.settings.motion ? 80 : 350);
   };
-  if (result.signalPath.length && world && !preferences.fast && sound.settings.motion) {
-    world.playPacket(result.signalPath, finish);
-    if (result.alternatePath.length)
-      world.playPacket(result.alternatePath, undefined, 0xb3d8e3);
+  const channels = result.channelPaths.length ? result.channelPaths : [result.signalPath].filter(path => path.length);
+  if (channels.length && world && !preferences.fast && sound.settings.motion) {
+    if (world.playChannels) world.playChannels(channels, finish);
+    else world.playPacket(channels[0], finish);
   } else window.setTimeout(finish, preferences.fast || !sound.settings.motion ? 80 : 550);
 }
 function exportNetwork() {
@@ -716,7 +904,18 @@ function exportNetwork() {
 async function action(name: string) {
   if (name === "hand-left" || name === "hand-right") {
     document.querySelector(".card-fan")?.scrollBy({left:(name === "hand-left" ? -1 : 1) * 340,behavior:sound.settings.motion ? "smooth" : "instant"});
-    sound.effect("hover");
+    sound.effect("select");
+    return;
+  }
+  if (name === "lesson-collapse" && practice) {
+    practice.collapsed = !practice.collapsed;
+    renderLesson();
+    return;
+  }
+  if (name === "lesson-hint" && practice) {
+    practice.showHint = true;
+    renderLesson();
+    sound.effect("select");
     return;
   }
   if (name === "close") {
@@ -739,10 +938,26 @@ async function action(name: string) {
     return;
   }
   if (busy) return;
-  if (name === "prepare" && (run.phase !== "battle" || practice)) return;
-  if (name === "release-prepared" && modal === "prepare" && !practice) {
+  if (name === "prepare" && run.phase !== "battle") return;
+  if (name === "release-prepared" && modal === "prepare") {
     closeModal();
-    playAction(() => releasePreparedCard(run));
+    playAction(() => releasePreparedCard(run), "undo");
+    return;
+  }
+  if (name === "console") { activateConsole(); return; }
+  if (name === "tutorial" || name === "lesson-menu") { openModal("training"); sound.effect("navigate"); return; }
+  if (name === "lesson-restart" && practice) { startLesson(practice.id); return; }
+  if (name === "lesson-next" && practice) {
+    const next = training.nextLesson(practice.id);
+    if (next) openLesson(next.id);
+    else finishPractice();
+    return;
+  }
+  if (name === "lesson-exit") { finishPractice(); return; }
+  if (name === "lesson-finish") {
+    training.markLessonComplete(training.WALKTHROUGH_LESSON);
+    sound.effect("reward");
+    openModal("training");
     return;
   }
   if (name === "inspect-back" && inspectReturn) {
@@ -751,8 +966,6 @@ async function action(name: string) {
     dialog.className = "wide";
     return;
   }
-  if (name === "tutorial") { startPractice(); return; }
-  if (name === "tutorial-exit" || name === "tutorial-finish") { finishPractice(); return; }
   if (
     name === "devices" ||
     name === "loadout" ||
@@ -761,7 +974,6 @@ async function action(name: string) {
     name === "combat-details" ||
     name === "combat-log" ||
     name === "relic-journal" ||
-    name === "refine" ||
     name === "exhaust-pile" ||
     name === "settings" ||
     name === "help" ||
@@ -834,6 +1046,7 @@ async function action(name: string) {
     chooseCardReward(run, null);
     save();
     render();
+    sound.effect("navigate");
     return;
   }
   if (name === "dismiss-tutorial") {
@@ -855,9 +1068,32 @@ document.addEventListener("click", (event) => {
   const managedNode = target.closest<HTMLElement>("[data-manage-node]")?.dataset.manageNode;
   if (managedNode && modal === "devices") { closeModal(); onNode(managedNode); return; }
   const preparedIndex = target.closest<HTMLElement>("[data-prepare-card]")?.dataset.prepareCard;
-  if (preparedIndex !== undefined && modal === "prepare" && !practice) {
+  if (preparedIndex !== undefined && modal === "prepare") {
     closeModal();
-    playAction(() => prepareCard(run, Number(preparedIndex)));
+    playAction(() => prepareCard(run, Number(preparedIndex)), "card");
+    return;
+  }
+  // Field Training: lesson menu, walkthrough pages and Handbook chapters live in the dialog.
+  const lessonId = target.closest<HTMLElement>("button[data-lesson]")?.dataset.lesson;
+  if (lessonId && training.lessonById(lessonId) && !busy) { openLesson(lessonId as training.LessonId); return; }
+  const page = target.closest<HTMLElement>("[data-walkthrough]")?.dataset.walkthrough;
+  if (page !== undefined && modal === "walkthrough") {
+    $("#dialog-content").innerHTML = training.walkthroughMarkup(Number(page));
+    resetDialogScroll();
+    sound.effect("select");
+    return;
+  }
+  const chapter = target.closest<HTMLElement>("[data-handbook]")?.dataset.handbook;
+  if (chapter && modal === "help") {
+    $("#dialog-content").innerHTML = training.handbookMarkup(chapter);
+    resetDialogScroll();
+    sound.effect("select");
+    return;
+  }
+  const scrubId = target.closest<HTMLElement>("[data-scrub]")?.dataset.scrub;
+  if (scrubId) {
+    if (modal === "devices") closeModal();
+    scrub(scrubId);
     return;
   }
   const fieldZone = target.closest<HTMLElement>("[data-field-zone]")?.dataset.fieldZone as Zone | undefined;
@@ -874,20 +1110,13 @@ document.addEventListener("click", (event) => {
     $("#dialog-content").innerHTML = alpha.libraryMarkup(libraryRun ?? run, libraryMode, libraryRarity, libraryQuery);
     return;
   }
-  const removal = target.closest<HTMLElement>("[data-remove-card]")?.dataset.removeCard;
-  if (removal !== undefined && modal === "refine") {
-    const result = removeDeckCard(run, Number(removal));
-    if (result.ok) { closeModal(); save(); render(); sound.effect("reward"); }
-    toast(result.message, result.ok ? "normal" : "error");
-    return;
-  }
   if (dialog.open || busy) return;
   const character = target.closest<HTMLElement>("[data-archetype]")?.dataset
     .archetype as Archetype | undefined;
   if (character) {
     archetype = character;
     render(false);
-    sound.effect("card");
+    sound.effect("pickup");
     return;
   }
   const room = target.closest<HTMLElement>("[data-room]")?.dataset.room;
@@ -900,7 +1129,10 @@ document.addEventListener("click", (event) => {
       world?.resetCamera();
       save();
       render();
-      sound.effect("turn");
+      // The route cue first, then the room announces itself.
+      sound.effect("navigate");
+      const arrival = screens.roomArrivalCue(run);
+      if (arrival) window.setTimeout(() => sound.effect(arrival), 170);
     }
     return;
   }
@@ -927,15 +1159,20 @@ document.addEventListener("click", (event) => {
     }
     return;
   }
-  const forge = target.closest<HTMLElement>("[data-forge]")?.dataset.forge as
-    | "repair"
-    | "relic"
-    | undefined;
-  if (forge) {
-    chooseForge(run, forge);
-    save();
+  // Expedition screens (sanctuary, market, events, deck pickers, ascension).
+  const screenControl = target.closest<HTMLElement>("[data-screen]");
+  if (screenControl) {
+    const outcome = screens.screenAction(run, screenControl.dataset);
+    if (outcome.result) toast(outcome.result.message, outcome.result.ok ? "normal" : "error");
+    if (outcome.cue) sound.effect(outcome.cue);
+    if (outcome.battle) {
+      clearSelection();
+      undoStack.length = 0;
+      handKey = "";
+      world?.resetCamera();
+    }
+    if (outcome.changed !== false) save();
     render();
-    sound.effect("reward");
     return;
   }
   const hand = target.closest<HTMLElement>("[data-hand]")?.dataset.hand;
@@ -1050,7 +1287,7 @@ window.addEventListener("pointerup", (event) => {
   ignoreClick = true;
   world?.setPlacement(null);
   const point = world?.pointFromScreen(event.clientX, event.clientY);
-  if (point) playAction(() => playGround(run, d.index, point.x, point.z));
+  if (point) playAction(() => playGround(run, d.index, point.x, point.z), undefined, run.hand[d.index]);
   else render(false);
   setTimeout(() => (ignoreClick = false), 0);
 });
@@ -1063,9 +1300,10 @@ document.addEventListener("keydown", (event) => {
   }
   if (event.key === "Escape") {
     event.preventDefault();
-    if (selected !== null || selectedNode || deviceDragging || cardDrag) {
+    if (selected !== null || selectedNode || deviceDragging || cardDrag || consoleTargeting) {
       clearSelection();
       render(false);
+      sound.effect("undo");
     } else if (view === "run") openModal("settings");
     else if (view === "select") {
       view = "title";
@@ -1074,9 +1312,14 @@ document.addEventListener("keydown", (event) => {
     return;
   }
   if (!playable()) return;
-  if (event.key.toLowerCase() === "p" && !practice) {
+  if (event.key.toLowerCase() === "p") {
     event.preventDefault();
     openModal("prepare");
+    return;
+  }
+  if (event.key.toLowerCase() === "c") {
+    event.preventDefault();
+    activateConsole();
     return;
   }
   if (event.key.toLowerCase() === "z") {
@@ -1096,8 +1339,8 @@ document.addEventListener("keydown", (event) => {
   }
 });
 document.addEventListener("pointerover", (event) => {
-  const el = (event.target as HTMLElement).closest("button");
-  if (el && !el.contains((event as PointerEvent).relatedTarget as Node | null))
+  const el = (event.target as HTMLElement).closest<HTMLElement>(HOVER_CUES);
+  if (el && !(el as HTMLButtonElement).disabled && !el.contains((event as PointerEvent).relatedTarget as Node | null))
     sound.effect("hover");
 });
 window.addEventListener("pagehide", (event) => {
@@ -1115,27 +1358,56 @@ function inspectCard(id: CardId) {
   hideTooltip();
   if (!dialog.open) dialog.showModal();
 }
-function startPractice() {
-  if (practice) { closeModal(); return; }
+/** A new chapter or page starts at its top, whichever element of the dialog scrolls. */
+function resetDialogScroll() {
+  for (const el of [dialog, ...Array.from(dialog.querySelectorAll<HTMLElement>("*"))]) if (el.scrollTop) el.scrollTop = 0;
+}
+/** Lesson menu entry: battle lessons start a practice battle; the expedition guide is a dialog. */
+function openLesson(id: training.LessonId) {
+  const lesson = training.lessonById(id);
+  if (!lesson) return;
+  if (lesson.kind === "walkthrough") {
+    modal = "walkthrough";
+    $("#dialog-content").innerHTML = training.walkthroughMarkup(0);
+    dialog.className = "wide walkthrough-dialog";
+    hideTooltip();
+    if (!dialog.open) dialog.showModal();
+    sound.effect("navigate");
+    return;
+  }
+  startLesson(id);
+}
+/** Park the real expedition (once) and start a fresh lesson battle. Nothing here is saved. */
+function startLesson(id: training.LessonId) {
   if (dialog.open) dialog.close();
   modal = "";
-  practice = { step: 0, expedition, run, view, undo: undoStack.map(state => structuredClone(state)) };
-  expedition = newExpedition("architect", 8841);
-  run = expedition.run;
-  chooseRoom(run, "0-1");
-  run.enemy = { id: "leech", name: "TRAINING ECHO", title: "A harmless memory of the first signal", hp: 50, maxHp: 50, turn: 0, color: 0x79ceb9 };
-  run.hand = ["router", "fiber", "fiber"];
-  run.energy = 5;
-  run.integrity = run.maxIntegrity = 20;
+  cancelDrag();
+  clearTimeout(hintTimer);
+  const parked = practice
+    ? { expedition: practice.expedition, run: practice.run, view: practice.view, undo: practice.undo }
+    : { expedition, run, view, undo: undoStack.map(state => structuredClone(state)) };
+  const lessonRun = training.createLessonRun(id);
+  // Short screens start with the coach folded to its current goal; it expands on demand.
+  const short = root.getBoundingClientRect().height / interfaceScale() < 780;
+  practice = { id, ...parked, progress: null, showHint: false, collapsed: practice?.collapsed ?? short };
+  expedition = { version: 3, run: lessonRun, archetype: lessonRun.archetype, daily: false, startedAt: Date.now(), recorded: true };
+  run = lessonRun;
   view = "run";
+  busy = false;
+  battleGeneration++;
   undoStack.length = 0;
   clearSelection();
   handKey = "";
+  world?.resetCamera();
+  practice.progress = training.lessonProgress(id, run);
   render();
+  armHint();
+  sound.effect("turn");
 }
 function finishPractice() {
-  if (!practice) return;
+  if (!practice) { if (dialog.open) closeModal(); return; }
   cancelDrag();
+  clearTimeout(hintTimer);
   const previous = practice;
   practice = null;
   expedition = previous.expedition;
@@ -1149,13 +1421,76 @@ function finishPractice() {
   clearSelection();
   handKey = "";
   render();
+  sound.effect("navigate");
 }
+/** Recompute lesson goals after every action and transmission. */
 function updateLesson() {
   if (!practice) return;
-  if (practice.step === 0 && run.topology.nodes.some(n => n.role === "router")) practice.step = 1;
-  else if (practice.step === 1 && run.topology.links.some(l => l.a === "alpha" || l.b === "alpha")) practice.step = 2;
-  else if (practice.step === 2 && signalPaths(run).length) practice.step = 3;
-  else if (practice.step === 4 && run.block >= 4) practice.step = 5;
+  const before = practice.progress;
+  const progress = training.lessonProgress(practice.id, run, practice.last, before ?? undefined);
+  const done = (p: training.LessonProgress | null) => p ? p.goals.filter(goal => goal.done).length : -1;
+  practice.progress = progress;
+  if (done(progress) > done(before)) { practice.showHint = false; armHint(); }
+  if (progress.complete && !before?.complete) {
+    training.markLessonComplete(practice.id);
+    clearTimeout(hintTimer);
+    sound.effect("reward", { delay: .35 });
+  }
+}
+/** Offer the hint after a stretch of inactivity (the lesson owns the delay). */
+function armHint() {
+  clearTimeout(hintTimer);
+  if (!practice || practice.progress?.complete) return;
+  hintTimer = window.setTimeout(() => {
+    if (!practice || practice.progress?.complete || practice.showHint) return;
+    practice.showHint = true;
+    renderLesson();
+  }, training.HINT_DELAY_MS);
+}
+function renderLesson() {
+  if (!practice?.progress) return;
+  $("#lesson-layer").innerHTML = view === "run" && root.classList.contains("is-battle")
+    ? training.lessonPanelMarkup(practice.progress, { showHint: practice.showHint, collapsed: practice.collapsed })
+    : "";
+  fitLesson();
+  spotlightLesson();
+}
+// Window size changes move the vitals card, so the coach re-measures its room.
+window.addEventListener("resize", () => { if (practice) fitLesson(); });
+/** The coach panel fills the left column down to the compact vitals card. */
+/** Field Training points at the control its current step needs (e.g. the Prepare slot). */
+function spotlightLesson() {
+  document.querySelectorAll(".lesson-focus").forEach(el => el.classList.remove("lesson-focus"));
+  const focus = practice?.progress?.focus;
+  if (!focus || busy || !root.classList.contains("is-battle")) return;
+  try { document.querySelectorAll(focus).forEach(el => el.classList.add("lesson-focus")); }
+  catch { /* A malformed selector must never break the lesson. */ }
+}
+function fitLesson() {
+  const plate = document.querySelector<HTMLElement>(".is-practice .battle-left");
+  if (!plate) return;
+  const scale = interfaceScale(), top = (plate.getBoundingClientRect().top - root.getBoundingClientRect().top) / scale;
+  root.style.setProperty("--training-room", `${Math.max(120, Math.round(top - 84 - 12))}px`);
+}
+/** A brief title card naming the encounter ground, once per fresh battle. */
+function showTerrainTitle() {
+  if (practice || !run.terrain || run.phase !== "battle") return;
+  const key = `${run.seed}:${run.stage}:${run.currentRoom}`;
+  if (terrainShown === key) return;
+  terrainShown = key;
+  if (run.turn !== 1 || run.cardsPlayed) return;
+  document.querySelector(".terrain-title")?.remove();
+  const el = document.createElement("div");
+  el.className = "terrain-title";
+  el.setAttribute("role", "status");
+  el.innerHTML = `<span>${ui.icon("terrain", 14)} ENCOUNTER GROUND</span><strong>${ui.esc(run.terrain.name)}</strong><p>${ui.esc(run.terrain.description)}</p>`;
+  root.append(el);
+  // A short beat: it leaves on its own, or the moment the player acts.
+  const dismiss = () => { el.classList.add("leaving"); window.setTimeout(() => el.remove(), 260); };
+  const timer = window.setTimeout(dismiss, 3600);
+  const early = () => { window.clearTimeout(timer); dismiss(); };
+  document.addEventListener("pointerdown", early, { once: true, capture: true });
+  document.addEventListener("keydown", early, { once: true, capture: true });
 }
 document.addEventListener("contextmenu", event => {
   const id = (event.target as HTMLElement).closest<HTMLElement>("[data-card-id]")?.dataset.cardId as CardId | undefined;

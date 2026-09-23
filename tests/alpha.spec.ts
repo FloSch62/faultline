@@ -1,8 +1,10 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+// Every test also fails on any page or console error (see helpers.ts).
+import { expect, test } from "./helpers.ts";
 import { newExpedition, type Expedition } from "../src/core/expedition.ts";
-import { CARDS } from "../src/core/cards.ts";
+import { BASE_CARD_IDS, CARDS, RULES, canUpgrade } from "../src/core/cards.ts";
 import { ENEMIES } from "../src/core/enemies.ts";
-import { chooseRoom } from "../src/core/run.ts";
+import { chooseRoom, combatPreview, playInstant } from "../src/core/run.ts";
 
 const SAVE = "faultline-expedition-v2";
 const RECORDS = "faultline-records-v2";
@@ -10,6 +12,13 @@ const RECORDS = "faultline-records-v2";
 function fixture(): Expedition {
   const expedition = newExpedition("architect", 12345);
   chooseRoom(expedition.run, "0-1");
+  // A bare table: encounter terrain (salvage, permanent fields) is tested elsewhere.
+  const run = expedition.run;
+  run.terrain = null;
+  run.zoneEffects = [];
+  run.malware = [];
+  run.topology.nodes = run.topology.nodes.filter((node) => node.fixed);
+  run.topology.links = [];
   return expedition;
 }
 
@@ -42,49 +51,6 @@ async function connect(page: Page, a: string, b: string) {
   await page.locator(`[data-node="${a}"]`).click();
   await page.locator(`[data-node="${b}"]`).click();
 }
-
-test("practice is optional and exiting it preserves the expedition and history", async ({
-  page,
-}) => {
-  await installSave(page);
-  const before = await saved(page);
-  const history = await page.evaluate(
-    (key) => localStorage.getItem(key),
-    RECORDS,
-  );
-  await page.locator('[data-action="tutorial"]').first().click();
-  await expect(page.locator(".game-root")).toHaveAttribute(
-    "data-view",
-    "battle",
-  );
-  await choose(page, "router");
-  await page.getByRole("button", { name: /Deploy in a free socket/ }).click();
-  await connect(page, "alpha", "router1");
-  await connect(page, "router1", "omega");
-  await expect(page.locator(".transmit-power strong")).toHaveText("5");
-  await page.locator('[data-action="transmit"]').click();
-  await expect(page.locator(".game-root")).not.toHaveClass(/busy/, {
-    timeout: 15_000,
-  });
-  expect(await saved(page)).toBe(before);
-  await page.locator('[data-action="tutorial-exit"]').click();
-  await expect(page.locator(".game-root")).toHaveAttribute(
-    "data-view",
-    "title",
-  );
-  await expect(page.locator("[data-hand]")).toHaveCount(0);
-  await expect(page.locator("#hand-zone")).toBeHidden();
-  expect(await saved(page)).toBe(before);
-  expect(await page.evaluate((key) => localStorage.getItem(key), RECORDS)).toBe(
-    history,
-  );
-  await page.locator('[data-action="continue"]').click();
-  await expect(page.locator(".game-root")).toHaveAttribute(
-    "data-view",
-    "battle",
-  );
-  expect(JSON.parse((await saved(page))!).run.topology.nodes).toHaveLength(2);
-});
 
 test("inspection exposes readable card rules without playing a card", async ({
   page,
@@ -172,14 +138,18 @@ test("the full card archive is inspectable and renders without failed artwork", 
   await page.goto("./");
   await page.locator('[data-action="collection"]').click();
   const entries = page.locator("dialog [data-collection]");
-  await expect(entries).toHaveCount(Object.keys(CARDS).length);
-  expect(Object.keys(CARDS).length).toBeGreaterThanOrEqual(30);
-  for (const rarity of ["rare", "legendary"]) {
+  // The archive lists every base card once; the Upgraded filter shows every "+" version.
+  await expect(entries).toHaveCount(BASE_CARD_IDS.length);
+  expect(BASE_CARD_IDS.length).toBeGreaterThanOrEqual(60);
+  for (const rarity of ["rare", "legendary", "special"]) {
     await page.locator(`[data-rarity="${rarity}"]`).click();
     await expect(entries).toHaveCount(
-      Object.values(CARDS).filter((card) => card.rarity === rarity).length,
+      BASE_CARD_IDS.filter((id) => CARDS[id].rarity === rarity).length,
     );
   }
+  await page.locator('[data-rarity="upgraded"]').click();
+  await expect(entries).toHaveCount(BASE_CARD_IDS.filter((id) => canUpgrade(id)).length);
+  await expect(entries.first()).toHaveAttribute("data-card-id", /\+$/);
   await page.locator('[data-rarity="all"]').click();
   await page
     .getByRole("searchbox", { name: "Search cards" })
@@ -187,7 +157,7 @@ test("the full card archive is inspectable and renders without failed artwork", 
   await expect(entries).toHaveCount(1);
   await expect(entries.first()).toHaveAttribute("data-card-id", "fiber");
   await page.getByRole("searchbox", { name: "Search cards" }).fill("");
-  await expect(entries).toHaveCount(Object.keys(CARDS).length);
+  await expect(entries).toHaveCount(BASE_CARD_IDS.length);
   const artwork = await page
     .locator("dialog .card-image")
     .evaluateAll(async (elements) => {
@@ -345,71 +315,6 @@ test("damage and shield calculations predict the actual transmission", async ({
   expect(after.run.block).toBe(0);
 });
 
-test("the guided lesson can be completed without creating an expedition save", async ({
-  page,
-}) => {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("./");
-  await page.locator('[data-action="tutorial"]').first().click();
-  await choose(page, "router");
-  await page.getByRole("button", { name: /Deploy in a free socket/ }).click();
-  await page.keyboard.press("z");
-  await expect(page.locator(".practice-lesson")).toContainText(
-    "A router gives the signal",
-  );
-  await choose(page, "router");
-  await page.getByRole("button", { name: /Deploy in a free socket/ }).click();
-  await connect(page, "alpha", "router1");
-  await connect(page, "router1", "omega");
-  await page.locator('[data-action="transmit"]').click();
-  await expect(page.locator(".game-root")).not.toHaveClass(/busy/, {
-    timeout: 15_000,
-  });
-  await choose(page, "guard");
-  await page.locator('[data-action="transmit"]').click();
-  await expect(page.locator('[data-action="tutorial-finish"]')).toBeVisible({
-    timeout: 15_000,
-  });
-  await page.locator('[data-action="tutorial-finish"]').click();
-  await expect(page.locator(".game-root")).toHaveAttribute(
-    "data-view",
-    "title",
-  );
-  expect(await saved(page)).toBeNull();
-  expect(
-    await page.evaluate((key) => localStorage.getItem(key), RECORDS),
-  ).toBeNull();
-  await expect(page.locator('[data-action="continue"]')).toHaveCount(0);
-  expect(errors).toEqual([]);
-});
-
-test("sanctuary refinement removes the selected card and spends its service", async ({
-  page,
-}) => {
-  const expedition = fixture();
-  expedition.run.phase = "forge";
-  expedition.run.floor = 2;
-  expedition.run.currentRoom = "2-0";
-  expedition.run.lastRoom = "1-0";
-  expedition.run.enemy = null;
-  const index = expedition.run.deck.indexOf("guard");
-  const previousDeck = [...expedition.run.deck];
-  await installSave(page, expedition);
-  await page.locator('[data-action="continue"]').click();
-  await page.locator('[data-action="refine"]').click();
-  await page.locator(`[data-remove-card="${index}"]`).click();
-  await expect(page.locator("dialog")).not.toBeVisible();
-  await expect(page.locator(".game-root")).toHaveAttribute("data-view", "map");
-  const state = JSON.parse((await saved(page))!).run;
-  previousDeck.splice(index, 1);
-  expect(state.deck).toEqual(previousDeck);
-  expect(state.floor).toBe(3);
-  expect(
-    state.map.find((room: { id: string }) => room.id === "2-0").cleared,
-  ).toBe(true);
-});
-
 test("a full ten-card hand supports the final shortcut without covering transmit", async ({
   page,
 }) => {
@@ -434,8 +339,14 @@ test("a full ten-card hand supports the final shortcut without covering transmit
   const dial = await page.locator('[data-action="transmit"]').boundingBox();
   const hand = await page.locator("#hand-zone").boundingBox();
   expect(hand!.x + hand!.width).toBeLessThan(dial!.x);
-  await page.getByRole("button", { name: "Next cards", exact: true }).click();
-  await expect.poll(() => page.locator(".card-fan").evaluate(el => el.scrollLeft)).toBeGreaterThan(0);
+  // Desktop hands overlap to fit instead of scrolling: every card is on screen and
+  // left of the Transmit dial, with no scroll arrows needed.
+  await expect(page.getByRole("button", { name: "Next cards", exact: true })).toBeHidden();
+  for (const card of await page.locator("[data-hand]").all()) {
+    const box = (await card.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThan(dial!.x);
+  }
   await page.locator("body").press("0");
   await expect(page.locator("[data-hand]")).toHaveCount(9);
   expect(JSON.parse((await saved(page))!).run.block).toBe(4);
@@ -464,10 +375,10 @@ test("separated circuits defend even when a central route is first, and relocati
   await installSave(page, expedition);
   await page.locator('[data-action="continue"]').click();
   await expect(page.locator(".forecast-net b")).toHaveText("0");
-  await expect(page.locator(".shield-resource strong")).toHaveText("2");
+  await expect(page.locator(".shield-resource strong")).toHaveText(String(RULES.separatedCircuitShield));
   await page.locator('[data-action="combat-details"]').first().click();
   await expect(page.locator(".calculation-grid section").nth(1)).toContainText(
-    "Separated circuits · north + south",
+    /Separated circuits/i,
   );
   await page.keyboard.press("Escape");
   await page.locator('[data-action="devices"]').click();
@@ -483,7 +394,7 @@ test("separated circuits defend even when a central route is first, and relocati
   await page.keyboard.press("z");
   await expect(page.locator(".energy-orb strong")).toHaveText("5");
   await expect(page.locator(".forecast-net b")).toHaveText("0");
-  await expect(page.locator(".shield-resource strong")).toHaveText("2");
+  await expect(page.locator(".shield-resource strong")).toHaveText(String(RULES.separatedCircuitShield));
   const restored = JSON.parse((await saved(page))!).run;
   expect(restored.topology).toEqual(run.topology);
 });
@@ -506,26 +417,29 @@ test("Sentinel armor is explained and routing through a firewall visibly bypasse
   run.enemy!.turn = 0;
   await installSave(page, expedition);
   await page.locator('[data-action="continue"]').click();
-  await expect(page.locator(".transmit-power strong")).toHaveText("3");
+  const plating = ENEMIES.sentinel.armor!.amount;
+  await expect(page.locator(".transmit-power strong")).toHaveText(String(RULES.baseRouteDamage - plating));
   await page.locator('[data-action="combat-details"]').first().click();
   const armor = page
     .locator(".calculation-grid section")
     .first()
     .locator(".calculation-term")
     .filter({ hasText: "GATE SENTINEL armor" });
-  await expect(armor.locator("b")).toHaveText(/[−-]2/);
+  await expect(armor.locator("b")).toHaveText(new RegExp(`[−-]${plating}`));
   await page.keyboard.press("Escape");
   await choose(page, "firewall");
   await page.getByRole("button", { name: /Deploy in a free socket/ }).click();
   await connect(page, "router1", "firewall2");
   await connect(page, "firewall2", "omega");
-  await expect(page.locator(".transmit-power strong")).toHaveText("6");
-  await expect(page.locator(".forecast-net b")).toHaveText("1");
+  // An online firewall anywhere bypasses the plating and blocks part of the breach.
+  const breach = ENEMIES.sentinel.pattern[0].amount;
+  await expect(page.locator(".transmit-power strong")).toHaveText(String(RULES.baseRouteDamage));
+  await expect(page.locator(".forecast-net b")).toHaveText(String(breach - RULES.firewallBreachBlock));
   await page.locator('[data-action="combat-details"]').first().click();
   await expect(
     page.locator(".calculation-grid section").first(),
   ).not.toContainText("GATE SENTINEL armor");
-  await expect(page.locator(".route-trace")).toContainText("FIREWALL2");
+  await expect(page.locator(".calculation-grid section").nth(1)).toContainText(/firewall/i);
 });
 
 test("Wireshark captures the active route, draws, boosts its transmission, and exhausts", async ({
@@ -550,17 +464,23 @@ test("Wireshark captures the active route, draws, boosts its transmission, and e
   run.enemy!.id = "leech";
   run.enemy!.hp = run.enemy!.maxHp = 100;
   run.enemy!.turn = 0;
+  const before = combatPreview(run).packetDamage;
+  const captured = structuredClone(run);
+  expect(playInstant(captured, 0).ok).toBe(true);
+  const after = combatPreview(captured).packetDamage;
+  // Router, switch and firewall: three distinct roles on the primary route.
+  expect(after).toBe(before + 3);
   await installSave(page, expedition);
   await page.locator('[data-action="continue"]').click();
-  await expect(page.locator(".transmit-power strong")).toHaveText("7");
+  await expect(page.locator(".transmit-power strong")).toHaveText(String(before));
   await choose(page, "wireshark");
   await expect(page.locator("[data-hand]")).toHaveCount(2);
   await expect(page.locator(".energy-orb strong")).toHaveText("4");
-  await expect(page.locator(".transmit-power strong")).toHaveText("10");
-  const captured = JSON.parse((await saved(page))!).run;
-  expect(captured.hand).toEqual(["guard", "pulse"]);
-  expect(captured.exhaustPile).toContain("wireshark");
-  expect(captured.packetBoost).toBe(3);
+  await expect(page.locator(".transmit-power strong")).toHaveText(String(after));
+  const capture = JSON.parse((await saved(page))!).run;
+  expect(capture.hand).toEqual(["guard", "pulse"]);
+  expect(capture.exhaustPile).toContain("wireshark");
+  expect(capture.packetBoost).toBe(3);
   await page.locator('[data-action="exhaust-pile"]').click();
   await expect(
     page.locator('dialog [data-collection="wireshark"]'),
@@ -571,12 +491,12 @@ test("Wireshark captures the active route, draws, boosts its transmission, and e
     timeout: 15_000,
   });
   const resolved = JSON.parse((await saved(page))!).run;
-  expect(resolved.enemy.hp).toBe(90);
+  expect(resolved.enemy.hp).toBe(100 - after);
   expect(resolved.packetBoost).toBe(0);
   expect(resolved.hand).not.toContain("wireshark");
 });
 
-test("leaving practice preserves the real expedition's undo history", async ({
+test("leaving Field Training preserves the real expedition's undo history", async ({
   page,
 }) => {
   await installSave(page);
@@ -588,7 +508,11 @@ test("leaving practice preserves the real expedition's undo history", async ({
   await page.locator('[data-action="enemy-dossier"]').first().click();
   await page.locator('dialog [data-action="help"]').click();
   await page.locator('dialog [data-action="tutorial"]').click();
-  await page.locator('[data-action="tutorial-exit"]').click();
+  await page.locator('dialog button[data-lesson="first-signal"]').click();
+  await expect(page.locator(".game-root")).toHaveAttribute("data-training", "first-signal");
+  expect(await saved(page)).toBe(before);
+  await page.locator('[data-action="lesson-exit"]').click();
+  await expect(page.locator(".game-root")).toHaveAttribute("data-training", "");
   await expect(page.locator(".game-root")).toHaveAttribute(
     "data-view",
     "battle",
@@ -770,10 +694,10 @@ test("a physical device drag cancelled by blur never spends energy or commits it
 test("all card rules fit without clipping across narrow, short, zoomed and desktop windows", async ({
   page,
 }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(420_000);
   await installSave(page);
   await page.locator('[data-action="collection"]').click();
-  const cards = await page
+  const collect = () => page
     .locator("dialog [data-collection]")
     .evaluateAll((elements) =>
       elements.map((element, index) => {
@@ -787,7 +711,13 @@ test("all card rules fit without clipping across narrow, short, zoomed and deskt
         return { id: card.dataset.cardId!, html: card.outerHTML };
       }),
     );
-  expect(cards).toHaveLength(Object.keys(CARDS).length);
+  // Every base card and every upgraded version must fit its rules.
+  const base = await collect();
+  await page.locator('[data-rarity="upgraded"]').click();
+  const upgradedCards = await collect();
+  const cards = [...base, ...upgradedCards];
+  expect(base).toHaveLength(BASE_CARD_IDS.length);
+  expect(upgradedCards).toHaveLength(BASE_CARD_IDS.filter((id) => canUpgrade(id)).length);
   await page.keyboard.press("Escape");
   await page.locator('[data-action="continue"]').click();
   // Rotation and hover lift change screen bounds, not the available text box.
@@ -845,22 +775,22 @@ test("all card rules fit without clipping across narrow, short, zoomed and deskt
         );
       for (const card of measurements) {
         const label = `${card.id} at ${viewport.width}×${viewport.height}`;
-        expect(card.text, label).toBe(
+        expect.soft(card.text, label).toBe(
           CARDS[card.id as keyof typeof CARDS].rules,
         );
-        expect(
+        expect.soft(
           card.fontSize,
           `${label}: readable rule font`,
         ).toBeGreaterThanOrEqual(11);
-        expect(
+        expect.soft(
           card.ruleBottom,
           `${label}: rules cross the footer`,
         ).toBeLessThanOrEqual(card.footerTop - 2);
-        expect(
+        expect.soft(
           card.ruleScroll,
           `${label}: clipped rule text`,
         ).toBeLessThanOrEqual(card.ruleHeight + 1);
-        expect(
+        expect.soft(
           card.copyScroll,
           `${label}: copy exceeds its reserved space`,
         ).toBeLessThanOrEqual(card.copyHeight + 1);

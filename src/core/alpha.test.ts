@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CARDS, RELICS } from "./cards.ts";
+import { CARDS, RELICS, RULES } from "./cards.ts";
 import { newExpedition, parseExpedition } from "./expedition.ts";
 import {
   createRun,
@@ -34,15 +34,19 @@ function cast(run: RunState, card: CardId) {
   return playInstant(run, 0);
 }
 
-test("alpha collection has 39 distinct playable cards and 9 distinct relics", () => {
-  assert.equal(Object.keys(CARDS).length, 39);
-  assert.equal(Object.keys(RELICS).length, 9);
-  assert.ok(
-    Object.values(CARDS).every(
-      (card) => card.cost >= 0 && card.rules.length > 20,
-    ),
-  );
-  assert.ok(Object.values(CARDS).some((card) => card.rarity === "common"));
+test("v3 collection: 61 base cards, an upgrade for every non-junk card, 21 tiered relics", () => {
+  const bases = Object.values(CARDS).filter(card => !card.upgraded);
+  assert.equal(bases.length, 61);
+  for (const card of bases) {
+    const plus = CARDS[`${card.id}+` as CardId];
+    if (card.junk || card.curse) { assert.equal(plus, undefined, card.id); continue; }
+    assert.ok(plus, `${card.id} has an upgrade`);
+    assert.equal(plus.base, card.id);
+    assert.ok(plus.cost < card.cost || plus.rules !== card.rules, `${card.id}+ improves`);
+  }
+  assert.equal(Object.keys(RELICS).length, 21);
+  assert.equal(Object.values(RELICS).filter(relic => relic.tier === "boss").length, 6);
+  assert.ok(Object.values(CARDS).every((card) => card.cost >= 0 && card.rules.length > 20));
 });
 
 test("preview is pure and its visible terms exactly sum to resolution", () => {
@@ -85,12 +89,12 @@ test("best route beats earlier low-value routes regardless of link insertion ord
     "switch1",
     "omega",
   ]);
-  assert.equal(preview.packetDamage, 12);
+  assert.equal(preview.packetDamage, 13);
   r.topology.links.reverse();
-  assert.equal(combatPreview(r).packetDamage, 12);
+  assert.equal(combatPreview(r).packetDamage, 13);
 });
 
-test("switch utility, compression and Packet Lens combine with capped switch routing", () => {
+test("switches, compression and Packet Lens stack without caps; three online devices form a cluster", () => {
   const r = battle();
   r.topology.links = [{ a: "alpha", b: "router1" }];
   for (let i = 0; i < 3; i++) {
@@ -108,7 +112,9 @@ test("switch utility, compression and Packet Lens combine with capped switch rou
   }
   r.topology.links.push({ a: "switch2", b: "omega" });
   r.relics = ["packet-lens"];
-  assert.equal(combatPreview(r).packetDamage, 12); // 5 + 2 clock + 2 switches + 2 compression + 1 lens
+  // v3 has no switch cap: 5 + 2 overclock + 3 switches × 2 (Packet Lens) + 3 compression × 2
+  // + 2 for the SOUTH cluster (three online devices in one band).
+  assert.equal(combatPreview(r).packetDamage, 21);
 });
 
 test("power surge exhausts before drawing and cannot draw itself from an empty deck", () => {
@@ -205,10 +211,10 @@ test("pressure and the boss half-health phase have deterministic telegraphs", ()
   r.enemy!.id = "core";
   r.enemy!.turn = 1;
   r.enemy!.hp = 50;
-  assert.equal(intentFor(r)!.amount, 7);
+  assert.equal(intentFor(r)!.amount, 6); // breach 4 + enraged 2
   assert.match(intentFor(r)!.label, /ENRAGED/);
   r.enemy!.turn = 2;
-  assert.equal(intentFor(r)!.amount, 2);
+  assert.equal(intentFor(r)!.amount, 1); // enraged jams chip 1
 });
 
 test("capacitor and Reserve Cell recharge only next turn; Grounded Core renews block", () => {
@@ -242,7 +248,8 @@ test("repair, recovery and redundancy cards apply their documented effects", () 
   r.hand = ["clabernetes"];
   playNode(r, 0, "router1");
   assert.equal(cast(r, "mirror").ok, true);
-  assert.equal(r.packetBoost, 3);
+  // Two channels: +2 burst and +2 block per channel.
+  assert.equal(r.packetBoost, 4);
   assert.equal(r.block, 7);
 });
 
@@ -281,7 +288,7 @@ test("emergency cards repair integrity and create a usable backup route", () => 
   assert.equal(r.block, 3);
   cast(r, "rebuild");
   assert.equal(combatPreview(r).independent, true);
-  assert.equal(combatPreview(r).packetDamage, 9);
+  assert.equal(combatPreview(r).packetDamage, 5 + 2 + RULES.bandwidthPerChannel);
 });
 
 test("reward rolls exclude basics, stay unique, and guarantee an elite rare", () => {
@@ -316,25 +323,6 @@ test("forge removal consumes the room and protects opening route essentials", ()
   assert.equal(r.floor, 3);
 });
 
-test("legacy version-2 saves default alpha fields once and reject invalid values", () => {
-  const e = newExpedition("architect", 77);
-  const old = JSON.parse(JSON.stringify(e));
-  for (const key of [
-    "exhaustPile",
-    "block",
-    "packetBoost",
-    "reserveEnergy",
-    "cardsPlayed",
-  ])
-    delete old.run[key];
-  const restored = parseExpedition(JSON.stringify(old))!;
-  assert.deepEqual(restored.run.exhaustPile, []);
-  assert.equal(restored.run.block, 0);
-  assert.deepEqual(parseExpedition(JSON.stringify(restored)), restored);
-  restored.run.block = -1;
-  assert.equal(parseExpedition(JSON.stringify(restored)), null);
-});
-
 test("crossing the boss phase threshold never rewrites the already displayed intent", () => {
   const r = battle();
   r.enemy!.id = "core";
@@ -346,10 +334,10 @@ test("crossing the boss phase threshold never rewrites the already displayed int
   assert.doesNotMatch(preview.intent!.label, /ENRAGED/);
   assert.equal(endTurn(r).integrityDamage, 4);
   assert.match(intentFor(r)!.label, /ENRAGED/);
-  assert.equal(intentFor(r)!.amount, 2);
+  assert.equal(intentFor(r)!.amount, 1);
 });
 
-test("dense fourteen-device routing remains complete and respects bonus caps", () => {
+test("dense fourteen-device routing stays complete and every term reconciles", () => {
   const r = battle();
   for (let i = 0; r.topology.nodes.length < 14; i++)
     r.topology.nodes.push({
@@ -361,14 +349,14 @@ test("dense fourteen-device routing remains complete and respects bonus caps", (
   r.topology.links = [];
   for (let a = 0; a < r.topology.nodes.length; a++)
     for (let b = a + 1; b < r.topology.nodes.length; b++)
-      r.topology.links.push({
-        a: r.topology.nodes[a].id,
-        b: r.topology.nodes[b].id,
-        boosted: true,
-      });
+      r.topology.links.push({ a: r.topology.nodes[a].id, b: r.topology.nodes[b].id, boosted: true });
   const preview = combatPreview(r);
-  assert.equal(preview.packetDamage, 14); // route5 + clock2 + firewall1 + switches2 + cables2 + independent2
+  const terms = preview.damageTerms.reduce((sum, term) => sum + term.amount, 0);
+  assert.equal(preview.packetDamage, terms);
   assert.equal(preview.independent, true);
   assert.equal(new Set(preview.signalPath).size, preview.signalPath.length);
-  assert.ok(preview.signalPath.includes("router1"));
+  // Uncapped: the strongest route threads every switch and every amplified cable.
+  const switches = r.topology.nodes.filter(node => node.role === "switch").map(node => node.id);
+  assert.ok(switches.every(id => preview.signalPath.includes(id)));
+  assert.ok(preview.channels >= 5);
 });

@@ -1,4 +1,5 @@
 import type { Archetype } from "./core/expedition.ts";
+import { RULES } from "./core/cards.ts";
 import type { Intent } from "./core/run.ts";
 import { ENEMIES } from "./core/enemies.ts";
 
@@ -78,28 +79,28 @@ export const ENEMY_STORIES: Record<StoryEnemyId, EnemyStory> = {
     name: "Coil Serpent", title: "One route is a perfect snare",
     motive: "A cable-recovery coil has learned to tighten around anything that still carries a signal. It follows a single route all the way to its heart.",
     pattern: ENEMIES.serpent.pattern.map(p => p.kind),
-    telegraphs: { strike: "The copper spine draws tight. A second route would loosen its grip.", sever: "A hooked fang settles over a live cable.", corrupt: "Emerald venom beads against the table." },
+    telegraphs: { strike: "The copper spine draws tight. A second channel would loosen its grip.", sever: "A hooked fang settles over a live cable.", corrupt: "Emerald venom beads against the table." },
     counterplay: ENEMIES.serpent.trait, defeated: "The coils open. There is more than one way home.",
   },
   moth: {
     name: "Ash Moth", title: "Cold wings over a living signal",
     motive: "A maintenance drone follows the warmth of working relays. Its ruined cooling wings shed conductive ash over everything it tries to save.",
     pattern: ENEMIES.moth.pattern.map(p => p.kind),
-    telegraphs: { corrupt: "Fine ash settles along your strongest route.", jam: "Its wings turn toward the marked band.", strike: "The lantern in its chest burns cold blue." },
+    telegraphs: { corrupt: "Fine ash settles along your primary route.", jam: "Its wings turn toward the marked band.", strike: "The lantern in its chest burns cold blue." },
     counterplay: ENEMIES.moth.trait, defeated: "The wings fold around a lantern that no longer needs tending.",
   },
   marshal: {
     name: "Null Marshal", title: "No passage without a firewall",
     motive: "It once escorted engineers safely through the trust boundary. With every credential expired, its shield now bars the very people it was built to protect.",
     pattern: ENEMIES.marshal.pattern.map(p => p.kind),
-    telegraphs: { breach: "The Marshal raises its final warrant.", jam: "A blue eye fixes on unprotected hardware.", strike: "The great shield turns edge-on." },
+    telegraphs: { breach: "The Marshal raises its final warrant.", jam: "A blue eye fixes on your firewall first.", strike: "The great shield turns edge-on." },
     counterplay: ENEMIES.marshal.trait, defeated: "The warrant expires. The road belongs to the living.",
   },
   choir: {
     name: "Glass Choir", title: "Three voices, one broken note",
     motive: "Three announcement bells repeat different fragments of the same evacuation order. Their incompatible frequencies turn the ground to rust and silence.",
     pattern: ENEMIES.choir.pattern.map(p => p.kind),
-    telegraphs: { corrupt: "A different bell begins the refrain. Watch which field it is casting.", strike: "Three glass faces draw breath together.", breach: "A single sharp note searches for an open boundary." },
+    telegraphs: { corrupt: "A different bell begins the refrain. Watch which field it casts, and for the static it scatters into your deck.", strike: "Three glass faces draw breath together.", breach: "A single sharp note searches for an open boundary." },
     counterplay: ENEMIES.choir.trait, defeated: "For a moment, all three bells agree on silence.",
   },
   weaver: {
@@ -120,38 +121,38 @@ export const ENEMY_STORIES: Record<StoryEnemyId, EnemyStory> = {
     name: "The Iron Regent", title: "Keeper of the copper gates",
     motive: "When the ring broke, the gatekeeper sealed the outer relays behind its own armor. It will only open for a network resilient enough to survive the road beyond.",
     pattern: ENEMIES.regent.pattern.map(p => p.kind),
-    telegraphs: { breach: "The crown burns green. The gate issues its challenge.", sever: "An iron gauntlet closes on the strongest line.", strike: "The Regent draws back its great armored hand.", corrupt: "Centuries of tarnish spill from the opened plates." },
+    telegraphs: { breach: "The crown burns green. The gate issues its challenge.", sever: "An iron gauntlet closes on the strongest line.", strike: "The Regent draws back its great armored hand.", corrupt: "Centuries of tarnish spill from the opened plates.", charge: "The crown rises. Crownfall comes next turn: interrupt it or brace." },
     counterplay: ENEMIES.regent.trait, defeated: "The copper gates open. Beyond them, glass bells are ringing.",
   },
   cantor: {
     name: "The Hollow Choir", title: "The silence behind every voice",
     motive: "The cathedral gathered every voice the Blackout left unanswered. Its keeper cannot bear to let even one escape, so every new connection becomes another sealed bell.",
     pattern: ENEMIES.cantor.pattern.map(p => p.kind),
-    telegraphs: { corrupt: "A ring of masks begins a new refrain.", jam: "One porcelain face turns toward your living route.", breach: "The great bell swings. The whole cathedral answers." },
+    telegraphs: { corrupt: "A ring of masks begins a new refrain.", jam: "One porcelain face turns toward your living route.", breach: "The great bell swings. The whole cathedral answers.", charge: "The Choir draws its last breath. Requiem comes next turn." },
     counterplay: ENEMIES.cantor.trait, defeated: "The masks open their mouths. This time, the voices leave.",
   },
   prophet: {
     name: "Rust Prophet", title: "The ground remembers every failure",
     motive: "Once a maintenance beacon, it now broadcasts the corrosion it was built to prevent. Every answered signal spreads another bloom of rust.",
-    pattern: ["corrupt", "strike", "breach"],
+    pattern: ENEMIES.prophet.pattern.map(p => p.kind),
     telegraphs: { corrupt: "Its censer tilts toward your busiest band. Rust is taking root.", strike: "Oxide gathers at the transmitter's eye.", breach: "The beacon discharges its poisoned reserve." },
-    counterplay: "Corrosion lasts two turns and adds 2 incoming damage while your hardware occupies the band. Purge Field cleanses it immediately. Moving every deployed device out of that band also avoids the damage.",
+    counterplay: `Corrosion lasts two turns and adds ${RULES.corrosionDamage} incoming damage while your hardware occupies the band. Purge Field cleanses it; a Quarantine Rule cancels the next field; relocating every device out of the band also avoids the damage — but splitting a cluster costs its +${RULES.clusterDamage}.`,
     defeated: "The censer cools. Clean light returns to the copper.",
   },
   widow: {
     name: "Prism Widow", title: "A beautiful silence, carefully woven",
     motive: "An optical repair automaton keeps weaving isolation webs around the last working signals. Its glass threads are flawless. Nothing gets through.",
-    pattern: ["corrupt", "sever", "strike"],
+    pattern: ENEMIES.widow.pattern.map(p => p.kind),
     telegraphs: { corrupt: "Violet threads converge on a band in your strongest route.", sever: "A glass limb draws tight against an exposed cable.", strike: "The prism gathers a painful flash of stored light." },
-    counterplay: "Suppression reduces routes through the marked band by 3 damage for two turns. Cleanse it, move the affected hardware, or complete a stronger route through another band.",
+    counterplay: `Suppression costs your primary route ${RULES.suppressionPenalty} damage for each suppressed band it crosses, for two turns. Reroute: build a stronger channel through another band and it becomes the primary route. Or cleanse the band with Purge Field.`,
     defeated: "The glass web unravels. Light takes the long way home.",
   },
   colossus: {
     name: "Ferric Colossus", title: "The furnace that never stopped",
     motive: "A smelter guardian still protects its cold industrial heart. It trusts only the iron around it and the redundant safety circuits its makers left behind.",
-    pattern: ["strike", "corrupt", "breach"],
+    pattern: ENEMIES.colossus.pattern.map(p => p.kind),
     telegraphs: { strike: "A vast iron fist rises above the table.", corrupt: "The furnace vents over your busiest band.", breach: "Its armored gates open on a final surge of heat." },
-    counterplay: "Two independent routes bypass its 3 armor. Cleanse scorched ground or evacuate the band to avoid corrosion's extra damage. Shields and a routed firewall soften its heavy attacks.",
+    counterplay: `Its armor absorbs ${RULES.gradedArmorBase}, minus ${RULES.gradedArmorPerChannel} for every channel beyond the first — build width, or hit hard enough that the armor stops mattering. Cleanse scorched ground or evacuate the band; online firewalls and shields soften its heavy attacks.`,
     defeated: "The furnace door settles. Even iron can learn to rest.",
   },
   leech: {
@@ -159,14 +160,15 @@ export const ENEMY_STORIES: Record<StoryEnemyId, EnemyStory> = {
     title: "A collector with nowhere to deliver",
     motive:
       "Recovery drones once gathered stray traffic for the exchange. With no exchange answering, this one drains live connections to keep its overflowing buffer powered.",
-    pattern: ["strike", "sever", "breach"],
+    pattern: ENEMIES.leech.pattern.map(p => p.kind),
     telegraphs: {
       strike: "Its intake opens. The collector is drawing power from your line.",
       sever: "A retrieval claw reaches for an exposed cable.",
       breach: "Its buffer spills toward your delivery port.",
+      infect: "A siphon tap uncoils toward an empty socket on your table.",
     },
     counterplay:
-      "Keep a live route: a transmission that deals no damage lets the Leech recover up to 3 health. Block its strikes and route through a firewall before the breach.",
+      `Keep damage flowing: a transmission that deals nothing lets the Leech recover ${RULES.leechHeal} health, and each siphon tap it plants feeds it ${RULES.leechTapHeal} more after it acts. Scrub taps for ${RULES.scrubCost} energy. Block its strikes; an online firewall softens the breach.`,
     defeated: "The collector goes quiet. Its last packet joins your outbound queue.",
   },
   wraith: {
@@ -174,14 +176,14 @@ export const ENEMY_STORIES: Record<StoryEnemyId, EnemyStory> = {
     title: "The isolation crew never stood down",
     motive:
       "This cable-cutting machine severed damaged routes during the evacuation. It still treats every fresh connection as another path the storm could take.",
-    pattern: ["sever", "strike", "jam"],
+    pattern: ENEMIES.wraith.pattern.map(p => p.kind),
     telegraphs: {
       sever: "The isolation blade aligns with your longest unarmored cable.",
       strike: "The cutter turns its stored charge toward your terminals.",
       jam: "A suppression coil searches for unprotected hardware.",
     },
     counterplay:
-      "Its blade always targets the longest unarmored cable; a span longer than 6 units also causes 1 damage. Armor that link, shorten exposed spans by repositioning routers, or keep an independent route ready.",
+      `Its blade always takes the longest unarmored cable — honeypots don't fool it — and a span longer than ${RULES.cableExposureLength} units also causes 1 damage. Armor that link, shorten spans by relocating, arm a Failover Policy, or keep a second channel so the cut can't silence you.`,
     defeated: "The blade folds away. For once, a new cable stays connected.",
   },
   storm: {
@@ -189,14 +191,14 @@ export const ENEMY_STORIES: Record<StoryEnemyId, EnemyStory> = {
     title: "A thousand unanswered retries",
     motive:
       "No one is sending this traffic anymore. Emergency packets circulate through broken return routes, feeding a storm that overwhelms any hardware still willing to listen.",
-    pattern: ["jam", "strike", "sever"],
+    pattern: ENEMIES.storm.pattern.map(p => p.kind),
     telegraphs: {
       jam: "Duplicate requests concentrate in the announced table band.",
       strike: "The returning wave carries a surge toward your terminals.",
       sever: "A standing wave gathers along an exposed cable.",
     },
     counterplay:
-      "Its jam band cycles North, Center, then South. Protect critical hardware or relocate it out of the marked band for 1 energy; independent routes through opposite outer bands also give 2 block.",
+      `Its jam band cycles North, Center, then South. Protect critical hardware, relocate it out of the marked band for ${RULES.relocateCost} energy, or put a honeypot there to take the jam. Channels with routers in opposite outer bands also give ${RULES.separatedCircuitShield} shield.`,
     defeated: "The echoes thin. One clean acknowledgement crosses the silence.",
   },
   sentinel: {
@@ -204,14 +206,14 @@ export const ENEMY_STORIES: Record<StoryEnemyId, EnemyStory> = {
     title: "A checkpoint without a relief shift",
     motive:
       "The Sentinel guards the archive's trust boundary. Its operators are gone, its credentials have expired, and every returning engineer now arrives as an unknown sender.",
-    pattern: ["breach", "sever", "strike"],
+    pattern: ENEMIES.sentinel.pattern.map(p => p.kind),
     telegraphs: {
       breach: "The plated gate issues its challenge directly into your route.",
       sever: "An isolation latch prepares to close an exposed connection.",
       strike: "The checkpoint commits its reserve power to a strike.",
     },
     counterplay:
-      "A firewall on the live route bypasses the Sentinel's 2 plating and blocks up to 3 breach damage. Add temporary block, then prepare for the cable cut that follows.",
+      `Any online firewall bypasses the Sentinel's plating and blocks ${RULES.firewallBreachBlock} of each breach — it only has to sit on some live route. Add block or arm an IPS Signature for the breach, then a Failover Policy for the cut that follows.`,
     defeated: "The checkpoint releases its lock. The archive remains intact.",
   },
   core: {
@@ -219,15 +221,17 @@ export const ENEMY_STORIES: Record<StoryEnemyId, EnemyStory> = {
     title: "Keeper of the undelivered",
     motive:
       "The Core did not start the disaster; its quarantine stopped the retry storm from erasing the archive. With no safe-route acknowledgement, it has kept the backbone dark and the last messages alive.",
-    pattern: ["sever", "breach", "jam", "strike"],
+    pattern: ENEMIES.core.pattern.map(p => p.kind),
     telegraphs: {
       sever: "Quarantine shutters prepare to isolate an exposed cable.",
       breach: "The archive gate discharges into the incoming route.",
       jam: "Suppression coils seek hardware without jam protection.",
       strike: "The Core redirects its remaining reserve toward your terminals.",
+      infect: "A quarantine seed drifts down toward an open socket.",
+      charge: "Event Horizon: the shell draws every light in the room inward.",
     },
     counterplay:
-      "Prepare for cut, breach, jam, then strike. At half integrity its emergency mode adds damage; finish decisively while keeping a protected route live.",
+      "Prepare for cut, breach, jam, then strike. Its cut also slips a Worm into your draw pile. At half integrity its emergency mode adds damage and every jam plants malware; keep a second channel live, scrub what it plants, and buffer or burst through Total Blackout.",
     defeated: "The isolation shell falls silent. Inside it, the delivery lights are still on.",
   },
 };
@@ -254,7 +258,7 @@ export const ARCHETYPE_STORIES: Record<Archetype, ArchetypeStory> = {
   warden: {
     title: "HOLD WHAT REMAINS",
     story:
-      "Your crew closed the backbone to save the archive. Carry its last Shield Array inside, and bring the messages home.",
+      "Your crew closed the backbone to save the archive. Every blow the boundary absorbs now becomes pressure you can send back. Bring the messages home.",
     epilogue: "The boundary opens. Everything you stayed to protect passes through.",
   },
   ghost: {

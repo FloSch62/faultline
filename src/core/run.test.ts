@@ -17,7 +17,8 @@ import {
   costFor,
   intentFor,
 } from "./run.ts";
-import { canLink, independentRouterPaths, paths } from "./graph.ts";
+import { canLink, paths } from "./graph.ts";
+import { combatPreview, RULES } from "./run.ts";
 import { topologyYaml } from "./export.ts";
 
 function firstBattle() {
@@ -73,7 +74,7 @@ test("two independent router routes survive a node outage", () => {
     { a: "alpha", b: "router2" },
     { a: "router2", b: "omega" },
   );
-  assert.ok(independentRouterPaths(run.topology, paths(run.topology)));
+  assert.equal(combatPreview(run).channels, 2);
   run.faultNode = "router1";
   assert.deepEqual(paths(run.topology, new Set(["router1"]))[0], [
     "alpha",
@@ -151,7 +152,8 @@ test("firewall and Shield Array mitigate a telegraphed breach", () => {
   );
   assert.equal(intentFor(run)?.kind, "breach");
   const turn = endTurn(run);
-  assert.equal(turn.packetDamage, 6);
+  // v3: firewalls defend while online anywhere; they no longer add damage.
+  assert.equal(turn.packetDamage, 5);
   assert.equal(turn.integrityDamage, 0);
   assert.equal(run.integrity, 12);
   assert.equal(run.shieldArrayUsed, true);
@@ -226,8 +228,8 @@ test("Clabernetes preserves overclock and links, shields both routers, and survi
     Math.hypot(routers[0].x - routers[1].x, routers[0].z - routers[1].z) >=
       1.55,
   );
-  assert.ok(independentRouterPaths(run.topology, signalPaths(run)));
-  assert.equal(damageFromPath(run, signalPaths(run)[0]), 9);
+  assert.equal(combatPreview(run).channels, 2);
+  assert.equal(damageFromPath(run, signalPaths(run)[0]), 7 + RULES.bandwidthPerChannel);
   run.faultLink = "alpha::router1";
   assert.deepEqual(signalPaths(run), [["alpha", "router2", "omega"]]);
   assert.equal(damageFromPath(run, signalPaths(run)[0]), 7);

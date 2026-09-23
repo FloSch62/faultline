@@ -545,3 +545,47 @@ body { min-width: 320px; }
   .title-screen { padding: 90px 7% 35px; }
   .title-bottom, .game-root[data-view="title"] .now-playing { display: none; }
 }
+
+/* Scouted encounters stay legible without covering the route connections. */
+.room-scout { display: block; margin-top: 3px; font: 500 10px/1.15 "Barlow Condensed", sans-serif; letter-spacing: .055em; color: #aaa996; white-space: nowrap; }
+.route-room.available .room-scout { color: #e4cba5; }
+.route-scroll { overflow: auto; scrollbar-color: #a28b60 #172028; scrollbar-width: thin; }
+.route-chart { min-height: 780px; min-width: 420px; }
+.route-room .room-label { min-width: 0; width: 108px; box-sizing: border-box; padding-inline: 4px; text-align: center; }
+.map-paths path { stroke: #beb28b70; }
+.map-paths .traversed { stroke: #e6c485d9; }
+
+/* One held card trades a draw for a planned answer. */
+.is-battle .draw-piles .exhaust-pile { grid-column: auto; justify-content: start; }
+.prepared-pile.occupied { color: #b8ebd1; }
+.is-practice .prepared-pile { display: none !important; }
+.prepare-options { display: grid; gap: 8px; margin: 20px 0; }
+.prepare-options button { display: flex; gap: 14px; align-items: center; text-align: left; padding: 12px; background: #16242c; border: 1px solid #9a88634d; color: #eee0c5; }
+.prepare-options button:hover { background: #253832; border-color: #d3bc7c; }
+.prepare-options button > span:nth-child(2) { flex: 1; }
+.prepare-options strong, .prepare-options small { display: block; }
+.prepare-options strong { font: 16px var(--display); }
+.prepare-options small { margin-top: 5px; color: #bebeb1; font: 13px/1.45 Barlow; }
+.prepare-cost { display: grid; place-items: center; flex: 0 0 30px; height: 30px; border: 1px solid #b8a878; border-radius: 50%; font: 20px var(--condensed); }
+.prepared-summary { padding: 18px; margin-block: 20px; background: #16312a; border: 1px solid #a7c9a86b; }
+.prepared-summary > span { font: 11px var(--condensed); letter-spacing: .12em; color: #a9d5bd; }
+.boss-window { padding: 8px 0; margin-bottom: 8px; border-block: 1px solid #c887674f; color: #f1bb99; }
+.boss-window > span, .boss-window > strong { display: block; }
+.boss-window > span { font: 10px var(--condensed); letter-spacing: .07em; }
+.boss-window > strong { margin-top: 3px; font: 14px/1.25 var(--condensed); }
+.boss-window.broken { color: #a6e4c7; border-color: #91c4a859; }
+.break-meter { height: 4px; margin-top: 6px; background: #120b16; }
+.break-meter i { display: block; height: 100%; background: #e7a87e; transition: width .18s ease; }
+.broken .break-meter i { background: #a6e4c7; }
+.is-battle[data-guardian-window="ultimate"] .scene-shade { box-shadow: inset 0 0 180px #a93f334f; }
+.is-battle[data-guardian-window="ultimate"] .enemy-plate { filter: drop-shadow(0 0 14px #b74a356b); }
+.is-battle[data-guardian-window="ultimate"] .encounter-heading .eyebrow { color: #ffb096; }
+.is-battle[data-guardian-window="charge"] .encounter-heading .eyebrow { color: #f2cd86; }
+.is-battle[data-guardian-window="exposed"] .encounter-heading .eyebrow { color: #a6e4c7; }
+.is-battle[data-guardian-window="break"] .encounter-heading .eyebrow { color: #a6e4c7; }
+.is-battle[data-guardian-window="break"] .enemy-plate { filter: drop-shadow(0 0 14px #85cba84f); }
+@container game (max-width: 900px) {
+  .boss-window { padding: 5px 0; margin-bottom: 5px; }
+  .boss-window > strong { font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .break-meter i { transition: none; } }

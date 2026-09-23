@@ -12,6 +12,7 @@ import { linkKey } from "../core/graph.ts";
 import type { Enemy, NetworkNode, Role, Topology, Zone, ZoneEffect } from "../core/types.ts";
 import type { Intent } from "../core/run.ts";
 import { ENEMIES } from "../core/enemies.ts";
+import { EnemyActor } from "./EnemyActor.ts";
 
 export type WorldPoint = { x: number; z: number };
 export type BoardZone = Zone;
@@ -127,7 +128,8 @@ export class World {
   private readonly composer: EffectComposer;
   private readonly antialias: ShaderPass;
   private readonly environment: THREE.WebGLRenderTarget;
-  private enemySprite!: THREE.Sprite;
+  private readonly enemyActor = new EnemyActor();
+  private readonly enemySprite = this.enemyActor.mesh;
   private enemyTexture!: THREE.Texture;
   private enemyAlphaTexture!: THREE.Texture;
   private enemyFieldTexture!: THREE.Texture;
@@ -138,7 +140,7 @@ export class World {
   private enemyAction: {
     kind: Intent["kind"]; start: number; duration: number;
     effect: THREE.Group; target: THREE.Vector3; origin: THREE.Vector3;
-    impacted: boolean; done: () => void;
+    impacted: boolean; done: () => void; onImpact: () => void;
   } | null = null;
   private readonly canvas: HTMLCanvasElement;
   private readonly callbacks: WorldCallbacks;
@@ -610,14 +612,7 @@ export class World {
     this.enemyExpeditionTexture.colorSpace = THREE.SRGBColorSpace;
     this.guardianTexture = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}art/stage-guardians.png`);
     this.guardianTexture.colorSpace = THREE.SRGBColorSpace;
-    this.enemySprite = new THREE.Sprite(
-      new THREE.SpriteMaterial({
-        map: this.enemyTexture,
-        transparent: true,
-        depthWrite: false,
-        toneMapped: false,
-      }),
-    );
+    this.enemySprite.material.map = this.enemyTexture;
     this.enemySprite.scale.set(4.3, 4.3, 1);
     this.enemyGroup.add(this.enemySprite);
     const enemyLight = new THREE.PointLight(0xe9a05c, 20, 9, 2);
@@ -982,6 +977,7 @@ export class World {
       if (!topology.nodes.some((node) => node.id === id)) this.deviceStates.delete(id);
     this.enemyGroup.visible = Boolean(enemy);
     if (enemy) {
+      if (!sameBattle) this.enemyActor.enter(enemy.id);
       const { art, boss } = ENEMIES[enemy.id];
       const texture = ({ "hostiles": this.enemyTexture, "hostiles-alpha": this.enemyAlphaTexture,
         "hostiles-zones": this.enemyFieldTexture, "hostiles-expedition": this.enemyExpeditionTexture,
@@ -1351,7 +1347,7 @@ export class World {
       if (node.fixed) this.pulseAt(node.x, node.z, 0xff7869, 1.4);
   }
   /** A wind-up, an action-specific projectile, and an impact at the real target. */
-  playEnemyAction(kind: Intent["kind"], targetId: string | null, zone: Zone | null, done: () => void, quick = false) {
+  playEnemyAction(kind: Intent["kind"], targetId: string | null, zone: Zone | null, done: () => void, quick = false, onImpact: () => void = () => {}) {
     if (this.enemyAction) return;
     const targetNode = this.topology.nodes.find(node => node.id === targetId);
     const cable = targetId ? this.cableCurves.get(targetId) : undefined;
@@ -1359,14 +1355,14 @@ export class World {
       : kind === "strike" || kind === "breach" ? new THREE.Vector3(kind === "breach" ? 6 : -6, 1.2, 0)
       : zone ? new THREE.Vector3(0, .8, zone === "north" ? -2.5 : zone === "south" ? 2.5 : 0)
       : new THREE.Vector3(0, 1.2, 0);
-    const color = ({ strike: 0xf0ad76, breach: 0xf57968, sever: 0xf1d5a0, jam: 0xb59cec, corrupt: 0xb980c6 })[kind];
+    const color = ({ strike: 0xf0ad76, breach: 0xf57968, sever: 0xf1d5a0, jam: 0xb59cec, corrupt: 0xb980c6, charge: 0xf6c486 })[kind];
     const effect = new THREE.Group();
     if (kind === "sever") {
       for (const angle of [-.65, .65]) {
         const blade = new THREE.Mesh(new THREE.BoxGeometry(.08, 1.8, .07), glow(color));
         blade.rotation.z = angle; effect.add(blade);
       }
-    } else if (kind === "jam" || kind === "corrupt") {
+    } else if (kind === "jam" || kind === "corrupt" || kind === "charge") {
       for (let i = 0; i < 3; i++) {
         const halo = new THREE.Mesh(new THREE.TorusGeometry(.22 + i * .14, .025, 6, 40), glow(color, .85));
         halo.rotation.set(i * .6, i * .7, 0); effect.add(halo);
@@ -1379,28 +1375,30 @@ export class World {
       }
     }
     const origin = this.enemyGroup.position.clone(); origin.y += .4;
+    if (kind === "charge") target.copy(origin);
     effect.position.copy(origin); effect.visible = false;
     this.scene.add(effect);
-    this.enemyAction = { kind, target, origin, effect, start: performance.now(), duration: quick || this.reducedMotion() ? 160 : kind === "breach" ? 1050 : 850, impacted: false, done };
+    this.enemyAction = { kind, target, origin, effect, start: performance.now(), duration: quick || this.reducedMotion() ? 160 : kind === "breach" ? 1050 : 850, impacted: false, done, onImpact };
     this.canvas.dataset.enemyAction = kind;
   }
 
   private animateEnemy(now: number, time: number, reduced: boolean) {
     const action = this.enemyAction;
     const hurt = this.enemyHitAt ? Math.max(0, 1 - (now - this.enemyHitAt) / 350) : 0;
-    const winged = this.enemy?.id === "moth";
-    this.enemyGroup.position.set(0, 1.2 + (reduced ? 0 : Math.sin(time * (winged ? 3 : 1.2)) * (winged ? .16 : .09)), -6.4 - (reduced ? 0 : hurt * .25));
-    this.enemySprite.scale.setScalar(this.enemySize);
-    this.enemySprite.material.rotation = reduced ? 0 : Math.sin(time * .7) * .015;
-    this.enemySprite.material.color.setRGB(1, 1 - hurt * .25, 1 - hurt * .45);
+    const attack = action ? Math.min(1, (now - action.start) / action.duration) : null;
+    const enraged = !!this.enemy && !!ENEMIES[this.enemy.id].enrages && this.enemy.hp <= this.enemy.maxHp / 2;
+    this.enemyGroup.position.set(0, 1.2, -6.4 - (reduced ? 0 : hurt * .3));
+    const state = this.enemyActor.update(this.camera, now, time, reduced, this.enemySize,
+      this.enemy?.color ?? 0xffffff, enraged, hurt, attack, action?.kind);
+    if (this.visible) this.canvas.dataset.enemyState = state;
+    if (enraged) this.canvas.dataset.enemyEnraged = "true";
+    else delete this.canvas.dataset.enemyEnraged;
     if (!action) return;
     const t = Math.min(1, (now - action.start) / action.duration);
     const charge = Math.sin(Math.min(1, t / .5) * Math.PI / 2);
     const lunge = Math.sin(Math.max(0, (t - .35) / .65) * Math.PI);
     if (!reduced) {
-      this.enemySprite.scale.setScalar(this.enemySize * (1 + Math.sin(t * Math.PI) * .12));
       if (action.kind === "strike" || action.kind === "breach") this.enemyGroup.position.z += lunge * (action.kind === "breach" ? 1.5 : .9);
-      else if (action.kind === "sever") this.enemySprite.material.rotation += Math.sin(t * Math.PI * 2) * .13;
       else this.enemyGroup.position.y += Math.sin(t * Math.PI) * .45;
       action.effect.visible = t > .28 && t < .86;
       action.effect.position.lerpVectors(action.origin, action.target, Math.min(1, Math.max(0, (t - .28) / .5)));
@@ -1410,7 +1408,8 @@ export class World {
     this.enemySprite.material.color.lerp(new THREE.Color(this.enemy?.color ?? 0xff9999), Math.sin(t * Math.PI) * .3);
     if (t >= .78 && !action.impacted) {
       action.impacted = true;
-      this.pulseAt(action.target.x, action.target.z, this.enemy?.color ?? 0xff9999, action.kind === "breach" ? 2 : 1.4);
+      action.onImpact();
+      if (action.kind !== "charge") this.pulseAt(action.target.x, action.target.z, this.enemy?.color ?? 0xff9999, action.kind === "breach" ? 2 : 1.4);
       if (action.kind === "corrupt" && this.forecastZone) this.pulseZone(this.forecastZone, "corrupt");
     }
     if (t >= 1) {
@@ -1420,8 +1419,17 @@ export class World {
       action.done();
     }
   }
+  playEnemyTransition(kind: "enrage" | "death" | "break", done: () => void, quick = false) {
+    if (!this.enemy) { done(); return; }
+    this.canvas.dataset.enemyState = kind;
+    this.pulseAt(0, -6.4, this.enemy.color, kind === "death" ? 3 : 2);
+    this.enemyActor.transitionTo(kind, done, quick || this.reducedMotion());
+  }
   setVisible(visible: boolean) {
-    if (this.visible && !visible) this.clearTransientEffects();
+    if (this.visible && !visible) {
+      this.clearTransientEffects();
+      this.battleIdentity = null;
+    }
     this.visible = visible;
   }
 
@@ -1433,6 +1441,9 @@ export class World {
     }
     delete this.canvas.dataset.enemyAction;
     this.enemyHitAt = 0;
+    this.enemyActor.clear();
+    delete this.canvas.dataset.enemyState;
+    delete this.canvas.dataset.enemyEnraged;
     for (const effect of [...this.packets, ...this.sparks, ...this.pulses]) {
       this.scene.remove(effect.mesh);
       this.disposeObject(effect.mesh);

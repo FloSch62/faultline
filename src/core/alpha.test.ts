@@ -177,8 +177,8 @@ test("Shield Array is spent only when at least one damage reaches it", () => {
   assert.equal(r.shieldArrayUsed, false);
   r.enemy!.turn = 9;
   assert.equal(combatPreview(r).incomingRaw, 5);
-  assert.equal(combatPreview(r).shield, 4);
-  assert.equal(combatPreview(r).incoming, 1);
+  assert.equal(combatPreview(r).shield, 2);
+  assert.equal(combatPreview(r).incoming, 3);
   endTurn(r);
   assert.equal(r.shieldArrayUsed, true);
 });
@@ -220,7 +220,7 @@ test("capacitor and Reserve Cell recharge only next turn; Grounded Core renews b
   endTurn(r);
   assert.equal(r.energy, 9);
   assert.equal(r.reserveEnergy, 0);
-  assert.equal(r.block, 2);
+  assert.equal(r.block, 1);
 });
 
 test("repair, recovery and redundancy cards apply their documented effects", () => {
@@ -288,7 +288,7 @@ test("reward rolls exclude basics, stay unique, and guarantee an elite rare", ()
   for (let seed = 1; seed <= 100; seed++) {
     const r = battle();
     r.rng = seed;
-    r.currentRoom = "3-0";
+    r.currentRoom = r.map.find(room => room.floor === 3 && room.type === "elite")!.id;
     r.enemy!.hp = 1;
     endTurn(r);
     assert.equal(r.cardRewards.length, 3);

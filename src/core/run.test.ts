@@ -1,3 +1,4 @@
+import { reachableRooms } from "./map.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
@@ -90,10 +91,14 @@ test("room route, reward, and forge change persistent run state", () => {
   assert.equal(run.deck.length, before + 1);
   assert.equal(run.floor, 1);
   assert.equal(run.phase, "map");
-  assert.equal(chooseRoom(run, "1-1").ok, true);
-  assert.equal(run.phase, "reward");
+  const battle = reachableRooms(run).find(room => room.type === "battle")!;
+  assert.equal(chooseRoom(run, battle.id).ok, true);
+  assert.equal(run.phase, "battle");
+  run.phase = "reward";
   assert.equal(chooseCardReward(run, null).ok, true);
-  assert.equal(chooseRoom(run, "2-0").ok, true);
+  const forge = run.map.find(room => room.floor === 2 && room.type === "forge")!;
+  run.map.find(room => room.id === run.lastRoom)!.exits = [forge.id];
+  assert.equal(chooseRoom(run, forge.id).ok, true);
   assert.equal(run.phase, "forge");
   run.integrity = 6;
   assert.equal(chooseForge(run, "repair").ok, true);
@@ -108,7 +113,7 @@ test("relics are unique and affect battle resources", () => {
   assert.equal(chooseRelic(run, "cold-start").ok, true);
   assert.equal(run.relics.includes("cold-start"), true);
   assert.equal(run.phase, "map");
-  assert.equal(chooseRoom(run, "1-0").ok, true);
+  assert.equal(chooseRoom(run, reachableRooms(run)[0].id).ok, true);
   assert.equal(run.energy, 6);
 });
 
@@ -152,7 +157,7 @@ test("firewall and Shield Array mitigate a telegraphed breach", () => {
   assert.equal(run.shieldArrayUsed, true);
 });
 
-test("map enforces adjacent routes and a guardian opens the next stage", () => {
+test("map enforces its routes and a guardian opens the next stage", () => {
   const run = createRun(99);
   const phase = () => run.phase;
   run.phase = "map";
@@ -163,7 +168,7 @@ test("map enforces adjacent routes and a guardian opens the next stage", () => {
   chooseCardReward(run, null);
   assert.equal(chooseRoom(run, "1-2").ok, false);
   for (let floor = 1; floor <= 6; floor++) {
-    const id = `${floor}-1`;
+    const id = reachableRooms(run)[0].id;
     assert.equal(chooseRoom(run, id).ok, true);
     if (phase() === "forge") chooseForge(run, "repair");
     else {

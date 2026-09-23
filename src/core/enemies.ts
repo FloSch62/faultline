@@ -82,12 +82,16 @@ const PATTERNS: Record<string, Omit<Intent, "pressure">[]> = {
       { kind: "sever", label: "CLOSE THE GATES", amount: 0, field: "corrosion" },
       { kind: "strike", label: "IRON JUDGEMENT", amount: 3 },
       { kind: "corrupt", label: "TARNISHED EARTH", amount: 0 },
+      { kind: "charge", label: "THE CROWN RISES", amount: 0 },
+      { kind: "breach", label: "CROWNFALL", amount: 7, ultimate: true },
     ],
     cantor: [
       { kind: "corrupt", label: "THE SILENCING", amount: 0 },
       { kind: "jam", label: "STOLEN VOICE", amount: 0, field: "suppression" },
       { kind: "corrupt", label: "THE SILENCING", amount: 0 },
       { kind: "breach", label: "CATHEDRAL FALL", amount: 4, field: "corrosion" },
+      { kind: "charge", label: "ONE LAST BREATH", amount: 0 },
+      { kind: "breach", label: "REQUIEM", amount: 8, ultimate: true, field: "suppression" },
     ],
     prophet: [
       { kind: "corrupt", label: "SEED CORROSION", amount: 0 },
@@ -129,6 +133,8 @@ const PATTERNS: Record<string, Omit<Intent, "pressure">[]> = {
       { kind: "breach", label: "SECURITY BREACH", amount: 4 },
       { kind: "jam", label: "JAM A DEVICE", amount: 0, field: "suppression" },
       { kind: "strike", label: "INTEGRITY STRIKE", amount: 4 },
+      { kind: "charge", label: "EVENT HORIZON", amount: 0 },
+      { kind: "breach", label: "TOTAL BLACKOUT", amount: 10, ultimate: true, field: "corrosion" },
     ],
   };
 
@@ -164,7 +170,7 @@ export interface EnemyDefinition extends Omit<Enemy, "hp" | "maxHp" | "turn"> {
   corruption?: "corrosion" | "suppression" | "alternating";
   jamBands?: boolean;
   enrages?: { attacks: number; faults: number };
-  boss?: { entrance: string; warning: string };
+  boss?: { entrance: string; warning: string; breakDamage: number };
 }
 
 const properties: Record<string, Partial<EnemyDefinition>> = {
@@ -182,15 +188,15 @@ const properties: Record<string, Partial<EnemyDefinition>> = {
   reaver: { badge: "BLOOD PRICE", corruption: "corrosion", enrages: { attacks: 2, faults: 0 } },
   regent: {
     badge: "SOVEREIGN ARMOR", armor: { amount: 3, bypass: "independent" }, corruption: "corrosion", enrages: { attacks: 2, faults: 1 },
-    boss: { entrance: "The copper gates close. Their keeper rises.", warning: "Two independent routes break its armor. At half integrity, the Regent awakens." },
+    boss: { entrance: "The copper gates close. Their keeper rises.", warning: "Independent routes bypass its armor. After the crown rises, deal 12 damage in one transmission to interrupt Crownfall. At half health, its attacks grow stronger.", breakDamage: 12 },
   },
   cantor: {
     badge: "THE FINAL REFRAIN", armor: { amount: 2, bypass: "firewall" }, corruption: "alternating", enrages: { attacks: 2, faults: 1 },
-    boss: { entrance: "Every bell falls silent. One voice remains.", warning: "Route through a firewall. Cleanse its fields, or move before the next refrain." },
+    boss: { entrance: "Every bell falls silent. One voice remains.", warning: "Route through a firewall. When the Choir draws its last breath, prepare 15 damage for the next transmission to interrupt Requiem.", breakDamage: 15 },
   },
   core: {
     badge: "QUARANTINE", enrages: { attacks: 3, faults: 2 },
-    boss: { entrance: "At the heart of the Blackout, the last light opens its eye.", warning: "Sever. Breach. Jam. Strike. At half integrity, the Core enters emergency mode." },
+    boss: { entrance: "At the heart of the Blackout, the last light opens its eye.", warning: "At half health, the Core enters emergency mode. Event Horizon warns of Total Blackout: deal 18 damage on the following transmission to interrupt it, or build enough shield to survive.", breakDamage: 18 },
   },
 };
 

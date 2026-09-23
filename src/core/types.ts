@@ -87,6 +87,9 @@ export interface MapRoom {
   lane: number;
   type: RoomType;
   cleared: boolean;
+  /** Omitted in older saves, which keep their original adjacent-lane routes. */
+  exits?: string[];
+  enemyId?: string;
 }
 export interface Enemy {
   id: string;
@@ -96,6 +99,8 @@ export interface Enemy {
   maxHp: number;
   turn: number;
   color: number;
+  /** A broken ultimate leaves the guardian vulnerable for one transmission. */
+  exposed?: boolean;
 }
 export interface RunState {
   seed: number;
@@ -120,6 +125,7 @@ export interface RunState {
   cardsPlayed: number;
   zoneEffects: ZoneEffect[];
   hand: CardId[];
+  preparedCard: CardId | null;
   relics: RelicId[];
   energy: number;
   turn: number;

@@ -33,6 +33,8 @@ import {
   playInstant,
   playLink,
   playNode,
+  prepareCard,
+  releasePreparedCard,
   signalPaths,
   type ActionResult,
 } from "./core/run.ts";
@@ -99,7 +101,7 @@ const root = $(".game-root"),
   dialog = $<HTMLDialogElement>("#dialog");
 sound.update({});
 sound.onUnavailable = () => {
-  $("#now-playing").textContent = "Music could not load";
+  $("#now-playing").textContent = "Some audio could not load";
 };
 function renderTrack() {
   $("#now-playing").innerHTML = `<span class="music-bars"><i></i><i></i><i></i></span><span>${sound.trackTitle}<small>ORIGINAL SOUNDTRACK</small></span>`;
@@ -185,11 +187,13 @@ function render(rebuild = true) {
     if (rebuild)
       world?.setBattle(run.topology, run.enemy, run.faultNode, run.faultLink);
     const forecast = combatPreview(run);
+    root.dataset.guardianWindow = forecast.lethal ? "" : forecast.interrupted ? "break" : forecast.intent?.ultimate ? "ultimate" : forecast.intent?.kind === "charge" ? "charge" : run.enemy?.exposed ? "exposed" : "";
     world?.setSignalRoute(forecast.signalPath, forecast.alternatePath);
     world?.setForecastTarget(forecast.faultTarget);
     world?.setForecastZone(forecast.hazardZone);
     world?.setZoneEffects(run.zoneEffects);
   }
+  if (!battle) delete root.dataset.guardianWindow;
   world?.setVisible(battle);
   let screen = "";
   if (view === "title") screen = ui.titleMarkup(expedition, records);
@@ -206,6 +210,13 @@ function render(rebuild = true) {
   else if (run.phase === "won" || run.phase === "lost")
     screen = ui.outcomeMarkup(expedition!);
   $("#screen").innerHTML = screen;
+  if (view === "run" && run.phase === "map") {
+    const chart = $<HTMLElement>(".route-scroll"), nextRoom = chart.querySelector<HTMLElement>(".route-room.available");
+    if (nextRoom) {
+      chart.scrollTop = Math.max(0, nextRoom.offsetTop - chart.clientHeight * .68);
+      chart.scrollLeft = Math.max(0, nextRoom.offsetLeft - chart.clientWidth / 2);
+    }
+  }
   $("#battle-hud").innerHTML = battle
     ? ui.battleMarkup(
         expedition!,
@@ -319,6 +330,7 @@ function openModal(type: string) {
   else if (type === "combat-log") content.innerHTML = alpha.historyMarkup(run);
   else if (type === "refine") content.innerHTML = alpha.refineMarkup(run);
   else if (type === "devices") content.innerHTML = alpha.devicesMarkup(run);
+  else if (type === "prepare") content.innerHTML = alpha.prepareMarkup(run);
   else if (["deck", "collection", "draw-pile", "discard-pile", "exhaust-pile", "loadout"].includes(type)) {
     libraryMode = type === "loadout" ? "deck" : type as alpha.LibraryMode;
     libraryRun = type === "loadout" ? newExpedition(archetype, 1).run : run;
@@ -327,7 +339,7 @@ function openModal(type: string) {
     content.innerHTML = alpha.libraryMarkup(libraryRun, libraryMode);
   }
   else if (type === "credits")
-    content.innerHTML = `<span class="eyebrow">THE PEOPLE & TOOLS BEHIND THE SIGNAL</span><h2>From an idea to an odyssey.</h2><div class="credits-copy"><h3>The Containerlab universe</h3><p>Inspired by Containerlab and the networks we build together. FAULTLINE is an independent fan project. The Containerlab mark is used under its original license.</p><h3>Original art</h3><p>Relay cathedral, sanctuary, ruined chamber, an expanded illustrated card collection, hostile creatures and painted interface pieces created for this game using OpenAI image generation. Typography: Cinzel and Barlow, under the SIL Open Font License.</p><h3>Original score · YuE2</h3><p>The Last Relay · Signal & Steel · The Blackout Core · The Copper Market · A Light Left On · A Thousand Fractures · Copperlight Pursuit · Ghosts in the Relay · Redline Protocol. Generated locally with the official YuE2 model and listening decoder. The score uses instrumental arrangements; vocal stems were removed with Demucs. Generation prompts and provenance are included in the project.</p><h3>A real network, in miniature</h3><p>Packets and faults are simulated in your browser. You can export the topology to Containerlab; real routing requires device configuration and container images.</p></div>`;
+    content.innerHTML = `<span class="eyebrow">THE PEOPLE & TOOLS BEHIND THE SIGNAL</span><h2>From an idea to an odyssey.</h2><div class="credits-copy"><h3>The Containerlab universe</h3><p>Inspired by Containerlab and the networks we build together. FAULTLINE is an independent fan project. The Containerlab mark is used under its original license.</p><h3>Original art</h3><p>Relay cathedral, sanctuary, ruined chamber, an expanded illustrated card collection, hostile creatures and painted interface pieces created for this game using OpenAI image generation. Typography: Cinzel and Barlow, under the SIL Open Font License.</p><h3>Original score · YuE2</h3><p>The Last Relay · Signal & Steel · The Blackout Core · The Copper Market · A Light Left On · A Thousand Fractures · Copperlight Pursuit · Ghosts in the Relay · Redline Protocol. Generated locally with the official YuE2 model and listening decoder. The score uses instrumental arrangements; vocal stems were removed with Demucs. Generation prompts and provenance are included in the project.</p><h3>Sound effects · Kenney</h3><p>Recorded card Foley, metal, glass and impact materials from Kenney’s CC0 Casino Audio, Impact Sounds and Sci-fi Sounds packs. Layered and mastered for FAULTLINE; source recordings, licenses and recipes are included.</p><h3>A real network, in miniature</h3><p>Packets and faults are simulated in your browser. You can export the topology to Containerlab; real routing requires device configuration and container images.</p></div>`;
   else if (type === "replace")
     content.innerHTML = `<span class="eyebrow">AN EXPEDITION IS ALREADY IN PROGRESS</span><h2>Leave this route behind?</h2><p class="modal-intro">Beginning a new expedition replaces your current saved run in stage ${run.stage + 1}, sector ${run.floor + 1}.</p><div class="confirm-actions"><button class="gold-button" data-action="confirm-replace">Begin a new expedition ${ui.icon("arrow")}</button><button class="text-button" data-action="close">Keep my current expedition</button></div>`;
   dialog.className = [
@@ -404,7 +416,9 @@ function playAction(action: () => ActionResult, cue?: "field" | "cleanse") {
   if (cue) {
     sound.effect(cue);
     toast(result.message);
-  } else sound.effect(connected ? "connect" : "card");
+  } else sound.effect(run.topology.nodes.length > before.topology.nodes.length ? "deploy"
+    : connected ? "connect" : run.block > before.block ? "block"
+    : run.integrity > before.integrity || run.faultNode !== before.faultNode || run.faultLink !== before.faultLink ? "cleanse" : "card");
   return true;
 }
 function chooseCard(index: number) {
@@ -427,7 +441,7 @@ function chooseCard(index: number) {
   source = null;
   selectedNode = null;
   render(false);
-  sound.effect("card");
+  sound.effect("select");
 }
 function onGround(point: WorldPoint) {
   if (!playable() || selected === null) return;
@@ -589,18 +603,25 @@ function transmit() {
   undoStack.length = 0;
   const next = structuredClone(run),
     result = endTurn(next);
+  const becomesEnraged = !result.defeated && next.enemy && ENEMIES[next.enemy.id].enrages && run.enemy!.hp > run.enemy!.maxHp / 2 && next.enemy.hp <= next.enemy.maxHp / 2;
   sound.effect("turn");
   render(false);
   const finish = () => {
     if (generation !== battleGeneration) return;
     if (result.packetDamage) {
       world?.impact(0xfbd69a, 36);
-      sound.effect("hit");
+      sound.effect("hit", { power: Math.min(1.2, .7 + result.packetDamage / 12) });
       floatText(`−${result.packetDamage}`, true);
+      // Show contact immediately while the already forecast enemy action remains
+      // committed. The rule state advances only when the sequence completes.
+      const health = $(".enemy-health");
+      health.setAttribute("aria-valuenow", String(next.enemy!.hp));
+      health.querySelector<HTMLElement>("span")!.style.width = `${next.enemy!.hp / next.enemy!.maxHp * 100}%`;
+      health.querySelector(".health-risk")?.remove();
+      $(".enemy-health-label strong").innerHTML = `${next.enemy!.hp}<small> / ${next.enemy!.maxHp}</small>`;
     } else toast(result.signalPath.length ? "The signal was absorbed. Check armor and hostile fields." : "No live route. The signal could not reach OMEGA.", "error");
     const resolve = () => {
       if (generation !== battleGeneration) return;
-      const becomesEnraged = !result.defeated && next.enemy && ENEMIES[next.enemy.id].enrages && run.enemy!.hp > run.enemy!.maxHp / 2 && next.enemy.hp <= next.enemy.maxHp / 2;
       run = next;
       expedition!.run = run;
       busy = false;
@@ -621,32 +642,56 @@ function transmit() {
       }
       if (result.integrityDamage) {
         world?.pulseThreat();
-        sound.effect("hurt");
+        sound.effect(result.lost ? "defeat" : "hurt");
         floatText(`−${result.integrityDamage}`, false);
         root.classList.remove("shake");
         void root.offsetWidth;
         if (sound.settings.motion) root.classList.add("shake");
       } else if (result.enemyAction) {
-        world?.pulseThreat();
-        if (forecast.shield && forecast.incomingRaw) floatText(`${Math.min(forecast.shield, forecast.incomingRaw)} blocked`, false, "shield");
+        if (!result.interrupted && forecast.intent?.kind !== "charge") world?.pulseThreat();
+        if (forecast.shield && forecast.incomingRaw) {
+          floatText(`${Math.min(forecast.shield, forecast.incomingRaw)} blocked`, false, "shield");
+          sound.effect("block");
+        }
         toast(result.enemyAction);
       }
       if (forecast.enemyHealing) floatText(`+${forecast.enemyHealing} siphoned`, true, "enemy-heal");
-      if (becomesEnraged) { sound.effect("enrage"); toast(`${run.enemy!.name} awakens. Its next intent is stronger.`, "error"); }
+      if (result.interrupted) toast("Ultimate interrupted. The guardian is exposed for one transmission.");
+      else if (becomesEnraged) toast(`${run.enemy!.name} awakens. Its attacks grow stronger.`, "error");
+      if (!result.lost) sound.effect("draw");
       const flash = $("#battle-flash");
       flash.classList.remove("active");
       void flash.offsetWidth;
       flash.classList.add("active");
     };
+    const afterEnemy = () => {
+      if (generation !== battleGeneration) return;
+      if (becomesEnraged && !result.lost) {
+        sound.effect("enrage");
+        if (world) world.playEnemyTransition("enrage", resolve, preferences.fast);
+        else resolve();
+      } else resolve();
+    };
     window.setTimeout(() => {
       if (generation !== battleGeneration) return;
-      if (!result.defeated && forecast.intent) {
+      if (result.interrupted) {
+        root.dataset.enemyAction = "break";
+        sound.effect("cleanse");
+        floatText("INTERRUPTED", true, "burst");
+        if (world) world.playEnemyTransition("break", afterEnemy, preferences.fast);
+        else afterEnemy();
+      } else if (!result.defeated && forecast.intent) {
         const kind = forecast.intent.kind;
         root.dataset.enemyAction = kind;
-        sound.effect(kind);
-        if (world) world.playEnemyAction(kind, forecast.faultTarget, forecast.hazardZone, resolve, preferences.fast);
-        else window.setTimeout(resolve, 160);
-      } else resolve();
+        if (kind === "breach" || kind === "charge") sound.effect("charge");
+        const impact = () => { if (kind !== "charge") sound.effect(kind, { pan: kind === "breach" ? .35 : kind === "strike" ? -.35 : 0, power: forecast.intent?.ultimate ? 1.2 : 1 }); };
+        if (world) world.playEnemyAction(kind, forecast.faultTarget, forecast.hazardZone, afterEnemy, preferences.fast, impact);
+        else { impact(); window.setTimeout(afterEnemy, 160); }
+      } else {
+        sound.effect("death");
+        if (world) world.playEnemyTransition("death", resolve, preferences.fast);
+        else resolve();
+      }
     }, preferences.fast || !sound.settings.motion ? 80 : 350);
   };
   if (result.signalPath.length && world && !preferences.fast && sound.settings.motion) {
@@ -694,6 +739,12 @@ async function action(name: string) {
     return;
   }
   if (busy) return;
+  if (name === "prepare" && (run.phase !== "battle" || practice)) return;
+  if (name === "release-prepared" && modal === "prepare" && !practice) {
+    closeModal();
+    playAction(() => releasePreparedCard(run));
+    return;
+  }
   if (name === "inspect-back" && inspectReturn) {
     modal = inspectReturn;
     $("#dialog-content").innerHTML = alpha.libraryMarkup(libraryRun ?? run, inspectReturn, libraryRarity, libraryQuery);
@@ -705,6 +756,7 @@ async function action(name: string) {
   if (
     name === "devices" ||
     name === "loadout" ||
+    name === "prepare" ||
     name === "enemy-dossier" ||
     name === "combat-details" ||
     name === "combat-log" ||
@@ -802,6 +854,12 @@ document.addEventListener("click", (event) => {
   }
   const managedNode = target.closest<HTMLElement>("[data-manage-node]")?.dataset.manageNode;
   if (managedNode && modal === "devices") { closeModal(); onNode(managedNode); return; }
+  const preparedIndex = target.closest<HTMLElement>("[data-prepare-card]")?.dataset.prepareCard;
+  if (preparedIndex !== undefined && modal === "prepare" && !practice) {
+    closeModal();
+    playAction(() => prepareCard(run, Number(preparedIndex)));
+    return;
+  }
   const fieldZone = target.closest<HTMLElement>("[data-field-zone]")?.dataset.fieldZone as Zone | undefined;
   if (fieldZone && !dialog.open && !busy) { castZone(fieldZone); return; }
   const deployZone = target.closest<HTMLElement>("[data-deploy-zone]")?.dataset.deployZone as "north" | "center" | "south" | undefined;
@@ -1016,6 +1074,11 @@ document.addEventListener("keydown", (event) => {
     return;
   }
   if (!playable()) return;
+  if (event.key.toLowerCase() === "p" && !practice) {
+    event.preventDefault();
+    openModal("prepare");
+    return;
+  }
   if (event.key.toLowerCase() === "z") {
     event.preventDefault();
     undo();

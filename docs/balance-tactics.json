@@ -1,0 +1,3056 @@
+{
+  "date": "2026-09-23",
+  "notes": "Full three-stage expeditions. Four deterministic lightweight policies use visible state; tactical adds card preparation, ultimate bursts and selective deck thinning. Bots are regression probes, not human skill or enjoyment measurements. All runs terminate.",
+  "runs": 21600,
+  "scenarios": {
+    "safe": {
+      "notes": "Deterministic lightweight bots, fewer-elites map route. These are regression probes, not a human difficulty estimate.",
+      "profiles": [
+        {
+          "archetype": "architect",
+          "policy": "careless",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 0,
+          "sampleWinningSeeds": [],
+          "winRate": "0%",
+          "reachedBoss": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            }
+          },
+          "averageTurnsPerBattle": 3.94,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 4
+        },
+        {
+          "archetype": "architect",
+          "policy": "aggressive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 10,
+          "sampleWinningSeeds": [
+            1013904226,
+            1387841383,
+            1296417516
+          ],
+          "winRate": "2%",
+          "reachedBoss": 57,
+          "guardians": {
+            "regent": {
+              "encounters": 451,
+              "wins": 241,
+              "losses": 210,
+              "ultimates": 221,
+              "interrupts": 98,
+              "ultimateDamage": 1098
+            },
+            "cantor": {
+              "encounters": 200,
+              "wins": 83,
+              "losses": 117,
+              "ultimates": 164,
+              "interrupts": 36,
+              "ultimateDamage": 1064
+            },
+            "core": {
+              "encounters": 57,
+              "wins": 10,
+              "losses": 47,
+              "ultimates": 39,
+              "interrupts": 6,
+              "ultimateDamage": 284
+            }
+          },
+          "averageTurnsPerBattle": 3.68,
+          "averageIntegrityOnWin": 5.1,
+          "averageLossSector": 10.7
+        },
+        {
+          "archetype": "architect",
+          "policy": "adaptive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 77,
+          "sampleWinningSeeds": [
+            3576916120,
+            2710938419,
+            3246141861
+          ],
+          "winRate": "15%",
+          "reachedBoss": 224,
+          "guardians": {
+            "regent": {
+              "encounters": 481,
+              "wins": 374,
+              "losses": 107,
+              "ultimates": 300,
+              "interrupts": 142,
+              "ultimateDamage": 771
+            },
+            "cantor": {
+              "encounters": 347,
+              "wins": 261,
+              "losses": 86,
+              "ultimates": 325,
+              "interrupts": 65,
+              "ultimateDamage": 1357
+            },
+            "core": {
+              "encounters": 224,
+              "wins": 77,
+              "losses": 147,
+              "ultimates": 210,
+              "interrupts": 34,
+              "ultimateDamage": 1073
+            }
+          },
+          "averageTurnsPerBattle": 4.19,
+          "averageIntegrityOnWin": 5.9,
+          "averageLossSector": 14.4
+        },
+        {
+          "archetype": "architect",
+          "policy": "tactical",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 168,
+          "sampleWinningSeeds": [
+            2654435761,
+            774553834,
+            147926525
+          ],
+          "winRate": "34%",
+          "reachedBoss": 307,
+          "guardians": {
+            "regent": {
+              "encounters": 489,
+              "wins": 407,
+              "losses": 82,
+              "ultimates": 353,
+              "interrupts": 137,
+              "ultimateDamage": 636
+            },
+            "cantor": {
+              "encounters": 393,
+              "wins": 331,
+              "losses": 62,
+              "ultimates": 405,
+              "interrupts": 82,
+              "ultimateDamage": 1350
+            },
+            "core": {
+              "encounters": 307,
+              "wins": 168,
+              "losses": 139,
+              "ultimates": 304,
+              "interrupts": 84,
+              "ultimateDamage": 1096
+            }
+          },
+          "averageTurnsPerBattle": 4.45,
+          "averageIntegrityOnWin": 7.5,
+          "averageLossSector": 15.1
+        },
+        {
+          "archetype": "warden",
+          "policy": "careless",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 0,
+          "sampleWinningSeeds": [],
+          "winRate": "0%",
+          "reachedBoss": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 48,
+              "wins": 0,
+              "losses": 48,
+              "ultimates": 3,
+              "interrupts": 0,
+              "ultimateDamage": 29
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            }
+          },
+          "averageTurnsPerBattle": 4.66,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 4.5
+        },
+        {
+          "archetype": "warden",
+          "policy": "aggressive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 29,
+          "sampleWinningSeeds": [
+            1366259934,
+            3541994911,
+            4077198353
+          ],
+          "winRate": "6%",
+          "reachedBoss": 156,
+          "guardians": {
+            "regent": {
+              "encounters": 490,
+              "wins": 347,
+              "losses": 143,
+              "ultimates": 362,
+              "interrupts": 151,
+              "ultimateDamage": 1672
+            },
+            "cantor": {
+              "encounters": 338,
+              "wins": 201,
+              "losses": 137,
+              "ultimates": 317,
+              "interrupts": 57,
+              "ultimateDamage": 1972
+            },
+            "core": {
+              "encounters": 156,
+              "wins": 29,
+              "losses": 127,
+              "ultimates": 142,
+              "interrupts": 20,
+              "ultimateDamage": 961
+            }
+          },
+          "averageTurnsPerBattle": 4.18,
+          "averageIntegrityOnWin": 6.7,
+          "averageLossSector": 13.9
+        },
+        {
+          "archetype": "warden",
+          "policy": "adaptive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 171,
+          "sampleWinningSeeds": [
+            1013904226,
+            387276917,
+            1401181143
+          ],
+          "winRate": "34%",
+          "reachedBoss": 365,
+          "guardians": {
+            "regent": {
+              "encounters": 498,
+              "wins": 445,
+              "losses": 53,
+              "ultimates": 395,
+              "interrupts": 154,
+              "ultimateDamage": 1011
+            },
+            "cantor": {
+              "encounters": 438,
+              "wins": 382,
+              "losses": 56,
+              "ultimates": 436,
+              "interrupts": 63,
+              "ultimateDamage": 1608
+            },
+            "core": {
+              "encounters": 365,
+              "wins": 171,
+              "losses": 194,
+              "ultimates": 364,
+              "interrupts": 53,
+              "ultimateDamage": 1645
+            }
+          },
+          "averageTurnsPerBattle": 4.59,
+          "averageIntegrityOnWin": 6.8,
+          "averageLossSector": 17.1
+        },
+        {
+          "archetype": "warden",
+          "policy": "tactical",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 282,
+          "sampleWinningSeeds": [
+            1013904226,
+            3668339987,
+            387276917
+          ],
+          "winRate": "56%",
+          "reachedBoss": 415,
+          "guardians": {
+            "regent": {
+              "encounters": 500,
+              "wins": 462,
+              "losses": 38,
+              "ultimates": 428,
+              "interrupts": 128,
+              "ultimateDamage": 809
+            },
+            "cantor": {
+              "encounters": 460,
+              "wins": 429,
+              "losses": 31,
+              "ultimates": 492,
+              "interrupts": 113,
+              "ultimateDamage": 1307
+            },
+            "core": {
+              "encounters": 415,
+              "wins": 282,
+              "losses": 133,
+              "ultimates": 447,
+              "interrupts": 152,
+              "ultimateDamage": 1511
+            }
+          },
+          "averageTurnsPerBattle": 4.83,
+          "averageIntegrityOnWin": 9.1,
+          "averageLossSector": 17.3
+        },
+        {
+          "archetype": "ghost",
+          "policy": "careless",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 0,
+          "sampleWinningSeeds": [],
+          "winRate": "0%",
+          "reachedBoss": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            }
+          },
+          "averageTurnsPerBattle": 3.73,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 3.9
+        },
+        {
+          "archetype": "ghost",
+          "policy": "aggressive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 7,
+          "sampleWinningSeeds": [
+            4042277144,
+            2218897875,
+            1592270566
+          ],
+          "winRate": "1%",
+          "reachedBoss": 48,
+          "guardians": {
+            "regent": {
+              "encounters": 442,
+              "wins": 240,
+              "losses": 202,
+              "ultimates": 108,
+              "interrupts": 64,
+              "ultimateDamage": 382
+            },
+            "cantor": {
+              "encounters": 203,
+              "wins": 76,
+              "losses": 127,
+              "ultimates": 141,
+              "interrupts": 42,
+              "ultimateDamage": 913
+            },
+            "core": {
+              "encounters": 48,
+              "wins": 7,
+              "losses": 41,
+              "ultimates": 31,
+              "interrupts": 6,
+              "ultimateDamage": 231
+            }
+          },
+          "averageTurnsPerBattle": 3.36,
+          "averageIntegrityOnWin": 7,
+          "averageLossSector": 10.6
+        },
+        {
+          "archetype": "ghost",
+          "policy": "adaptive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 66,
+          "sampleWinningSeeds": [
+            387276917,
+            2415085369,
+            774553834
+          ],
+          "winRate": "13%",
+          "reachedBoss": 211,
+          "guardians": {
+            "regent": {
+              "encounters": 472,
+              "wins": 383,
+              "losses": 89,
+              "ultimates": 194,
+              "interrupts": 106,
+              "ultimateDamage": 413
+            },
+            "cantor": {
+              "encounters": 367,
+              "wins": 260,
+              "losses": 107,
+              "ultimates": 312,
+              "interrupts": 86,
+              "ultimateDamage": 1196
+            },
+            "core": {
+              "encounters": 211,
+              "wins": 66,
+              "losses": 145,
+              "ultimates": 182,
+              "interrupts": 50,
+              "ultimateDamage": 795
+            }
+          },
+          "averageTurnsPerBattle": 3.88,
+          "averageIntegrityOnWin": 6.2,
+          "averageLossSector": 14.6
+        },
+        {
+          "archetype": "ghost",
+          "policy": "tactical",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 181,
+          "sampleWinningSeeds": [
+            2654435761,
+            774553834,
+            1788458060
+          ],
+          "winRate": "36%",
+          "reachedBoss": 346,
+          "guardians": {
+            "regent": {
+              "encounters": 486,
+              "wins": 439,
+              "losses": 47,
+              "ultimates": 207,
+              "interrupts": 126,
+              "ultimateDamage": 277
+            },
+            "cantor": {
+              "encounters": 431,
+              "wins": 382,
+              "losses": 49,
+              "ultimates": 399,
+              "interrupts": 164,
+              "ultimateDamage": 1114
+            },
+            "core": {
+              "encounters": 346,
+              "wins": 181,
+              "losses": 165,
+              "ultimates": 334,
+              "interrupts": 149,
+              "ultimateDamage": 1008
+            }
+          },
+          "averageTurnsPerBattle": 4.12,
+          "averageIntegrityOnWin": 7,
+          "averageLossSector": 16.6
+        }
+      ]
+    },
+    "elite": {
+      "notes": "Deterministic lightweight bots, elite-seeking map route. These are regression probes, not a human difficulty estimate.",
+      "profiles": [
+        {
+          "archetype": "architect",
+          "policy": "careless",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 0,
+          "sampleWinningSeeds": [],
+          "winRate": "0%",
+          "reachedBoss": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            }
+          },
+          "averageTurnsPerBattle": 4.11,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 2.8
+        },
+        {
+          "archetype": "architect",
+          "policy": "aggressive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 22,
+          "sampleWinningSeeds": [
+            1605610326,
+            373937157,
+            3324225968
+          ],
+          "winRate": "4%",
+          "reachedBoss": 64,
+          "guardians": {
+            "regent": {
+              "encounters": 334,
+              "wins": 190,
+              "losses": 144,
+              "ultimates": 106,
+              "interrupts": 56,
+              "ultimateDamage": 368
+            },
+            "cantor": {
+              "encounters": 147,
+              "wins": 90,
+              "losses": 57,
+              "ultimates": 101,
+              "interrupts": 29,
+              "ultimateDamage": 591
+            },
+            "core": {
+              "encounters": 64,
+              "wins": 22,
+              "losses": 42,
+              "ultimates": 56,
+              "interrupts": 16,
+              "ultimateDamage": 366
+            }
+          },
+          "averageTurnsPerBattle": 3.95,
+          "averageIntegrityOnWin": 7,
+          "averageLossSector": 9.3
+        },
+        {
+          "archetype": "architect",
+          "policy": "adaptive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 144,
+          "sampleWinningSeeds": [
+            2654435761,
+            1013904226,
+            3428989595
+          ],
+          "winRate": "29%",
+          "reachedBoss": 253,
+          "guardians": {
+            "regent": {
+              "encounters": 434,
+              "wins": 338,
+              "losses": 96,
+              "ultimates": 198,
+              "interrupts": 103,
+              "ultimateDamage": 404
+            },
+            "cantor": {
+              "encounters": 316,
+              "wins": 283,
+              "losses": 33,
+              "ultimates": 251,
+              "interrupts": 70,
+              "ultimateDamage": 854
+            },
+            "core": {
+              "encounters": 253,
+              "wins": 144,
+              "losses": 109,
+              "ultimates": 245,
+              "interrupts": 52,
+              "ultimateDamage": 1222
+            }
+          },
+          "averageTurnsPerBattle": 4.48,
+          "averageIntegrityOnWin": 7.6,
+          "averageLossSector": 12.8
+        },
+        {
+          "archetype": "architect",
+          "policy": "tactical",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 249,
+          "sampleWinningSeeds": [
+            2654435761,
+            2027808452,
+            3041712678
+          ],
+          "winRate": "50%",
+          "reachedBoss": 351,
+          "guardians": {
+            "regent": {
+              "encounters": 471,
+              "wins": 412,
+              "losses": 59,
+              "ultimates": 259,
+              "interrupts": 130,
+              "ultimateDamage": 311
+            },
+            "cantor": {
+              "encounters": 396,
+              "wins": 365,
+              "losses": 31,
+              "ultimates": 364,
+              "interrupts": 115,
+              "ultimateDamage": 1010
+            },
+            "core": {
+              "encounters": 351,
+              "wins": 249,
+              "losses": 102,
+              "ultimates": 354,
+              "interrupts": 137,
+              "ultimateDamage": 1173
+            }
+          },
+          "averageTurnsPerBattle": 4.76,
+          "averageIntegrityOnWin": 9.2,
+          "averageLossSector": 14.2
+        },
+        {
+          "archetype": "warden",
+          "policy": "careless",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 0,
+          "sampleWinningSeeds": [],
+          "winRate": "0%",
+          "reachedBoss": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 2,
+              "wins": 0,
+              "losses": 2,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            }
+          },
+          "averageTurnsPerBattle": 5.05,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 2.8
+        },
+        {
+          "archetype": "warden",
+          "policy": "aggressive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 64,
+          "sampleWinningSeeds": [
+            1013904226,
+            683129967,
+            2471588027
+          ],
+          "winRate": "13%",
+          "reachedBoss": 207,
+          "guardians": {
+            "regent": {
+              "encounters": 467,
+              "wins": 365,
+              "losses": 102,
+              "ultimates": 259,
+              "interrupts": 126,
+              "ultimateDamage": 923
+            },
+            "cantor": {
+              "encounters": 333,
+              "wins": 263,
+              "losses": 70,
+              "ultimates": 281,
+              "interrupts": 83,
+              "ultimateDamage": 1489
+            },
+            "core": {
+              "encounters": 207,
+              "wins": 64,
+              "losses": 143,
+              "ultimates": 185,
+              "interrupts": 36,
+              "ultimateDamage": 1203
+            }
+          },
+          "averageTurnsPerBattle": 4.5,
+          "averageIntegrityOnWin": 8.4,
+          "averageLossSector": 14.3
+        },
+        {
+          "archetype": "warden",
+          "policy": "adaptive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 254,
+          "sampleWinningSeeds": [
+            387276917,
+            3428989595,
+            1788458060
+          ],
+          "winRate": "51%",
+          "reachedBoss": 407,
+          "guardians": {
+            "regent": {
+              "encounters": 494,
+              "wins": 452,
+              "losses": 42,
+              "ultimates": 317,
+              "interrupts": 149,
+              "ultimateDamage": 605
+            },
+            "cantor": {
+              "encounters": 449,
+              "wins": 435,
+              "losses": 14,
+              "ultimates": 401,
+              "interrupts": 114,
+              "ultimateDamage": 1106
+            },
+            "core": {
+              "encounters": 407,
+              "wins": 254,
+              "losses": 153,
+              "ultimates": 396,
+              "interrupts": 83,
+              "ultimateDamage": 1748
+            }
+          },
+          "averageTurnsPerBattle": 4.86,
+          "averageIntegrityOnWin": 8.4,
+          "averageLossSector": 17.4
+        },
+        {
+          "archetype": "warden",
+          "policy": "tactical",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 377,
+          "sampleWinningSeeds": [
+            2654435761,
+            1013904226,
+            3668339987
+          ],
+          "winRate": "75%",
+          "reachedBoss": 467,
+          "guardians": {
+            "regent": {
+              "encounters": 499,
+              "wins": 479,
+              "losses": 20,
+              "ultimates": 368,
+              "interrupts": 151,
+              "ultimateDamage": 505
+            },
+            "cantor": {
+              "encounters": 479,
+              "wins": 475,
+              "losses": 4,
+              "ultimates": 459,
+              "interrupts": 144,
+              "ultimateDamage": 919
+            },
+            "core": {
+              "encounters": 467,
+              "wins": 377,
+              "losses": 90,
+              "ultimates": 472,
+              "interrupts": 208,
+              "ultimateDamage": 1259
+            }
+          },
+          "averageTurnsPerBattle": 5.1,
+          "averageIntegrityOnWin": 10.3,
+          "averageLossSector": 18.2
+        },
+        {
+          "archetype": "ghost",
+          "policy": "careless",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 0,
+          "sampleWinningSeeds": [],
+          "winRate": "0%",
+          "reachedBoss": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            }
+          },
+          "averageTurnsPerBattle": 3.89,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 2.8
+        },
+        {
+          "archetype": "ghost",
+          "policy": "aggressive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 15,
+          "sampleWinningSeeds": [
+            169507974,
+            1923044825,
+            3289304759
+          ],
+          "winRate": "3%",
+          "reachedBoss": 42,
+          "guardians": {
+            "regent": {
+              "encounters": 278,
+              "wins": 157,
+              "losses": 121,
+              "ultimates": 49,
+              "interrupts": 31,
+              "ultimateDamage": 160
+            },
+            "cantor": {
+              "encounters": 117,
+              "wins": 65,
+              "losses": 52,
+              "ultimates": 71,
+              "interrupts": 22,
+              "ultimateDamage": 464
+            },
+            "core": {
+              "encounters": 42,
+              "wins": 15,
+              "losses": 27,
+              "ultimates": 38,
+              "interrupts": 13,
+              "ultimateDamage": 251
+            }
+          },
+          "averageTurnsPerBattle": 3.62,
+          "averageIntegrityOnWin": 7.3,
+          "averageLossSector": 8.3
+        },
+        {
+          "archetype": "ghost",
+          "policy": "adaptive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 96,
+          "sampleWinningSeeds": [
+            2027808452,
+            3189639203,
+            922480359
+          ],
+          "winRate": "19%",
+          "reachedBoss": 188,
+          "guardians": {
+            "regent": {
+              "encounters": 383,
+              "wins": 309,
+              "losses": 74,
+              "ultimates": 104,
+              "interrupts": 60,
+              "ultimateDamage": 209
+            },
+            "cantor": {
+              "encounters": 286,
+              "wins": 231,
+              "losses": 55,
+              "ultimates": 210,
+              "interrupts": 61,
+              "ultimateDamage": 790
+            },
+            "core": {
+              "encounters": 188,
+              "wins": 96,
+              "losses": 92,
+              "ultimates": 177,
+              "interrupts": 65,
+              "ultimateDamage": 741
+            }
+          },
+          "averageTurnsPerBattle": 4.15,
+          "averageIntegrityOnWin": 7.4,
+          "averageLossSector": 11.9
+        },
+        {
+          "archetype": "ghost",
+          "policy": "tactical",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 225,
+          "sampleWinningSeeds": [
+            2654435761,
+            3668339987,
+            2027808452
+          ],
+          "winRate": "45%",
+          "reachedBoss": 317,
+          "guardians": {
+            "regent": {
+              "encounters": 435,
+              "wins": 392,
+              "losses": 43,
+              "ultimates": 151,
+              "interrupts": 118,
+              "ultimateDamage": 90
+            },
+            "cantor": {
+              "encounters": 383,
+              "wins": 353,
+              "losses": 30,
+              "ultimates": 297,
+              "interrupts": 127,
+              "ultimateDamage": 806
+            },
+            "core": {
+              "encounters": 317,
+              "wins": 225,
+              "losses": 92,
+              "ultimates": 302,
+              "interrupts": 154,
+              "ultimateDamage": 821
+            }
+          },
+          "averageTurnsPerBattle": 4.39,
+          "averageIntegrityOnWin": 8.3,
+          "averageLossSector": 13.5
+        }
+      ]
+    },
+    "mesh": {
+      "notes": "Deterministic lightweight bots, fewer-elites map route. These are regression probes, not a human difficulty estimate.",
+      "profiles": [
+        {
+          "archetype": "architect",
+          "policy": "careless",
+          "build": "mesh",
+          "seeds": 200,
+          "wins": 0,
+          "sampleWinningSeeds": [],
+          "winRate": "0%",
+          "reachedBoss": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            }
+          },
+          "averageTurnsPerBattle": 3.92,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 4
+        },
+        {
+          "archetype": "architect",
+          "policy": "aggressive",
+          "build": "mesh",
+          "seeds": 200,
+          "wins": 3,
+          "sampleWinningSeeds": [
+            3359147177,
+            3655000227,
+            1387841383
+          ],
+          "winRate": "2%",
+          "reachedBoss": 11,
+          "guardians": {
+            "regent": {
+              "encounters": 180,
+              "wins": 98,
+              "losses": 82,
+              "ultimates": 71,
+              "interrupts": 36,
+              "ultimateDamage": 298
+            },
+            "cantor": {
+              "encounters": 72,
+              "wins": 28,
+              "losses": 44,
+              "ultimates": 47,
+              "interrupts": 10,
+              "ultimateDamage": 287
+            },
+            "core": {
+              "encounters": 11,
+              "wins": 3,
+              "losses": 8,
+              "ultimates": 7,
+              "interrupts": 2,
+              "ultimateDamage": 31
+            }
+          },
+          "averageTurnsPerBattle": 3.58,
+          "averageIntegrityOnWin": 6.7,
+          "averageLossSector": 10.4
+        },
+        {
+          "archetype": "architect",
+          "policy": "adaptive",
+          "build": "mesh",
+          "seeds": 200,
+          "wins": 13,
+          "sampleWinningSeeds": [
+            2654435761,
+            1549107668,
+            1309757276
+          ],
+          "winRate": "7%",
+          "reachedBoss": 61,
+          "guardians": {
+            "regent": {
+              "encounters": 194,
+              "wins": 152,
+              "losses": 42,
+              "ultimates": 100,
+              "interrupts": 48,
+              "ultimateDamage": 232
+            },
+            "cantor": {
+              "encounters": 134,
+              "wins": 87,
+              "losses": 47,
+              "ultimates": 116,
+              "interrupts": 28,
+              "ultimateDamage": 493
+            },
+            "core": {
+              "encounters": 61,
+              "wins": 13,
+              "losses": 48,
+              "ultimates": 50,
+              "interrupts": 12,
+              "ultimateDamage": 251
+            }
+          },
+          "averageTurnsPerBattle": 4.01,
+          "averageIntegrityOnWin": 5.5,
+          "averageLossSector": 14.2
+        },
+        {
+          "archetype": "architect",
+          "policy": "tactical",
+          "build": "mesh",
+          "seeds": 200,
+          "wins": 40,
+          "sampleWinningSeeds": [
+            2654435761,
+            2027808452,
+            4055616904
+          ],
+          "winRate": "20%",
+          "reachedBoss": 102,
+          "guardians": {
+            "regent": {
+              "encounters": 194,
+              "wins": 160,
+              "losses": 34,
+              "ultimates": 119,
+              "interrupts": 64,
+              "ultimateDamage": 173
+            },
+            "cantor": {
+              "encounters": 155,
+              "wins": 134,
+              "losses": 21,
+              "ultimates": 150,
+              "interrupts": 57,
+              "ultimateDamage": 445
+            },
+            "core": {
+              "encounters": 102,
+              "wins": 40,
+              "losses": 62,
+              "ultimates": 89,
+              "interrupts": 36,
+              "ultimateDamage": 265
+            }
+          },
+          "averageTurnsPerBattle": 4.28,
+          "averageIntegrityOnWin": 6.3,
+          "averageLossSector": 15.7
+        },
+        {
+          "archetype": "warden",
+          "policy": "careless",
+          "build": "mesh",
+          "seeds": 200,
+          "wins": 0,
+          "sampleWinningSeeds": [],
+          "winRate": "0%",
+          "reachedBoss": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 16,
+              "wins": 0,
+              "losses": 16,
+              "ultimates": 1,
+              "interrupts": 0,
+              "ultimateDamage": 10
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            }
+          },
+          "averageTurnsPerBattle": 4.68,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 4.5
+        },
+        {
+          "archetype": "warden",
+          "policy": "aggressive",
+          "build": "mesh",
+          "seeds": 200,
+          "wins": 6,
+          "sampleWinningSeeds": [
+            2232237635,
+            2380164160,
+            1901463376
+          ],
+          "winRate": "3%",
+          "reachedBoss": 39,
+          "guardians": {
+            "regent": {
+              "encounters": 194,
+              "wins": 137,
+              "losses": 57,
+              "ultimates": 141,
+              "interrupts": 81,
+              "ultimateDamage": 483
+            },
+            "cantor": {
+              "encounters": 123,
+              "wins": 63,
+              "losses": 60,
+              "ultimates": 113,
+              "interrupts": 21,
+              "ultimateDamage": 772
+            },
+            "core": {
+              "encounters": 39,
+              "wins": 6,
+              "losses": 33,
+              "ultimates": 35,
+              "interrupts": 5,
+              "ultimateDamage": 236
+            }
+          },
+          "averageTurnsPerBattle": 4.13,
+          "averageIntegrityOnWin": 4.3,
+          "averageLossSector": 13.2
+        },
+        {
+          "archetype": "warden",
+          "policy": "adaptive",
+          "build": "mesh",
+          "seeds": 200,
+          "wins": 35,
+          "sampleWinningSeeds": [
+            535203442,
+            3724842645,
+            4112119562
+          ],
+          "winRate": "18%",
+          "reachedBoss": 138,
+          "guardians": {
+            "regent": {
+              "encounters": 198,
+              "wins": 177,
+              "losses": 21,
+              "ultimates": 153,
+              "interrupts": 80,
+              "ultimateDamage": 329
+            },
+            "cantor": {
+              "encounters": 175,
+              "wins": 154,
+              "losses": 21,
+              "ultimates": 172,
+              "interrupts": 49,
+              "ultimateDamage": 580
+            },
+            "core": {
+              "encounters": 138,
+              "wins": 35,
+              "losses": 103,
+              "ultimates": 135,
+              "interrupts": 28,
+              "ultimateDamage": 641
+            }
+          },
+          "averageTurnsPerBattle": 4.53,
+          "averageIntegrityOnWin": 6.3,
+          "averageLossSector": 17.8
+        },
+        {
+          "archetype": "warden",
+          "policy": "tactical",
+          "build": "mesh",
+          "seeds": 200,
+          "wins": 85,
+          "sampleWinningSeeds": [
+            2027808452,
+            387276917,
+            1401181143
+          ],
+          "winRate": "43%",
+          "reachedBoss": 164,
+          "guardians": {
+            "regent": {
+              "encounters": 200,
+              "wins": 182,
+              "losses": 18,
+              "ultimates": 164,
+              "interrupts": 65,
+              "ultimateDamage": 233
+            },
+            "cantor": {
+              "encounters": 182,
+              "wins": 177,
+              "losses": 5,
+              "ultimates": 184,
+              "interrupts": 45,
+              "ultimateDamage": 412
+            },
+            "core": {
+              "encounters": 164,
+              "wins": 85,
+              "losses": 79,
+              "ultimates": 170,
+              "interrupts": 48,
+              "ultimateDamage": 578
+            }
+          },
+          "averageTurnsPerBattle": 4.81,
+          "averageIntegrityOnWin": 7.7,
+          "averageLossSector": 18.2
+        },
+        {
+          "archetype": "ghost",
+          "policy": "careless",
+          "build": "mesh",
+          "seeds": 200,
+          "wins": 0,
+          "sampleWinningSeeds": [],
+          "winRate": "0%",
+          "reachedBoss": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            }
+          },
+          "averageTurnsPerBattle": 3.72,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 3.9
+        },
+        {
+          "archetype": "ghost",
+          "policy": "aggressive",
+          "build": "mesh",
+          "seeds": 200,
+          "wins": 2,
+          "sampleWinningSeeds": [
+            2436666818,
+            1387841383
+          ],
+          "winRate": "1%",
+          "reachedBoss": 8,
+          "guardians": {
+            "regent": {
+              "encounters": 177,
+              "wins": 76,
+              "losses": 101,
+              "ultimates": 32,
+              "interrupts": 17,
+              "ultimateDamage": 148
+            },
+            "cantor": {
+              "encounters": 53,
+              "wins": 19,
+              "losses": 34,
+              "ultimates": 34,
+              "interrupts": 16,
+              "ultimateDamage": 186
+            },
+            "core": {
+              "encounters": 8,
+              "wins": 2,
+              "losses": 6,
+              "ultimates": 5,
+              "interrupts": 2,
+              "ultimateDamage": 23
+            }
+          },
+          "averageTurnsPerBattle": 3.2,
+          "averageIntegrityOnWin": 4.5,
+          "averageLossSector": 9.4
+        },
+        {
+          "archetype": "ghost",
+          "policy": "adaptive",
+          "build": "mesh",
+          "seeds": 200,
+          "wins": 10,
+          "sampleWinningSeeds": [
+            1401181143,
+            2710938419,
+            2380164160
+          ],
+          "winRate": "5%",
+          "reachedBoss": 43,
+          "guardians": {
+            "regent": {
+              "encounters": 187,
+              "wins": 132,
+              "losses": 55,
+              "ultimates": 53,
+              "interrupts": 33,
+              "ultimateDamage": 88
+            },
+            "cantor": {
+              "encounters": 122,
+              "wins": 72,
+              "losses": 50,
+              "ultimates": 98,
+              "interrupts": 38,
+              "ultimateDamage": 402
+            },
+            "core": {
+              "encounters": 43,
+              "wins": 10,
+              "losses": 33,
+              "ultimates": 30,
+              "interrupts": 14,
+              "ultimateDamage": 114
+            }
+          },
+          "averageTurnsPerBattle": 3.66,
+          "averageIntegrityOnWin": 6,
+          "averageLossSector": 13
+        },
+        {
+          "archetype": "ghost",
+          "policy": "tactical",
+          "build": "mesh",
+          "seeds": 200,
+          "wins": 40,
+          "sampleWinningSeeds": [
+            2654435761,
+            1013904226,
+            3668339987
+          ],
+          "winRate": "20%",
+          "reachedBoss": 106,
+          "guardians": {
+            "regent": {
+              "encounters": 193,
+              "wins": 165,
+              "losses": 28,
+              "ultimates": 76,
+              "interrupts": 52,
+              "ultimateDamage": 97
+            },
+            "cantor": {
+              "encounters": 156,
+              "wins": 135,
+              "losses": 21,
+              "ultimates": 140,
+              "interrupts": 88,
+              "ultimateDamage": 328
+            },
+            "core": {
+              "encounters": 106,
+              "wins": 40,
+              "losses": 66,
+              "ultimates": 91,
+              "interrupts": 41,
+              "ultimateDamage": 294
+            }
+          },
+          "averageTurnsPerBattle": 3.99,
+          "averageIntegrityOnWin": 6.3,
+          "averageLossSector": 15.8
+        }
+      ]
+    },
+    "fortress": {
+      "notes": "Deterministic lightweight bots, fewer-elites map route. These are regression probes, not a human difficulty estimate.",
+      "profiles": [
+        {
+          "archetype": "architect",
+          "policy": "careless",
+          "build": "fortress",
+          "seeds": 200,
+          "wins": 0,
+          "sampleWinningSeeds": [],
+          "winRate": "0%",
+          "reachedBoss": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            }
+          },
+          "averageTurnsPerBattle": 3.92,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 4
+        },
+        {
+          "archetype": "architect",
+          "policy": "aggressive",
+          "build": "fortress",
+          "seeds": 200,
+          "wins": 11,
+          "sampleWinningSeeds": [
+            295853050,
+            2710938419,
+            2619514552
+          ],
+          "winRate": "6%",
+          "reachedBoss": 39,
+          "guardians": {
+            "regent": {
+              "encounters": 189,
+              "wins": 111,
+              "losses": 78,
+              "ultimates": 129,
+              "interrupts": 66,
+              "ultimateDamage": 481
+            },
+            "cantor": {
+              "encounters": 101,
+              "wins": 57,
+              "losses": 44,
+              "ultimates": 104,
+              "interrupts": 11,
+              "ultimateDamage": 591
+            },
+            "core": {
+              "encounters": 39,
+              "wins": 11,
+              "losses": 28,
+              "ultimates": 40,
+              "interrupts": 8,
+              "ultimateDamage": 176
+            }
+          },
+          "averageTurnsPerBattle": 4.18,
+          "averageIntegrityOnWin": 7.7,
+          "averageLossSector": 11.8
+        },
+        {
+          "archetype": "architect",
+          "policy": "adaptive",
+          "build": "fortress",
+          "seeds": 200,
+          "wins": 47,
+          "sampleWinningSeeds": [
+            774553834,
+            3816266512,
+            2563011894
+          ],
+          "winRate": "24%",
+          "reachedBoss": 108,
+          "guardians": {
+            "regent": {
+              "encounters": 194,
+              "wins": 158,
+              "losses": 36,
+              "ultimates": 155,
+              "interrupts": 70,
+              "ultimateDamage": 379
+            },
+            "cantor": {
+              "encounters": 149,
+              "wins": 117,
+              "losses": 32,
+              "ultimates": 156,
+              "interrupts": 22,
+              "ultimateDamage": 576
+            },
+            "core": {
+              "encounters": 108,
+              "wins": 47,
+              "losses": 61,
+              "ultimates": 114,
+              "interrupts": 4,
+              "ultimateDamage": 481
+            }
+          },
+          "averageTurnsPerBattle": 4.69,
+          "averageIntegrityOnWin": 7.4,
+          "averageLossSector": 14.8
+        },
+        {
+          "archetype": "architect",
+          "policy": "tactical",
+          "build": "fortress",
+          "seeds": 200,
+          "wins": 94,
+          "sampleWinningSeeds": [
+            2654435761,
+            2027808452,
+            4055616904
+          ],
+          "winRate": "47%",
+          "reachedBoss": 138,
+          "guardians": {
+            "regent": {
+              "encounters": 197,
+              "wins": 162,
+              "losses": 35,
+              "ultimates": 175,
+              "interrupts": 63,
+              "ultimateDamage": 284
+            },
+            "cantor": {
+              "encounters": 159,
+              "wins": 143,
+              "losses": 16,
+              "ultimates": 189,
+              "interrupts": 25,
+              "ultimateDamage": 536
+            },
+            "core": {
+              "encounters": 138,
+              "wins": 94,
+              "losses": 44,
+              "ultimates": 166,
+              "interrupts": 15,
+              "ultimateDamage": 491
+            }
+          },
+          "averageTurnsPerBattle": 5.09,
+          "averageIntegrityOnWin": 8.9,
+          "averageLossSector": 14.5
+        },
+        {
+          "archetype": "warden",
+          "policy": "careless",
+          "build": "fortress",
+          "seeds": 200,
+          "wins": 0,
+          "sampleWinningSeeds": [],
+          "winRate": "0%",
+          "reachedBoss": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 17,
+              "wins": 0,
+              "losses": 17,
+              "ultimates": 1,
+              "interrupts": 0,
+              "ultimateDamage": 10
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            }
+          },
+          "averageTurnsPerBattle": 4.69,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 4.5
+        },
+        {
+          "archetype": "warden",
+          "policy": "aggressive",
+          "build": "fortress",
+          "seeds": 200,
+          "wins": 38,
+          "sampleWinningSeeds": [
+            2654435761,
+            3041712678,
+            2415085369
+          ],
+          "winRate": "19%",
+          "reachedBoss": 100,
+          "guardians": {
+            "regent": {
+              "encounters": 198,
+              "wins": 152,
+              "losses": 46,
+              "ultimates": 171,
+              "interrupts": 66,
+              "ultimateDamage": 682
+            },
+            "cantor": {
+              "encounters": 149,
+              "wins": 116,
+              "losses": 33,
+              "ultimates": 156,
+              "interrupts": 19,
+              "ultimateDamage": 701
+            },
+            "core": {
+              "encounters": 100,
+              "wins": 38,
+              "losses": 62,
+              "ultimates": 105,
+              "interrupts": 5,
+              "ultimateDamage": 557
+            }
+          },
+          "averageTurnsPerBattle": 4.75,
+          "averageIntegrityOnWin": 6.9,
+          "averageLossSector": 14.9
+        },
+        {
+          "archetype": "warden",
+          "policy": "adaptive",
+          "build": "fortress",
+          "seeds": 200,
+          "wins": 94,
+          "sampleWinningSeeds": [
+            2654435761,
+            2027808452,
+            3041712678
+          ],
+          "winRate": "47%",
+          "reachedBoss": 162,
+          "guardians": {
+            "regent": {
+              "encounters": 199,
+              "wins": 185,
+              "losses": 14,
+              "ultimates": 179,
+              "interrupts": 67,
+              "ultimateDamage": 396
+            },
+            "cantor": {
+              "encounters": 183,
+              "wins": 168,
+              "losses": 15,
+              "ultimates": 206,
+              "interrupts": 23,
+              "ultimateDamage": 598
+            },
+            "core": {
+              "encounters": 162,
+              "wins": 94,
+              "losses": 68,
+              "ultimates": 186,
+              "interrupts": 5,
+              "ultimateDamage": 801
+            }
+          },
+          "averageTurnsPerBattle": 5.09,
+          "averageIntegrityOnWin": 7.7,
+          "averageLossSector": 17.7
+        },
+        {
+          "archetype": "warden",
+          "policy": "tactical",
+          "build": "fortress",
+          "seeds": 200,
+          "wins": 139,
+          "sampleWinningSeeds": [
+            2654435761,
+            1013904226,
+            3668339987
+          ],
+          "winRate": "70%",
+          "reachedBoss": 175,
+          "guardians": {
+            "regent": {
+              "encounters": 200,
+              "wins": 188,
+              "losses": 12,
+              "ultimates": 192,
+              "interrupts": 61,
+              "ultimateDamage": 250
+            },
+            "cantor": {
+              "encounters": 187,
+              "wins": 177,
+              "losses": 10,
+              "ultimates": 232,
+              "interrupts": 21,
+              "ultimateDamage": 510
+            },
+            "core": {
+              "encounters": 175,
+              "wins": 139,
+              "losses": 36,
+              "ultimates": 238,
+              "interrupts": 26,
+              "ultimateDamage": 641
+            }
+          },
+          "averageTurnsPerBattle": 5.48,
+          "averageIntegrityOnWin": 9.6,
+          "averageLossSector": 16.9
+        },
+        {
+          "archetype": "ghost",
+          "policy": "careless",
+          "build": "fortress",
+          "seeds": 200,
+          "wins": 0,
+          "sampleWinningSeeds": [],
+          "winRate": "0%",
+          "reachedBoss": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            }
+          },
+          "averageTurnsPerBattle": 3.72,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 3.9
+        },
+        {
+          "archetype": "ghost",
+          "policy": "aggressive",
+          "build": "fortress",
+          "seeds": 200,
+          "wins": 17,
+          "sampleWinningSeeds": [
+            1401181143,
+            3189639203,
+            4203543429
+          ],
+          "winRate": "9%",
+          "reachedBoss": 49,
+          "guardians": {
+            "regent": {
+              "encounters": 191,
+              "wins": 124,
+              "losses": 67,
+              "ultimates": 72,
+              "interrupts": 42,
+              "ultimateDamage": 241
+            },
+            "cantor": {
+              "encounters": 112,
+              "wins": 65,
+              "losses": 47,
+              "ultimates": 98,
+              "interrupts": 23,
+              "ultimateDamage": 495
+            },
+            "core": {
+              "encounters": 49,
+              "wins": 17,
+              "losses": 32,
+              "ultimates": 47,
+              "interrupts": 4,
+              "ultimateDamage": 190
+            }
+          },
+          "averageTurnsPerBattle": 3.89,
+          "averageIntegrityOnWin": 7,
+          "averageLossSector": 12.4
+        },
+        {
+          "archetype": "ghost",
+          "policy": "adaptive",
+          "build": "fortress",
+          "seeds": 200,
+          "wins": 54,
+          "sampleWinningSeeds": [
+            1013904226,
+            387276917,
+            774553834
+          ],
+          "winRate": "27%",
+          "reachedBoss": 116,
+          "guardians": {
+            "regent": {
+              "encounters": 194,
+              "wins": 156,
+              "losses": 38,
+              "ultimates": 100,
+              "interrupts": 49,
+              "ultimateDamage": 177
+            },
+            "cantor": {
+              "encounters": 153,
+              "wins": 131,
+              "losses": 22,
+              "ultimates": 156,
+              "interrupts": 40,
+              "ultimateDamage": 415
+            },
+            "core": {
+              "encounters": 116,
+              "wins": 54,
+              "losses": 62,
+              "ultimates": 114,
+              "interrupts": 17,
+              "ultimateDamage": 333
+            }
+          },
+          "averageTurnsPerBattle": 4.36,
+          "averageIntegrityOnWin": 7.1,
+          "averageLossSector": 15.1
+        },
+        {
+          "archetype": "ghost",
+          "policy": "tactical",
+          "build": "fortress",
+          "seeds": 200,
+          "wins": 98,
+          "sampleWinningSeeds": [
+            3668339987,
+            387276917,
+            1401181143
+          ],
+          "winRate": "49%",
+          "reachedBoss": 152,
+          "guardians": {
+            "regent": {
+              "encounters": 193,
+              "wins": 177,
+              "losses": 16,
+              "ultimates": 119,
+              "interrupts": 75,
+              "ultimateDamage": 98
+            },
+            "cantor": {
+              "encounters": 176,
+              "wins": 159,
+              "losses": 17,
+              "ultimates": 179,
+              "interrupts": 41,
+              "ultimateDamage": 509
+            },
+            "core": {
+              "encounters": 152,
+              "wins": 98,
+              "losses": 54,
+              "ultimates": 172,
+              "interrupts": 25,
+              "ultimateDamage": 526
+            }
+          },
+          "averageTurnsPerBattle": 4.63,
+          "averageIntegrityOnWin": 7,
+          "averageLossSector": 16.2
+        }
+      ]
+    },
+    "burst": {
+      "notes": "Deterministic lightweight bots, fewer-elites map route. These are regression probes, not a human difficulty estimate.",
+      "profiles": [
+        {
+          "archetype": "architect",
+          "policy": "careless",
+          "build": "burst",
+          "seeds": 200,
+          "wins": 0,
+          "sampleWinningSeeds": [],
+          "winRate": "0%",
+          "reachedBoss": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            }
+          },
+          "averageTurnsPerBattle": 3.91,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 4
+        },
+        {
+          "archetype": "architect",
+          "policy": "aggressive",
+          "build": "burst",
+          "seeds": 200,
+          "wins": 1,
+          "sampleWinningSeeds": [
+            1091988333
+          ],
+          "winRate": "1%",
+          "reachedBoss": 22,
+          "guardians": {
+            "regent": {
+              "encounters": 185,
+              "wins": 104,
+              "losses": 81,
+              "ultimates": 59,
+              "interrupts": 32,
+              "ultimateDamage": 276
+            },
+            "cantor": {
+              "encounters": 88,
+              "wins": 43,
+              "losses": 45,
+              "ultimates": 57,
+              "interrupts": 15,
+              "ultimateDamage": 384
+            },
+            "core": {
+              "encounters": 22,
+              "wins": 1,
+              "losses": 21,
+              "ultimates": 10,
+              "interrupts": 2,
+              "ultimateDamage": 66
+            }
+          },
+          "averageTurnsPerBattle": 3.41,
+          "averageIntegrityOnWin": 8,
+          "averageLossSector": 11.4
+        },
+        {
+          "archetype": "architect",
+          "policy": "adaptive",
+          "build": "burst",
+          "seeds": 200,
+          "wins": 16,
+          "sampleWinningSeeds": [
+            2323661502,
+            1070406884,
+            113005316
+          ],
+          "winRate": "8%",
+          "reachedBoss": 63,
+          "guardians": {
+            "regent": {
+              "encounters": 194,
+              "wins": 142,
+              "losses": 52,
+              "ultimates": 87,
+              "interrupts": 36,
+              "ultimateDamage": 310
+            },
+            "cantor": {
+              "encounters": 127,
+              "wins": 86,
+              "losses": 41,
+              "ultimates": 92,
+              "interrupts": 30,
+              "ultimateDamage": 412
+            },
+            "core": {
+              "encounters": 63,
+              "wins": 16,
+              "losses": 47,
+              "ultimates": 50,
+              "interrupts": 14,
+              "ultimateDamage": 288
+            }
+          },
+          "averageTurnsPerBattle": 3.69,
+          "averageIntegrityOnWin": 8.4,
+          "averageLossSector": 13.8
+        },
+        {
+          "archetype": "architect",
+          "policy": "tactical",
+          "build": "burst",
+          "seeds": 200,
+          "wins": 65,
+          "sampleWinningSeeds": [
+            3668339987,
+            387276917,
+            2802362286
+          ],
+          "winRate": "33%",
+          "reachedBoss": 113,
+          "guardians": {
+            "regent": {
+              "encounters": 196,
+              "wins": 164,
+              "losses": 32,
+              "ultimates": 109,
+              "interrupts": 59,
+              "ultimateDamage": 246
+            },
+            "cantor": {
+              "encounters": 159,
+              "wins": 139,
+              "losses": 20,
+              "ultimates": 135,
+              "interrupts": 58,
+              "ultimateDamage": 442
+            },
+            "core": {
+              "encounters": 113,
+              "wins": 65,
+              "losses": 48,
+              "ultimates": 100,
+              "interrupts": 63,
+              "ultimateDamage": 243
+            }
+          },
+          "averageTurnsPerBattle": 3.95,
+          "averageIntegrityOnWin": 6.4,
+          "averageLossSector": 15.3
+        },
+        {
+          "archetype": "warden",
+          "policy": "careless",
+          "build": "burst",
+          "seeds": 200,
+          "wins": 0,
+          "sampleWinningSeeds": [],
+          "winRate": "0%",
+          "reachedBoss": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 14,
+              "wins": 0,
+              "losses": 14,
+              "ultimates": 1,
+              "interrupts": 0,
+              "ultimateDamage": 10
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            }
+          },
+          "averageTurnsPerBattle": 4.67,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 4.5
+        },
+        {
+          "archetype": "warden",
+          "policy": "aggressive",
+          "build": "burst",
+          "seeds": 200,
+          "wins": 14,
+          "sampleWinningSeeds": [
+            2710938419,
+            739632625,
+            1274836067
+          ],
+          "winRate": "7%",
+          "reachedBoss": 66,
+          "guardians": {
+            "regent": {
+              "encounters": 198,
+              "wins": 151,
+              "losses": 47,
+              "ultimates": 125,
+              "interrupts": 59,
+              "ultimateDamage": 559
+            },
+            "cantor": {
+              "encounters": 146,
+              "wins": 92,
+              "losses": 54,
+              "ultimates": 121,
+              "interrupts": 36,
+              "ultimateDamage": 685
+            },
+            "core": {
+              "encounters": 66,
+              "wins": 14,
+              "losses": 52,
+              "ultimates": 54,
+              "interrupts": 15,
+              "ultimateDamage": 329
+            }
+          },
+          "averageTurnsPerBattle": 3.94,
+          "averageIntegrityOnWin": 5.9,
+          "averageLossSector": 14.6
+        },
+        {
+          "archetype": "warden",
+          "policy": "adaptive",
+          "build": "burst",
+          "seeds": 200,
+          "wins": 46,
+          "sampleWinningSeeds": [
+            1013904226,
+            387276917,
+            922480359
+          ],
+          "winRate": "23%",
+          "reachedBoss": 139,
+          "guardians": {
+            "regent": {
+              "encounters": 199,
+              "wins": 178,
+              "losses": 21,
+              "ultimates": 124,
+              "interrupts": 57,
+              "ultimateDamage": 340
+            },
+            "cantor": {
+              "encounters": 177,
+              "wins": 153,
+              "losses": 24,
+              "ultimates": 156,
+              "interrupts": 46,
+              "ultimateDamage": 535
+            },
+            "core": {
+              "encounters": 139,
+              "wins": 46,
+              "losses": 93,
+              "ultimates": 121,
+              "interrupts": 40,
+              "ultimateDamage": 575
+            }
+          },
+          "averageTurnsPerBattle": 4.21,
+          "averageIntegrityOnWin": 7,
+          "averageLossSector": 17.6
+        },
+        {
+          "archetype": "warden",
+          "policy": "tactical",
+          "build": "burst",
+          "seeds": 200,
+          "wins": 104,
+          "sampleWinningSeeds": [
+            2654435761,
+            1013904226,
+            3668339987
+          ],
+          "winRate": "52%",
+          "reachedBoss": 164,
+          "guardians": {
+            "regent": {
+              "encounters": 200,
+              "wins": 184,
+              "losses": 16,
+              "ultimates": 155,
+              "interrupts": 68,
+              "ultimateDamage": 245
+            },
+            "cantor": {
+              "encounters": 182,
+              "wins": 171,
+              "losses": 11,
+              "ultimates": 177,
+              "interrupts": 71,
+              "ultimateDamage": 488
+            },
+            "core": {
+              "encounters": 164,
+              "wins": 104,
+              "losses": 60,
+              "ultimates": 164,
+              "interrupts": 91,
+              "ultimateDamage": 525
+            }
+          },
+          "averageTurnsPerBattle": 4.39,
+          "averageIntegrityOnWin": 8.7,
+          "averageLossSector": 17.5
+        },
+        {
+          "archetype": "ghost",
+          "policy": "careless",
+          "build": "burst",
+          "seeds": 200,
+          "wins": 0,
+          "sampleWinningSeeds": [],
+          "winRate": "0%",
+          "reachedBoss": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            }
+          },
+          "averageTurnsPerBattle": 3.72,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 3.9
+        },
+        {
+          "archetype": "ghost",
+          "policy": "aggressive",
+          "build": "burst",
+          "seeds": 200,
+          "wins": 1,
+          "sampleWinningSeeds": [
+            430439815
+          ],
+          "winRate": "1%",
+          "reachedBoss": 16,
+          "guardians": {
+            "regent": {
+              "encounters": 173,
+              "wins": 81,
+              "losses": 92,
+              "ultimates": 25,
+              "interrupts": 17,
+              "ultimateDamage": 76
+            },
+            "cantor": {
+              "encounters": 67,
+              "wins": 25,
+              "losses": 42,
+              "ultimates": 29,
+              "interrupts": 10,
+              "ultimateDamage": 196
+            },
+            "core": {
+              "encounters": 16,
+              "wins": 1,
+              "losses": 15,
+              "ultimates": 6,
+              "interrupts": 1,
+              "ultimateDamage": 39
+            }
+          },
+          "averageTurnsPerBattle": 3.14,
+          "averageIntegrityOnWin": 3,
+          "averageLossSector": 10
+        },
+        {
+          "archetype": "ghost",
+          "policy": "adaptive",
+          "build": "burst",
+          "seeds": 200,
+          "wins": 21,
+          "sampleWinningSeeds": [
+            2654435761,
+            3964193037,
+            2710938419
+          ],
+          "winRate": "11%",
+          "reachedBoss": 62,
+          "guardians": {
+            "regent": {
+              "encounters": 181,
+              "wins": 144,
+              "losses": 37,
+              "ultimates": 46,
+              "interrupts": 21,
+              "ultimateDamage": 118
+            },
+            "cantor": {
+              "encounters": 129,
+              "wins": 96,
+              "losses": 33,
+              "ultimates": 71,
+              "interrupts": 35,
+              "ultimateDamage": 229
+            },
+            "core": {
+              "encounters": 62,
+              "wins": 21,
+              "losses": 41,
+              "ultimates": 37,
+              "interrupts": 20,
+              "ultimateDamage": 109
+            }
+          },
+          "averageTurnsPerBattle": 3.47,
+          "averageIntegrityOnWin": 5.2,
+          "averageLossSector": 13.8
+        },
+        {
+          "archetype": "ghost",
+          "policy": "tactical",
+          "build": "burst",
+          "seeds": 200,
+          "wins": 51,
+          "sampleWinningSeeds": [
+            3668339987,
+            1161830751,
+            1936384585
+          ],
+          "winRate": "26%",
+          "reachedBoss": 106,
+          "guardians": {
+            "regent": {
+              "encounters": 189,
+              "wins": 164,
+              "losses": 25,
+              "ultimates": 47,
+              "interrupts": 30,
+              "ultimateDamage": 94
+            },
+            "cantor": {
+              "encounters": 157,
+              "wins": 133,
+              "losses": 24,
+              "ultimates": 114,
+              "interrupts": 71,
+              "ultimateDamage": 305
+            },
+            "core": {
+              "encounters": 106,
+              "wins": 51,
+              "losses": 55,
+              "ultimates": 83,
+              "interrupts": 53,
+              "ultimateDamage": 211
+            }
+          },
+          "averageTurnsPerBattle": 3.69,
+          "averageIntegrityOnWin": 6.2,
+          "averageLossSector": 15.4
+        }
+      ]
+    },
+    "no-signature": {
+      "notes": "Deterministic lightweight bots, fewer-elites map route, neither orchestration signature card accepted. These are regression probes, not a human difficulty estimate.",
+      "profiles": [
+        {
+          "archetype": "architect",
+          "policy": "careless",
+          "build": "balanced",
+          "seeds": 200,
+          "wins": 0,
+          "sampleWinningSeeds": [],
+          "winRate": "0%",
+          "reachedBoss": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            }
+          },
+          "averageTurnsPerBattle": 3.92,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 4
+        },
+        {
+          "archetype": "architect",
+          "policy": "aggressive",
+          "build": "balanced",
+          "seeds": 200,
+          "wins": 9,
+          "sampleWinningSeeds": [
+            387276917,
+            1309757276,
+            3337565728
+          ],
+          "winRate": "5%",
+          "reachedBoss": 27,
+          "guardians": {
+            "regent": {
+              "encounters": 185,
+              "wins": 94,
+              "losses": 91,
+              "ultimates": 84,
+              "interrupts": 34,
+              "ultimateDamage": 408
+            },
+            "cantor": {
+              "encounters": 80,
+              "wins": 41,
+              "losses": 39,
+              "ultimates": 64,
+              "interrupts": 17,
+              "ultimateDamage": 360
+            },
+            "core": {
+              "encounters": 27,
+              "wins": 9,
+              "losses": 18,
+              "ultimates": 23,
+              "interrupts": 5,
+              "ultimateDamage": 132
+            }
+          },
+          "averageTurnsPerBattle": 3.72,
+          "averageIntegrityOnWin": 5.9,
+          "averageLossSector": 10.7
+        },
+        {
+          "archetype": "architect",
+          "policy": "adaptive",
+          "build": "balanced",
+          "seeds": 200,
+          "wins": 39,
+          "sampleWinningSeeds": [
+            774553834,
+            2802362286,
+            3816266512
+          ],
+          "winRate": "20%",
+          "reachedBoss": 99,
+          "guardians": {
+            "regent": {
+              "encounters": 196,
+              "wins": 149,
+              "losses": 47,
+              "ultimates": 119,
+              "interrupts": 47,
+              "ultimateDamage": 309
+            },
+            "cantor": {
+              "encounters": 140,
+              "wins": 112,
+              "losses": 28,
+              "ultimates": 130,
+              "interrupts": 20,
+              "ultimateDamage": 563
+            },
+            "core": {
+              "encounters": 99,
+              "wins": 39,
+              "losses": 60,
+              "ultimates": 93,
+              "interrupts": 20,
+              "ultimateDamage": 467
+            }
+          },
+          "averageTurnsPerBattle": 4.27,
+          "averageIntegrityOnWin": 6.7,
+          "averageLossSector": 14.5
+        },
+        {
+          "archetype": "architect",
+          "policy": "tactical",
+          "build": "balanced",
+          "seeds": 200,
+          "wins": 72,
+          "sampleWinningSeeds": [
+            2654435761,
+            774553834,
+            3189639203
+          ],
+          "winRate": "36%",
+          "reachedBoss": 125,
+          "guardians": {
+            "regent": {
+              "encounters": 197,
+              "wins": 161,
+              "losses": 36,
+              "ultimates": 159,
+              "interrupts": 70,
+              "ultimateDamage": 241
+            },
+            "cantor": {
+              "encounters": 156,
+              "wins": 136,
+              "losses": 20,
+              "ultimates": 163,
+              "interrupts": 39,
+              "ultimateDamage": 517
+            },
+            "core": {
+              "encounters": 125,
+              "wins": 72,
+              "losses": 53,
+              "ultimates": 125,
+              "interrupts": 39,
+              "ultimateDamage": 418
+            }
+          },
+          "averageTurnsPerBattle": 4.53,
+          "averageIntegrityOnWin": 8.1,
+          "averageLossSector": 15
+        },
+        {
+          "archetype": "warden",
+          "policy": "careless",
+          "build": "balanced",
+          "seeds": 200,
+          "wins": 0,
+          "sampleWinningSeeds": [],
+          "winRate": "0%",
+          "reachedBoss": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 17,
+              "wins": 0,
+              "losses": 17,
+              "ultimates": 1,
+              "interrupts": 0,
+              "ultimateDamage": 10
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            }
+          },
+          "averageTurnsPerBattle": 4.69,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 4.5
+        },
+        {
+          "archetype": "warden",
+          "policy": "aggressive",
+          "build": "balanced",
+          "seeds": 200,
+          "wins": 19,
+          "sampleWinningSeeds": [
+            1401181143,
+            3189639203,
+            3576916120
+          ],
+          "winRate": "10%",
+          "reachedBoss": 59,
+          "guardians": {
+            "regent": {
+              "encounters": 198,
+              "wins": 130,
+              "losses": 68,
+              "ultimates": 152,
+              "interrupts": 54,
+              "ultimateDamage": 804
+            },
+            "cantor": {
+              "encounters": 126,
+              "wins": 78,
+              "losses": 48,
+              "ultimates": 121,
+              "interrupts": 18,
+              "ultimateDamage": 831
+            },
+            "core": {
+              "encounters": 59,
+              "wins": 19,
+              "losses": 40,
+              "ultimates": 53,
+              "interrupts": 10,
+              "ultimateDamage": 270
+            }
+          },
+          "averageTurnsPerBattle": 4.17,
+          "averageIntegrityOnWin": 6.6,
+          "averageLossSector": 13.2
+        },
+        {
+          "archetype": "warden",
+          "policy": "adaptive",
+          "build": "balanced",
+          "seeds": 200,
+          "wins": 78,
+          "sampleWinningSeeds": [
+            2654435761,
+            1013904226,
+            3041712678
+          ],
+          "winRate": "39%",
+          "reachedBoss": 149,
+          "guardians": {
+            "regent": {
+              "encounters": 200,
+              "wins": 178,
+              "losses": 22,
+              "ultimates": 164,
+              "interrupts": 58,
+              "ultimateDamage": 484
+            },
+            "cantor": {
+              "encounters": 177,
+              "wins": 152,
+              "losses": 25,
+              "ultimates": 180,
+              "interrupts": 26,
+              "ultimateDamage": 661
+            },
+            "core": {
+              "encounters": 149,
+              "wins": 78,
+              "losses": 71,
+              "ultimates": 150,
+              "interrupts": 34,
+              "ultimateDamage": 637
+            }
+          },
+          "averageTurnsPerBattle": 4.64,
+          "averageIntegrityOnWin": 7.2,
+          "averageLossSector": 16.9
+        },
+        {
+          "archetype": "warden",
+          "policy": "tactical",
+          "build": "balanced",
+          "seeds": 200,
+          "wins": 120,
+          "sampleWinningSeeds": [
+            2654435761,
+            387276917,
+            1401181143
+          ],
+          "winRate": "60%",
+          "reachedBoss": 163,
+          "guardians": {
+            "regent": {
+              "encounters": 200,
+              "wins": 187,
+              "losses": 13,
+              "ultimates": 174,
+              "interrupts": 45,
+              "ultimateDamage": 311
+            },
+            "cantor": {
+              "encounters": 187,
+              "wins": 170,
+              "losses": 17,
+              "ultimates": 214,
+              "interrupts": 46,
+              "ultimateDamage": 612
+            },
+            "core": {
+              "encounters": 163,
+              "wins": 120,
+              "losses": 43,
+              "ultimates": 178,
+              "interrupts": 56,
+              "ultimateDamage": 557
+            }
+          },
+          "averageTurnsPerBattle": 4.92,
+          "averageIntegrityOnWin": 8.2,
+          "averageLossSector": 17
+        },
+        {
+          "archetype": "ghost",
+          "policy": "careless",
+          "build": "balanced",
+          "seeds": 200,
+          "wins": 0,
+          "sampleWinningSeeds": [],
+          "winRate": "0%",
+          "reachedBoss": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0
+            }
+          },
+          "averageTurnsPerBattle": 3.72,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 3.9
+        },
+        {
+          "archetype": "ghost",
+          "policy": "aggressive",
+          "build": "balanced",
+          "seeds": 200,
+          "wins": 3,
+          "sampleWinningSeeds": [
+            944061808,
+            2218897875,
+            1592270566
+          ],
+          "winRate": "2%",
+          "reachedBoss": 26,
+          "guardians": {
+            "regent": {
+              "encounters": 177,
+              "wins": 96,
+              "losses": 81,
+              "ultimates": 42,
+              "interrupts": 24,
+              "ultimateDamage": 171
+            },
+            "cantor": {
+              "encounters": 84,
+              "wins": 41,
+              "losses": 43,
+              "ultimates": 58,
+              "interrupts": 20,
+              "ultimateDamage": 321
+            },
+            "core": {
+              "encounters": 26,
+              "wins": 3,
+              "losses": 23,
+              "ultimates": 19,
+              "interrupts": 6,
+              "ultimateDamage": 133
+            }
+          },
+          "averageTurnsPerBattle": 3.39,
+          "averageIntegrityOnWin": 4.3,
+          "averageLossSector": 11
+        },
+        {
+          "archetype": "ghost",
+          "policy": "adaptive",
+          "build": "balanced",
+          "seeds": 200,
+          "wins": 27,
+          "sampleWinningSeeds": [
+            774553834,
+            147926525,
+            3337565728
+          ],
+          "winRate": "14%",
+          "reachedBoss": 83,
+          "guardians": {
+            "regent": {
+              "encounters": 188,
+              "wins": 150,
+              "losses": 38,
+              "ultimates": 66,
+              "interrupts": 36,
+              "ultimateDamage": 143
+            },
+            "cantor": {
+              "encounters": 145,
+              "wins": 106,
+              "losses": 39,
+              "ultimates": 129,
+              "interrupts": 32,
+              "ultimateDamage": 508
+            },
+            "core": {
+              "encounters": 83,
+              "wins": 27,
+              "losses": 56,
+              "ultimates": 75,
+              "interrupts": 14,
+              "ultimateDamage": 396
+            }
+          },
+          "averageTurnsPerBattle": 3.93,
+          "averageIntegrityOnWin": 6.3,
+          "averageLossSector": 14.5
+        },
+        {
+          "archetype": "ghost",
+          "policy": "tactical",
+          "build": "balanced",
+          "seeds": 200,
+          "wins": 95,
+          "sampleWinningSeeds": [
+            2654435761,
+            387276917,
+            1788458060
+          ],
+          "winRate": "48%",
+          "reachedBoss": 138,
+          "guardians": {
+            "regent": {
+              "encounters": 191,
+              "wins": 163,
+              "losses": 28,
+              "ultimates": 93,
+              "interrupts": 56,
+              "ultimateDamage": 136
+            },
+            "cantor": {
+              "encounters": 161,
+              "wins": 149,
+              "losses": 12,
+              "ultimates": 155,
+              "interrupts": 63,
+              "ultimateDamage": 340
+            },
+            "core": {
+              "encounters": 138,
+              "wins": 95,
+              "losses": 43,
+              "ultimates": 138,
+              "interrupts": 71,
+              "ultimateDamage": 350
+            }
+          },
+          "averageTurnsPerBattle": 4.22,
+          "averageIntegrityOnWin": 6.9,
+          "averageLossSector": 14.6
+        }
+      ]
+    }
+  }
+}

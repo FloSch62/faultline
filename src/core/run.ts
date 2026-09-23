@@ -7,7 +7,7 @@ import {
   paths,
   roleInPath,
 } from "./graph.ts";
-import { createMap, reachableRooms } from "./map.ts";
+import { createMap, reachableRooms, encounterHealth } from "./map.ts";
 import { ENEMIES } from "./enemies.ts";
 import { STAGES } from "./stages.ts";
 import type {
@@ -35,9 +35,11 @@ export interface TurnResult {
   integrityDamage: number;
   defeated: boolean;
   lost: boolean;
+  interrupted: boolean;
 }
 export interface Intent {
-  kind: "strike" | "sever" | "jam" | "breach" | "corrupt";
+  kind: "strike" | "sever" | "jam" | "breach" | "corrupt" | "charge";
+  ultimate?: boolean;
   field?: "corrosion" | "suppression";
   label: string;
   amount: number;
@@ -122,7 +124,7 @@ export function createRun(seed = Date.now() >>> 0): RunState {
     stage: 0,
     bossIntroSeen: true,
     phase: "title",
-    map: createMap(),
+    map: createMap(0, seed),
     currentRoom: null,
     lastRoom: null,
     floor: 0,
@@ -139,6 +141,7 @@ export function createRun(seed = Date.now() >>> 0): RunState {
     cardsPlayed: 0,
     zoneEffects: [],
     hand: [],
+    preparedCard: null,
     relics: [],
     energy: 5,
     turn: 1,
@@ -183,14 +186,9 @@ export function chooseRoom(run: RunState, roomId: string): ActionResult {
 function beginBattle(run: RunState, room: MapRoom) {
   const stage = STAGES[run.stage];
   const pool = room.type === "elite" ? stage.elites : stage.encounters;
-  const enemyId = room.type === "boss" ? stage.boss : pool[Math.floor(random(run) * pool.length)];
+  const enemyId = room.enemyId ?? (room.type === "boss" ? stage.boss : pool[Math.floor(random(run) * pool.length)]);
   const template = ENEMIES[enemyId];
-  const hp =
-    room.type === "boss"
-      ? stage.bossHp
-      : room.type === "elite"
-        ? 30 + room.floor * 2 + run.stage * 10
-        : 10 + room.floor * 3 + run.stage * 8;
+  const hp = encounterHealth(run.stage, room);
   const { id, name, title, color } = template;
   run.enemy = { id, name, title, color, hp, maxHp: hp, turn: 0 };
   run.bossIntroSeen = room.type !== "boss";
@@ -204,12 +202,13 @@ function beginBattle(run: RunState, room: MapRoom) {
   run.drawPile = shuffle(run, [...run.deck]);
   run.discardPile = [];
   run.exhaustPile = [];
-  run.block = run.relics.includes("grounded-core") ? 2 : 0;
+  run.block = run.relics.includes("grounded-core") ? 1 : 0;
   run.packetBoost = 0;
   run.reserveEnergy = 0;
   run.cardsPlayed = 0;
   run.zoneEffects = [];
   run.hand = [];
+  run.preparedCard = null;
   run.firstFiberPlayed = false;
   run.shieldArrayUsed = false;
   guaranteedDraw(run, "router");
@@ -219,26 +218,46 @@ function beginBattle(run: RunState, room: MapRoom) {
   log(run, `${run.enemy.name} enters the grid. Establish a route.`);
 }
 
-export function intentFor(run: RunState): Intent | null {
+export function intentFor(run: RunState, turnsAhead = 0): Intent | null {
   if (!run.enemy) return null;
   const definition = ENEMIES[run.enemy.id];
   const pattern = definition.pattern;
-  const base = pattern[run.enemy.turn % pattern.length];
-  const pressure = Math.floor(run.enemy.turn / 3);
+  const turn = run.enemy.turn + turnsAhead;
+  const base = pattern[turn % pattern.length];
+  const pressure = Math.floor(turn / 3);
   const enraged = definition.enrages && run.enemy.hp <= run.enemy.maxHp / 2;
   const amount =
     base.amount +
     (base.kind === "strike" || base.kind === "breach"
       ? pressure + run.stage + (enraged ? definition.enrages!.attacks : 0)
-      : enraged
+      : enraged && base.kind !== "charge"
         ? definition.enrages!.faults
         : 0);
   return {
     ...base,
     amount,
     pressure,
-    label: `${enraged ? "ENRAGED · " : ""}${base.label}${run.stage && ["strike", "breach"].includes(base.kind) ? ` +${run.stage} STAGE THREAT` : ""}${pressure ? ` +${pressure} PRESSURE` : ""}`,
+    label: `${enraged ? "ENRAGED · " : ""}${base.label}${run.stage && ["strike", "breach"].includes(base.kind) ? ` +${run.stage} STAGE THREAT` : ""}${pressure && ["strike", "breach"].includes(base.kind) ? ` +${pressure} PRESSURE` : ""}`,
   };
+}
+
+/** Set one card aside now; it replaces one draw in your next hand. */
+export function prepareCard(run: RunState, index: number): ActionResult {
+  if (run.phase !== "battle") return { ok: false, message: "Prepare a card during an encounter." };
+  if (run.preparedCard) return { ok: false, message: "Return your prepared card before choosing another." };
+  if (!Number.isInteger(index) || index < 0 || !run.hand[index]) return { ok: false, message: "Choose a card from your hand." };
+  run.preparedCard = run.hand.splice(index, 1)[0];
+  log(run, `${CARDS[run.preparedCard].name} prepared for the next turn, replacing one draw.`);
+  return { ok: true, message: `${CARDS[run.preparedCard].name} held for next turn.` };
+}
+
+export function releasePreparedCard(run: RunState): ActionResult {
+  if (run.phase !== "battle" || !run.preparedCard) return { ok: false, message: "No prepared card to return." };
+  if (run.hand.length >= HAND_LIMIT) return { ok: false, message: "Your hand is full. Play a card first." };
+  const card = run.preparedCard;
+  run.hand.push(card);
+  run.preparedCard = null;
+  return { ok: true, message: `${CARDS[card].name} returned to your hand.` };
 }
 
 export function costFor(run: RunState, index: number): number {
@@ -692,6 +711,8 @@ export interface CombatPreview {
   incomingTerms: CombatTerm[];
   traitDescription: string;
   zoneThreat: ZoneEffect | null;
+  interrupted: boolean;
+  breakDamage: number | null;
 }
 
 function damageTerms(
@@ -713,7 +734,7 @@ function damageTerms(
       terms.push({ label: `${field.zone.toUpperCase()} · ${FIELD_RULES[field.kind].name}`, amount: field.kind === "resonance" ? 3 : -3 });
   }
   const armor = run.enemy && ENEMIES[run.enemy.id].armor;
-  if (armor && !(armor.bypass === "independent" ? independent : nodes.some(node => node.role === "firewall")))
+  if (armor && !run.enemy?.exposed && !(armor.bypass === "independent" ? independent : nodes.some(node => node.role === "firewall")))
     terms.push({ label: `${run.enemy!.name} armor · needs ${armor.bypass === "independent" ? "independent routes" : "a routed firewall"}`, amount: -armor.amount });
   if (nodes.some((node) => node.role === "firewall"))
     terms.push({ label: "Firewall routing", amount: 1 });
@@ -744,6 +765,7 @@ function damageTerms(
     terms.push({ label: "Packet Lens", amount: 1 });
   if (run.packetBoost)
     terms.push({ label: "Packet boost this turn", amount: run.packetBoost });
+  if (run.enemy?.exposed) terms.push({ label: "Exposed guardian", amount: 3 });
   return terms;
 }
 const sumTerms = (terms: CombatTerm[]) =>
@@ -804,6 +826,12 @@ export function combatPreview(run: RunState): CombatPreview {
       : [];
   let raw = intent?.amount ?? 0;
   const definition = run.enemy ? ENEMIES[run.enemy.id] : null;
+  const breakDamage = definition?.boss?.breakDamage ?? null;
+  const interrupted = !lethal && !!intent?.ultimate && breakDamage !== null && packetDamage >= breakDamage;
+  if (interrupted) {
+    raw = 0;
+    incomingTerms.push({ label: "Ultimate interrupted", amount: -intent!.amount });
+  }
   if (intent?.kind === "strike" && run.enemy?.id === "serpent" && !independent) {
     raw += 2;
     incomingTerms.push({ label: "Coil pressure · no independent routes", amount: 2 });
@@ -820,7 +848,7 @@ export function combatPreview(run: RunState): CombatPreview {
       : null;
   let hazardZone = jamZone;
   let zoneThreat: ZoneEffect | null = null;
-  if (intent?.kind === "corrupt" || intent?.field) {
+  if (!interrupted && (intent?.kind === "corrupt" || intent?.field)) {
     const corruption = intent.field ?? (definition?.corruption === "alternating"
       ? Math.floor(run.enemy!.turn / 2) % 2 ? "corrosion" : "suppression"
       : definition?.corruption ?? "corrosion");
@@ -893,7 +921,7 @@ export function combatPreview(run: RunState): CombatPreview {
 
   if (run.block > 0)
     shields.push({ label: "Block this turn", amount: run.block });
-  if (signalPath.length && roleInPath(signalPath, run.topology, "firewall")) {
+  if (!interrupted && signalPath.length && roleInPath(signalPath, run.topology, "firewall")) {
     if (intent?.kind === "breach")
       shields.push({ label: "Firewall vs breach", amount: 3 });
     else if (intent?.kind === "strike")
@@ -906,10 +934,12 @@ export function combatPreview(run: RunState): CombatPreview {
   )
     shields.push({
       label: "Shield Array (once per battle)",
-      amount: Math.min(4, raw - sumTerms(shields)),
+      amount: Math.min(2, raw - sumTerms(shields)),
     });
   return {
     signalPath,
+    interrupted,
+    breakDamage,
     zoneThreat: lethal ? null : zoneThreat,
     hazardZone: lethal ? null : hazardZone,
     enemyHealing:
@@ -956,6 +986,7 @@ export function endTurn(run: RunState): TurnResult {
     integrityDamage: 0,
     defeated: false,
     lost: false,
+    interrupted: preview.interrupted,
   };
   run.enemy.hp = Math.max(0, run.enemy.hp - preview.packetDamage);
   run.score += preview.packetDamage * 10;
@@ -969,12 +1000,15 @@ export function endTurn(run: RunState): TurnResult {
     result.defeated = true;
     run.score += 100 + run.integrity * 5;
     if (run.relics.includes("repair-drone"))
-      run.integrity = Math.min(run.maxIntegrity, run.integrity + 2);
+      run.integrity = Math.min(run.maxIntegrity, run.integrity + 1);
     run.phase = "reward";
     run.cardRewards = cardRewards(run);
     run.block = 0;
     run.packetBoost = 0;
     run.zoneEffects = [];
+    if (run.preparedCard) run.discardPile.push(run.preparedCard);
+    run.preparedCard = null;
+    delete run.enemy.exposed;
     log(run, `${run.enemy.name} neutralized. Its intent is cancelled.`);
     return result;
   }
@@ -1004,6 +1038,14 @@ export function endTurn(run: RunState): TurnResult {
     : "";
   result.enemyAction = `${run.enemy.name} ${preview.zoneThreat ? `cast ${FIELD_RULES[preview.zoneThreat.kind].name} on ${preview.zoneThreat.zone.toUpperCase()} for 2 turns; ` : ""}${fault}dealt ${preview.incoming} integrity damage${preview.shield ? ` (${Math.min(preview.incomingRaw, preview.shield)} blocked)` : ""}.`;
   log(run, result.enemyAction);
+  if (preview.interrupted) {
+    result.enemyAction = `${run.enemy.name}'s ultimate interrupted! Armor broken and +3 signal damage next turn.${preview.incoming ? ` Existing fields dealt ${preview.incoming} integrity damage.` : ""}`;
+    log(run, result.enemyAction);
+  } else if (intent.kind === "charge") {
+    log(run, `${run.enemy.name} is charging. Prepare a burst to interrupt the next transmission, or brace for the impact.`);
+  }
+  if (preview.interrupted) run.enemy.exposed = true;
+  else delete run.enemy.exposed;
   run.enemy.turn++;
   run.turn++;
   run.energy =
@@ -1011,12 +1053,14 @@ export function endTurn(run: RunState): TurnResult {
     run.reserveEnergy +
     (run.relics.includes("reserve-cell") ? Math.min(2, run.energy) : 0);
   run.reserveEnergy = 0;
-  run.block = run.relics.includes("grounded-core") ? 2 : 0;
+  run.block = run.relics.includes("grounded-core") ? 1 : 0;
   run.packetBoost = 0;
   run.cardsPlayed = 0;
   run.firstFiberPlayed = false;
   run.discardPile.push(...run.hand.splice(0));
-  draw(run, 6 + Number(run.relics.includes("deep-cache")));
+  if (run.preparedCard) run.hand.push(run.preparedCard);
+  run.preparedCard = null;
+  draw(run, 6 + Number(run.relics.includes("deep-cache")) - run.hand.length);
   if (run.integrity <= 0) {
     run.phase = "lost";
     result.lost = true;
@@ -1035,10 +1079,11 @@ function advanceRoom(run: RunState) {
   run.zoneEffects = [];
   run.faultNode = null;
   run.faultLink = null;
+  run.preparedCard = null;
   if (run.floor >= 7 && run.stage < STAGES.length - 1) {
     run.stage++;
     run.floor = 0;
-    run.map = createMap(run.stage);
+    run.map = createMap(run.stage, run.seed);
     run.lastRoom = null;
     const restored = Math.min(6, run.maxIntegrity - run.integrity);
     run.integrity += restored;
@@ -1082,6 +1127,8 @@ export function chooseRelic(run: RunState, relic: RelicId): ActionResult {
   advanceRoom(run);
   return { ok: true, message: `${RELICS[relic].name} installed.` };
 }
+export const SALVAGE_COST = 2;
+export const SALVAGE_MIN_INTEGRITY = 6;
 export function chooseForge(
   run: RunState,
   option: "repair" | "relic",
@@ -1095,13 +1142,16 @@ export function chooseForge(
     advanceRoom(run);
     return { ok: true, message: `${restored} integrity restored.` };
   }
+  if (run.relics.length >= Object.keys(RELICS).length)
+    return { ok: false, message: "All relics are already installed. Choose another service." };
+  if (run.maxIntegrity - SALVAGE_COST < SALVAGE_MIN_INTEGRITY)
+    return { ok: false, message: `Relic salvage must leave at least ${SALVAGE_MIN_INTEGRITY} maximum integrity.` };
   run.relicRewards = relicRewards(run);
-  if (!run.relicRewards.length) {
-    advanceRoom(run);
-    return { ok: true, message: "All relics are already installed." };
-  }
+  run.maxIntegrity -= SALVAGE_COST;
+  run.integrity = Math.min(run.integrity, run.maxIntegrity);
+  log(run, `Sacrificed ${SALVAGE_COST} maximum integrity to salvage a relic. The cost lasts for this expedition.`);
   run.phase = "relic";
-  return { ok: true, message: "Select one system relic." };
+  return { ok: true, message: `Maximum integrity reduced by ${SALVAGE_COST}. Select one relic.` };
 }
 
 /** Removes one card as the single maintenance service. Keep a reliable basic route. */

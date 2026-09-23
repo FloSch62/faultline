@@ -6,7 +6,7 @@ This document describes the implemented alpha rules. It is also the balance refe
 
 ## The expedition
 
-One expedition crosses **three stages of seven sectors each**. Choose one reachable room in each sector; the next room must be in the same or an adjacent lane. Each stage has its own route chart, encounter pool, chapter names and final guardian.
+One expedition crosses **three stages of seven sectors each**. Choose one reachable room in each sector. Seeded connections offer a straight route and sometimes one adjacent branch; only the drawn connections can be followed. Older saved maps retain their original adjacent-lane rules. Each stage has its own route chart, encounter pool, chapter names and final guardian.
 
 | Stage | Region | Final guardian | Guardian health |
 | --- | --- | --- | ---: |
@@ -14,9 +14,9 @@ One expedition crosses **three stages of seven sectors each**. Choose one reacha
 | II | The Glass Cathedral | The Hollow Choir | 80 |
 | III | The Blackout Heart | Blackout Core | 110 |
 
-All charts offer early salvage and sanctuary choices, optional elites in sector four, a final sanctuary or elite choice in sector six, and their guardian in sector seven. Their exact lane arrangements live in `src/core/map.ts`. The first two guardians award a card and a relic, restore up to six integrity, then open a fresh stage map. The final Core awards a card before the victory ending. A guardian's introduction is shown once per encounter; dismissing it is saved.
+Every new route crosses at least five fights per stage, including its guardian. Sectors one, two, four and five are combat; sectors three and six offer competing sanctuary, cache and combat choices. Free recovery/reward rooms cannot be chained. Lane arrangements, connections and enemies are generated from the run seed and stage, independently of card shuffling. The chart names each enemy before entry; its tooltip gives health and traits. Elites remain optional risks with guaranteed rare card and relic rewards. Exact generation rules live in `src/core/map.ts`. The first two guardians award a card and a relic, restore up to six integrity, then open a fresh stage map. The final Core awards a card before the victory ending. A guardian's introduction is shown once per encounter; dismissing it is saved.
 
-A victory or cache offers three different cards. Take one or skip; taking everything can dilute a useful deck. An elite or intermediate guardian additionally offers three unowned relics; take one. Maintenance grants one service: restore up to four integrity, choose a relic, or remove one deck card. Removal preserves at least ten cards, the last basic Core Router and the last two Optic Fibers. Earned rare or legendary cards may be removed normally.
+A victory or cache offers three different cards. Take one or skip; taking everything can dilute a useful deck. An elite or intermediate guardian additionally offers three unowned relics; take one. Maintenance grants one service: restore up to four integrity, sacrifice two maximum integrity for a relic, or remove one deck card. Salvage must leave at least six maximum integrity; its permanent cost is shown before selection and charged once when the three offers appear. Elite and guardian relics have no integrity cost. Removal preserves at least ten cards, the last basic Core Router and the last two Optic Fibers. Earned rare or legendary cards may be removed normally.
 
 Integrity persists between rooms. Topology, faults, upgrades, protection, block, energy, exhaust and combat piles reset for every encounter. The deck and installed relics persist. Loss at zero integrity ends the expedition. Defeating the final boss and finishing its reward ends it in victory.
 
@@ -36,6 +36,7 @@ Opening hands guarantee one Core Router and two Optic Fibers when those cards ar
 
 - A normal turn has five energy. Cold Start adds one only on the encounter's first turn. Reserve Cell carries at most two unused energy; Capacitors add their reserved energy to the next turn. Other unused energy is lost.
 - Draw six at the start of every turn, plus one with Deep Cache. The hand limit is ten; cards beyond the limit remain in the draw pile. When drawing from an empty pile, shuffle the discard pile using the expedition RNG.
+- Prepare one card at no energy cost: remove it from your hand now and make it the first card of your next hand, replacing one normal draw. Return it before transmitting if you change your plan and have hand space. Preparing neither plays nor exhausts a card. The slot clears on transmission or victory, and supports undo and saves.
 - Playing a card spends its displayed energy and removes it from hand. A normal card enters discard. An Exhaust card enters a separate exhausted pile for the remainder of this encounter. Unplayed cards, including unplayed Exhaust cards, go to discard at end of turn.
 - All zero-cost draw/energy cards exhaust. Power Surge is moved to exhaust before drawing, so it cannot draw itself from an otherwise empty deck. The deck cannot create an infinite energy/draw loop.
 - Relocating a deployed device costs one energy; a position left unchanged costs nothing. Terminals cannot move. Invalid moves leave both board and energy untouched.
@@ -46,12 +47,38 @@ Opening hands guarantee one Core Router and two Optic Fibers when those cards ar
 ### End-turn order
 
 1. Compute and display the exact best signal route, damage terms, announced enemy action, disruption target and integrity forecast.
-2. Deal the packet damage. If it kills, cancel the entire enemy action and grant rewards. Repair Drone restores two integrity after the victory.
+2. Deal the packet damage. If it kills, cancel the entire enemy action and grant rewards. Repair Drone restores one integrity after the victory.
 3. Otherwise resolve any forecast Packet Leech healing, apply the announced action, clear old faults, install its new fault, and deduct the forecast integrity damage. A boss phase transition caused by this packet takes effect on the next displayed intent, never retroactively changes the attack the player saw.
 4. Decrement existing zone fields, remove expired fields, then install any newly announced hostile field with its full two-turn lifetime.
-5. Discard the remaining hand; expire block and packet boosts; recharge and draw the next hand. Check integrity loss.
+5. Discard the remaining hand; expire block and packet boosts; recharge and draw the next hand, including the prepared card in place of one draw. Check integrity loss.
 
 Lethal forecasts show zero incoming damage and no disruption target. Preview calculation consumes no RNG and mutates no state. Resolution uses those same computed numbers and target.
+
+### Guardian ultimates and exposed windows
+
+Every guardian follows four normal actions with a charge turn, then an ultimate.
+The charge deals no direct damage, including while enraged. Existing fields still
+resolve. Its forecast shows the next attack's damage, including a half-health
+crossing caused by the current planned transmission. Use the Prepare slot to hold
+an answer for that attack turn.
+
+| Guardian | Ultimate | Base breach damage | Damage required to interrupt |
+| --- | --- | ---: | ---: |
+| Iron Regent | Crownfall | 7 | 12 |
+| Hollow Choir | Requiem, with suppression | 8 | 15 |
+| Blackout Core | Total Blackout, with corrosion | 10 | 18 |
+
+Stage threat, pressure and enrage increase ultimate damage normally. Deal the
+required damage **on the ultimate turn**, after armor and suppression, to break
+it. The meter updates as you play. A successful break cancels that attack and
+its new field, then exposes the guardian for one transmission: ignore its armor
+and add three damage to a live route. Existing corrosion still resolves, and
+unused Shield Array protection is preserved. Exposure expires after that next
+transmission. A lethal hit takes priority and cancels all retaliation.
+
+Interrupting is optional: shields, firewall routing, separated circuits and
+integrity can absorb an ultimate. The thresholds reward deliberate burst turns;
+a well-developed ordinary route should not automatically cancel every climax.
 
 ## Why a route deals that much damage
 
@@ -127,9 +154,9 @@ Available block is a capacity, not necessarily the amount an enemy will hit. Act
 
 1. Temporary block and the two-point separated-circuit bonus apply to all integrity damage this turn.
 2. A firewall on the chosen live route contributes three against **breach**, or one against **strike**. Multiple firewalls do not stack this protection. A firewall on an inactive branch offers no mitigation.
-3. Shield Array intercepts up to four points from the first remaining hit once per battle. It is consumed only when damage reaches it; a fully blocked attack or cancelled lethal intent does not consume it.
+3. Shield Array intercepts up to two points from the first remaining hit once per battle. It is consumed only when damage reaches it; a fully blocked attack or cancelled lethal intent does not consume it.
 
-Faraday Shell is **jam protection**, not block. Armored Fiber is **sever protection**, not block. Grounded Core grants two temporary block at every turn start. These concepts have different explanations because they solve different problems.
+Faraday Shell is **jam protection**, not block. Armored Fiber is **sever protection**, not block. Grounded Core grants one temporary block at every turn start. These concepts have different explanations because they solve different problems.
 
 If an ordinary untargeted jam hits an empty device grid, or a sever hits a grid with zero cables, it deals one exposed-backbone damage. Null Storm's announced zone jam is exempt: an empty target band is a successful dodge. If a grid exists but every eligible target is protected, disruption fails without fallback damage. There is no universal extra damage for lacking a route. Escalating pressure is the anti-stall mechanism; Packet Leech additionally heals from a lost transmission.
 
@@ -152,9 +179,9 @@ Normal health is `10 + 3 × zero-based sector + 8 × zero-based stage`; elite he
 | Glass Choir | Corrupt → strike 2 → corrupt → breach 3 | Alternates suppression and corrosion on its two field turns. |
 | Wire Weaver | Sever + suppression → jam → strike 3 | Six or more cables add +2 to strikes. Protect key cables and keep a compact route. |
 | Grave Reaver | Breach 3 + corrosion → strike 3 → corrupt | At half health, strikes and breaches gain +2. |
-| Iron Regent | Breach 4 → sever + corrosion → strike 3 → corrupt | Absorbs 3 damage without independent routes. At half health: +2 strikes/breaches; +1 alongside faults/fields. |
-| Hollow Choir | Corrupt → jam + suppression → corrupt → breach 4 + corrosion | Absorbs 2 damage without a routed firewall. Alternates primary field types. At half health: +2 breaches; +1 alongside jams/fields. |
-| Blackout Core | Sever + corrosion → breach 4 → jam + suppression → strike 4 | At half health, enrages for +3 strike/breach and 2 chip damage alongside jam/sever. Redundancy, separation, burst timing and defense all matter.                                                       |
+| Iron Regent | Breach 4 → sever + corrosion → strike 3 → corrupt → charge → Crownfall 7 | Absorbs 3 damage without independent routes. At half health: +2 strikes/breaches; +1 alongside faults/fields. |
+| Hollow Choir | Corrupt → jam + suppression → corrupt → breach 4 + corrosion → charge → Requiem 8 | Absorbs 2 damage without a routed firewall. Alternates primary field types. At half health: +2 breaches; +1 alongside jams/fields. |
+| Blackout Core | Sever + corrosion → breach 4 → jam + suppression → strike 4 → charge → Total Blackout 10 | At half health, enrages for +3 strike/breach and 2 chip damage alongside jam/sever. Redundancy, separation, burst timing and defense all matter.                                                       |
 
 Pressure is `floor(enemy actions already taken / 3)`. Add it to strike and breach damage, together with +1 in stage II or +2 in stage III. The first three actions have no pressure bonus; later cycles grow progressively dangerous.
 
@@ -227,11 +254,11 @@ All relics are unique within a run. Offers only contain unowned relics.
 | Cold Start    | +1 energy at the start of each battle.                           |
 | Hot Swap      | The first Optic Fiber each turn costs zero energy.               |
 | Parallel Core | +2 packet damage when two independent routes are live.           |
-| Shield Array  | Prevent up to 4 damage from the first unblocked hit each battle. |
+| Shield Array  | Prevent up to 2 damage from the first unblocked hit each battle. |
 | Deep Cache    | Draw one extra card every turn.                                  |
-| Grounded Core | Start every turn with 2 block.                                   |
+| Grounded Core | Start every turn with 1 block.                                   |
 | Packet Lens   | +1 damage when your signal route includes a switch.              |
-| Repair Drone  | Restore 2 integrity after winning an encounter.                  |
+| Repair Drone  | Restore 1 integrity after winning an encounter.                  |
 | Reserve Cell  | Carry up to 2 unspent energy into the next turn.                 |
 
 ## Strategies and balance intent
@@ -246,6 +273,8 @@ No build should require one exact rare. The guaranteed basic router and two fibe
 
 Persistent structures give each turn a changing context; exhausted orchestration prevents rebuilding an entire board every shuffle. Fourteen devices and capped route bonuses keep the table readable and prevent a longest-path stacking exploit.
 
+Preparing an answer trades immediate options and a random draw for reliability. Breaking a guardian creates an earned offensive window; absorbing the attack is a viable competing line. Sanctuary salvage trades a smaller life ceiling for permanent power, so removal and recovery remain relevant even with a functioning engine.
+
 Warden deliberately has the most forgiving integrity budget. Choosing elites should be a preparation check with an extra relic as compensation. Caches and maintenance offer control over deck and survival without guaranteeing an optimal deck. Free reward skipping and selective card removal make deck size a decision.
 
 ## Presentation, learning and feedback contract
@@ -258,7 +287,7 @@ Motion should explain causality: installation, a cable becoming live, a packet t
 
 ## Save compatibility and deterministic behavior
 
-Storage remains expedition version 2. Saves predating stages resume as a final-stage expedition, preserving their existing map and promised Blackout Core ending. New runs begin in stage I. Stage index and guardian-introduction dismissal are validated and persisted. Older saves receive an empty zone-effect list; existing decks are preserved. Field kinds, bands, durations and unique allied/hostile slots are validated on load. Existing runs receive empty exhausted piles and zero temporary block, boost, reserve energy and played-card counts. Cards already present in an older run, including signature cards, remain intact. Loading an old run never inserts missing Containerlab or Clabernetes cards; this prevents save-version flags from bypassing rarity. Oversized legacy hands are reduced to ten by moving overflow to discard. Invalid card IDs, bad topology references and invalid numeric combat values are rejected. Saves preserve RNG, topology, piles and faults so reload cannot reroll an enemy action.
+Storage remains expedition version 2. Saves predating stages resume as a final-stage expedition, preserving their existing map and promised Blackout Core ending. New runs begin in stage I. Stage index and guardian-introduction dismissal are validated and persisted. Older saves receive an empty zone-effect list; existing decks are preserved. Field kinds, bands, durations and unique allied/hostile slots are validated on load. Existing runs receive empty exhausted piles and zero temporary block, boost, reserve energy and played-card counts. A missing prepared-card slot defaults to empty; prepared card IDs and optional guardian exposure flags are validated and persist across reloads. Cards already present in an older run, including signature cards, remain intact. Loading an old run never inserts missing Containerlab or Clabernetes cards; this prevents save-version flags from bypassing rarity. Oversized legacy hands are reduced to ten by moving overflow to discard. Invalid card IDs, bad topology references and invalid numeric combat values are rejected. Saves preserve RNG, topology, piles and faults so reload cannot reroll an enemy action.
 
 Daily seeds derive from the UTC date. Player choices still change subsequent RNG consumption and rewards; identical seed, archetype and decisions repeat the expedition. There is no remote leaderboard or multiplayer authority in this alpha.
 
@@ -290,9 +319,9 @@ The core tests verify formula/resolution agreement, forecast purity, best-route 
 The additional seeded probe is in [balance-fields.json](balance-fields.json): 150 seeds for each of three archetypes and three policies (1,350 runs). The adaptive and aggressive bots now evaluate field cards using the shared forecast. This updates the encounter/card mix and includes all eight enemy types; the earlier alpha report remains a historical baseline. The harness still does not model human comprehension or every possible tactical line.
 
 
-## Current three-stage balance
+## Historical three-stage baseline
 
-The current [expedition probe](balance-expedition.json) covers **6,300 runs**: 300 seeds per archetype/policy on the safe route, and 100 per archetype/policy for elite, mesh, fortress and burst scenarios. All 16 enemies and three guardians participate through their stage pools. New compound intents, stage attack bonuses, guardian health, and the Warden starting at 15 integrity with an extra Packet Guard are included. Existing saves retain their existing health and decks.
+The earlier [expedition probe](balance-expedition.json) covers **6,300 runs**: 300 seeds per archetype/policy on the safe route, and 100 per archetype/policy for elite, mesh, fortress and burst scenarios. All 16 enemies and three guardians participate through their stage pools. New compound intents, stage attack bonuses, guardian health, and the Warden starting at 15 integrity with an extra Packet Guard are included. Existing saves retain their existing health and decks.
 
 | Adaptive policy / route | Architect wins | Warden wins | Ghost wins |
 | --- | ---: | ---: | ---: |
@@ -305,3 +334,33 @@ The current [expedition probe](balance-expedition.json) covers **6,300 runs**: 3
 Careless play wins zero runs in every scenario. On the safe route, aggressive play wins 25% / 58% / 23% for Architect / Warden / Ghost, compared with 64% / 86% / 65% when defending adaptively. Elite routes are now more dangerous than the safe route in this probe. Warden remains the forgiving class; fortress priorities are the strongest tested route and an explicit human-playtest watchpoint. These samples support a meaningful benefit from preparation and counterplay, not equal mastery curves or guaranteed human win rates.
 
 New fields never deal surprise damage during the action that creates them. Enrage applies to the following forecast after crossing half health. First encounters retain a guaranteed manual route and deterministic, visible targets; finishing blows cancel the entire retaliation, including secondary fields.
+
+## Current tactics and route balance
+
+The [current probe](balance-tactics.json) covers **21,600 complete three-stage runs**: 500 seeds per archetype/policy for routes avoiding or seeking elites; 200 per archetype/policy for mesh, fortress, burst and no-signature runs. Four policies range from careless construction to defense, preparation and selective refinement. All probes terminate.
+
+| Tactical policy / rewards | Architect wins | Warden wins | Ghost wins |
+| --- | ---: | ---: | ---: |
+| Avoid elites | 34% | 56% | 36% |
+| Seek elites | 50% | 75% | 45% |
+| Mesh, avoid elites | 20% | 43% | 20% |
+| Fortress, avoid elites | 47% | 70% | 49% |
+| Burst, avoid elites | 33% | 52% | 26% |
+| No Containerlab or Clabernetes rewards | 36% | 60% | 48% |
+
+With the same default reward priorities on routes avoiding elites, adaptive play without preparation wins 15% / 34% / 13%; tactical play wins 34% / 56% / 36%. The tactical policy also prioritizes burst and emergency card draw before shielding an ultimate and removes excess Fibers once its engine is established, so this is not an isolated estimate of the prepared slot. Careless play wins zero runs in every scenario.
+
+All tested build priorities win with every archetype. Wins without accepting either signature orchestration card show that those discoveries are optional. The Warden remains forgiving, fortress priorities remain strongest for this simple player, and successful elite routes earn enough relic value to outperform routes avoiding elites. These remain human-playtest watchpoints; the harness does not establish optimal play, equal class difficulty or enjoyment.
+
+Guardian reports include encounters, wins, losses, ultimate attempts, interruptions and actual ultimate damage. Static damage alone no longer automatically breaks the climaxes. Defensive cards can absorb an ultimate; a planned burst can cancel it and earn a one-turn exposed window.
+
+Run `node --experimental-strip-types scripts/playthrough.ts warden 2654435761` for an actual browser expedition against the dev server. The QA player clicks real controls and reads the saved result after every action. It injects only the initial fresh map, exercises a reload during play, checks every nonlethal damage forecast, and writes screenshots and its encounter report under ignored `artifacts/`. Set `FAULTLINE_BASE_URL` for a production subpath. This is an automated integration playthrough, not a human session.
+
+The [browser expedition audit](playthrough-alpha.json) records a fresh Architect
+victory through all 21 sectors with 2/12 integrity, 221 card/build actions and
+71 transmissions. It interrupted the Regent, shielded Requiem, and survived
+Total Blackout. The Core encounter lasted 11 turns. The contrasting Warden run
+lost to the Choir's second Requiem with 4 enemy health remaining. Every checked
+nonlethal forecast matched the saved result; the Architect run had no page or
+asset-response errors. These integration outcomes demonstrate complete flows
+and distinct counterplay, without establishing human enjoyment.

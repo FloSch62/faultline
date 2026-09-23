@@ -134,7 +134,7 @@ test("battle music survives card plays and turns, then changes for the next enco
   await page.locator('[data-action="transmit"]').click();
   await expect(page.locator(".reward-screen")).toBeVisible({ timeout: 15000 });
   await page.locator('[data-action="skip-reward"]').click();
-  await page.locator('[data-room="1-0"]').click();
+  await page.locator('.route-room.available').first().click();
   expect(await page.locator("#now-playing").innerText()).not.toBe(first);
 });
 

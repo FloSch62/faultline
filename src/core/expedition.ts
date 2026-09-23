@@ -157,6 +157,9 @@ export function parseExpedition(value: string | null): Expedition | null {
     r.packetBoost ??= 0;
     r.reserveEnergy ??= 0;
     r.cardsPlayed ??= 0;
+    r.preparedCard ??= null;
+    if (r.preparedCard !== null && (typeof r.preparedCard !== "string" || !Object.hasOwn(CARDS, r.preparedCard))) return null;
+    if (r.enemy?.exposed !== undefined && typeof r.enemy.exposed !== "boolean") return null;
     r.zoneEffects ??= [];
     if (!Array.isArray(r.zoneEffects) || r.zoneEffects.length > 6 || !r.zoneEffects.every(field =>
       field && ["north", "center", "south"].includes(field.zone) &&
@@ -204,6 +207,10 @@ export function parseExpedition(value: string | null): Expedition | null {
       )
     )
       return null;
+    if (new Set(r.map.map(room => room.id)).size !== r.map.length || r.map.some(room =>
+      (room.enemyId !== undefined && !Object.hasOwn(ENEMIES, room.enemyId)) ||
+      (room.exits !== undefined && (!Array.isArray(room.exits) || room.exits.some(id =>
+        !r.map.some(next => next.id === id && next.floor === room.floor + 1)))))) return null;
     if (
       !Array.isArray(r.log) ||
       !r.log.every((line) => typeof line === "string")

@@ -1,0 +1,953 @@
+{
+  "license": "CC0-1.0",
+  "author": "Kenney",
+  "sampleRate": 44100,
+  "sources": {
+    "impact": "https://kenney.nl/assets/impact-sounds",
+    "casino": "https://kenney.nl/assets/casino-audio",
+    "scifi": "https://kenney.nl/assets/sci-fi-sounds"
+  },
+  "cues": {
+    "hover": {
+      "layers": [
+        {
+          "pack": "casino",
+          "name": "card-slide-1",
+          "gain": 0.5,
+          "speed": 1.0,
+          "delay": 0.0,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.07,
+      "masters": [
+        {
+          "file": "hover-1.ogg",
+          "seconds": 0.176,
+          "peakDb": -5.32,
+          "rmsDb": -26.21,
+          "sha256": "8f8a866de3e7dbc72ffa526b79cd4ca9b18b9c3c31f6a8abd6b3c86b0da72c84"
+        },
+        {
+          "file": "hover-2.ogg",
+          "seconds": 0.172,
+          "peakDb": -5.6,
+          "rmsDb": -26.11,
+          "sha256": "b1fa7541c4600dec3606f4c3ee3cc6c5d4e2cbc2c503c671daabf47228dfbf32"
+        }
+      ]
+    },
+    "select": {
+      "layers": [
+        {
+          "pack": "casino",
+          "name": "card-fan-1",
+          "gain": 0.8,
+          "speed": 1.0,
+          "delay": 0.0,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.06,
+      "masters": [
+        {
+          "file": "select-1.ogg",
+          "seconds": 0.757,
+          "peakDb": -2.94,
+          "rmsDb": -23.31,
+          "sha256": "52aa24db8d7fa124a48336fb24beb3e635de174375b655d0df204825d4429e82"
+        },
+        {
+          "file": "select-2.ogg",
+          "seconds": 0.726,
+          "peakDb": -3.14,
+          "rmsDb": -23.57,
+          "sha256": "ec7a02a742aec9ef876920f1ba73dbae378f787ed6f8ee919b37fa9886abedd4"
+        }
+      ]
+    },
+    "card": {
+      "layers": [
+        {
+          "pack": "casino",
+          "name": "card-place-1",
+          "gain": 1.0,
+          "speed": 1.0,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "impact",
+          "name": "impactWood_light_000",
+          "gain": 0.25,
+          "speed": 0.85,
+          "delay": 0.0,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.1,
+      "masters": [
+        {
+          "file": "card-1.ogg",
+          "seconds": 0.266,
+          "peakDb": -3.48,
+          "rmsDb": -25.4,
+          "sha256": "623f8d941232e156123b7897fd3a1cd9da09c1285f60396dd7c1abef742fe7e9"
+        },
+        {
+          "file": "card-2.ogg",
+          "seconds": 0.259,
+          "peakDb": -3.79,
+          "rmsDb": -25.49,
+          "sha256": "79ede22709e40b6d4b0f9aff6ba693dcf44841d3b09a92c6f93b1ffd5664ef1d"
+        },
+        {
+          "file": "card-3.ogg",
+          "seconds": 0.252,
+          "peakDb": -3.33,
+          "rmsDb": -25.51,
+          "sha256": "677b89d588876758331d51961dd0950be6da8d926cb4ef9282170d5d9703fda4"
+        }
+      ]
+    },
+    "draw": {
+      "layers": [
+        {
+          "pack": "casino",
+          "name": "card-shuffle",
+          "gain": 0.8,
+          "speed": 1.0,
+          "delay": 0.0,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.06,
+      "masters": [
+        {
+          "file": "draw-1.ogg",
+          "seconds": 2.46,
+          "peakDb": -3.44,
+          "rmsDb": -32.94,
+          "sha256": "6dc0fe48aa729fbc5f965a1316b3b4f7a482b370ca460ac5cd44b1a8200e479d"
+        }
+      ]
+    },
+    "deploy": {
+      "layers": [
+        {
+          "pack": "scifi",
+          "name": "doorClose_000",
+          "gain": 0.45,
+          "speed": 0.8,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "impact",
+          "name": "impactMetal_medium_000",
+          "gain": 0.8,
+          "speed": 1.0,
+          "delay": 0.0,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.28,
+      "masters": [
+        {
+          "file": "deploy-1.ogg",
+          "seconds": 0.928,
+          "peakDb": -3.07,
+          "rmsDb": -22.3,
+          "sha256": "acae72f4914feb0f343e677a1273f90d39b7c57948d4719b3c30e3a67cebfd49"
+        },
+        {
+          "file": "deploy-2.ogg",
+          "seconds": 0.899,
+          "peakDb": -3.13,
+          "rmsDb": -22.6,
+          "sha256": "319ffa02e11ccbb57402a4e8a7a3d1fbf7157f03f7cc1ca89d213da145f7d27c"
+        }
+      ]
+    },
+    "connect": {
+      "layers": [
+        {
+          "pack": "impact",
+          "name": "impactMetal_light_000",
+          "gain": 0.6,
+          "speed": 1.0,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "scifi",
+          "name": "forceField_000",
+          "gain": 0.18,
+          "speed": 1.3,
+          "delay": 0.04,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.22,
+      "masters": [
+        {
+          "file": "connect-1.ogg",
+          "seconds": 0.755,
+          "peakDb": -3.32,
+          "rmsDb": -20.98,
+          "sha256": "bad5f3383e5c59e23789c05e7d8f0f894a26eed868c63bebceb76d8462dc703b"
+        },
+        {
+          "file": "connect-2.ogg",
+          "seconds": 0.733,
+          "peakDb": -3.19,
+          "rmsDb": -20.97,
+          "sha256": "e0fadc9243942cb65dd409e6b47c6fc8581a36730368f33253d151126894db3d"
+        }
+      ]
+    },
+    "hit": {
+      "layers": [
+        {
+          "pack": "impact",
+          "name": "impactPunch_heavy_000",
+          "gain": 0.8,
+          "speed": 0.85,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "impact",
+          "name": "impactGlass_heavy_000",
+          "gain": 0.35,
+          "speed": 0.8,
+          "delay": 0.02,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.42,
+      "masters": [
+        {
+          "file": "hit-1.ogg",
+          "seconds": 0.835,
+          "peakDb": -3.17,
+          "rmsDb": -22.99,
+          "sha256": "9647df341208119b76026ec0f80c8ea2947ea711dc379cc08447b32cfb2d7b7a"
+        },
+        {
+          "file": "hit-2.ogg",
+          "seconds": 0.817,
+          "peakDb": -3.01,
+          "rmsDb": -22.84,
+          "sha256": "ebc76f5f11f61c338e6656af0d67bfc6e827886c80cf434cac235fee95af8cbe"
+        },
+        {
+          "file": "hit-3.ogg",
+          "seconds": 0.8,
+          "peakDb": -2.97,
+          "rmsDb": -23.15,
+          "sha256": "8f313cbe227abbd187adb4e0e318863e8e995b79b8a1a28294ce5414e5bfba3a"
+        }
+      ]
+    },
+    "hurt": {
+      "layers": [
+        {
+          "pack": "impact",
+          "name": "impactMetal_heavy_001",
+          "gain": 0.7,
+          "speed": 0.7,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "scifi",
+          "name": "lowFrequency_explosion_000",
+          "gain": 0.4,
+          "speed": 1.2,
+          "delay": 0.0,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.42,
+      "masters": [
+        {
+          "file": "hurt-1.ogg",
+          "seconds": 1.276,
+          "peakDb": -3.1,
+          "rmsDb": -20.52,
+          "sha256": "050bc7d2d868ff1271eea83febd4bce5c9e155f84e894754591de27fa77946f6"
+        },
+        {
+          "file": "hurt-2.ogg",
+          "seconds": 1.238,
+          "peakDb": -3.14,
+          "rmsDb": -19.93,
+          "sha256": "41051d692d80982039869883be3fa763c656617a45d1a0167a192f62e63c169d"
+        }
+      ]
+    },
+    "block": {
+      "layers": [
+        {
+          "pack": "impact",
+          "name": "impactPlate_heavy_000",
+          "gain": 0.75,
+          "speed": 1.0,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "scifi",
+          "name": "forceField_002",
+          "gain": 0.18,
+          "speed": 1.5,
+          "delay": 0.0,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.34,
+      "masters": [
+        {
+          "file": "block-1.ogg",
+          "seconds": 0.77,
+          "peakDb": -3.18,
+          "rmsDb": -21.78,
+          "sha256": "219edfb6fe263f1d4b395b14f61881166cf5b77cecbbe2afae9878ab9b9fc44d"
+        },
+        {
+          "file": "block-2.ogg",
+          "seconds": 0.751,
+          "peakDb": -3.25,
+          "rmsDb": -21.59,
+          "sha256": "71b42e4e2759da4d93dce1cde25a8619b20837cfde77ebfcfc9deb5651ef52f1"
+        }
+      ]
+    },
+    "reward": {
+      "layers": [
+        {
+          "pack": "impact",
+          "name": "impactBell_heavy_000",
+          "gain": 0.4,
+          "speed": 1.35,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "casino",
+          "name": "chips-handle-1",
+          "gain": 0.45,
+          "speed": 1.0,
+          "delay": 0.15,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.65,
+      "masters": [
+        {
+          "file": "reward-1.ogg",
+          "seconds": 1.325,
+          "peakDb": -4.19,
+          "rmsDb": -28.29,
+          "sha256": "fa46b4875cf667f0aa12eda3bac4d8df5eb54dfc593305ed965caacaea4cef09"
+        }
+      ]
+    },
+    "error": {
+      "layers": [
+        {
+          "pack": "impact",
+          "name": "impactWood_medium_000",
+          "gain": 0.65,
+          "speed": 0.75,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "impact",
+          "name": "impactWood_medium_000",
+          "gain": 0.35,
+          "speed": 0.65,
+          "delay": 0.09,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.06,
+      "masters": [
+        {
+          "file": "error-1.ogg",
+          "seconds": 0.329,
+          "peakDb": -7.12,
+          "rmsDb": -24.03,
+          "sha256": "3b92e3382452a9f5a1da962a22c94adfb613bdcb2fb3658a9a390c9096790215"
+        }
+      ]
+    },
+    "turn": {
+      "layers": [
+        {
+          "pack": "scifi",
+          "name": "thrusterFire_000",
+          "gain": 0.35,
+          "speed": 1.3,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "impact",
+          "name": "impactMetal_light_002",
+          "gain": 0.5,
+          "speed": 0.8,
+          "delay": 0.0,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.25,
+      "masters": [
+        {
+          "file": "turn-1.ogg",
+          "seconds": 2.65,
+          "peakDb": -3.41,
+          "rmsDb": -23.2,
+          "sha256": "d3373f483da98bed59b50262b7a6a875283529bdf41b2454f098ce1fadd94de4"
+        },
+        {
+          "file": "turn-2.ogg",
+          "seconds": 2.65,
+          "peakDb": -3.14,
+          "rmsDb": -23.29,
+          "sha256": "1369867471b07528b198f2d671d0ea134ccc5ef3008e34c6a851318851ecfe7a"
+        }
+      ]
+    },
+    "field": {
+      "layers": [
+        {
+          "pack": "scifi",
+          "name": "forceField_003",
+          "gain": 0.6,
+          "speed": 0.85,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "impact",
+          "name": "impactGlass_medium_000",
+          "gain": 0.3,
+          "speed": 1.2,
+          "delay": 0.08,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.65,
+      "masters": [
+        {
+          "file": "field-1.ogg",
+          "seconds": 1.391,
+          "peakDb": -10.36,
+          "rmsDb": -21.94,
+          "sha256": "782f41ecc4bf63262d15524cad7f7ebe706ead3ba918468dff992070e4d12e41"
+        }
+      ]
+    },
+    "cleanse": {
+      "layers": [
+        {
+          "pack": "impact",
+          "name": "impactGlass_heavy_002",
+          "gain": 0.35,
+          "speed": 0.85,
+          "delay": 0,
+          "reverse": true
+        },
+        {
+          "pack": "impact",
+          "name": "impactBell_heavy_002",
+          "gain": 0.45,
+          "speed": 1.5,
+          "delay": 0.2,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.7,
+      "masters": [
+        {
+          "file": "cleanse-1.ogg",
+          "seconds": 1.148,
+          "peakDb": -3.49,
+          "rmsDb": -26.63,
+          "sha256": "9f19273fd0a703fe5bdb8b418391e8d781fa6f23a8d59efec7320619bf51eaac"
+        }
+      ]
+    },
+    "corrupt": {
+      "layers": [
+        {
+          "pack": "scifi",
+          "name": "slime_000",
+          "gain": 0.45,
+          "speed": 0.7,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "scifi",
+          "name": "spaceEngineLow_000",
+          "gain": 0.35,
+          "speed": 1.3,
+          "delay": 0.0,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.65,
+      "masters": [
+        {
+          "file": "corrupt-1.ogg",
+          "seconds": 3.05,
+          "peakDb": -8.65,
+          "rmsDb": -22.0,
+          "sha256": "57965391128aa102294c2526782ea1436dace371051b08170458232b266d597c"
+        },
+        {
+          "file": "corrupt-2.ogg",
+          "seconds": 3.05,
+          "peakDb": -9.44,
+          "rmsDb": -21.99,
+          "sha256": "a9954a1f35ed3dd6cd19f79d34e65e2770d9b9cb1bfe6e432871481532c18cc2"
+        }
+      ]
+    },
+    "move": {
+      "layers": [
+        {
+          "pack": "scifi",
+          "name": "doorOpen_000",
+          "gain": 0.25,
+          "speed": 1.5,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "impact",
+          "name": "impactMetal_light_002",
+          "gain": 0.55,
+          "speed": 0.9,
+          "delay": 0.1,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.15,
+      "masters": [
+        {
+          "file": "move-1.ogg",
+          "seconds": 0.493,
+          "peakDb": -2.94,
+          "rmsDb": -24.3,
+          "sha256": "47f29db552a808548ac14f85119a2b11a7e07bdbbcddb3643142e4ff339f69f2"
+        },
+        {
+          "file": "move-2.ogg",
+          "seconds": 0.478,
+          "peakDb": -3.06,
+          "rmsDb": -23.87,
+          "sha256": "a1f544c1e6fa804f69ab4714cdfa7416dabd6cd290a714daf7df818130ef899e"
+        }
+      ]
+    },
+    "strike": {
+      "layers": [
+        {
+          "pack": "impact",
+          "name": "impactPunch_heavy_003",
+          "gain": 1.0,
+          "speed": 0.68,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "impact",
+          "name": "impactPlate_heavy_002",
+          "gain": 0.35,
+          "speed": 0.8,
+          "delay": 0.02,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.5,
+      "masters": [
+        {
+          "file": "strike-1.ogg",
+          "seconds": 0.963,
+          "peakDb": -3.17,
+          "rmsDb": -22.11,
+          "sha256": "e782b1a5480477821a1670f8b4ea0d48ffadded9a2c9c501c5c241200b00b7fe"
+        },
+        {
+          "file": "strike-2.ogg",
+          "seconds": 0.944,
+          "peakDb": -3.09,
+          "rmsDb": -22.59,
+          "sha256": "1d36927c80d19dd6fe9d96becace8bd44f3761e3580d7d3a78e1a1d0b98de5bf"
+        },
+        {
+          "file": "strike-3.ogg",
+          "seconds": 0.925,
+          "peakDb": -3.05,
+          "rmsDb": -23.41,
+          "sha256": "aa85d0b872bf2d15fcb216631ade5b168ab4b7c3102a2707b87255264928f77e"
+        }
+      ]
+    },
+    "breach": {
+      "layers": [
+        {
+          "pack": "scifi",
+          "name": "explosionCrunch_001",
+          "gain": 0.4,
+          "speed": 0.8,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "impact",
+          "name": "impactMetal_heavy_003",
+          "gain": 0.8,
+          "speed": 0.6,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "scifi",
+          "name": "lowFrequency_explosion_001",
+          "gain": 0.4,
+          "speed": 0.8,
+          "delay": 0.0,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.7,
+      "masters": [
+        {
+          "file": "breach-1.ogg",
+          "seconds": 2.383,
+          "peakDb": -3.11,
+          "rmsDb": -22.21,
+          "sha256": "c2d04ab83980f8b2221989e252612417272eb31d724ca93ee980c13886f2734a"
+        },
+        {
+          "file": "breach-2.ogg",
+          "seconds": 2.309,
+          "peakDb": -3.58,
+          "rmsDb": -21.97,
+          "sha256": "3dfb592e73c86b190d6addfe93275824664a5f8c6f95b389f81e4496fd491bfb"
+        }
+      ]
+    },
+    "sever": {
+      "layers": [
+        {
+          "pack": "impact",
+          "name": "impactGlass_heavy_001",
+          "gain": 0.8,
+          "speed": 0.9,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "impact",
+          "name": "impactMetal_light_003",
+          "gain": 0.5,
+          "speed": 0.75,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "scifi",
+          "name": "thrusterFire_001",
+          "gain": 0.2,
+          "speed": 1.4,
+          "delay": 0.0,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.45,
+      "masters": [
+        {
+          "file": "sever-1.ogg",
+          "seconds": 2.85,
+          "peakDb": -3.17,
+          "rmsDb": -30.96,
+          "sha256": "1aa86dea93a77cd69af0fac554a306b1aaf4e1c53e848f9ea862a39edf538f00"
+        },
+        {
+          "file": "sever-2.ogg",
+          "seconds": 2.85,
+          "peakDb": -3.04,
+          "rmsDb": -30.71,
+          "sha256": "756976776d208c8ecc0f89544fcbdb479bf726f181646646014decd6a58f00a4"
+        }
+      ]
+    },
+    "jam": {
+      "layers": [
+        {
+          "pack": "scifi",
+          "name": "doorClose_002",
+          "gain": 0.6,
+          "speed": 0.65,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "scifi",
+          "name": "forceField_001",
+          "gain": 0.3,
+          "speed": 0.75,
+          "delay": 0.0,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.6,
+      "masters": [
+        {
+          "file": "jam-1.ogg",
+          "seconds": 1.459,
+          "peakDb": -8.04,
+          "rmsDb": -20.99,
+          "sha256": "d25969b8af922eb29c38786d9376773177bd3e2225dc989305c3305266cdf330"
+        },
+        {
+          "file": "jam-2.ogg",
+          "seconds": 1.421,
+          "peakDb": -8.43,
+          "rmsDb": -20.99,
+          "sha256": "ac7e8476fe3841f74c767a0af35fc3082ec0f1837738fd7ad8e7ccdec2204d4a"
+        }
+      ]
+    },
+    "charge": {
+      "layers": [
+        {
+          "pack": "impact",
+          "name": "impactPlate_heavy_003",
+          "gain": 0.4,
+          "speed": 0.5,
+          "delay": 0,
+          "reverse": true
+        },
+        {
+          "pack": "scifi",
+          "name": "spaceEngineLarge_000",
+          "gain": 0.3,
+          "speed": 0.8,
+          "delay": 0.0,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.6,
+      "masters": [
+        {
+          "file": "charge-1.ogg",
+          "seconds": 3.0,
+          "peakDb": -8.56,
+          "rmsDb": -24.07,
+          "sha256": "641bd36188c236a430b317f9bde3ff7f155378f05a9c7443afe17d24a3e5dbed"
+        }
+      ]
+    },
+    "boss": {
+      "layers": [
+        {
+          "pack": "impact",
+          "name": "impactBell_heavy_003",
+          "gain": 0.65,
+          "speed": 0.5,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "scifi",
+          "name": "lowFrequency_explosion_001",
+          "gain": 0.6,
+          "speed": 0.65,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "impact",
+          "name": "impactMetal_heavy_003",
+          "gain": 0.3,
+          "speed": 0.6,
+          "delay": 0.15,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 1.25,
+      "masters": [
+        {
+          "file": "boss-1.ogg",
+          "seconds": 2.198,
+          "peakDb": -2.92,
+          "rmsDb": -20.71,
+          "sha256": "998b9fc4353b57eb72e7796bb4ccf255ceb0258952615c8277eafe0013d3bfd0"
+        }
+      ]
+    },
+    "enrage": {
+      "layers": [
+        {
+          "pack": "scifi",
+          "name": "spaceEngineLarge_003",
+          "gain": 0.3,
+          "speed": 0.7,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "impact",
+          "name": "impactGlass_heavy_004",
+          "gain": 0.55,
+          "speed": 0.55,
+          "delay": 0.1,
+          "reverse": false
+        },
+        {
+          "pack": "impact",
+          "name": "impactBell_heavy_003",
+          "gain": 0.35,
+          "speed": 0.6,
+          "delay": 0.2,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 1.15,
+      "masters": [
+        {
+          "file": "enrage-1.ogg",
+          "seconds": 3.55,
+          "peakDb": -6.83,
+          "rmsDb": -19.07,
+          "sha256": "c3474ccbe1492ced2ca23b0334f126a3e91f84df6048137b5c03cda1b82e3522"
+        }
+      ]
+    },
+    "death": {
+      "layers": [
+        {
+          "pack": "scifi",
+          "name": "explosionCrunch_004",
+          "gain": 0.4,
+          "speed": 0.65,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "impact",
+          "name": "impactGlass_heavy_003",
+          "gain": 0.6,
+          "speed": 0.6,
+          "delay": 0.1,
+          "reverse": false
+        },
+        {
+          "pack": "impact",
+          "name": "impactMetal_heavy_002",
+          "gain": 0.5,
+          "speed": 0.75,
+          "delay": 0.0,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 0.9,
+      "masters": [
+        {
+          "file": "death-1.ogg",
+          "seconds": 3.3,
+          "peakDb": -2.94,
+          "rmsDb": -25.05,
+          "sha256": "dc9a7a80581ce8687f8b0c33257ca51f7847540083bf6fd1a272a8b9a15f9f4c"
+        }
+      ]
+    },
+    "defeat": {
+      "layers": [
+        {
+          "pack": "impact",
+          "name": "impactBell_heavy_001",
+          "gain": 0.65,
+          "speed": 0.48,
+          "delay": 0.0,
+          "reverse": false
+        },
+        {
+          "pack": "scifi",
+          "name": "spaceEngineLow_003",
+          "gain": 0.3,
+          "speed": 0.6,
+          "delay": 0.0,
+          "reverse": false
+        }
+      ],
+      "reflectionSeconds": 1.5,
+      "masters": [
+        {
+          "file": "defeat-1.ogg",
+          "seconds": 3.9,
+          "peakDb": -8.19,
+          "rmsDb": -23.03,
+          "sha256": "17f498187b2c925540d1c17c7e62c2a70060ddade5d1dc58dc1bc24dd91d48b9"
+        }
+      ]
+    }
+  },
+  "sourceHashes": {
+    "casino/card-fan-1.ogg": "7a9758ccad8899baef1b9f60b4064e4baa724a548293832fdaea07e6e07e638d",
+    "casino/card-place-1.ogg": "d8f26c33a665dcbdcc6f632f6050bc9dd548feb0d4942d4547615926d3926810",
+    "casino/card-shuffle.ogg": "96c84883a30845ede723a4cf2e8369e9837e7dd4e0d4eb0212b0a7ed21b0f544",
+    "casino/card-slide-1.ogg": "006cf9822d15d7063f8899e56041f41646df30adb6fbd8b974ee5d5420012690",
+    "casino/chips-handle-1.ogg": "a2c495237fb0dc0dc96ccc2c9840572edd226e6459398ecb631c6c9f9e5408f0",
+    "impact/impactBell_heavy_000.ogg": "94b8bb5f2d43ab65e4bcc32b28562416e9bc2c51d9fd4be1e333660ee52f977f",
+    "impact/impactBell_heavy_001.ogg": "9df61e3ae9a83dc65e5a1fd3ed19d480876f3b22b963a1b9ef6fa293592dcec4",
+    "impact/impactBell_heavy_002.ogg": "a4171ed1a4a17fb858a38de1c59b5b42e50d8f046c525706c0e3ac8671f189f5",
+    "impact/impactBell_heavy_003.ogg": "5572ccdeb3b62373b86fa955355b3a222c36e815f0636ba16165189a21cf2514",
+    "impact/impactGlass_heavy_000.ogg": "b44b39a940e8948e74b9bd3776bff980df43cf220abdaf0d467dc4c43c0244a5",
+    "impact/impactGlass_heavy_001.ogg": "58686e0e562612cc566791844a10e269f8d1921f4766c14ba43976fd0a429f4e",
+    "impact/impactGlass_heavy_002.ogg": "4978654ac840ad519692d5d5ba48a8101cabce13b9a577be73ad589185e5e9ed",
+    "impact/impactGlass_heavy_003.ogg": "aed07b154f24410c17e5262bbef832842fb275d41fe297f721af7501d0e9c23a",
+    "impact/impactGlass_heavy_004.ogg": "c7742b0e33c1733ddaf902aa68464a4f5364e4d4cb6ff11b76a7aa4151a138dd",
+    "impact/impactGlass_medium_000.ogg": "9252d50bfb85edb17d6073c4a7806e10cdb9de56d3dbfc93a4b9727146d2df6d",
+    "impact/impactMetal_heavy_001.ogg": "83554049f81f4db9209379e103c30bfa63f65c42189a03f300b045c2c82e23ae",
+    "impact/impactMetal_heavy_002.ogg": "b914c8f1eb7c0f34bb165d7c77f4be0351f6be0660c13c53e65424e262e2c093",
+    "impact/impactMetal_heavy_003.ogg": "b0f2ba4dabde9a87eb9c188a19d31e0c2300fd321adeba08d3b9b8aa011d7037",
+    "impact/impactMetal_light_000.ogg": "33b5e6e37c6e9d54e07bf5a89b12c76e879f40c1ea83cdd82714df1d6f9fec6d",
+    "impact/impactMetal_light_002.ogg": "25a96f90a9a1f88a531e824e126f0519504625e5635e65a72e4f31611428db29",
+    "impact/impactMetal_light_003.ogg": "92d5db6bfc672d9dc1b4f390b2900504f013187fa36335472554fafefa9050b1",
+    "impact/impactMetal_medium_000.ogg": "a96f879fec0864a8938e0c745b6996a6c5679c16a234ce31a01cc995e8401003",
+    "impact/impactPlate_heavy_000.ogg": "112d4f93ddcc370b410630f971c0f5d991856102da9c76bc5c5540d388e75aaa",
+    "impact/impactPlate_heavy_002.ogg": "b0cab75d1befa32b4cf215d8ee7e1c400a39182e8b105963b8e310f825b198a1",
+    "impact/impactPlate_heavy_003.ogg": "59775f8979a396c8a793b0a1db206d5bdc651eae808d858e9acaee8ebda5bc6d",
+    "impact/impactPunch_heavy_000.ogg": "b33a8f14068aec24ec69ba85e5e87fdc41228975f6a1a3e44a6e7d6fc3d9f8d8",
+    "impact/impactPunch_heavy_003.ogg": "4ab53b26f4ea575120dcc1348526c9e0db2afc6af7a442aa0489bdead2ca80b6",
+    "impact/impactWood_light_000.ogg": "eb45e35b4bed784d3f120de4afec4b0d6ac09d9e143cce8cfcb7d739e1b1f3c3",
+    "impact/impactWood_medium_000.ogg": "1723a9fd25103ed41af06054814e84e65f4a772bac86ab2dc927da93d9592ff5",
+    "scifi/doorClose_000.ogg": "c9134651ebbd7c016f90393aee495ff8120bd343bb7569b689a7506987ebd6c2",
+    "scifi/doorClose_002.ogg": "01c7d15e90ae1b218812597d04c20e3df872367ebf22cd99d66dddd5fdb542a4",
+    "scifi/doorOpen_000.ogg": "5b7e07eccd4413ad9ef3720c2d14f9cc699f4c50111e9b2f48bd60e6f1a164c3",
+    "scifi/explosionCrunch_001.ogg": "fdd04d6f0032d4d57c134ad37f3587d2d00e58c9572715275bd8cf4f43593576",
+    "scifi/explosionCrunch_004.ogg": "9c3a1c73cadf0de5d5a578b31a264f20b1ac7cb6ec9bbd34a203f58402ea5390",
+    "scifi/forceField_000.ogg": "c2916f2a062c8ddd1aca2826d134fe90847037db31342726ffb0f9097afe339c",
+    "scifi/forceField_001.ogg": "5574e69dd04e5f59322c5ddffde5978f077b09170ae5e29cec0bd9901828cd90",
+    "scifi/forceField_002.ogg": "051b0eafc479695af4ca3607d41fd4be41bae7c21f4f9508d004722b09f1bd63",
+    "scifi/forceField_003.ogg": "15e3fe971ffd3415e5ab641d3a4d043fb31f6712b0956315b524ba29c3889cda",
+    "scifi/lowFrequency_explosion_000.ogg": "3cb48d86dab63140cfb9aaeea4d4a6846abaca5831d157d8adbec0490da26343",
+    "scifi/lowFrequency_explosion_001.ogg": "cdda50600a4928f2f1b8371224d53c171ac799c1cf2c30b11999508985250b3b",
+    "scifi/slime_000.ogg": "480ee82b690136ea9db6966a3c3033356b8274752795c4e37afd6b6defcfacff",
+    "scifi/spaceEngineLarge_000.ogg": "885aeda16116b715be5e8fd03d0d77959761015e1ca5823fd3b53d4fd965107f",
+    "scifi/spaceEngineLarge_003.ogg": "c1e6542f9ad0839083072d9b2d4d77208b9ceb60e5f3fd9873047de7f0c57a83",
+    "scifi/spaceEngineLow_000.ogg": "d7deee8d7217ce63aab802ad7365a59cacfd243392dc1bd03b0a9d454aa494df",
+    "scifi/spaceEngineLow_003.ogg": "e8f7ce4dbc20b5aeead35b94f1c8927b0baa416edaa5b39f1699703031111488",
+    "scifi/thrusterFire_000.ogg": "0fdc474d93f209debf1fc4ea77765a669dcb7676db31b4d8a0a509685bccf374",
+    "scifi/thrusterFire_001.ogg": "924636edc923fe4aab5829b69dc5dc1c5d659dec5739865434dabee752a3bb79"
+  }
+}

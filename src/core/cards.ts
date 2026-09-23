@@ -507,7 +507,7 @@ export const RELICS: Record<
   "shield-array": {
     name: "Shield Array",
     subtitle: "DEFENSE MODULE",
-    rules: "Prevent up to 4 damage from the first unblocked hit each battle.",
+    rules: "Prevent up to 2 damage from the first unblocked hit each battle.",
     color: "#ffc186",
   },
   "deep-cache": {
@@ -519,7 +519,7 @@ export const RELICS: Record<
   "grounded-core": {
     name: "Grounded Core",
     subtitle: "DEFENSE MODULE",
-    rules: "Start every turn with 2 block.",
+    rules: "Start every turn with 1 block.",
     color: "#93d2d0",
   },
   "packet-lens": {
@@ -531,7 +531,7 @@ export const RELICS: Record<
   "repair-drone": {
     name: "Repair Drone",
     subtitle: "RECOVERY MODULE",
-    rules: "Restore 2 integrity after winning an encounter.",
+    rules: "Restore 1 integrity after winning an encounter.",
     color: "#b4d58b",
   },
   "reserve-cell": {

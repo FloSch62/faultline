@@ -59,7 +59,7 @@ test("each stage has a distinct route map and its complete encounter pool is rea
     const seen = new Set<string>();
     for (let seed = 1; seed <= 100; seed++) {
       const r = newExpedition("architect", Math.imul(seed, 0x9e3779b1) >>> 0).run;
-      r.stage = stage; r.map = createMap(stage);
+      r.stage = stage; r.map = createMap(stage, r.seed);
       chooseRoom(r, "0-1"); seen.add(r.enemy!.id);
     }
     assert.deepEqual([...seen].sort(), [...STAGES[stage].encounters].sort());
@@ -108,7 +108,7 @@ test("Choirs alternate fields, Moth announces its jam band, Weaver punishes dens
   for (const id of ["choir", "cantor"]) {
     assert.equal(combatPreview(encounter(id, 0)).zoneThreat!.kind, "suppression");
     assert.equal(combatPreview(encounter(id, 2)).zoneThreat!.kind, "corrosion");
-    assert.equal(combatPreview(encounter(id, 4)).zoneThreat!.kind, "suppression");
+    assert.equal(combatPreview(encounter(id, id === "cantor" ? 6 : 4)).zoneThreat!.kind, id === "cantor" ? "corrosion" : "suppression");
   }
   const moth = encounter("moth", 1);
   assert.equal(combatPreview(moth).hazardZone, "north");

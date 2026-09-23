@@ -91,12 +91,13 @@ test("the nine local music tracks decode for browser playback",async({page})=>{
 });
 
 for (const scene of [
-  {room:"1-1",floor:1,title:"The Copper Market",file:"the-copper-market",art:"relay-bazaar"},
-  {room:"2-0",floor:2,title:"A Light Left On",file:"a-light-left-on",art:"relay-sanctuary"},
-  {room:"3-2",floor:3,title:"A Thousand Fractures",file:"a-thousand-fractures",art:"relay-interior"},
+  {room:"1-1",floor:1,type:"cache",title:"The Copper Market",file:"the-copper-market",art:"relay-bazaar"},
+  {room:"2-0",floor:2,type:"forge",title:"A Light Left On",file:"a-light-left-on",art:"relay-sanctuary"},
+  {room:"3-2",floor:3,type:"elite",title:"A Thousand Fractures",file:"a-thousand-fractures",art:"relay-interior"},
 ]) test(`${scene.title} is selected and loaded in its game scene`,async({page})=>{
   const e=newExpedition("architect",293);
   e.run.floor=scene.floor;
+  e.run.map.find(room=>room.id===scene.room)!.type=scene.type as "cache" | "forge" | "elite";
   chooseRoom(e.run,scene.room);
   await page.addInitScript(({storage,e})=>localStorage.setItem(storage,JSON.stringify(e)),{storage,e});
   await page.goto('./');

@@ -1,4 +1,5 @@
 import { MusicRotation } from "./core/music.ts";
+import { EffectsPlayer, type EffectKind, type EffectOptions } from "./audio-effects.ts";
 export type ScoreScene = "explore" | "battle" | "boss" | "shop" | "sanctuary" | "elite";
 const tracks: Record<ScoreScene, string> = {
   explore: "the-last-relay",
@@ -29,6 +30,8 @@ export interface AudioSettings {
 export class Soundscape {
   settings: AudioSettings;
   private ctx: AudioContext | null = null;
+  private effects: EffectsPlayer | null = null;
+  private musicBus: GainNode | null = null;
   private players = [new Audio(), new Audio()];
   private active = 0;
   private scene: ScoreScene = "explore";
@@ -50,11 +53,11 @@ export class Soundscape {
       );
       this.settings = {
         music:
-          typeof stored.music === "number"
+          typeof stored.music === "number" && Number.isFinite(stored.music)
             ? Math.max(0, Math.min(1, stored.music))
             : defaults.music,
         effects:
-          typeof stored.effects === "number"
+          typeof stored.effects === "number" && Number.isFinite(stored.effects)
             ? Math.max(0, Math.min(1, stored.effects))
             : defaults.effects,
         muted: stored.muted === true,
@@ -74,13 +77,31 @@ export class Soundscape {
       });
     }
     document.addEventListener("visibilitychange", () => {
-      if (document.hidden) this.players.forEach((p) => p.pause());
-      else if (this.ready && !this.settings.muted)
-        void this.players[this.active].play().catch(() => {});
+      if (document.hidden) {
+        this.players.forEach((p) => p.pause());
+        this.effects?.stop();
+        void this.ctx?.suspend().catch(() => {});
+      } else if (this.ready) {
+        void this.ctx?.resume().catch(() => {});
+        if (!this.settings.muted) void this.players[this.active].play().catch(() => {});
+      }
     });
   }
   async unlock() {
-    this.ctx ??= new AudioContext();
+    if (!this.ctx) {
+      this.ctx = new AudioContext();
+      this.musicBus = this.ctx.createGain();
+      this.musicBus.connect(this.ctx.destination);
+      for (const player of this.players) this.ctx.createMediaElementSource(player).connect(this.musicBus);
+      this.effects = new EffectsPlayer(this.ctx, () => this.onUnavailable?.(), () => {
+        const now = this.ctx!.currentTime, gain = this.musicBus!.gain;
+        gain.cancelScheduledValues(now);
+        gain.setTargetAtTime(.58, now, .035);
+        gain.setTargetAtTime(1, now + .6, .3);
+      });
+      this.effects.setVolume(this.settings.muted ? 0 : this.settings.effects);
+      void this.effects.preload();
+    }
     await this.ctx.resume().catch(() => {});
     if (!this.ready) {
       this.ready = true;
@@ -126,7 +147,13 @@ export class Soundscape {
     this.fade = requestAnimationFrame(fade);
   }
   update(settings: Partial<AudioSettings>) {
-    Object.assign(this.settings, settings);
+    for (const key of ["music", "effects"] as const) {
+      const value = settings[key];
+      if (typeof value === "number" && Number.isFinite(value)) this.settings[key] = Math.max(0, Math.min(1, value));
+    }
+    if (typeof settings.muted === "boolean") this.settings.muted = settings.muted;
+    if (typeof settings.motion === "boolean") this.settings.motion = settings.motion;
+    this.effects?.setVolume(this.settings.muted ? 0 : this.settings.effects);
     try {
       localStorage.setItem(
         "faultline-settings-v2",
@@ -150,77 +177,7 @@ export class Soundscape {
       void this.players[this.active].play().catch(() => {});
     }
   }
-  effect(
-    kind:
-      | "hover"
-      | "card"
-      | "connect"
-      | "hit"
-      | "hurt"
-      | "reward"
-      | "error"
-      | "turn"
-      | "field"
-      | "cleanse"
-      | "corrupt"
-      | "strike" | "breach" | "sever" | "jam" | "boss" | "enrage"
-      | "move",
-  ) {
-    if (!this.ctx || this.settings.muted || !this.settings.effects) return;
-    const ctx = this.ctx,
-      now = ctx.currentTime;
-    const tones: Record<typeof kind, number[]> = {
-      hover: [260],
-      card: [330, 494],
-      connect: [392, 588, 784],
-      hit: [73, 110],
-      hurt: [52, 61],
-      reward: [294, 440, 587, 880],
-      error: [130, 123],
-      turn: [147, 220, 294],
-      field: [196, 294, 392, 588],
-      cleanse: [523, 659, 784, 1047],
-      corrupt: [65, 69, 98, 103],
-      move: [220, 330, 440],
-      strike: [82, 123, 164], breach: [49, 73, 98, 147],
-      sever: [880, 440, 110], jam: [185, 196, 207],
-      boss: [49, 73, 110, 147], enrage: [55, 58, 82, 110],
-    };
-    const duration =
-      ["boss", "enrage"].includes(kind) ? 1.8 : ["reward", "field", "cleanse"].includes(kind) ? 0.9 : ["hit", "hurt", "corrupt", "strike", "breach", "sever", "jam"].includes(kind) ? 0.5 : 0.18;
-    tones[kind].forEach((frequency, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = ["hurt", "corrupt", "sever", "jam", "breach", "enrage"].includes(kind) ? "sawtooth" : "sine";
-      osc.frequency.setValueAtTime(frequency, now);
-      osc.frequency.exponentialRampToValueAtTime(
-        frequency * (["hit", "strike", "sever", "breach"].includes(kind) ? 0.3 : kind === "boss" ? 1.5 : 1),
-        now + duration,
-      );
-      gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(
-        (this.settings.effects * (kind === "hover" ? 0.014 : 0.07)) / (i + 1),
-        now + 0.008,
-      );
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(now + i * 0.022);
-      osc.stop(now + duration + 0.05);
-    });
-    if (kind === "card" || kind === "hit" || kind === "hurt") {
-      const buffer = ctx.createBuffer(1, ctx.sampleRate * 0.15, ctx.sampleRate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < data.length; i++)
-        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (data.length / 6));
-      const source = ctx.createBufferSource(),
-        filter = ctx.createBiquadFilter(),
-        gain = ctx.createGain();
-      source.buffer = buffer;
-      filter.type = "lowpass";
-      filter.frequency.value = kind === "card" ? 1800 : 400;
-      gain.gain.value = this.settings.effects * 0.11;
-      source.connect(filter).connect(gain).connect(ctx.destination);
-      source.start();
-    }
+  effect(kind: EffectKind, options?: EffectOptions) {
+    if (!this.settings.muted) this.effects?.play(kind, options);
   }
 }

@@ -34,7 +34,9 @@ Playing requires no API keys, GPU music model, Containerlab daemon, or external 
 
 ## Inside the alpha
 
-- Three seven-sector stages with distinct route maps, 16 hostiles, elite rewards and sanctuaries. The Iron Regent, Hollow Choir and Blackout Core guard the stage exits, with cinematic introductions and enraged second phases.
+- Three seven-sector stages with seeded, scouted route maps, 16 hostiles, elite rewards and sanctuaries. Every route crosses at least five fights per stage; recovery and reward rooms compete for your route. The Iron Regent, Hollow Choir and Blackout Core guard the stage exits, with cinematic introductions and enraged second phases. Painted enemies have individual wing, limb, coil, spectral and armored motion, attack anticipation, hit reactions, transformations and dissolving defeats.
+- Guardian charge turns announce **Crownfall, Requiem and Total Blackout**. Meet the damage threshold on the attack turn to interrupt and expose the boss, or brace with shields. Prepare one card for next turn in place of one draw.
+- Sanctuaries offer repair, deck refinement, or a relic at the permanent cost of two maximum integrity. Elite and guardian relics are earned without that cost.
 - Three distinct starter decks: the Architect builds efficient routes, the Warden absorbs mistakes, and the Ghost trades protection for card flow and bursts.
 - **39 cards and nine persistent relics.** Common through legendary rewards support redundant networks, fortified circuits, persistent zone fields and burst turns. Powerful effects exhaust until the next encounter.
 - Router placement matters. Independent north/south circuits grant shield; moving installed hardware costs energy. A Wraith hunts your longest exposed cable; a Null Storm threatens a visible band.
@@ -44,10 +46,11 @@ Playing requires no API keys, GPU music model, Containerlab daemon, or external 
 - Distinct painted player and enemy frames. Player integrity, shield, damage, burst and every carried relic stay together; enemy health and next intent live opposite. Card rules have reserved space, with a scrollable hand and arrow controls for more than six cards.
 - Four field cards: Resonance, Aegis, Purge and Null. Allied fields last three transmissions; enemy corrosion and suppression last two. Cleanse a hostile band or relocate your hardware, with a destination and damage/shield forecast before dropping. Field actions have sound and table effects.
 - Six additional roaming enemies: Coil Serpent, Ash Moth, Null Marshal, Glass Choir, Wire Weaver and Grave Reaver. Several hostiles combine device attacks and zone effects. Every threat is forecast, and new hostile fields activate next turn. New expeditions include Resonance Field and Purge Field.
+- **25 material sound cues with 43 stereo masters:** card Foley, metal, glass, layered combat impacts, shields, faults, guardian transformations and defeats. Bundled CC0 sources, recipes and licenses are included; music ducks briefly under major impacts.
 - Expanded painted artwork, a sanctuary, the Copper Market salvage exchange, and **nine original instrumental tracks**, including dedicated music for sanctuary, salvage and elite encounters. Four battle tracks rotate without immediate repeats; card plays and turns preserve the current song.
 - A Containerlab topology exporter. Combat is a browser simulation; exported labs need suitable images and real device configuration before they can route traffic.
 
-Read the [complete implemented game design](docs/game-design.md), [story and world](docs/narrative.md), and [current three-stage balance probe](docs/balance-expedition.json). Simulated win rates are regression probes; human playtesting remains necessary to tune difficulty and enjoyment.
+Read the [complete implemented game design](docs/game-design.md), [story and world](docs/narrative.md), and [current tactics balance probe](docs/balance-tactics.json). Simulated win rates are regression probes; human playtesting remains necessary to tune difficulty and enjoyment.
 
 ### Discover the signature cards
 
@@ -76,6 +79,7 @@ These are discoveries, **not starter cards**. Opening hands provide a Core Route
 | Apply a field | Play a field card, then click a band on the table or its field seal |
 | Browse a large hand | Hand arrows or horizontal scrolling; 1–0 still selects any card |
 | Transmit / end turn | Brass dial, Space or Enter; focused buttons retain normal keyboard behavior |
+| Prepare / return a card | Prepare control or P; keep one card for next turn in place of one draw |
 | Undo before transmitting | Z |
 | Cancel selection / settings | Escape |
 
@@ -90,11 +94,11 @@ Fields belong to the ground: moving hardware changes which effects apply immedia
 - `src/ui.ts`, `src/alpha-ui.ts`, `src/style.css`, `src/alpha.css`, `src/polish.css` — illustrated cards, painted instruments, inspection and tutorials.
 - `src/story.ts` — chapters, enemy motivations, sanctuary discoveries and endings.
 - `src/main.ts` — input, view transitions, targeting, undo and autosave.
-- `src/audio.ts` — music playback, crossfades and synthesized interaction effects.
+- `src/audio.ts`, `src/audio-effects.ts` — music playback, crossfades, sampled effects, voice priority and combat ducking.
 - `public/art/` — finished game artwork; [original art direction](docs/art-prompts.md) and [fieldcraft artwork prompts](docs/art-polish-prompts.md), and [expedition artwork prompts](docs/art-expedition-prompts.md).
-- `public/audio/` — the nine final instrumental Ogg masters.
+- `public/audio/` — nine instrumental Ogg masters and the material effects bank.
 - `soundtrack/` — prompts, original scores, generation metadata, provenance and licenses. Large production recordings and intermediate arrays are generated locally and ignored by Git.
-- [Soundtrack production](soundtrack/README.md) — exact model versions and reproduction steps.
+- [Soundtrack production](soundtrack/README.md) and [effects production](soundtrack/effects/README.md) — source material, licenses and reproduction steps.
 - [Third-party notices](THIRD_PARTY_NOTICES.md).
 
 ## GitHub Pages

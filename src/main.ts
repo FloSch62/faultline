@@ -135,7 +135,7 @@ const undoStack: RunState[] = [];
 
 
 $("#app").innerHTML =
-  `<main class="game-root"><div class="scene-backdrop"></div><div class="scene-shade"></div><div class="motes" aria-hidden="true">${Array.from({ length: 22 }, (_, i) => `<i style="--x:${(i * 47) % 100}%;--duration:${14 + (i % 8) * 3}s;--delay:-${i * 2.7}s;--size:${(i % 3) + 1}px"></i>`).join("")}</div><div class="world-stage"><canvas id="world" aria-label="Network battlefield. Use cards and the device targeting controls to build your route."></canvas></div><div class="texture"></div><header id="header" class="game-header"></header><div id="screen"></div><div id="battle-hud"></div><div id="hand-zone"></div><div id="target-dock"></div><div id="lesson-layer"></div><div id="game-tooltip" role="tooltip"></div><div id="impact-layer" aria-hidden="true"></div><div id="battle-flash"></div><div id="toast" role="status" aria-live="polite"></div><div class="now-playing" id="now-playing"></div></main><dialog id="dialog" aria-label="Field journal"><div class="dialog-surface"><button class="dialog-close" data-action="close" aria-label="Close dialog">${ui.icon("close", 22)}</button><div id="dialog-content"></div></div></dialog>`;
+  `<main class="game-root"><div class="scene-backdrop"></div><div class="scene-shade"></div><div class="motes" aria-hidden="true">${Array.from({ length: 22 }, (_, i) => `<i style="--x:${(i * 47) % 100}%;--duration:${14 + (i % 8) * 3}s;--delay:-${i * 2.7}s;--size:${(i % 3) + 1}px"></i>`).join("")}</div><div class="world-stage"><canvas id="world" aria-label="Network battlefield. Use cards and the device targeting controls to build your route."></canvas></div><div class="texture"></div><header id="header" class="game-header"></header><div id="screen"></div><div id="battle-hud"></div><div id="hand-zone"></div><div id="target-dock"></div><div id="lesson-spotlight" aria-hidden="true"><i></i></div><div id="lesson-layer"></div><div id="game-tooltip" role="tooltip"></div><div id="impact-layer" aria-hidden="true"></div><div id="battle-flash"></div><div id="toast" role="status" aria-live="polite"></div><div class="now-playing" id="now-playing"></div></main><dialog id="dialog" aria-label="Field journal"><div class="dialog-surface"><button class="dialog-close" data-action="close" aria-label="Close dialog">${ui.icon("close", 22)}</button><div id="dialog-content"></div></div></dialog>`;
 const root = $(".game-root"),
   dialog = $<HTMLDialogElement>("#dialog");
 sound.update({});
@@ -226,9 +226,9 @@ function render(rebuild = true) {
   root.classList.toggle("busy", busy);
   root.classList.toggle("is-practice", !!practice);
   root.dataset.training = practice ? practice.id : "";
-  $("#lesson-layer").innerHTML = practice && battle && practice.progress
+  patchLessonLayer(practice && battle && practice.progress
     ? training.lessonPanelMarkup(practice.progress, { showHint: practice.showHint, collapsed: practice.collapsed })
-    : "";
+    : "");
   $("#header").innerHTML = screens.headerMarkup(
     expedition,
     view === "title" || view === "select",
@@ -310,6 +310,7 @@ function render(rebuild = true) {
   if (selected !== null) document.querySelector(`[data-hand="${selected}"]`)?.scrollIntoView({block:"nearest",inline:"nearest"});
   if (practice && battle) fitLesson();
   spotlightLesson();
+  if (practice && battle) railHand();
   renderTargetDock();
   if (selected !== null && run.hand[selected])
     world?.setPlacement(CARDS[run.hand[selected]].role ?? null, source, laysArmoredCable(run.hand[selected]));
@@ -532,9 +533,21 @@ function playAction(action: () => ActionResult, cue?: EffectKind, card?: CardId)
   if (liveChannels(run) > liveChannels(before)) sound.effect("route", { delay: .18 });
   return true;
 }
+/** Field Training rails: the coach stops a wrong move and points at the right one. */
+function lessonBlocks(action: training.LessonAction): boolean {
+  if (!practice?.progress) return false;
+  const objection = training.lessonGuard(practice.id, run, practice.progress, action);
+  if (!objection) return false;
+  toast(objection, "coach");
+  practice.showHint = true;
+  renderLesson();
+  sound.effect("error");
+  return true;
+}
 function chooseCard(index: number) {
   if (!playable() || !run.hand[index]) return;
   const id = run.hand[index], c = CARDS[id];
+  if (lessonBlocks({ kind: "card", card: id })) return;
   if (c.unplayable) {
     toast(c.curse ? `${c.name} is a curse: unplayable. Remove it at a Sanctuary or Market.` : `${c.name} is junk: unplayable. It vanishes at the end of your turn.`, "error");
     sound.effect("error");
@@ -597,9 +610,10 @@ function scrub(id: string) {
 function onGround(point: WorldPoint) {
   if (!playable() || selected === null) return;
   const index = selected;
-  if (CARDS[run.hand[index]]?.target === "ground")
+  if (CARDS[run.hand[index]]?.target === "ground") {
+    if (lessonBlocks({ kind: "ground", card: run.hand[index], zone: zoneForNode(point) })) return;
     playAction(() => playGround(run, index, point.x, point.z), undefined, run.hand[index]);
-  else if (CARDS[run.hand[index]]?.target === "zone") castZone(zoneForNode(point));
+  } else if (CARDS[run.hand[index]]?.target === "zone") castZone(zoneForNode(point));
 }
 function castZone(zone: Zone) {
   if (!playable() || selected === null || CARDS[run.hand[selected]]?.target !== "zone") {
@@ -607,6 +621,7 @@ function castZone(zone: Zone) {
     return;
   }
   const index = selected, cleanse = run.hand[index] === "purge-field";
+  if (lessonBlocks({ kind: "zone", card: run.hand[index], zone })) return;
   if (playAction(() => playZone(run,index,zone),cleanse ? "cleanse" : "field")) world?.pulseZone(zone,cleanse ? "cleanse" : "field");
 }
 function onNode(id: string) {
@@ -616,6 +631,7 @@ function onNode(id: string) {
     else if (!source) { source = id; render(false); sound.effect("select"); }
     else {
       const from = source;
+      if (lessonBlocks({ kind: "link", a: from, b: id })) return;
       if (playAction(() => useConsole(run, from, id), "connect")) sound.effect("console", { delay: .05 });
     }
     return;
@@ -640,6 +656,7 @@ function onNode(id: string) {
         sound.effect("select");
       } else {
         const from = source;
+        if (lessonBlocks({ kind: "link", card: run.hand[index], a: from, b: id })) return;
         playAction(() => playLink(run, index, from, id), undefined, run.hand[index]);
       }
       return;
@@ -669,6 +686,7 @@ function onMove(id: string, point: WorldPoint | null, finished: boolean) {
   if (finished) {
     deviceDragging = false;
     const destination = zoneForNode(point), origin = zoneForNode(node);
+    if (lessonBlocks({ kind: "move", node: id, zone: destination })) { clearSelection(); render(); return; }
     // One cue per drop: a real relocation slides the device; dropping it back in place is a soft return.
     const moved = Math.hypot(node.x - point.x, node.z - point.z) >= .01;
     if (!playAction(() => relocateNode(run, id, point.x, point.z), moved ? "move" : "undo")) { clearSelection(); render(); }
@@ -700,6 +718,7 @@ function relocateToZone(zone: "north" | "center" | "south") {
   const id = selectedNode;
   const node = run.topology.nodes.find(n => n.id === id)!;
   if (zoneForNode(node) === zone) { toast(`${id.toUpperCase()} is already in ${zone.toUpperCase()}.`); return; }
+  if (lessonBlocks({ kind: "move", node: id, zone })) return;
   let spot: WorldPoint | undefined;
   for (const z of { north: [-2.5, -3.6, -1.8], center: [0, 0.9, -0.9], south: [2.5, 3.6, 1.8] }[zone])
     for (const x of [node.x, 0, -1.25, 1.25, -2.5, 2.5, -3.75, 3.75, -4.5, 4.5])
@@ -774,6 +793,7 @@ function trapFocus(forecast: ReturnType<typeof combatPreview>): { id: string; ki
 }
 function transmit() {
   if (!playable()) return;
+  if (lessonBlocks({ kind: "transmit" })) return;
   const generation = ++battleGeneration;
   const forecast = combatPreview(run);
   clearSelection();
@@ -1089,6 +1109,8 @@ document.addEventListener("click", (event) => {
   const preparedIndex = target.closest<HTMLElement>("[data-prepare-card]")?.dataset.prepareCard;
   if (preparedIndex !== undefined && modal === "prepare") {
     closeModal();
+    const chosen = run.hand[Number(preparedIndex)];
+    if (chosen && lessonBlocks({ kind: "prepare", card: chosen })) return;
     playAction(() => prepareCard(run, Number(preparedIndex)), "card");
     return;
   }
@@ -1250,6 +1272,8 @@ document.addEventListener("pointerdown", (event) => {
     costFor(run, index) > run.energy
   )
     return;
+  // In training a guarded card doesn't lift; the click on it explains why.
+  if (practice?.progress && training.lessonGuard(practice.id, run, practice.progress, { kind: "card", card: run.hand[index] })) return;
   cardDrag = {
     index,
     x: event.clientX,
@@ -1306,7 +1330,8 @@ window.addEventListener("pointerup", (event) => {
   ignoreClick = true;
   world?.setPlacement(null);
   const point = world?.pointFromScreen(event.clientX, event.clientY);
-  if (point) playAction(() => playGround(run, d.index, point.x, point.z), undefined, run.hand[d.index]);
+  if (point && lessonBlocks({ kind: "ground", card: run.hand[d.index], zone: zoneForNode(point) })) render(false);
+  else if (point) playAction(() => playGround(run, d.index, point.x, point.z), undefined, run.hand[d.index]);
   else render(false);
   setTimeout(() => (ignoreClick = false), 0);
 });
@@ -1468,22 +1493,81 @@ function armHint() {
 }
 function renderLesson() {
   if (!practice?.progress) return;
-  $("#lesson-layer").innerHTML = view === "run" && root.classList.contains("is-battle")
+  patchLessonLayer(view === "run" && root.classList.contains("is-battle")
     ? training.lessonPanelMarkup(practice.progress, { showHint: practice.showHint, collapsed: practice.collapsed })
-    : "";
+    : "");
   fitLesson();
   spotlightLesson();
 }
-// Window size changes move the vitals card, so the coach re-measures its room.
-window.addEventListener("resize", () => { if (practice) fitLesson(); });
+let lessonLayerHtml = "";
+/** Update #lesson-layer in place. Rebuilding it with innerHTML on every render replayed
+ * the panel's entrance animation each click — a constant flicker. Morphing touches only
+ * the nodes whose content changed, so animations play once, when their content arrives. */
+function patchLessonLayer(markup: string) {
+  if (markup === lessonLayerHtml) return;
+  lessonLayerHtml = markup;
+  const template = document.createElement("template");
+  template.innerHTML = markup;
+  morphChildren($("#lesson-layer"), template.content);
+}
+function morphChildren(from: ParentNode & Node, to: ParentNode) {
+  const wanted = Array.from(to.childNodes);
+  for (let i = 0; i < wanted.length; i++) {
+    const next = wanted[i];
+    const current = from.childNodes[i];
+    if (!current) { from.appendChild(next.cloneNode(true)); continue; }
+    const matches = current.nodeType === next.nodeType &&
+      (current.nodeType !== Node.ELEMENT_NODE || (current as Element).tagName === (next as Element).tagName);
+    if (!matches) { (current as ChildNode).replaceWith(next.cloneNode(true)); continue; }
+    if (current.nodeType === Node.ELEMENT_NODE) {
+      const target = current as Element, source = next as Element;
+      for (const name of source.getAttributeNames())
+        if (target.getAttribute(name) !== source.getAttribute(name)) target.setAttribute(name, source.getAttribute(name)!);
+      for (const name of target.getAttributeNames()) if (!source.hasAttribute(name)) target.removeAttribute(name);
+      morphChildren(target, source);
+    } else if (current.textContent !== next.textContent) current.textContent = next.textContent;
+  }
+  while (from.childNodes.length > wanted.length) from.lastChild!.remove();
+}
+// Window size changes move the vitals card and the spotlit control.
+window.addEventListener("resize", () => { if (practice) { fitLesson(); spotlightLesson(); } });
 /** The coach panel fills the left column down to the compact vitals card. */
 /** Field Training points at the control its current step needs (e.g. the Prepare slot). */
 function spotlightLesson() {
-  document.querySelectorAll(".lesson-focus").forEach(el => el.classList.remove("lesson-focus"));
-  const focus = practice?.progress?.focus;
-  if (!focus || busy || !root.classList.contains("is-battle")) return;
-  try { document.querySelectorAll(focus).forEach(el => el.classList.add("lesson-focus")); }
+  const focus = (!busy && root.classList.contains("is-battle") && practice?.progress?.focus) || "";
+  let targets: Element[] = [];
+  try { if (focus) targets = Array.from(document.querySelectorAll(focus)); }
   catch { /* A malformed selector must never break the lesson. */ }
+  // Leave elements that keep the spotlight untouched: re-adding the class would not
+  // restart the pulse, but removing and re-adding it every render did.
+  document.querySelectorAll(".lesson-focus").forEach(el => { if (!targets.includes(el)) el.classList.remove("lesson-focus"); });
+  for (const el of targets) el.classList.add("lesson-focus");
+  // The dimmer cuts a hole around the one control the step needs. It rests while the
+  // player is mid-action — targeting, dragging or reading a dialog — and glides when
+  // the step moves on.
+  const overlay = $("#lesson-spotlight"), hole = overlay.firstElementChild as HTMLElement;
+  const target = targets.find((el): el is HTMLElement => el instanceof HTMLElement && el.offsetParent !== null);
+  const resting = selected !== null || consoleTargeting || !!cardDrag || deviceDragging || dialog.open;
+  if (!target || resting) { overlay.classList.remove("active"); return; }
+  const fresh = !overlay.classList.contains("active");
+  if (fresh) hole.style.transition = "none";
+  const scale = interfaceScale(), origin = root.getBoundingClientRect(), rect = target.getBoundingClientRect(), pad = 9;
+  hole.style.left = `${(rect.left - origin.left) / scale - pad}px`;
+  hole.style.top = `${(rect.top - origin.top) / scale - pad}px`;
+  hole.style.width = `${rect.width / scale + pad * 2}px`;
+  hole.style.height = `${rect.height / scale + pad * 2}px`;
+  if (fresh) { void hole.offsetWidth; hole.style.transition = ""; }
+  overlay.classList.add("active");
+}
+/** In training, cards outside the current step rest visibly parked in the hand. */
+function railHand() {
+  const progress = practice?.progress;
+  document.querySelectorAll<HTMLElement>("#hand-zone [data-hand]").forEach(el => {
+    const index = Number(el.dataset.hand);
+    const parked = !!progress && !progress.complete && !!run.hand[index] &&
+      !!training.lessonGuard(practice!.id, run, progress, { kind: "card", card: run.hand[index] });
+    el.classList.toggle("lesson-parked", parked);
+  });
 }
 function fitLesson() {
   const plate = document.querySelector<HTMLElement>(".is-practice .battle-left");

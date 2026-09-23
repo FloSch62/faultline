@@ -8,7 +8,7 @@ import {
 } from "./run.ts";
 import { CARDS } from "./cards.ts";
 import type { CardId, RunState } from "./types.ts";
-import { LESSONS, createLessonRun, lessonProgress, nextLesson, type LessonId, type LessonProgress } from "../tutorial/lessons.ts";
+import { LESSONS, createLessonRun, lessonGuard, lessonProgress, nextLesson, type LessonAction, type LessonId, type LessonProgress } from "../tutorial/lessons.ts";
 
 type Result = { ok: boolean; message: string };
 
@@ -258,6 +258,99 @@ test("08 · danger: bracing the ultimate is the other valid answer", () => {
   assert.equal(combatPreview(s.run).incoming, 0);
   assert.ok(s.transmit().complete);
   assert.equal(s.last!.integrityDamage, 0);
+});
+
+function guard(s: Session, action: LessonAction) {
+  return lessonGuard(s.id, s.run, s.update(), action);
+}
+
+test("training rails: lesson 1 blocks off-script cards, dead-end cables and empty transmissions", () => {
+  const s = new Session("first-signal");
+  assert.ok(guard(s, { kind: "card", card: "pulse" }), "burst has no place before the route");
+  assert.ok(guard(s, { kind: "card", card: "fiber" }), "one step at a time: the router comes first");
+  assert.equal(guard(s, { kind: "card", card: "router" }), null);
+  assert.ok(guard(s, { kind: "transmit" }), "no route: the transmission would do nothing");
+  const router = place(s.run, "router", 0, 0);
+  assert.equal(guard(s, { kind: "card", card: "fiber" }), null, "the cabling step frees the fiber");
+  assert.ok(guard(s, { kind: "link", card: "fiber", a: "alpha", b: "omega" }), "a straight ALPHA–OMEGA cable is stopped");
+  assert.equal(guard(s, { kind: "link", card: "fiber", a: "alpha", b: router }), null);
+  cable(s.run, "alpha", router);
+  cable(s.run, router, "omega");
+  assert.equal(guard(s, { kind: "transmit" }), null, "a live route may transmit");
+  assert.ok(s.transmit().complete);
+  assert.equal(guard(s, { kind: "card", card: "pulse" }), null, "a complete lesson plays free");
+});
+
+test("training rails: cables must serve the step in every cabling lesson", () => {
+  const online = new Session("online");
+  assert.ok(guard(online, { kind: "link", card: "fiber", a: "alpha", b: "router1" }), "the Trust Gate comes first");
+  assert.equal(guard(online, { kind: "link", card: "fiber", a: "alpha", b: "firewall2" }), null);
+  const reroute = new Session("reroute");
+  const second = place(reroute.run, "router", 0, 2.6);
+  assert.ok(guard(reroute, { kind: "link", card: "fiber", a: "alpha", b: "router1" }), "the first route's router is off limits");
+  assert.equal(guard(reroute, { kind: "link", card: "fiber", a: "alpha", b: second }), null);
+  const traps = new Session("traps");
+  assert.ok(guard(traps, { kind: "link", card: "fiber", a: "alpha", b: "router1" }), "deploy the honeypot before cabling");
+  const honeypot = place(traps.run, "honeypot", -2.6, 2.6);
+  assert.ok(guard(traps, { kind: "link", card: "fiber", a: "alpha", b: "router1" }), "the cable must reach the decoy");
+  assert.equal(guard(traps, { kind: "link", card: "fiber", a: "alpha", b: honeypot }), null);
+});
+
+test("training rails: ground is held in the bands lesson", () => {
+  const s = new Session("bands");
+  assert.ok(guard(s, { kind: "move", node: "router1", zone: "north" }), "never into the storm's band");
+  assert.equal(guard(s, { kind: "move", node: "router1", zone: "center" }), null);
+  assert.ok(guard(s, { kind: "ground", card: "router", zone: "north" }), "no new hardware in the marked band");
+  assert.ok(guard(s, { kind: "zone", card: "purge-field", zone: "center" }), "purge belongs on the suppression");
+  assert.equal(guard(s, { kind: "zone", card: "purge-field", zone: "north" }), null);
+  ok(relocateNode(s.run, "router1", 0, 0), "relocate to center");
+  assert.ok(guard(s, { kind: "zone", card: "resonance-field", zone: "south" }), "resonance belongs where the route runs");
+  assert.equal(guard(s, { kind: "zone", card: "resonance-field", zone: "center" }), null);
+});
+
+test("training rails: the danger drill guards the prepare slot", () => {
+  const s = new Session("danger");
+  assert.ok(guard(s, { kind: "prepare", card: "guard" }), "the slot is for the burst answer");
+  assert.equal(guard(s, { kind: "prepare", card: "zero-day" }), null);
+});
+
+test("training rails: junk is always deletable, and a lethal turn always frees the shield", () => {
+  const s = new Session("danger");
+  assert.equal(guard(s, { kind: "card", card: "worm" }), null);
+  const covered = new Session("read-the-enemy");
+  assert.ok(combatPreview(covered.run).incoming > 0);
+  assert.equal(guard(covered, { kind: "card", card: "guard" }), null, "the cover step takes its shield");
+  const warden = new Session("console-warden");
+  assert.ok(guard(warden, { kind: "card", card: "guard" }), "outside its step even shield waits");
+  warden.run.integrity = 1;
+  assert.equal(guard(warden, { kind: "card", card: "guard" }), null, "unless the hit would end the drill");
+});
+
+test("training rails: a step the hand can no longer afford is not enforced", () => {
+  const s = new Session("reroute");
+  assert.ok(guard(s, { kind: "transmit" }), "the second channel comes first");
+  s.run.hand = [];
+  s.run.energy = 0;
+  assert.equal(guard(s, { kind: "transmit" }), null, "nothing left to build with: the drill moves on");
+});
+
+test("training rails: the ghost cannot transmit into packet loss", () => {
+  const s = new Session("console-ghost");
+  ok(useConsole(s.run), "buffer on");
+  s.transmit();
+  ok(useConsole(s.run), "buffer again, unprotected");
+  assert.ok(guard(s, { kind: "transmit" }), "packet loss ahead is stopped");
+  ok(playProtocol(s.run, index(s.run, "failover-policy")), "arm failover");
+  assert.equal(guard(s, { kind: "transmit" }), null);
+});
+
+test("training rails: a lethal transmission is stopped only while a shield answer remains", () => {
+  const s = new Session("console-warden");
+  s.run.integrity = 1;
+  assert.ok(combatPreview(s.run).incoming >= 1, "the strike would finish the drill");
+  assert.ok(guard(s, { kind: "transmit" }), "the coach stops the loss");
+  s.run.hand = s.run.hand.filter(card => card !== "guard");
+  assert.equal(guard(s, { kind: "transmit" }), null, "with no shield left the drill may play out");
 });
 
 test("progress is sticky and the menu order chains lessons", () => {

@@ -28,11 +28,13 @@ export {
   TRAINING_STORAGE,
   createLessonRun,
   lessonById,
+  lessonGuard,
   lessonProgress,
   loadCompletedLessons,
   markLessonComplete,
   nextLesson,
   resetTrainingProgress,
+  type LessonAction,
   type LessonDefinition,
   type LessonId,
   type LessonProgress,
@@ -42,6 +44,8 @@ export { HANDBOOK_CHAPTERS, handbookMarkup, type HandbookChapter } from "./tutor
 const asset = (path: string) => `${import.meta.env?.BASE_URL ?? "/"}${path}`;
 const TOTAL_CHAPTERS = Math.max(...LESSONS.map(lesson => lesson.chapter));
 const pad = (n: number) => String(n).padStart(2, "0");
+/** Coach text: escaped, with `**term**` highlighted so key words carry the sentence. */
+const rich = (text: string) => esc(text).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
 
 export interface PanelOptions {
   /** Show the hint (after inactivity or a failed action). */
@@ -59,23 +63,23 @@ export function lessonPanelMarkup(progress: LessonProgress, options: PanelOption
   return `<aside class="training-panel ${progress.complete ? "is-complete" : ""} ${options.collapsed ? "is-collapsed" : ""}" aria-label="Field training: ${esc(lesson.title)}" style="--training-progress:${(done / progress.goals.length) * 100}%">
     <header class="training-head">
       <span class="training-seal" aria-hidden="true">${icon(progress.complete ? "check" : lesson.icon, 20)}</span>
-      <div class="training-titles"><span class="training-kicker">FIELD TRAINING · ${pad(lesson.chapter)} / ${pad(TOTAL_CHAPTERS)} · ${esc(lesson.kicker)}</span><h3>${esc(lesson.title)}</h3></div>
+      <div class="training-titles"><span class="training-kicker"><span class="kicker-realm">FIELD TRAINING · </span>${pad(lesson.chapter)} / ${pad(TOTAL_CHAPTERS)} · ${esc(lesson.kicker)}</span><h3>${esc(lesson.title)}</h3></div>
       <button class="training-collapse" data-action="lesson-collapse" aria-expanded="${!options.collapsed}" aria-label="${options.collapsed ? "Expand" : "Minimise"} the lesson panel">${icon("chevron", 16)}</button>
     </header>
     <div class="training-meter" role="progressbar" aria-label="Lesson goals" aria-valuemin="0" aria-valuemax="${progress.goals.length}" aria-valuenow="${done}"><i></i></div>
     ${options.collapsed
-      ? `<p class="training-current">${progress.complete ? "Lesson complete" : esc(currentGoal?.label ?? "")}</p>`
-      : `<ol class="training-goals">${progress.goals.map((goal, i) => `<li class="${goal.done ? "done" : i === progress.current ? "current" : "pending"}"><i aria-hidden="true">${goal.done ? icon("check", 12) : i + 1}</i><span>${esc(goal.label)}</span>${goal.done ? '<span class="visually-hidden">(done)</span>' : ""}</li>`).join("")}</ol>
+      ? `<p class="training-current">${progress.complete ? "Lesson complete" : rich(progress.coach) || esc(currentGoal?.label ?? "")}</p>`
+      : `<div class="training-progress"><ol class="training-goals" aria-label="Lesson steps">${progress.goals.map((goal, i) => `<li class="${goal.done ? "done" : i === progress.current ? "current" : "pending"}" title="${esc(goal.label)}"><i aria-hidden="true">${goal.done ? icon("check", 12) : i + 1}</i><span class="visually-hidden">${esc(goal.label)}${goal.done ? " (done)" : ""}</span></li>`).join("")}</ol><span class="training-count">${progress.complete ? "ALL STEPS DONE" : `STEP ${progress.current + 1} OF ${progress.goals.length}`}</span></div>
+      ${progress.complete ? `<div class="training-complete"><span class="training-banner">${icon("check", 14)} LESSON COMPLETE</span><div class="training-actions">${next
+        ? `<button class="gold-button" data-action="lesson-next">Next · ${esc(next.title)} ${icon("arrow", 16)}</button>`
+        : `<button class="gold-button" data-action="lesson-exit">Return to the expedition ${icon("arrow", 16)}</button>`}<button class="training-link" data-action="lesson-menu">All lessons</button></div></div>` : ""}
       <div class="training-coach" aria-live="polite">${progress.complete
-        ? `<span class="training-label">WHY THIS MATTERS</span><p>${esc(progress.coach)}</p>`
-        : `<span class="training-label">COACH</span><p>${esc(progress.coach)}</p>`}</div>
+        ? `<span class="training-label">WHY THIS MATTERS</span><p class="coach-do">${rich(progress.coach)}</p>`
+        : `<span class="training-label">${esc(currentGoal?.label ?? "Your next move")}</span><p class="coach-do">${rich(progress.coach)}</p>${progress.detail ? `<p class="coach-why">${rich(progress.detail)}</p>` : ""}`}</div>
       ${progress.warning ? `<p class="training-warning" role="alert">${icon("warning", 15)} ${esc(progress.warning)}</p>` : ""}
       ${progress.complete ? "" : options.showHint && progress.hint
         ? `<p class="training-hint">${icon("hint", 15)} <span><b>HINT</b> ${esc(progress.hint)}</span></p>`
         : progress.hint ? `<button class="training-hint-button" data-action="lesson-hint">${icon("hint", 14)} Show a hint</button>` : ""}
-      ${progress.complete ? `<div class="training-complete"><span class="training-banner">${icon("check", 14)} LESSON COMPLETE</span><div class="training-actions">${next
-        ? `<button class="gold-button" data-action="lesson-next">Next · ${esc(next.title)} ${icon("arrow", 16)}</button>`
-        : `<button class="gold-button" data-action="lesson-exit">Return to the expedition ${icon("arrow", 16)}</button>`}<button class="training-link" data-action="lesson-menu">All lessons</button></div></div>` : ""}
       <footer class="training-foot"><button data-action="lesson-restart">${icon("undo", 13)} Restart</button><button data-action="lesson-menu">${icon("book", 13)} Lessons</button><button data-action="lesson-exit">${icon("close", 13)} Leave training</button><span>Practice only · your expedition is safe</span></footer>`}
   </aside>`;
 }

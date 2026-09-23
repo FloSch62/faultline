@@ -44,8 +44,9 @@ test("Field Training: lessons 1 and 3 complete through the real controls; exit r
   await lessonReady(page, "first-signal");
   await expandCoach(page);
 
-  // Lesson 1: router, two cables, transmit.
-  const terminals = await dockNodes(page);
+  // Lesson 1: router, two cables, transmit. The rails hold every card but the
+  // router while step one is open, so the fiber probe waits until the router stands.
+  const terminals = ["alpha", "omega"];
   await page.locator('[data-hand][data-card-id="router"]').first().click();
   await page.locator('#target-dock [data-action="auto-place"]').click();
   const router = (await dockNodes(page)).find(id => !terminals.includes(id))!;

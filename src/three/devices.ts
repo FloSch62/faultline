@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import type { NetworkNode, Role } from "../core/types.ts";
 import { box, cylinder, glow, mat, ring } from "./materials.ts";
+import { addModelBody } from "./models.ts";
 
 export const COLORS: Record<Role, number> = {
   client: 0xe2c184,
@@ -49,7 +50,7 @@ export function newDeviceGroup(node: NetworkNode): DeviceGroup {
   return group;
 }
 
-interface Palette { color: number; dark: THREE.Material; trim: THREE.Material; luminous: THREE.Material }
+export interface Palette { color: number; dark: THREE.Material; trim: THREE.Material; luminous: THREE.Material }
 
 function led(group: DeviceGroup, color: number, w: number, h: number, d: number, x: number, y: number, z: number, speed: number, phase: number, base = .9) {
   const material = glow(color, base);
@@ -61,8 +62,10 @@ function led(group: DeviceGroup, color: number, w: number, h: number, d: number,
   return mesh;
 }
 
-/** Builds the role-specific body above the shared base plinth. */
-export function addRoleBody(group: DeviceGroup, node: NetworkNode, { color, dark, trim, luminous }: Palette) {
+/** Builds the role-specific body above the shared base plinth: the Blender model when it has loaded, else primitives. */
+export function addRoleBody(group: DeviceGroup, node: NetworkNode, palette: Palette) {
+  if (addModelBody(group, node, palette)) return;
+  const { color, dark, trim, luminous } = palette;
   const data = group.userData;
   if (node.role === "client") {
     group.add(cylinder(0.46, 0.54, 0.48, 8, dark, 1.2));

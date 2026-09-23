@@ -2,8 +2,10 @@
  * Dev-only harness for the 3D battlefield (not part of the game build).
  * Open /dev/world-preview.html?enemy=core&scene=devices
  *   enemy   any hostile id (default leech)
- *   scene   devices | terrain | empty (default devices)
+ *   scene   devices | terrain | gallery | empty (default devices)
+ *           gallery: one of every role (and variants) in two rows, for model review
  *   online  0 disables the online/offline pass (everything lit)
+ *   cam     x,y,z camera position and target x,y,z orbit target, for close-ups
  * `window.__world` exposes the World for scripted captures.
  */
 import { World } from "../src/three/World.ts";
@@ -60,6 +62,17 @@ if (scene === "devices" || scene === "terrain") {
   ];
   online = ["router1", "switch2", "balancer3", "router4", "firewall5", "power6"];
 }
+if (scene === "gallery") {
+  const back: [string, NetworkNode["role"], Partial<NetworkNode>][] = [
+    ["router", "router", {}], ["switch", "switch", {}], ["firewall", "firewall", {}], ["stateful", "firewall", { stateful: true }],
+  ];
+  const front: [string, NetworkNode["role"], Partial<NetworkNode>][] = [
+    ["client", "client", {}], ["honeypot", "honeypot", {}], ["cache", "cache", {}], ["power", "power", {}], ["balancer", "balancer", {}],
+  ];
+  back.forEach(([id, role, extra], i) => topology.nodes.push(node(id, role, -3.3 + i * 2.2, -1.9, extra)));
+  front.forEach(([id, role, extra], i) => topology.nodes.push(node(id, role, -4.4 + i * 2.2, 1.9, extra)));
+  online = topology.nodes.map(item => item.id);
+}
 if (scene === "terrain") {
   terrain = { name: "Collapsed rack row", description: "Wreckage blocks two sockets.", debris: [{ x: -1.2, z: -1.6 }, { x: 4, z: 1.6 }] };
   // Two unarmored spans across the wrecks: they fray.
@@ -85,6 +98,15 @@ function apply() {
   world.setZoneEffects([]);
 }
 apply();
+const vector = (value: string | null) => value?.split(",").map(Number) as [number, number, number] | undefined;
+const cam = vector(params.get("cam"));
+if (cam) {
+  // The game keeps the camera 13.5+ away; close-ups for model review need to get nearer.
+  world.controls.minDistance = 0.5;
+  world.camera.position.set(...cam);
+  world.controls.target.set(...(vector(params.get("target")) ?? [0, 0.8, 0]));
+  world.controls.update();
+}
 caption(`${definition.name} · scene ${scene}`);
 Object.assign(window, {
   __world: world,

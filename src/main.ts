@@ -51,6 +51,7 @@ import {
 } from "./core/run.ts";
 import type { CardId, RelicId, RunState, Zone } from "./core/types.ts";
 import { World, type WorldPoint } from "./three/World.ts";
+import { loadDeviceModels } from "./three/models.ts";
 import * as ui from "./ui.ts";
 import * as battleUi from "./battle-ui.ts";
 import * as screens from "./screens.ts";
@@ -62,6 +63,8 @@ const $ = <T extends HTMLElement = HTMLElement>(selector: string) =>
   document.querySelector<T>(selector)!;
 const STORAGE = "faultline-expedition-v2";
 const sound = new Soundscape();
+// Fetch the device models behind the title screen so the first table is built with them.
+void loadDeviceModels();
 /** Enemy intent → the cue heard on its contact frame. */
 const INTENT_CUES: Record<string, EffectKind> = {
   strike: "strike", breach: "breach", sever: "sever", jam: "jam", corrupt: "corrupt", charge: "charge", infect: "malware",

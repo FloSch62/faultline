@@ -9,6 +9,7 @@ artifacts/
 .env.*
 !.env.example
 .DS_Store
+__pycache__/
 
 # Large music production intermediates; scores and provenance remain tracked.
 soundtrack/**/*.flac

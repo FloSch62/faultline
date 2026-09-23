@@ -30,6 +30,7 @@ The browser suite launches a preview server on port 4174 for that production che
 - Keep readable enemy intentions, card rules and actual damage in agreement.
 - Desktop is the primary target. Check 1366×768 and 1920×1080, long hands, keyboard controls and reduced motion.
 - Use the existing brass, worn ivory and indigo art direction. Preserve enough contrast to read cards during play.
+- Device models are built by the scripts in `blender/devices/`; change the script and run `npm run models` rather than editing a GLB by hand. `/dev/world-preview.html?scene=gallery` shows every role in the real renderer. See [blender/README.md](blender/README.md).
 - Include a screenshot or a short recording for visual changes. `node scripts/capture.mjs` captures a repeatable encounter while the dev server runs.
 - Preserve third-party notices. Document new assets and their source/license. Generated art and music have their prompts and production metadata documented in the repository.
 - Finished artwork, fonts and playable music are bundled. Do not add API keys or require a music model to play the game.

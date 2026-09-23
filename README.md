@@ -29,9 +29,10 @@ npm run balance -- 500 # Reproducible seeded balance probe
 npx playwright install chromium
 npm run test:e2e    # Actual browser gameplay, desktop layout and audio playback
 npm run test:smoke  # A quick @smoke subset of the browser suite
+npm run models      # Rebuild the device models from blender/ (needs Blender 4.2+)
 ```
 
-Playing requires no API keys, GPU music model, Containerlab daemon, or external asset service. All artwork, fonts and playable music are bundled. Hardware-accelerated WebGL is recommended. Desktop is the primary target. The game defaults to 110% interface scale while browser zoom stays at 100%; compact windows scroll instead of cropping essential controls.
+Playing requires no API keys, GPU music model, Containerlab daemon, or external asset service. All artwork, device models, fonts and playable music are bundled. Hardware-accelerated WebGL is recommended. Desktop is the primary target. The game defaults to 110% interface scale while browser zoom stays at 100%; compact windows scroll instead of cropping essential controls.
 
 ## Inside the game
 
@@ -94,7 +95,8 @@ Fields belong to the ground: moving hardware changes which effects apply immedia
 ## Project guide
 
 - `src/core/` — deterministic rules: `cards.ts` (`RULES`, cards, upgrades, relics), `run.ts` (combat and forecast), `graph.ts` (routes and channels), `terrain.ts`, `enemies.ts`, `meta.ts` (rooms, rewards, market, sanctuary), `events.ts`, `ascension.ts`, `map.ts`, `expedition.ts` (archetypes and save validation) and YAML export.
-- `src/three/` — table, device models, terrain props, cables, painted enemies, lighting and packet animation.
+- `src/three/` — table, device models (`models.ts` loads the Blender bodies), terrain props, cables, painted enemies, lighting and packet animation.
+- `blender/` — one Python script per device role that builds its body in Blender and exports `public/models/<role>.glb`; see the [device model contract](blender/README.md).
 - `src/ui.ts`, `src/alpha-ui.ts`, `src/screens.ts` and their stylesheets — illustrated cards, the battle HUD, inspection and every expedition screen.
 - `src/tutorial.ts`, `src/tutorial/` — Field Training lessons and the illustrated Handbook.
 - `src/story.ts` — chapters, enemy motivations, sanctuary discoveries and endings.

@@ -10,7 +10,8 @@
     "test": "node --experimental-strip-types --test src/core/*.test.ts",
     "test:e2e": "playwright test",
     "test:smoke": "playwright test --grep @smoke",
-    "balance": "node --experimental-strip-types scripts/balance.ts"
+    "balance": "node --experimental-strip-types scripts/balance.ts",
+    "models": "node --experimental-strip-types scripts/models.ts"
   },
   "dependencies": {
     "three": "^0.180.0"

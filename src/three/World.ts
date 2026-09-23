@@ -17,6 +17,7 @@ import { STAGES } from "../core/stages.ts";
 import { EnemyActor } from "./EnemyActor.ts";
 import { cylinder, glow, mat, ring } from "./materials.ts";
 import { COLORS, addRoleBody, addSalvageScrap, animateDevice, newDeviceGroup, type DeviceGroup } from "./devices.ts";
+import { deviceModelsSettled, loadDeviceModels } from "./models.ts";
 import { MALWARE_COLOR, animateProp, buildDebris, buildMalware, buildMalwareGhost, type PropGroup } from "./props.ts";
 
 export type WorldPoint = { x: number; z: number };
@@ -288,6 +289,11 @@ export class World {
     canvas.addEventListener("pointercancel", this.onPointerCancel);
     canvas.addEventListener("pointerleave", this.onPointerLeave);
     this.tick();
+    // Blender device bodies stream in; anything built before they land is rebuilt once.
+    if (!deviceModelsSettled())
+      void loadDeviceModels().then((loaded) => {
+        if (loaded && this.active) this.rebuildDevices();
+      });
   }
 
   private buildTable() {
@@ -835,6 +841,22 @@ export class World {
     return group;
   }
 
+  /** Swaps every device for a fresh build in place, e.g. once the Blender models have loaded. */
+  private rebuildDevices() {
+    for (const [id, old] of this.devices) {
+      const node = this.topology.nodes.find((candidate) => candidate.id === id);
+      if (!node) continue;
+      const next = this.createDevice(node);
+      next.position.copy(old.position);
+      const stale = this.hitObjects.findIndex((hit) => hit.parent === old);
+      if (stale >= 0) this.hitObjects.splice(stale, 1);
+      this.dynamic.remove(old);
+      this.disposeObject(old);
+      this.dynamic.add(next);
+      this.devices.set(id, next);
+    }
+  }
+
   /** Offline hardware is desaturated and quiet; salvage stays weathered until it joins a route. */
   private applyOnline(group: DeviceGroup, node: NetworkNode) {
     const online = this.isOnline(node);
@@ -980,8 +1002,9 @@ export class World {
     const textures = new Set<THREE.Texture>();
     object.traverse((child) => {
       if (child instanceof THREE.Mesh || child instanceof THREE.Sprite || child instanceof THREE.Points || child instanceof THREE.Line) {
-        // Sprite geometry is shared internally by Three.js; its material is owned here.
-        if (!(child instanceof THREE.Sprite)) geometries.add(child.geometry);
+        // Sprite geometry is shared internally by Three.js (its material is owned here);
+        // device models share their geometry across every instance.
+        if (!(child instanceof THREE.Sprite) && !child.geometry.userData.shared) geometries.add(child.geometry);
         const childMaterials = Array.isArray(child.material)
           ? child.material
           : [child.material];

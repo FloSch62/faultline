@@ -15,7 +15,8 @@ for (const id of enemies) {
   page.on("console", message => { if (message.type() === "error") console.error("console", message.text()); });
   const clock = !!process.env.CLOCK;
   if (clock) await page.clock.install({ time: 1_000_000 });
-  await page.goto(`${base}dev/world-preview.html?enemy=${id}&scene=${scene}`);
+  // QUERY adds harness parameters, e.g. QUERY='cam=0,5,7&target=0,1,0'.
+  await page.goto(`${base}dev/world-preview.html?enemy=${id}&scene=${scene}${process.env.QUERY ? `&${process.env.QUERY}` : ""}`);
   if (clock) await page.clock.runFor(1600);
   await page.waitForSelector('#world[data-enemy-state="idle"]', { timeout: 20000 }).catch(() => console.error("no idle state"));
   if (!clock) await page.waitForTimeout(Number(process.env.WAIT ?? 900));

@@ -1,14 +1,32 @@
-import { test, expect, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+// Every test also fails on any page or console error (see helpers.ts).
+import { expect, test } from "./helpers.ts";
+import { RULES } from "../src/core/cards.ts";
 import { newExpedition } from "../src/core/expedition.ts";
 import { chooseRoom } from "../src/core/run.ts";
+import type { CardId } from "../src/core/types.ts";
 const key = "faultline-expedition-v2";
 async function startBattle(
   page: Page,
   seed = 12345,
   archetype: "architect" | "ghost" = "architect",
+  options: {
+    hand?: CardId[];
+    drawPile?: CardId[];
+    enemyHp?: number;
+    enemyId?: string;
+  } = {},
 ) {
   const e = newExpedition(archetype, seed);
   chooseRoom(e.run, "0-1");
+  if (options.hand) {
+    e.run.hand = options.hand;
+    for (const card of options.hand)
+      if (!e.run.deck.includes(card)) e.run.deck.push(card);
+  }
+  if (options.drawPile) e.run.drawPile = options.drawPile;
+  if (options.enemyHp) e.run.enemy!.hp = e.run.enemy!.maxHp = options.enemyHp;
+  if (options.enemyId) e.run.enemy!.id = options.enemyId;
   await page.addInitScript(
     ({ key, value }) => localStorage.setItem(key, value),
     { key, value: JSON.stringify(e) },
@@ -42,8 +60,8 @@ test("a new expedition has working loadouts, map, settings, and isolated saves",
     (key) => JSON.parse(localStorage.getItem(key)!),
     key,
   );
-  expect(saved.run.integrity).toBe(18);
-  expect(saved.run.relics).toEqual(["shield-array"]);
+  expect(saved.run.integrity).toBe(15);
+  expect(saved.run.relics).toEqual(["backpressure"]);
   await page.getByRole("button", { name: "Open settings" }).click();
   await page.getByRole("slider", { name: "Music volume" }).fill("24");
   await expect(page.locator('[data-setting="music"]')).toHaveValue("24");
@@ -53,7 +71,7 @@ test("a new expedition has working loadouts, map, settings, and isolated saves",
   ).toBeVisible();
   await page.reload();
   await page.getByRole("button", { name: /Continue expedition/ }).click();
-  await expect(page.locator(".integrity-stat")).toContainText("18");
+  await expect(page.locator(".integrity-stat")).toContainText("15");
   expect(
     await page.evaluate(() => localStorage.getItem("faultline-run-v1")),
   ).toBeNull();
@@ -65,7 +83,12 @@ test("build, undo, connect, transmit, recover a fault, and take a reward", async
   test.setTimeout(100_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await startBattle(page);
+  await startBattle(page, 12345, "architect", {
+    enemyHp: 10,
+    enemyId: "wraith",
+    hand: ["router", "fiber", "fiber", "guard", "guard", "inspect"],
+    drawPile: ["patch", "fiber", "guard", "router", "fiber", "router"],
+  });
   await playCard(page, "router");
   await page.getByRole("button", { name: /Deploy in a free socket/ }).click();
   await expect(page.locator(".energy-orb strong")).toHaveText("3");
@@ -76,23 +99,22 @@ test("build, undo, connect, transmit, recover a fault, and take a reward", async
   await wire(page, "alpha", "router1");
   await wire(page, "router1", "omega");
   await expect(page.locator(".signal-readout")).toHaveClass(/online/);
-  await expect(page.locator(".intent-preview")).toContainText("5 damage");
+  await expect(page.locator(".transmit-power strong")).toHaveText("5");
   await page.getByRole("button", { name: /^Transmit/ }).click();
-  await expect(page.locator(".turn-label")).toContainText("02", {
+  await expect(page.locator(".round-banner")).toContainText("02", {
     timeout: 15000,
   });
   await expect(page.locator(".enemy-health-label strong")).toContainText("5");
-  // With a fixed seed this enemy jams a device. A failed signal must not pretend to deal damage.
-  const phase = async () =>
-    page.locator(".game-root").getAttribute("data-view");
-  for (let turn = 0; turn < 8 && (await phase()) === "battle"; turn++) {
-    const patch = page.locator('[data-hand][data-card-id="patch"]');
-    if (await patch.count()) await patch.first().click();
-    await page.getByRole("button", { name: /^Transmit/ }).click();
-    await expect(page.locator(".game-root")).not.toHaveClass(/busy/, {
-      timeout: 15000,
-    });
-  }
+  // The Wraith cuts the route. Repairing the announced fault restores the actual damage.
+  await expect(page.locator(".transmit-power strong")).toHaveText("0");
+  await expect(page.locator(".signal-readout")).not.toHaveClass(/online/);
+  await playCard(page, "patch");
+  await expect(page.locator(".transmit-power strong")).toHaveText("5");
+  await expect(page.locator(".signal-readout")).toHaveClass(/online/);
+  await page.getByRole("button", { name: /^Transmit/ }).click();
+  await expect(page.locator(".game-root")).not.toHaveClass(/busy/, {
+    timeout: 15000,
+  });
   await expect(page.locator(".game-root")).toHaveAttribute(
     "data-view",
     "reward",
@@ -144,15 +166,19 @@ test("Containerlab and Clabernetes deploy, replicate, undo, and transmit", async
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await startBattle(page, 8);
+  await startBattle(page, 8, "architect", {
+    hand: ["router", "fiber", "fiber", "containerlab", "clabernetes", "guard"],
+    enemyHp: 11,
+  });
   await playCard(page, "containerlab");
   await expect(page.locator(".energy-orb strong")).toHaveText("2");
-  await expect(page.locator(".intent-preview")).toHaveText("7 damage");
+  await expect(page.locator(".transmit-power strong")).toHaveText("7");
   await playCard(page, "clabernetes");
   await expect(page.locator('[data-node="alpha"]')).toHaveCount(0);
   await page.locator('[data-node="router1"]').click();
   await expect(page.locator(".energy-orb strong")).toHaveText("0");
-  await expect(page.locator(".intent-preview")).toHaveText("9 damage");
+  // Overclocked replica: a second channel adds bandwidth.
+  await expect(page.locator(".transmit-power strong")).toHaveText(String(7 + RULES.bandwidthPerChannel));
   await page.keyboard.press("z");
   await expect(page.locator(".energy-orb strong")).toHaveText("2");
   const undone = await page.evaluate(
@@ -167,10 +193,10 @@ test("Containerlab and Clabernetes deploy, replicate, undo, and transmit", async
   await playCard(page, "clabernetes");
   await page.locator('[data-node="router1"]').click();
   await page.locator("body").press("Space");
-  await expect(page.locator(".turn-label")).toContainText("02", {
+  await expect(page.locator(".round-banner")).toContainText("02", {
     timeout: 15000,
   });
-  await expect(page.locator(".enemy-health-label strong")).toHaveText("1 / 10");
+  await expect(page.locator(".enemy-health-label strong")).toHaveText(`${11 - 7 - RULES.bandwidthPerChannel} / 11`);
   const saved = await page.evaluate(
     (key) => JSON.parse(localStorage.getItem(key)!),
     key,
@@ -194,11 +220,14 @@ test("painted desktop controls stay clear of the hand at laptop and full HD size
     await page.setViewportSize(viewport);
     const plaque = await page.locator(".battle-left").boundingBox();
     const note = await page.locator(".tutorial-callout").boundingBox();
-    expect(note!.y).toBeGreaterThan(plaque!.y + plaque!.height);
     const transmit = page.getByRole("button", { name: /^Transmit/ });
     await expect(transmit).toBeInViewport();
     const a = await transmit.boundingBox();
-    const b = await page.locator(".card-fan .game-card").last().boundingBox();
+    const b = await page.locator("#hand-zone").boundingBox();
+    if (note) {
+      expect(note.x).toBeGreaterThan(plaque!.x + plaque!.width);
+      expect(note.y + note.height).toBeLessThan(b!.y - 12);
+    }
     expect(a!.x).toBeGreaterThan(b!.x + b!.width);
     for (const side of [".battle-left", ".battle-right"]) {
       await expect(page.locator(side)).toBeInViewport();
@@ -252,17 +281,27 @@ test("an expanded Ghost hand leaves the transmission control clickable", async (
   page,
 }) => {
   await page.setViewportSize({ width: 1366, height: 768 });
-  await startBattle(page, 2, "ghost");
+  await startBattle(page, 2, "ghost", {
+    hand: [
+      "router",
+      "fiber",
+      "fiber",
+      "containerlab",
+      "surge",
+      "fiber",
+      "guard",
+    ],
+  });
   await playCard(page, "surge");
   await expect(page.locator("[data-hand]")).toHaveCount(8);
   await page.mouse.move(500, 60);
   await expect(page.locator(".energy-orb strong")).toHaveText("7");
   const dial = page.getByRole("button", { name: /^Transmit/ });
   const a = await dial.boundingBox();
-  const b = await page.locator(".card-fan .game-card").last().boundingBox();
+  const b = await page.locator("#hand-zone").boundingBox();
   expect(a!.x).toBeGreaterThan(b!.x + b!.width);
   await dial.click();
-  await expect(page.locator(".turn-label")).toContainText("02", {
+  await expect(page.locator(".round-banner")).toContainText("02", {
     timeout: 15000,
   });
 });

@@ -1,0 +1,15 @@
+{
+  "source": "../../instrumental-v3/a-thousand-fractures/audio.flac",
+  "separation_model": "htdemucs_ft",
+  "included_stems": [
+    "drums",
+    "bass",
+    "other"
+  ],
+  "excluded_stems": [
+    "vocals"
+  ],
+  "instrumental_rms": 0.14066895842552185,
+  "removed_vocal_rms": 0.013042794540524483,
+  "sample_rate": 44100
+}

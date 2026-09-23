@@ -1,0 +1,3234 @@
+{
+  "date": "2026-09-23",
+  "notes": "v3 combat and expedition layer, final tuning: normal hostile health 16 + 5 × floor + 13 × stage, guardian health 67 / 96 / 132 (Regent / Hollow Choir / Blackout Core). 150 deterministic seeds per archetype and policy; four lightweight bots (careless, aggressive, adaptive, tactical) play every room of all three stages, including market, events and sanctuary via scripts/bot-meta.ts. These are regression probes, not human difficulty or enjoyment measurements.",
+  "tuning": {
+    "bandwidthPerChannel": 3,
+    "parallelCorePerChannel": 4,
+    "firewallBreachBlock": 2,
+    "firewallStrikeBlock": 1,
+    "hardenShield": 2,
+    "hardenPerFirewall": 1,
+    "separatedCircuitShield": 3,
+    "bufferMultiplier": 2,
+    "backpressureRatio": 0.5,
+    "coreEnrage": {
+      "attacks": 2,
+      "faults": 1
+    },
+    "gradedArmor": {
+      "base": 4,
+      "perChannel": 2
+    },
+    "normalHealth": "16 + 5 × floor + 13 × stage",
+    "guardianHealth": [
+      67,
+      96,
+      132
+    ]
+  },
+  "scenarios": {
+    "current": {
+      "notes": "v3 deterministic bots, default routing, ascension 0. Regression probes, not a human difficulty estimate.",
+      "profiles": [
+        {
+          "archetype": "architect",
+          "policy": "careless",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 0,
+          "winRate": "0%",
+          "sampleWinningSeeds": [],
+          "reachedCore": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            }
+          },
+          "lostTo": {
+            "leech": 25,
+            "weaver": 2,
+            "moth": 20,
+            "serpent": 39,
+            "prophet": 19,
+            "colossus": 8,
+            "sentinel": 6,
+            "wraith": 31
+          },
+          "averageTurnsPerBattle": 4.8,
+          "averageTurnsPerNormalBattle": 4.84,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 2.6
+        },
+        {
+          "archetype": "architect",
+          "policy": "aggressive",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 12,
+          "winRate": "8%",
+          "sampleWinningSeeds": [
+            1549107668,
+            3485492253,
+            2767441077
+          ],
+          "reachedCore": 23,
+          "guardians": {
+            "regent": {
+              "encounters": 141,
+              "wins": 125,
+              "losses": 16,
+              "turns": 823,
+              "ultimates": 38,
+              "interrupts": 34,
+              "ultimateDamage": 34,
+              "averageTurns": 5.8
+            },
+            "cantor": {
+              "encounters": 90,
+              "wins": 64,
+              "losses": 26,
+              "turns": 584,
+              "ultimates": 60,
+              "interrupts": 48,
+              "ultimateDamage": 92,
+              "averageTurns": 6.5
+            },
+            "core": {
+              "encounters": 23,
+              "wins": 12,
+              "losses": 11,
+              "turns": 137,
+              "ultimates": 14,
+              "interrupts": 10,
+              "ultimateDamage": 30,
+              "averageTurns": 6
+            }
+          },
+          "lostTo": {
+            "storm": 2,
+            "marshal": 18,
+            "reaver": 14,
+            "weaver": 8,
+            "core": 11,
+            "sentinel": 2,
+            "cantor": 26,
+            "colossus": 18,
+            "choir": 10,
+            "leech": 1,
+            "regent": 16,
+            "widow": 6,
+            "serpent": 5,
+            "prophet": 1
+          },
+          "averageTurnsPerBattle": 4.16,
+          "averageTurnsPerNormalBattle": 3.67,
+          "averageIntegrityOnWin": 6.3,
+          "averageLossSector": 13.6
+        },
+        {
+          "archetype": "architect",
+          "policy": "adaptive",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 29,
+          "winRate": "19%",
+          "sampleWinningSeeds": [
+            2654435761,
+            3041712678,
+            3428989595
+          ],
+          "reachedCore": 63,
+          "guardians": {
+            "regent": {
+              "encounters": 147,
+              "wins": 141,
+              "losses": 6,
+              "turns": 892,
+              "ultimates": 49,
+              "interrupts": 45,
+              "ultimateDamage": 24,
+              "averageTurns": 6.1
+            },
+            "cantor": {
+              "encounters": 118,
+              "wins": 109,
+              "losses": 9,
+              "turns": 832,
+              "ultimates": 92,
+              "interrupts": 83,
+              "ultimateDamage": 48,
+              "averageTurns": 7.1
+            },
+            "core": {
+              "encounters": 63,
+              "wins": 29,
+              "losses": 34,
+              "turns": 357,
+              "ultimates": 34,
+              "interrupts": 27,
+              "ultimateDamage": 54,
+              "averageTurns": 5.7
+            }
+          },
+          "lostTo": {
+            "cantor": 9,
+            "choir": 6,
+            "reaver": 13,
+            "sentinel": 6,
+            "widow": 2,
+            "marshal": 16,
+            "colossus": 13,
+            "moth": 1,
+            "core": 34,
+            "regent": 6,
+            "serpent": 6,
+            "weaver": 9
+          },
+          "averageTurnsPerBattle": 4.39,
+          "averageTurnsPerNormalBattle": 3.86,
+          "averageIntegrityOnWin": 7.2,
+          "averageLossSector": 16.4
+        },
+        {
+          "archetype": "architect",
+          "policy": "tactical",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 58,
+          "winRate": "39%",
+          "sampleWinningSeeds": [
+            2654435761,
+            1013904226,
+            387276917
+          ],
+          "reachedCore": 81,
+          "guardians": {
+            "regent": {
+              "encounters": 148,
+              "wins": 143,
+              "losses": 5,
+              "turns": 923,
+              "ultimates": 59,
+              "interrupts": 52,
+              "ultimateDamage": 17,
+              "averageTurns": 6.2
+            },
+            "cantor": {
+              "encounters": 135,
+              "wins": 130,
+              "losses": 5,
+              "turns": 995,
+              "ultimates": 105,
+              "interrupts": 83,
+              "ultimateDamage": 65,
+              "averageTurns": 7.4
+            },
+            "core": {
+              "encounters": 81,
+              "wins": 58,
+              "losses": 23,
+              "turns": 562,
+              "ultimates": 60,
+              "interrupts": 54,
+              "ultimateDamage": 18,
+              "averageTurns": 6.9
+            }
+          },
+          "lostTo": {
+            "colossus": 20,
+            "reaver": 17,
+            "serpent": 2,
+            "marshal": 10,
+            "sentinel": 4,
+            "core": 23,
+            "regent": 5,
+            "cantor": 5,
+            "weaver": 2,
+            "moth": 1,
+            "widow": 2,
+            "leech": 1
+          },
+          "averageTurnsPerBattle": 4.56,
+          "averageTurnsPerNormalBattle": 3.86,
+          "averageIntegrityOnWin": 8.2,
+          "averageLossSector": 17.3
+        },
+        {
+          "archetype": "warden",
+          "policy": "careless",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 0,
+          "winRate": "0%",
+          "sampleWinningSeeds": [],
+          "reachedCore": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            }
+          },
+          "lostTo": {
+            "leech": 29,
+            "weaver": 5,
+            "moth": 13,
+            "serpent": 39,
+            "prophet": 18,
+            "colossus": 9,
+            "sentinel": 8,
+            "wraith": 29
+          },
+          "averageTurnsPerBattle": 4.96,
+          "averageTurnsPerNormalBattle": 4.93,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 2.8
+        },
+        {
+          "archetype": "warden",
+          "policy": "aggressive",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 4,
+          "winRate": "3%",
+          "sampleWinningSeeds": [
+            3485492253,
+            556784891,
+            2105892559
+          ],
+          "reachedCore": 22,
+          "guardians": {
+            "regent": {
+              "encounters": 148,
+              "wins": 108,
+              "losses": 40,
+              "turns": 1233,
+              "ultimates": 150,
+              "interrupts": 31,
+              "ultimateDamage": 605,
+              "averageTurns": 8.3
+            },
+            "cantor": {
+              "encounters": 103,
+              "wins": 42,
+              "losses": 61,
+              "turns": 945,
+              "ultimates": 119,
+              "interrupts": 8,
+              "ultimateDamage": 696,
+              "averageTurns": 9.2
+            },
+            "core": {
+              "encounters": 22,
+              "wins": 4,
+              "losses": 18,
+              "turns": 183,
+              "ultimates": 25,
+              "interrupts": 1,
+              "ultimateDamage": 143,
+              "averageTurns": 8.3
+            }
+          },
+          "lostTo": {
+            "core": 18,
+            "marshal": 5,
+            "cantor": 61,
+            "serpent": 5,
+            "colossus": 8,
+            "regent": 40,
+            "reaver": 4,
+            "choir": 1,
+            "sentinel": 2,
+            "widow": 1,
+            "wraith": 1
+          },
+          "averageTurnsPerBattle": 5.4,
+          "averageTurnsPerNormalBattle": 4.48,
+          "averageIntegrityOnWin": 6,
+          "averageLossSector": 13.3
+        },
+        {
+          "archetype": "warden",
+          "policy": "adaptive",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 19,
+          "winRate": "13%",
+          "sampleWinningSeeds": [
+            2654435761,
+            147926525,
+            535203442
+          ],
+          "reachedCore": 51,
+          "guardians": {
+            "regent": {
+              "encounters": 149,
+              "wins": 138,
+              "losses": 11,
+              "turns": 1268,
+              "ultimates": 147,
+              "interrupts": 36,
+              "ultimateDamage": 233,
+              "averageTurns": 8.5
+            },
+            "cantor": {
+              "encounters": 132,
+              "wins": 90,
+              "losses": 42,
+              "turns": 1378,
+              "ultimates": 168,
+              "interrupts": 15,
+              "ultimateDamage": 691,
+              "averageTurns": 10.4
+            },
+            "core": {
+              "encounters": 51,
+              "wins": 19,
+              "losses": 32,
+              "turns": 464,
+              "ultimates": 57,
+              "interrupts": 4,
+              "ultimateDamage": 281,
+              "averageTurns": 9.1
+            }
+          },
+          "lostTo": {
+            "core": 32,
+            "cantor": 42,
+            "serpent": 10,
+            "reaver": 11,
+            "colossus": 12,
+            "sentinel": 3,
+            "marshal": 4,
+            "regent": 11,
+            "choir": 3,
+            "weaver": 3
+          },
+          "averageTurnsPerBattle": 5.78,
+          "averageTurnsPerNormalBattle": 4.78,
+          "averageIntegrityOnWin": 6.8,
+          "averageLossSector": 16.2
+        },
+        {
+          "archetype": "warden",
+          "policy": "tactical",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 52,
+          "winRate": "35%",
+          "sampleWinningSeeds": [
+            2654435761,
+            1013904226,
+            2027808452
+          ],
+          "reachedCore": 95,
+          "guardians": {
+            "regent": {
+              "encounters": 150,
+              "wins": 148,
+              "losses": 2,
+              "turns": 1358,
+              "ultimates": 152,
+              "interrupts": 27,
+              "ultimateDamage": 134,
+              "averageTurns": 9.1
+            },
+            "cantor": {
+              "encounters": 148,
+              "wins": 118,
+              "losses": 30,
+              "turns": 1566,
+              "ultimates": 188,
+              "interrupts": 21,
+              "ultimateDamage": 570,
+              "averageTurns": 10.6
+            },
+            "core": {
+              "encounters": 95,
+              "wins": 52,
+              "losses": 43,
+              "turns": 901,
+              "ultimates": 105,
+              "interrupts": 9,
+              "ultimateDamage": 336,
+              "averageTurns": 9.5
+            }
+          },
+          "lostTo": {
+            "cantor": 30,
+            "core": 43,
+            "marshal": 2,
+            "reaver": 5,
+            "sentinel": 1,
+            "regent": 2,
+            "colossus": 8,
+            "widow": 1,
+            "serpent": 5,
+            "choir": 1
+          },
+          "averageTurnsPerBattle": 6.01,
+          "averageTurnsPerNormalBattle": 4.76,
+          "averageIntegrityOnWin": 9.3,
+          "averageLossSector": 17.9
+        },
+        {
+          "archetype": "ghost",
+          "policy": "careless",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 0,
+          "winRate": "0%",
+          "sampleWinningSeeds": [],
+          "reachedCore": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            }
+          },
+          "lostTo": {
+            "leech": 19,
+            "serpent": 52,
+            "moth": 14,
+            "wraith": 46,
+            "prophet": 9,
+            "colossus": 4,
+            "sentinel": 5,
+            "weaver": 1
+          },
+          "averageTurnsPerBattle": 4.57,
+          "averageTurnsPerNormalBattle": 4.6,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 2
+        },
+        {
+          "archetype": "ghost",
+          "policy": "aggressive",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 3,
+          "winRate": "2%",
+          "sampleWinningSeeds": [
+            1788458060,
+            887559150,
+            648208758
+          ],
+          "reachedCore": 6,
+          "guardians": {
+            "regent": {
+              "encounters": 141,
+              "wins": 72,
+              "losses": 69,
+              "turns": 751,
+              "ultimates": 53,
+              "interrupts": 21,
+              "ultimateDamage": 236,
+              "averageTurns": 5.3
+            },
+            "cantor": {
+              "encounters": 53,
+              "wins": 22,
+              "losses": 31,
+              "turns": 321,
+              "ultimates": 31,
+              "interrupts": 13,
+              "ultimateDamage": 142,
+              "averageTurns": 6.1
+            },
+            "core": {
+              "encounters": 6,
+              "wins": 3,
+              "losses": 3,
+              "turns": 50,
+              "ultimates": 7,
+              "interrupts": 4,
+              "ultimateDamage": 17,
+              "averageTurns": 8.3
+            }
+          },
+          "lostTo": {
+            "regent": 69,
+            "cantor": 31,
+            "colossus": 10,
+            "marshal": 15,
+            "reaver": 6,
+            "leech": 2,
+            "core": 3,
+            "choir": 3,
+            "storm": 1,
+            "serpent": 5,
+            "sentinel": 2
+          },
+          "averageTurnsPerBattle": 3.64,
+          "averageTurnsPerNormalBattle": 3.1,
+          "averageIntegrityOnWin": 6.7,
+          "averageLossSector": 10.3
+        },
+        {
+          "archetype": "ghost",
+          "policy": "adaptive",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 23,
+          "winRate": "15%",
+          "sampleWinningSeeds": [
+            2654435761,
+            3816266512,
+            4203543429
+          ],
+          "reachedCore": 53,
+          "guardians": {
+            "regent": {
+              "encounters": 149,
+              "wins": 134,
+              "losses": 15,
+              "turns": 743,
+              "ultimates": 12,
+              "interrupts": 5,
+              "ultimateDamage": 38,
+              "averageTurns": 5
+            },
+            "cantor": {
+              "encounters": 114,
+              "wins": 89,
+              "losses": 25,
+              "turns": 687,
+              "ultimates": 47,
+              "interrupts": 20,
+              "ultimateDamage": 163,
+              "averageTurns": 6
+            },
+            "core": {
+              "encounters": 53,
+              "wins": 23,
+              "losses": 30,
+              "turns": 303,
+              "ultimates": 27,
+              "interrupts": 13,
+              "ultimateDamage": 101,
+              "averageTurns": 5.7
+            }
+          },
+          "lostTo": {
+            "sentinel": 5,
+            "cantor": 25,
+            "reaver": 9,
+            "core": 30,
+            "serpent": 7,
+            "marshal": 16,
+            "weaver": 2,
+            "regent": 15,
+            "colossus": 11,
+            "widow": 3,
+            "choir": 4
+          },
+          "averageTurnsPerBattle": 3.55,
+          "averageTurnsPerNormalBattle": 3.05,
+          "averageIntegrityOnWin": 6.4,
+          "averageLossSector": 15.6
+        },
+        {
+          "archetype": "ghost",
+          "policy": "tactical",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 58,
+          "winRate": "39%",
+          "sampleWinningSeeds": [
+            2654435761,
+            1013904226,
+            3668339987
+          ],
+          "reachedCore": 95,
+          "guardians": {
+            "regent": {
+              "encounters": 148,
+              "wins": 137,
+              "losses": 11,
+              "turns": 743,
+              "ultimates": 10,
+              "interrupts": 4,
+              "ultimateDamage": 21,
+              "averageTurns": 5
+            },
+            "cantor": {
+              "encounters": 133,
+              "wins": 121,
+              "losses": 12,
+              "turns": 781,
+              "ultimates": 44,
+              "interrupts": 19,
+              "ultimateDamage": 113,
+              "averageTurns": 5.9
+            },
+            "core": {
+              "encounters": 95,
+              "wins": 58,
+              "losses": 37,
+              "turns": 591,
+              "ultimates": 52,
+              "interrupts": 34,
+              "ultimateDamage": 63,
+              "averageTurns": 6.2
+            }
+          },
+          "lostTo": {
+            "reaver": 10,
+            "serpent": 6,
+            "core": 37,
+            "cantor": 12,
+            "regent": 11,
+            "sentinel": 1,
+            "colossus": 7,
+            "weaver": 2,
+            "marshal": 5,
+            "widow": 1
+          },
+          "averageTurnsPerBattle": 3.62,
+          "averageTurnsPerNormalBattle": 3.03,
+          "averageIntegrityOnWin": 8.1,
+          "averageLossSector": 16.9
+        }
+      ]
+    },
+    "eliteSeeking": {
+      "notes": "v3 deterministic bots, elite-seeking routing, ascension 0. Regression probes, not a human difficulty estimate.",
+      "profiles": [
+        {
+          "archetype": "architect",
+          "policy": "careless",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 0,
+          "winRate": "0%",
+          "sampleWinningSeeds": [],
+          "reachedCore": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            }
+          },
+          "lostTo": {
+            "leech": 25,
+            "weaver": 2,
+            "moth": 20,
+            "serpent": 39,
+            "prophet": 19,
+            "colossus": 8,
+            "sentinel": 6,
+            "wraith": 31
+          },
+          "averageTurnsPerBattle": 4.8,
+          "averageTurnsPerNormalBattle": 4.84,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 2.6
+        },
+        {
+          "archetype": "architect",
+          "policy": "aggressive",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 7,
+          "winRate": "5%",
+          "sampleWinningSeeds": [
+            1753536851,
+            500282233,
+            2528090685
+          ],
+          "reachedCore": 17,
+          "guardians": {
+            "regent": {
+              "encounters": 129,
+              "wins": 107,
+              "losses": 22,
+              "turns": 728,
+              "ultimates": 31,
+              "interrupts": 28,
+              "ultimateDamage": 19,
+              "averageTurns": 5.6
+            },
+            "cantor": {
+              "encounters": 63,
+              "wins": 44,
+              "losses": 19,
+              "turns": 397,
+              "ultimates": 36,
+              "interrupts": 28,
+              "ultimateDamage": 50,
+              "averageTurns": 6.3
+            },
+            "core": {
+              "encounters": 17,
+              "wins": 7,
+              "losses": 10,
+              "turns": 77,
+              "ultimates": 6,
+              "interrupts": 6,
+              "ultimateDamage": 0,
+              "averageTurns": 4.5
+            }
+          },
+          "lostTo": {
+            "colossus": 30,
+            "cantor": 19,
+            "marshal": 20,
+            "core": 10,
+            "sentinel": 9,
+            "reaver": 10,
+            "weaver": 9,
+            "regent": 22,
+            "leech": 2,
+            "widow": 4,
+            "prophet": 2,
+            "serpent": 3,
+            "choir": 3
+          },
+          "averageTurnsPerBattle": 4.07,
+          "averageTurnsPerNormalBattle": 3.51,
+          "averageIntegrityOnWin": 7.1,
+          "averageLossSector": 12.2
+        },
+        {
+          "archetype": "architect",
+          "policy": "adaptive",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 33,
+          "winRate": "22%",
+          "sampleWinningSeeds": [
+            387276917,
+            3428989595,
+            1549107668
+          ],
+          "reachedCore": 55,
+          "guardians": {
+            "regent": {
+              "encounters": 143,
+              "wins": 132,
+              "losses": 11,
+              "turns": 841,
+              "ultimates": 43,
+              "interrupts": 43,
+              "ultimateDamage": 0,
+              "averageTurns": 5.9
+            },
+            "cantor": {
+              "encounters": 115,
+              "wins": 102,
+              "losses": 13,
+              "turns": 756,
+              "ultimates": 63,
+              "interrupts": 55,
+              "ultimateDamage": 29,
+              "averageTurns": 6.6
+            },
+            "core": {
+              "encounters": 55,
+              "wins": 33,
+              "losses": 22,
+              "turns": 329,
+              "ultimates": 29,
+              "interrupts": 27,
+              "ultimateDamage": 6,
+              "averageTurns": 6
+            }
+          },
+          "lostTo": {
+            "sentinel": 15,
+            "marshal": 9,
+            "cantor": 13,
+            "core": 22,
+            "colossus": 23,
+            "reaver": 11,
+            "storm": 1,
+            "regent": 11,
+            "serpent": 4,
+            "weaver": 3,
+            "choir": 3,
+            "moth": 1,
+            "widow": 1
+          },
+          "averageTurnsPerBattle": 4.36,
+          "averageTurnsPerNormalBattle": 3.74,
+          "averageIntegrityOnWin": 7.8,
+          "averageLossSector": 15.5
+        },
+        {
+          "archetype": "architect",
+          "policy": "tactical",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 47,
+          "winRate": "31%",
+          "sampleWinningSeeds": [
+            2654435761,
+            387276917,
+            2415085369
+          ],
+          "reachedCore": 70,
+          "guardians": {
+            "regent": {
+              "encounters": 146,
+              "wins": 142,
+              "losses": 4,
+              "turns": 894,
+              "ultimates": 53,
+              "interrupts": 46,
+              "ultimateDamage": 16,
+              "averageTurns": 6.1
+            },
+            "cantor": {
+              "encounters": 130,
+              "wins": 126,
+              "losses": 4,
+              "turns": 925,
+              "ultimates": 96,
+              "interrupts": 78,
+              "ultimateDamage": 62,
+              "averageTurns": 7.1
+            },
+            "core": {
+              "encounters": 70,
+              "wins": 47,
+              "losses": 23,
+              "turns": 457,
+              "ultimates": 50,
+              "interrupts": 49,
+              "ultimateDamage": 5,
+              "averageTurns": 6.5
+            }
+          },
+          "lostTo": {
+            "core": 23,
+            "sentinel": 15,
+            "reaver": 20,
+            "colossus": 23,
+            "marshal": 7,
+            "cantor": 4,
+            "regent": 4,
+            "choir": 3,
+            "serpent": 1,
+            "widow": 2,
+            "leech": 1
+          },
+          "averageTurnsPerBattle": 4.51,
+          "averageTurnsPerNormalBattle": 3.83,
+          "averageIntegrityOnWin": 8.8,
+          "averageLossSector": 17.3
+        },
+        {
+          "archetype": "warden",
+          "policy": "careless",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 0,
+          "winRate": "0%",
+          "sampleWinningSeeds": [],
+          "reachedCore": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            }
+          },
+          "lostTo": {
+            "leech": 29,
+            "weaver": 5,
+            "moth": 13,
+            "serpent": 39,
+            "prophet": 18,
+            "colossus": 9,
+            "sentinel": 8,
+            "wraith": 29
+          },
+          "averageTurnsPerBattle": 4.96,
+          "averageTurnsPerNormalBattle": 4.93,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 2.8
+        },
+        {
+          "archetype": "warden",
+          "policy": "aggressive",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 4,
+          "winRate": "3%",
+          "sampleWinningSeeds": [
+            3337565728,
+            4168622220,
+            887559150
+          ],
+          "reachedCore": 17,
+          "guardians": {
+            "regent": {
+              "encounters": 140,
+              "wins": 88,
+              "losses": 52,
+              "turns": 1091,
+              "ultimates": 135,
+              "interrupts": 37,
+              "ultimateDamage": 456,
+              "averageTurns": 7.8
+            },
+            "cantor": {
+              "encounters": 73,
+              "wins": 40,
+              "losses": 33,
+              "turns": 658,
+              "ultimates": 79,
+              "interrupts": 6,
+              "ultimateDamage": 404,
+              "averageTurns": 9
+            },
+            "core": {
+              "encounters": 17,
+              "wins": 4,
+              "losses": 13,
+              "turns": 146,
+              "ultimates": 17,
+              "interrupts": 0,
+              "ultimateDamage": 95,
+              "averageTurns": 8.6
+            }
+          },
+          "lostTo": {
+            "regent": 52,
+            "marshal": 5,
+            "cantor": 33,
+            "colossus": 24,
+            "core": 13,
+            "reaver": 7,
+            "sentinel": 5,
+            "choir": 2,
+            "serpent": 4,
+            "wraith": 1
+          },
+          "averageTurnsPerBattle": 5.31,
+          "averageTurnsPerNormalBattle": 4.26,
+          "averageIntegrityOnWin": 10,
+          "averageLossSector": 12.1
+        },
+        {
+          "archetype": "warden",
+          "policy": "adaptive",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 23,
+          "winRate": "15%",
+          "sampleWinningSeeds": [
+            2027808452,
+            4203543429,
+            3964193037
+          ],
+          "reachedCore": 44,
+          "guardians": {
+            "regent": {
+              "encounters": 149,
+              "wins": 136,
+              "losses": 13,
+              "turns": 1234,
+              "ultimates": 143,
+              "interrupts": 41,
+              "ultimateDamage": 171,
+              "averageTurns": 8.3
+            },
+            "cantor": {
+              "encounters": 119,
+              "wins": 85,
+              "losses": 34,
+              "turns": 1133,
+              "ultimates": 131,
+              "interrupts": 25,
+              "ultimateDamage": 438,
+              "averageTurns": 9.5
+            },
+            "core": {
+              "encounters": 44,
+              "wins": 23,
+              "losses": 21,
+              "turns": 392,
+              "ultimates": 46,
+              "interrupts": 5,
+              "ultimateDamage": 137,
+              "averageTurns": 8.9
+            }
+          },
+          "lostTo": {
+            "colossus": 18,
+            "marshal": 9,
+            "serpent": 7,
+            "cantor": 34,
+            "core": 21,
+            "reaver": 17,
+            "sentinel": 4,
+            "widow": 1,
+            "regent": 13,
+            "weaver": 3
+          },
+          "averageTurnsPerBattle": 5.68,
+          "averageTurnsPerNormalBattle": 4.57,
+          "averageIntegrityOnWin": 7.5,
+          "averageLossSector": 15.5
+        },
+        {
+          "archetype": "warden",
+          "policy": "tactical",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 54,
+          "winRate": "36%",
+          "sampleWinningSeeds": [
+            2654435761,
+            2027808452,
+            2415085369
+          ],
+          "reachedCore": 92,
+          "guardians": {
+            "regent": {
+              "encounters": 150,
+              "wins": 146,
+              "losses": 4,
+              "turns": 1353,
+              "ultimates": 150,
+              "interrupts": 32,
+              "ultimateDamage": 134,
+              "averageTurns": 9
+            },
+            "cantor": {
+              "encounters": 142,
+              "wins": 113,
+              "losses": 29,
+              "turns": 1529,
+              "ultimates": 185,
+              "interrupts": 21,
+              "ultimateDamage": 550,
+              "averageTurns": 10.8
+            },
+            "core": {
+              "encounters": 92,
+              "wins": 54,
+              "losses": 38,
+              "turns": 884,
+              "ultimates": 106,
+              "interrupts": 11,
+              "ultimateDamage": 315,
+              "averageTurns": 9.6
+            }
+          },
+          "lostTo": {
+            "marshal": 5,
+            "cantor": 29,
+            "core": 38,
+            "colossus": 9,
+            "reaver": 6,
+            "regent": 4,
+            "sentinel": 5
+          },
+          "averageTurnsPerBattle": 6.09,
+          "averageTurnsPerNormalBattle": 4.8,
+          "averageIntegrityOnWin": 8.2,
+          "averageLossSector": 17.4
+        },
+        {
+          "archetype": "ghost",
+          "policy": "careless",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 0,
+          "winRate": "0%",
+          "sampleWinningSeeds": [],
+          "reachedCore": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            }
+          },
+          "lostTo": {
+            "leech": 19,
+            "serpent": 52,
+            "moth": 14,
+            "wraith": 46,
+            "prophet": 9,
+            "colossus": 4,
+            "sentinel": 5,
+            "weaver": 1
+          },
+          "averageTurnsPerBattle": 4.57,
+          "averageTurnsPerNormalBattle": 4.6,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 2
+        },
+        {
+          "archetype": "ghost",
+          "policy": "aggressive",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 3,
+          "winRate": "2%",
+          "sampleWinningSeeds": [
+            443779575,
+            1366259934,
+            317434499
+          ],
+          "reachedCore": 10,
+          "guardians": {
+            "regent": {
+              "encounters": 115,
+              "wins": 62,
+              "losses": 53,
+              "turns": 553,
+              "ultimates": 28,
+              "interrupts": 11,
+              "ultimateDamage": 129,
+              "averageTurns": 4.8
+            },
+            "cantor": {
+              "encounters": 41,
+              "wins": 20,
+              "losses": 21,
+              "turns": 266,
+              "ultimates": 26,
+              "interrupts": 13,
+              "ultimateDamage": 76,
+              "averageTurns": 6.5
+            },
+            "core": {
+              "encounters": 10,
+              "wins": 3,
+              "losses": 7,
+              "turns": 70,
+              "ultimates": 10,
+              "interrupts": 2,
+              "ultimateDamage": 56,
+              "averageTurns": 7
+            }
+          },
+          "lostTo": {
+            "regent": 53,
+            "sentinel": 9,
+            "colossus": 35,
+            "leech": 1,
+            "cantor": 21,
+            "marshal": 7,
+            "weaver": 1,
+            "core": 7,
+            "serpent": 6,
+            "wraith": 1,
+            "reaver": 1,
+            "storm": 1,
+            "choir": 2,
+            "prophet": 1,
+            "moth": 1
+          },
+          "averageTurnsPerBattle": 3.69,
+          "averageTurnsPerNormalBattle": 3.05,
+          "averageIntegrityOnWin": 9,
+          "averageLossSector": 9.6
+        },
+        {
+          "archetype": "ghost",
+          "policy": "adaptive",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 30,
+          "winRate": "20%",
+          "sampleWinningSeeds": [
+            2654435761,
+            2027808452,
+            4055616904
+          ],
+          "reachedCore": 60,
+          "guardians": {
+            "regent": {
+              "encounters": 142,
+              "wins": 124,
+              "losses": 18,
+              "turns": 682,
+              "ultimates": 13,
+              "interrupts": 8,
+              "ultimateDamage": 8,
+              "averageTurns": 4.8
+            },
+            "cantor": {
+              "encounters": 105,
+              "wins": 94,
+              "losses": 11,
+              "turns": 588,
+              "ultimates": 28,
+              "interrupts": 17,
+              "ultimateDamage": 65,
+              "averageTurns": 5.6
+            },
+            "core": {
+              "encounters": 60,
+              "wins": 30,
+              "losses": 30,
+              "turns": 348,
+              "ultimates": 28,
+              "interrupts": 13,
+              "ultimateDamage": 100,
+              "averageTurns": 5.8
+            }
+          },
+          "lostTo": {
+            "marshal": 13,
+            "reaver": 11,
+            "core": 30,
+            "sentinel": 12,
+            "regent": 18,
+            "colossus": 11,
+            "cantor": 11,
+            "weaver": 1,
+            "choir": 3,
+            "serpent": 8,
+            "widow": 2
+          },
+          "averageTurnsPerBattle": 3.5,
+          "averageTurnsPerNormalBattle": 2.96,
+          "averageIntegrityOnWin": 8.6,
+          "averageLossSector": 15
+        },
+        {
+          "archetype": "ghost",
+          "policy": "tactical",
+          "ascension": 0,
+          "seeds": 150,
+          "wins": 55,
+          "winRate": "37%",
+          "sampleWinningSeeds": [
+            2654435761,
+            1013904226,
+            3668339987
+          ],
+          "reachedCore": 72,
+          "guardians": {
+            "regent": {
+              "encounters": 145,
+              "wins": 129,
+              "losses": 16,
+              "turns": 694,
+              "ultimates": 7,
+              "interrupts": 3,
+              "ultimateDamage": 14,
+              "averageTurns": 4.8
+            },
+            "cantor": {
+              "encounters": 119,
+              "wins": 113,
+              "losses": 6,
+              "turns": 688,
+              "ultimates": 31,
+              "interrupts": 20,
+              "ultimateDamage": 51,
+              "averageTurns": 5.8
+            },
+            "core": {
+              "encounters": 72,
+              "wins": 55,
+              "losses": 17,
+              "turns": 467,
+              "ultimates": 41,
+              "interrupts": 28,
+              "ultimateDamage": 47,
+              "averageTurns": 6.5
+            }
+          },
+          "lostTo": {
+            "reaver": 19,
+            "marshal": 7,
+            "cantor": 6,
+            "sentinel": 8,
+            "core": 17,
+            "serpent": 9,
+            "regent": 16,
+            "colossus": 11,
+            "choir": 1,
+            "storm": 1
+          },
+          "averageTurnsPerBattle": 3.55,
+          "averageTurnsPerNormalBattle": 2.97,
+          "averageIntegrityOnWin": 7.5,
+          "averageLossSector": 15.4
+        }
+      ]
+    },
+    "ascension5": {
+      "notes": "v3 deterministic bots, default routing, ascension 5. Regression probes, not a human difficulty estimate.",
+      "profiles": [
+        {
+          "archetype": "architect",
+          "policy": "careless",
+          "ascension": 5,
+          "seeds": 150,
+          "wins": 0,
+          "winRate": "0%",
+          "sampleWinningSeeds": [],
+          "reachedCore": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            }
+          },
+          "lostTo": {
+            "leech": 41,
+            "serpent": 31,
+            "moth": 14,
+            "wraith": 45,
+            "prophet": 10,
+            "colossus": 4,
+            "sentinel": 4,
+            "weaver": 1
+          },
+          "averageTurnsPerBattle": 4.76,
+          "averageTurnsPerNormalBattle": 4.81,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 1.8
+        },
+        {
+          "archetype": "architect",
+          "policy": "aggressive",
+          "ascension": 5,
+          "seeds": 150,
+          "wins": 2,
+          "winRate": "1%",
+          "sampleWinningSeeds": [
+            4168622220,
+            1866542167
+          ],
+          "reachedCore": 7,
+          "guardians": {
+            "regent": {
+              "encounters": 119,
+              "wins": 88,
+              "losses": 31,
+              "turns": 661,
+              "ultimates": 35,
+              "interrupts": 32,
+              "ultimateDamage": 27,
+              "averageTurns": 5.6
+            },
+            "cantor": {
+              "encounters": 49,
+              "wins": 28,
+              "losses": 21,
+              "turns": 308,
+              "ultimates": 32,
+              "interrupts": 20,
+              "ultimateDamage": 100,
+              "averageTurns": 6.3
+            },
+            "core": {
+              "encounters": 7,
+              "wins": 2,
+              "losses": 5,
+              "turns": 35,
+              "ultimates": 3,
+              "interrupts": 3,
+              "ultimateDamage": 0,
+              "averageTurns": 5
+            }
+          },
+          "lostTo": {
+            "storm": 2,
+            "sentinel": 2,
+            "colossus": 16,
+            "marshal": 22,
+            "cantor": 21,
+            "leech": 2,
+            "regent": 31,
+            "serpent": 16,
+            "reaver": 9,
+            "wraith": 1,
+            "weaver": 7,
+            "widow": 3,
+            "choir": 6,
+            "prophet": 5,
+            "core": 5
+          },
+          "averageTurnsPerBattle": 4.21,
+          "averageTurnsPerNormalBattle": 3.8,
+          "averageIntegrityOnWin": 5,
+          "averageLossSector": 10.4
+        },
+        {
+          "archetype": "architect",
+          "policy": "adaptive",
+          "ascension": 5,
+          "seeds": 150,
+          "wins": 11,
+          "winRate": "7%",
+          "sampleWinningSeeds": [
+            3098215336,
+            2232237635,
+            1366259934
+          ],
+          "reachedCore": 24,
+          "guardians": {
+            "regent": {
+              "encounters": 136,
+              "wins": 112,
+              "losses": 24,
+              "turns": 800,
+              "ultimates": 49,
+              "interrupts": 39,
+              "ultimateDamage": 65,
+              "averageTurns": 5.9
+            },
+            "cantor": {
+              "encounters": 72,
+              "wins": 57,
+              "losses": 15,
+              "turns": 493,
+              "ultimates": 52,
+              "interrupts": 46,
+              "ultimateDamage": 46,
+              "averageTurns": 6.8
+            },
+            "core": {
+              "encounters": 24,
+              "wins": 11,
+              "losses": 13,
+              "turns": 132,
+              "ultimates": 13,
+              "interrupts": 11,
+              "ultimateDamage": 15,
+              "averageTurns": 5.5
+            }
+          },
+          "lostTo": {
+            "cantor": 15,
+            "core": 13,
+            "sentinel": 6,
+            "regent": 24,
+            "leech": 1,
+            "serpent": 9,
+            "reaver": 12,
+            "colossus": 20,
+            "marshal": 18,
+            "choir": 7,
+            "prophet": 2,
+            "widow": 2,
+            "weaver": 10
+          },
+          "averageTurnsPerBattle": 4.42,
+          "averageTurnsPerNormalBattle": 3.99,
+          "averageIntegrityOnWin": 6.5,
+          "averageLossSector": 12.5
+        },
+        {
+          "archetype": "architect",
+          "policy": "tactical",
+          "ascension": 5,
+          "seeds": 150,
+          "wins": 13,
+          "winRate": "9%",
+          "sampleWinningSeeds": [
+            1309757276,
+            2084311110,
+            1844960718
+          ],
+          "reachedCore": 32,
+          "guardians": {
+            "regent": {
+              "encounters": 139,
+              "wins": 112,
+              "losses": 27,
+              "turns": 843,
+              "ultimates": 62,
+              "interrupts": 46,
+              "ultimateDamage": 66,
+              "averageTurns": 6.1
+            },
+            "cantor": {
+              "encounters": 92,
+              "wins": 83,
+              "losses": 9,
+              "turns": 666,
+              "ultimates": 71,
+              "interrupts": 57,
+              "ultimateDamage": 61,
+              "averageTurns": 7.2
+            },
+            "core": {
+              "encounters": 32,
+              "wins": 13,
+              "losses": 19,
+              "turns": 178,
+              "ultimates": 18,
+              "interrupts": 13,
+              "ultimateDamage": 38,
+              "averageTurns": 5.6
+            }
+          },
+          "lostTo": {
+            "core": 19,
+            "marshal": 23,
+            "colossus": 16,
+            "cantor": 9,
+            "serpent": 6,
+            "regent": 27,
+            "reaver": 11,
+            "sentinel": 9,
+            "prophet": 3,
+            "weaver": 7,
+            "storm": 1,
+            "leech": 1,
+            "choir": 5
+          },
+          "averageTurnsPerBattle": 4.64,
+          "averageTurnsPerNormalBattle": 4.05,
+          "averageIntegrityOnWin": 5.3,
+          "averageLossSector": 13.8
+        },
+        {
+          "archetype": "warden",
+          "policy": "careless",
+          "ascension": 5,
+          "seeds": 150,
+          "wins": 0,
+          "winRate": "0%",
+          "sampleWinningSeeds": [],
+          "reachedCore": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            }
+          },
+          "lostTo": {
+            "leech": 46,
+            "weaver": 2,
+            "moth": 13,
+            "serpent": 34,
+            "prophet": 14,
+            "wraith": 30,
+            "colossus": 6,
+            "sentinel": 5
+          },
+          "averageTurnsPerBattle": 4.66,
+          "averageTurnsPerNormalBattle": 4.73,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 2
+        },
+        {
+          "archetype": "warden",
+          "policy": "aggressive",
+          "ascension": 5,
+          "seeds": 150,
+          "wins": 0,
+          "winRate": "0%",
+          "sampleWinningSeeds": [],
+          "reachedCore": 3,
+          "guardians": {
+            "regent": {
+              "encounters": 137,
+              "wins": 54,
+              "losses": 83,
+              "turns": 970,
+              "ultimates": 127,
+              "interrupts": 25,
+              "ultimateDamage": 563,
+              "averageTurns": 7.1
+            },
+            "cantor": {
+              "encounters": 36,
+              "wins": 12,
+              "losses": 24,
+              "turns": 281,
+              "ultimates": 33,
+              "interrupts": 2,
+              "ultimateDamage": 215,
+              "averageTurns": 7.8
+            },
+            "core": {
+              "encounters": 3,
+              "wins": 0,
+              "losses": 3,
+              "turns": 26,
+              "ultimates": 3,
+              "interrupts": 0,
+              "ultimateDamage": 10,
+              "averageTurns": 8.7
+            }
+          },
+          "lostTo": {
+            "regent": 83,
+            "cantor": 24,
+            "colossus": 9,
+            "widow": 2,
+            "wraith": 1,
+            "leech": 1,
+            "marshal": 10,
+            "prophet": 2,
+            "choir": 3,
+            "serpent": 8,
+            "core": 3,
+            "storm": 1,
+            "sentinel": 1,
+            "reaver": 2
+          },
+          "averageTurnsPerBattle": 5.12,
+          "averageTurnsPerNormalBattle": 4.45,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 9.3
+        },
+        {
+          "archetype": "warden",
+          "policy": "adaptive",
+          "ascension": 5,
+          "seeds": 150,
+          "wins": 3,
+          "winRate": "2%",
+          "sampleWinningSeeds": [
+            1788458060,
+            1239914858,
+            2253819084
+          ],
+          "reachedCore": 24,
+          "guardians": {
+            "regent": {
+              "encounters": 143,
+              "wins": 107,
+              "losses": 36,
+              "turns": 1152,
+              "ultimates": 139,
+              "interrupts": 26,
+              "ultimateDamage": 318,
+              "averageTurns": 8.1
+            },
+            "cantor": {
+              "encounters": 89,
+              "wins": 53,
+              "losses": 36,
+              "turns": 815,
+              "ultimates": 94,
+              "interrupts": 9,
+              "ultimateDamage": 408,
+              "averageTurns": 9.2
+            },
+            "core": {
+              "encounters": 24,
+              "wins": 3,
+              "losses": 21,
+              "turns": 181,
+              "ultimates": 26,
+              "interrupts": 0,
+              "ultimateDamage": 180,
+              "averageTurns": 7.5
+            }
+          },
+          "lostTo": {
+            "sentinel": 8,
+            "regent": 36,
+            "cantor": 36,
+            "weaver": 2,
+            "serpent": 8,
+            "core": 21,
+            "marshal": 10,
+            "colossus": 10,
+            "widow": 3,
+            "prophet": 1,
+            "leech": 1,
+            "reaver": 7,
+            "choir": 4
+          },
+          "averageTurnsPerBattle": 5.69,
+          "averageTurnsPerNormalBattle": 4.86,
+          "averageIntegrityOnWin": 4.7,
+          "averageLossSector": 13.3
+        },
+        {
+          "archetype": "warden",
+          "policy": "tactical",
+          "ascension": 5,
+          "seeds": 150,
+          "wins": 34,
+          "winRate": "23%",
+          "sampleWinningSeeds": [
+            3668339987,
+            2027808452,
+            774553834
+          ],
+          "reachedCore": 64,
+          "guardians": {
+            "regent": {
+              "encounters": 150,
+              "wins": 130,
+              "losses": 20,
+              "turns": 1311,
+              "ultimates": 150,
+              "interrupts": 22,
+              "ultimateDamage": 185,
+              "averageTurns": 8.7
+            },
+            "cantor": {
+              "encounters": 122,
+              "wins": 90,
+              "losses": 32,
+              "turns": 1243,
+              "ultimates": 148,
+              "interrupts": 18,
+              "ultimateDamage": 479,
+              "averageTurns": 10.2
+            },
+            "core": {
+              "encounters": 64,
+              "wins": 34,
+              "losses": 30,
+              "turns": 583,
+              "ultimates": 68,
+              "interrupts": 9,
+              "ultimateDamage": 236,
+              "averageTurns": 9.1
+            }
+          },
+          "lostTo": {
+            "core": 30,
+            "regent": 20,
+            "marshal": 7,
+            "sentinel": 4,
+            "colossus": 7,
+            "reaver": 9,
+            "choir": 3,
+            "cantor": 32,
+            "serpent": 4
+          },
+          "averageTurnsPerBattle": 6.2,
+          "averageTurnsPerNormalBattle": 5.08,
+          "averageIntegrityOnWin": 7,
+          "averageLossSector": 15.3
+        },
+        {
+          "archetype": "ghost",
+          "policy": "careless",
+          "ascension": 5,
+          "seeds": 150,
+          "wins": 0,
+          "winRate": "0%",
+          "sampleWinningSeeds": [],
+          "reachedCore": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            }
+          },
+          "lostTo": {
+            "leech": 39,
+            "serpent": 43,
+            "moth": 11,
+            "wraith": 41,
+            "prophet": 8,
+            "colossus": 3,
+            "sentinel": 4,
+            "weaver": 1
+          },
+          "averageTurnsPerBattle": 4.56,
+          "averageTurnsPerNormalBattle": 4.67,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 1.7
+        },
+        {
+          "archetype": "ghost",
+          "policy": "aggressive",
+          "ascension": 5,
+          "seeds": 150,
+          "wins": 0,
+          "winRate": "0%",
+          "sampleWinningSeeds": [],
+          "reachedCore": 2,
+          "guardians": {
+            "regent": {
+              "encounters": 100,
+              "wins": 25,
+              "losses": 75,
+              "turns": 429,
+              "ultimates": 33,
+              "interrupts": 13,
+              "ultimateDamage": 200,
+              "averageTurns": 4.3
+            },
+            "cantor": {
+              "encounters": 15,
+              "wins": 7,
+              "losses": 8,
+              "turns": 89,
+              "ultimates": 8,
+              "interrupts": 4,
+              "ultimateDamage": 29,
+              "averageTurns": 5.9
+            },
+            "core": {
+              "encounters": 2,
+              "wins": 0,
+              "losses": 2,
+              "turns": 8,
+              "ultimates": 1,
+              "interrupts": 0,
+              "ultimateDamage": 6,
+              "averageTurns": 4
+            }
+          },
+          "lostTo": {
+            "regent": 75,
+            "cantor": 8,
+            "sentinel": 8,
+            "serpent": 13,
+            "leech": 10,
+            "colossus": 13,
+            "marshal": 5,
+            "moth": 2,
+            "choir": 2,
+            "wraith": 5,
+            "core": 2,
+            "prophet": 3,
+            "weaver": 2,
+            "reaver": 2
+          },
+          "averageTurnsPerBattle": 3.43,
+          "averageTurnsPerNormalBattle": 3.06,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 7.3
+        },
+        {
+          "archetype": "ghost",
+          "policy": "adaptive",
+          "ascension": 5,
+          "seeds": 150,
+          "wins": 8,
+          "winRate": "5%",
+          "sampleWinningSeeds": [
+            3576916120,
+            683129967,
+            500282233
+          ],
+          "reachedCore": 25,
+          "guardians": {
+            "regent": {
+              "encounters": 126,
+              "wins": 88,
+              "losses": 38,
+              "turns": 625,
+              "ultimates": 22,
+              "interrupts": 8,
+              "ultimateDamage": 74,
+              "averageTurns": 5
+            },
+            "cantor": {
+              "encounters": 63,
+              "wins": 50,
+              "losses": 13,
+              "turns": 374,
+              "ultimates": 22,
+              "interrupts": 16,
+              "ultimateDamage": 33,
+              "averageTurns": 5.9
+            },
+            "core": {
+              "encounters": 25,
+              "wins": 8,
+              "losses": 17,
+              "turns": 133,
+              "ultimates": 10,
+              "interrupts": 5,
+              "ultimateDamage": 47,
+              "averageTurns": 5.3
+            }
+          },
+          "lostTo": {
+            "marshal": 20,
+            "regent": 38,
+            "reaver": 9,
+            "leech": 4,
+            "serpent": 11,
+            "colossus": 17,
+            "weaver": 4,
+            "cantor": 13,
+            "wraith": 3,
+            "core": 17,
+            "widow": 1,
+            "sentinel": 3,
+            "storm": 1,
+            "prophet": 1
+          },
+          "averageTurnsPerBattle": 3.65,
+          "averageTurnsPerNormalBattle": 3.2,
+          "averageIntegrityOnWin": 6.8,
+          "averageLossSector": 11.5
+        },
+        {
+          "archetype": "ghost",
+          "policy": "tactical",
+          "ascension": 5,
+          "seeds": 150,
+          "wins": 27,
+          "winRate": "18%",
+          "sampleWinningSeeds": [
+            1161830751,
+            3816266512,
+            1549107668
+          ],
+          "reachedCore": 46,
+          "guardians": {
+            "regent": {
+              "encounters": 139,
+              "wins": 116,
+              "losses": 23,
+              "turns": 673,
+              "ultimates": 17,
+              "interrupts": 11,
+              "ultimateDamage": 24,
+              "averageTurns": 4.8
+            },
+            "cantor": {
+              "encounters": 98,
+              "wins": 89,
+              "losses": 9,
+              "turns": 617,
+              "ultimates": 42,
+              "interrupts": 23,
+              "ultimateDamage": 77,
+              "averageTurns": 6.3
+            },
+            "core": {
+              "encounters": 46,
+              "wins": 27,
+              "losses": 19,
+              "turns": 301,
+              "ultimates": 27,
+              "interrupts": 17,
+              "ultimateDamage": 39,
+              "averageTurns": 6.5
+            }
+          },
+          "lostTo": {
+            "cantor": 9,
+            "sentinel": 9,
+            "core": 19,
+            "reaver": 16,
+            "serpent": 8,
+            "choir": 5,
+            "colossus": 19,
+            "regent": 23,
+            "marshal": 11,
+            "weaver": 3,
+            "storm": 1
+          },
+          "averageTurnsPerBattle": 3.81,
+          "averageTurnsPerNormalBattle": 3.25,
+          "averageIntegrityOnWin": 7.5,
+          "averageLossSector": 13.8
+        }
+      ]
+    },
+    "ascension10": {
+      "notes": "v3 deterministic bots, default routing, ascension 10. Regression probes, not a human difficulty estimate.",
+      "profiles": [
+        {
+          "archetype": "architect",
+          "policy": "careless",
+          "ascension": 10,
+          "seeds": 150,
+          "wins": 0,
+          "winRate": "0%",
+          "sampleWinningSeeds": [],
+          "reachedCore": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            }
+          },
+          "lostTo": {
+            "leech": 39,
+            "serpent": 43,
+            "moth": 11,
+            "wraith": 41,
+            "prophet": 8,
+            "colossus": 3,
+            "sentinel": 4,
+            "weaver": 1
+          },
+          "averageTurnsPerBattle": 4.91,
+          "averageTurnsPerNormalBattle": 5,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 1.7
+        },
+        {
+          "archetype": "architect",
+          "policy": "aggressive",
+          "ascension": 10,
+          "seeds": 150,
+          "wins": 0,
+          "winRate": "0%",
+          "sampleWinningSeeds": [],
+          "reachedCore": 3,
+          "guardians": {
+            "regent": {
+              "encounters": 101,
+              "wins": 64,
+              "losses": 37,
+              "turns": 575,
+              "ultimates": 48,
+              "interrupts": 43,
+              "ultimateDamage": 47,
+              "averageTurns": 5.7
+            },
+            "cantor": {
+              "encounters": 30,
+              "wins": 17,
+              "losses": 13,
+              "turns": 201,
+              "ultimates": 22,
+              "interrupts": 15,
+              "ultimateDamage": 76,
+              "averageTurns": 6.7
+            },
+            "core": {
+              "encounters": 3,
+              "wins": 0,
+              "losses": 3,
+              "turns": 13,
+              "ultimates": 1,
+              "interrupts": 1,
+              "ultimateDamage": 0,
+              "averageTurns": 4.3
+            }
+          },
+          "lostTo": {
+            "storm": 3,
+            "marshal": 16,
+            "choir": 6,
+            "reaver": 4,
+            "cantor": 13,
+            "leech": 3,
+            "regent": 37,
+            "serpent": 17,
+            "colossus": 15,
+            "wraith": 7,
+            "weaver": 8,
+            "sentinel": 7,
+            "widow": 3,
+            "prophet": 6,
+            "moth": 2,
+            "core": 3
+          },
+          "averageTurnsPerBattle": 4.06,
+          "averageTurnsPerNormalBattle": 3.62,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 8.9
+        },
+        {
+          "archetype": "architect",
+          "policy": "adaptive",
+          "ascension": 10,
+          "seeds": 150,
+          "wins": 3,
+          "winRate": "2%",
+          "sampleWinningSeeds": [
+            4168622220,
+            1274836067,
+            2345242951
+          ],
+          "reachedCore": 7,
+          "guardians": {
+            "regent": {
+              "encounters": 125,
+              "wins": 92,
+              "losses": 33,
+              "turns": 763,
+              "ultimates": 69,
+              "interrupts": 60,
+              "ultimateDamage": 87,
+              "averageTurns": 6.1
+            },
+            "cantor": {
+              "encounters": 55,
+              "wins": 39,
+              "losses": 16,
+              "turns": 388,
+              "ultimates": 44,
+              "interrupts": 39,
+              "ultimateDamage": 49,
+              "averageTurns": 7.1
+            },
+            "core": {
+              "encounters": 7,
+              "wins": 3,
+              "losses": 4,
+              "turns": 41,
+              "ultimates": 4,
+              "interrupts": 4,
+              "ultimateDamage": 0,
+              "averageTurns": 5.9
+            }
+          },
+          "lostTo": {
+            "storm": 1,
+            "sentinel": 7,
+            "cantor": 16,
+            "prophet": 3,
+            "serpent": 12,
+            "leech": 1,
+            "regent": 33,
+            "colossus": 18,
+            "choir": 5,
+            "reaver": 9,
+            "marshal": 23,
+            "weaver": 11,
+            "wraith": 3,
+            "core": 4,
+            "moth": 1
+          },
+          "averageTurnsPerBattle": 4.34,
+          "averageTurnsPerNormalBattle": 3.85,
+          "averageIntegrityOnWin": 1.7,
+          "averageLossSector": 11
+        },
+        {
+          "archetype": "architect",
+          "policy": "tactical",
+          "ascension": 10,
+          "seeds": 150,
+          "wins": 13,
+          "winRate": "9%",
+          "sampleWinningSeeds": [
+            3816266512,
+            1844960718,
+            1992887243
+          ],
+          "reachedCore": 24,
+          "guardians": {
+            "regent": {
+              "encounters": 129,
+              "wins": 94,
+              "losses": 35,
+              "turns": 778,
+              "ultimates": 76,
+              "interrupts": 62,
+              "ultimateDamage": 88,
+              "averageTurns": 6
+            },
+            "cantor": {
+              "encounters": 65,
+              "wins": 57,
+              "losses": 8,
+              "turns": 519,
+              "ultimates": 58,
+              "interrupts": 49,
+              "ultimateDamage": 57,
+              "averageTurns": 8
+            },
+            "core": {
+              "encounters": 24,
+              "wins": 13,
+              "losses": 11,
+              "turns": 164,
+              "ultimates": 17,
+              "interrupts": 13,
+              "ultimateDamage": 25,
+              "averageTurns": 6.8
+            }
+          },
+          "lostTo": {
+            "sentinel": 14,
+            "marshal": 25,
+            "colossus": 18,
+            "core": 11,
+            "regent": 35,
+            "cantor": 8,
+            "prophet": 4,
+            "leech": 2,
+            "reaver": 7,
+            "serpent": 7,
+            "weaver": 4,
+            "storm": 1,
+            "choir": 1
+          },
+          "averageTurnsPerBattle": 4.61,
+          "averageTurnsPerNormalBattle": 3.96,
+          "averageIntegrityOnWin": 6,
+          "averageLossSector": 11.5
+        },
+        {
+          "archetype": "warden",
+          "policy": "careless",
+          "ascension": 10,
+          "seeds": 150,
+          "wins": 0,
+          "winRate": "0%",
+          "sampleWinningSeeds": [],
+          "reachedCore": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            }
+          },
+          "lostTo": {
+            "leech": 42,
+            "serpent": 45,
+            "moth": 13,
+            "prophet": 12,
+            "wraith": 28,
+            "colossus": 4,
+            "sentinel": 5,
+            "weaver": 1
+          },
+          "averageTurnsPerBattle": 4.57,
+          "averageTurnsPerNormalBattle": 4.63,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 1.9
+        },
+        {
+          "archetype": "warden",
+          "policy": "aggressive",
+          "ascension": 10,
+          "seeds": 150,
+          "wins": 0,
+          "winRate": "0%",
+          "sampleWinningSeeds": [],
+          "reachedCore": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 128,
+              "wins": 29,
+              "losses": 99,
+              "turns": 840,
+              "ultimates": 117,
+              "interrupts": 32,
+              "ultimateDamage": 639,
+              "averageTurns": 6.6
+            },
+            "cantor": {
+              "encounters": 21,
+              "wins": 4,
+              "losses": 17,
+              "turns": 172,
+              "ultimates": 21,
+              "interrupts": 4,
+              "ultimateDamage": 118,
+              "averageTurns": 8.2
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            }
+          },
+          "lostTo": {
+            "regent": 99,
+            "cantor": 17,
+            "colossus": 11,
+            "serpent": 11,
+            "choir": 1,
+            "wraith": 1,
+            "marshal": 3,
+            "prophet": 3,
+            "sentinel": 2,
+            "widow": 1,
+            "leech": 1
+          },
+          "averageTurnsPerBattle": 4.89,
+          "averageTurnsPerNormalBattle": 4.26,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 8
+        },
+        {
+          "archetype": "warden",
+          "policy": "adaptive",
+          "ascension": 10,
+          "seeds": 150,
+          "wins": 1,
+          "winRate": "1%",
+          "sampleWinningSeeds": [
+            2584593343
+          ],
+          "reachedCore": 1,
+          "guardians": {
+            "regent": {
+              "encounters": 138,
+              "wins": 63,
+              "losses": 75,
+              "turns": 1068,
+              "ultimates": 135,
+              "interrupts": 21,
+              "ultimateDamage": 483,
+              "averageTurns": 7.7
+            },
+            "cantor": {
+              "encounters": 44,
+              "wins": 16,
+              "losses": 28,
+              "turns": 384,
+              "ultimates": 51,
+              "interrupts": 5,
+              "ultimateDamage": 319,
+              "averageTurns": 8.7
+            },
+            "core": {
+              "encounters": 1,
+              "wins": 1,
+              "losses": 0,
+              "turns": 13,
+              "ultimates": 2,
+              "interrupts": 0,
+              "ultimateDamage": 4,
+              "averageTurns": 13
+            }
+          },
+          "lostTo": {
+            "cantor": 28,
+            "regent": 75,
+            "serpent": 8,
+            "colossus": 14,
+            "sentinel": 4,
+            "reaver": 4,
+            "widow": 2,
+            "marshal": 10,
+            "choir": 1,
+            "weaver": 2,
+            "prophet": 1
+          },
+          "averageTurnsPerBattle": 5.29,
+          "averageTurnsPerNormalBattle": 4.5,
+          "averageIntegrityOnWin": 2,
+          "averageLossSector": 9.7
+        },
+        {
+          "archetype": "warden",
+          "policy": "tactical",
+          "ascension": 10,
+          "seeds": 150,
+          "wins": 13,
+          "winRate": "9%",
+          "sampleWinningSeeds": [
+            3668339987,
+            1161830751,
+            4203543429
+          ],
+          "reachedCore": 35,
+          "guardians": {
+            "regent": {
+              "encounters": 148,
+              "wins": 95,
+              "losses": 53,
+              "turns": 1287,
+              "ultimates": 156,
+              "interrupts": 26,
+              "ultimateDamage": 384,
+              "averageTurns": 8.7
+            },
+            "cantor": {
+              "encounters": 88,
+              "wins": 49,
+              "losses": 39,
+              "turns": 909,
+              "ultimates": 109,
+              "interrupts": 9,
+              "ultimateDamage": 563,
+              "averageTurns": 10.3
+            },
+            "core": {
+              "encounters": 35,
+              "wins": 13,
+              "losses": 22,
+              "turns": 326,
+              "ultimates": 43,
+              "interrupts": 2,
+              "ultimateDamage": 202,
+              "averageTurns": 9.3
+            }
+          },
+          "lostTo": {
+            "core": 22,
+            "regent": 53,
+            "choir": 2,
+            "marshal": 5,
+            "cantor": 39,
+            "colossus": 5,
+            "reaver": 4,
+            "weaver": 1,
+            "serpent": 5,
+            "sentinel": 1
+          },
+          "averageTurnsPerBattle": 6.1,
+          "averageTurnsPerNormalBattle": 4.94,
+          "averageIntegrityOnWin": 7.4,
+          "averageLossSector": 12.5
+        },
+        {
+          "archetype": "ghost",
+          "policy": "careless",
+          "ascension": 10,
+          "seeds": 150,
+          "wins": 0,
+          "winRate": "0%",
+          "sampleWinningSeeds": [],
+          "reachedCore": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "cantor": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            }
+          },
+          "lostTo": {
+            "leech": 32,
+            "serpent": 34,
+            "prophet": 47,
+            "wraith": 32,
+            "sentinel": 2,
+            "moth": 2,
+            "weaver": 1
+          },
+          "averageTurnsPerBattle": 4.82,
+          "averageTurnsPerNormalBattle": 4.86,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 1.3
+        },
+        {
+          "archetype": "ghost",
+          "policy": "aggressive",
+          "ascension": 10,
+          "seeds": 150,
+          "wins": 0,
+          "winRate": "0%",
+          "sampleWinningSeeds": [],
+          "reachedCore": 0,
+          "guardians": {
+            "regent": {
+              "encounters": 76,
+              "wins": 8,
+              "losses": 68,
+              "turns": 309,
+              "ultimates": 21,
+              "interrupts": 6,
+              "ultimateDamage": 173,
+              "averageTurns": 4.1
+            },
+            "cantor": {
+              "encounters": 3,
+              "wins": 0,
+              "losses": 3,
+              "turns": 14,
+              "ultimates": 1,
+              "interrupts": 0,
+              "ultimateDamage": 13,
+              "averageTurns": 4.7
+            },
+            "core": {
+              "encounters": 0,
+              "wins": 0,
+              "losses": 0,
+              "turns": 0,
+              "ultimates": 0,
+              "interrupts": 0,
+              "ultimateDamage": 0,
+              "averageTurns": 0
+            }
+          },
+          "lostTo": {
+            "prophet": 8,
+            "sentinel": 15,
+            "regent": 68,
+            "colossus": 13,
+            "serpent": 24,
+            "leech": 4,
+            "wraith": 9,
+            "marshal": 2,
+            "cantor": 3,
+            "moth": 3,
+            "weaver": 1
+          },
+          "averageTurnsPerBattle": 3.14,
+          "averageTurnsPerNormalBattle": 2.83,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 6
+        },
+        {
+          "archetype": "ghost",
+          "policy": "adaptive",
+          "ascension": 10,
+          "seeds": 150,
+          "wins": 2,
+          "winRate": "1%",
+          "sampleWinningSeeds": [
+            887559150,
+            78084107
+          ],
+          "reachedCore": 11,
+          "guardians": {
+            "regent": {
+              "encounters": 110,
+              "wins": 57,
+              "losses": 53,
+              "turns": 556,
+              "ultimates": 33,
+              "interrupts": 12,
+              "ultimateDamage": 215,
+              "averageTurns": 5.1
+            },
+            "cantor": {
+              "encounters": 36,
+              "wins": 23,
+              "losses": 13,
+              "turns": 223,
+              "ultimates": 20,
+              "interrupts": 13,
+              "ultimateDamage": 63,
+              "averageTurns": 6.2
+            },
+            "core": {
+              "encounters": 11,
+              "wins": 2,
+              "losses": 9,
+              "turns": 68,
+              "ultimates": 8,
+              "interrupts": 3,
+              "ultimateDamage": 57,
+              "averageTurns": 6.2
+            }
+          },
+          "lostTo": {
+            "marshal": 15,
+            "sentinel": 8,
+            "regent": 53,
+            "leech": 4,
+            "serpent": 16,
+            "colossus": 12,
+            "wraith": 7,
+            "weaver": 4,
+            "reaver": 4,
+            "cantor": 13,
+            "prophet": 2,
+            "core": 9,
+            "storm": 1
+          },
+          "averageTurnsPerBattle": 3.58,
+          "averageTurnsPerNormalBattle": 3.1,
+          "averageIntegrityOnWin": 9,
+          "averageLossSector": 9.1
+        },
+        {
+          "archetype": "ghost",
+          "policy": "tactical",
+          "ascension": 10,
+          "seeds": 150,
+          "wins": 8,
+          "winRate": "5%",
+          "sampleWinningSeeds": [
+            4203543429,
+            2323661502,
+            3929271828
+          ],
+          "reachedCore": 22,
+          "guardians": {
+            "regent": {
+              "encounters": 130,
+              "wins": 85,
+              "losses": 45,
+              "turns": 655,
+              "ultimates": 36,
+              "interrupts": 19,
+              "ultimateDamage": 138,
+              "averageTurns": 5
+            },
+            "cantor": {
+              "encounters": 73,
+              "wins": 57,
+              "losses": 16,
+              "turns": 474,
+              "ultimates": 43,
+              "interrupts": 28,
+              "ultimateDamage": 114,
+              "averageTurns": 6.5
+            },
+            "core": {
+              "encounters": 22,
+              "wins": 8,
+              "losses": 14,
+              "turns": 134,
+              "ultimates": 14,
+              "interrupts": 7,
+              "ultimateDamage": 31,
+              "averageTurns": 6.1
+            }
+          },
+          "lostTo": {
+            "regent": 45,
+            "sentinel": 10,
+            "cantor": 16,
+            "colossus": 10,
+            "serpent": 11,
+            "core": 14,
+            "reaver": 18,
+            "leech": 3,
+            "marshal": 10,
+            "weaver": 3,
+            "prophet": 1,
+            "storm": 1
+          },
+          "averageTurnsPerBattle": 3.75,
+          "averageTurnsPerNormalBattle": 3.15,
+          "averageIntegrityOnWin": 4.9,
+          "averageLossSector": 11.6
+        }
+      ]
+    }
+  },
+  "experiments": {
+    "notes": "150 seeds per archetype, tactical policy, ascension 0, before the shipped guardian health change (base guardians 56/80/110). Used to choose the final numbers; not the shipped state.",
+    "baseline": {
+      "architect": {
+        "winRate": "37%",
+        "normalTurns": 3.93,
+        "guardianTurns": {
+          "regent": 5.7,
+          "cantor": 6.7,
+          "core": 6.4
+        }
+      },
+      "warden": {
+        "winRate": "44%",
+        "normalTurns": 4.92,
+        "guardianTurns": {
+          "regent": 8.1,
+          "cantor": 9.7,
+          "core": 8.9
+        }
+      },
+      "ghost": {
+        "winRate": "42%",
+        "normalTurns": 3.02,
+        "guardianTurns": {
+          "regent": 4.4,
+          "cantor": 5.4,
+          "core": 5.8
+        }
+      }
+    },
+    "guardianHealthX1_15": {
+      "architect": {
+        "winRate": "42%",
+        "normalTurns": 3.86,
+        "guardianTurns": {
+          "regent": 6.1,
+          "cantor": 7.3,
+          "core": 6.8
+        }
+      },
+      "warden": {
+        "winRate": "39%",
+        "normalTurns": 4.82,
+        "guardianTurns": {
+          "regent": 8.8,
+          "cantor": 10.5,
+          "core": 9.5
+        }
+      },
+      "ghost": {
+        "winRate": "41%",
+        "normalTurns": 3.02,
+        "guardianTurns": {
+          "regent": 4.9,
+          "cantor": 5.7,
+          "core": 5.9
+        }
+      }
+    },
+    "guardianHealthX1_2 (shipped)": {
+      "architect": {
+        "winRate": "39%",
+        "normalTurns": 3.86,
+        "guardianTurns": {
+          "regent": 6.2,
+          "cantor": 7.4,
+          "core": 6.9
+        }
+      },
+      "warden": {
+        "winRate": "35%",
+        "normalTurns": 4.76,
+        "guardianTurns": {
+          "regent": 9.1,
+          "cantor": 10.6,
+          "core": 9.5
+        }
+      },
+      "ghost": {
+        "winRate": "39%",
+        "normalTurns": 3.03,
+        "guardianTurns": {
+          "regent": 5,
+          "cantor": 5.9,
+          "core": 6.2
+        }
+      }
+    },
+    "guardianHealthX1_25": {
+      "architect": {
+        "winRate": "37%",
+        "normalTurns": 3.87,
+        "guardianTurns": {
+          "regent": 6.3,
+          "cantor": 7.6,
+          "core": 7.1
+        }
+      },
+      "warden": {
+        "winRate": "33%",
+        "normalTurns": 4.81,
+        "guardianTurns": {
+          "regent": 9.3,
+          "cantor": 11.1,
+          "core": 9.9
+        }
+      },
+      "ghost": {
+        "winRate": "35%",
+        "normalTurns": 3.06,
+        "guardianTurns": {
+          "regent": 5.1,
+          "cantor": 6,
+          "core": 6.4
+        }
+      }
+    },
+    "guardianHealthX1_4": {
+      "architect": {
+        "winRate": "29%",
+        "normalTurns": 3.89,
+        "guardianTurns": {
+          "regent": 6.7,
+          "cantor": 8.2,
+          "core": 7.2
+        }
+      },
+      "warden": {
+        "winRate": "28%",
+        "normalTurns": 4.84,
+        "guardianTurns": {
+          "regent": 10,
+          "cantor": 12,
+          "core": 10.8
+        }
+      },
+      "ghost": {
+        "winRate": "30%",
+        "normalTurns": 3.03,
+        "guardianTurns": {
+          "regent": 5.5,
+          "cantor": 6.5,
+          "core": 6.6
+        }
+      }
+    },
+    "guardianX1_2_normalX1_1": {
+      "architect": {
+        "winRate": "39%",
+        "normalTurns": 4.11,
+        "guardianTurns": {
+          "regent": 6.2,
+          "cantor": 7.4,
+          "core": 6.8
+        }
+      },
+      "warden": {
+        "winRate": "32%",
+        "normalTurns": 5.25,
+        "guardianTurns": {
+          "regent": 9.3,
+          "cantor": 10.9,
+          "core": 10.1
+        }
+      },
+      "ghost": {
+        "winRate": "37%",
+        "normalTurns": 3.23,
+        "guardianTurns": {
+          "regent": 5,
+          "cantor": 5.9,
+          "core": 6.3
+        }
+      }
+    },
+    "normalHealthX1_15": {
+      "architect": {
+        "winRate": "35%",
+        "normalTurns": 4.2,
+        "guardianTurns": {
+          "regent": 5.8,
+          "cantor": 6.7,
+          "core": 6.4
+        }
+      },
+      "warden": {
+        "winRate": "43%",
+        "normalTurns": 5.39,
+        "guardianTurns": {
+          "regent": 8.2,
+          "cantor": 9.9,
+          "core": 8.6
+        }
+      },
+      "ghost": {
+        "winRate": "39%",
+        "normalTurns": 3.33,
+        "guardianTurns": {
+          "regent": 4.3,
+          "cantor": 5.3,
+          "core": 6
+        }
+      }
+    },
+    "bufferMultiplier1_5": {
+      "architect": {
+        "winRate": "37%",
+        "normalTurns": 3.93,
+        "guardianTurns": {
+          "regent": 5.7,
+          "cantor": 6.7,
+          "core": 6.4
+        }
+      },
+      "warden": {
+        "winRate": "44%",
+        "normalTurns": 4.92,
+        "guardianTurns": {
+          "regent": 8.1,
+          "cantor": 9.7,
+          "core": 8.9
+        }
+      },
+      "ghost": {
+        "winRate": "46%",
+        "normalTurns": 3.18,
+        "guardianTurns": {
+          "regent": 4.8,
+          "cantor": 5.7,
+          "core": 5.9
+        }
+      }
+    }
+  }
+}

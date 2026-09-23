@@ -1,0 +1,572 @@
+{
+  "date": "2026-09-22",
+  "rules": "35 cards including Wireshark; manual starter routes, spatial defense, unique enemy traits, rare Containerlab, legendary Clabernetes",
+  "sample": "500 distributed seeds x 3 archetypes x 3 policies x 5 scenarios = 22500 simulated runs",
+  "scenarios": {
+    "safe": {
+      "notes": "Deterministic lightweight bots, safest map route. These are regression probes, not a human difficulty estimate.",
+      "profiles": [
+        {
+          "archetype": "architect",
+          "policy": "careless",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 0,
+          "winRate": "0%",
+          "reachedBoss": 279,
+          "averageTurnsPerBattle": 4.75,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 5.7
+        },
+        {
+          "archetype": "architect",
+          "policy": "aggressive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 407,
+          "winRate": "81%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.13,
+          "averageIntegrityOnWin": 8.1,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "architect",
+          "policy": "adaptive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 400,
+          "winRate": "80%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.17,
+          "averageIntegrityOnWin": 7.9,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "warden",
+          "policy": "careless",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 0,
+          "winRate": "0%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.75,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "warden",
+          "policy": "aggressive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 479,
+          "winRate": "96%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.37,
+          "averageIntegrityOnWin": 11.1,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "warden",
+          "policy": "adaptive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 474,
+          "winRate": "95%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.47,
+          "averageIntegrityOnWin": 11.3,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "ghost",
+          "policy": "careless",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 0,
+          "winRate": "0%",
+          "reachedBoss": 172,
+          "averageTurnsPerBattle": 4.51,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 5
+        },
+        {
+          "archetype": "ghost",
+          "policy": "aggressive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 425,
+          "winRate": "85%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 4.59,
+          "averageIntegrityOnWin": 7.3,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "ghost",
+          "policy": "adaptive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 437,
+          "winRate": "87%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 4.71,
+          "averageIntegrityOnWin": 7.9,
+          "averageLossSector": 7
+        }
+      ]
+    },
+    "elite": {
+      "notes": "Deterministic lightweight bots, elite map route. These are regression probes, not a human difficulty estimate.",
+      "profiles": [
+        {
+          "archetype": "architect",
+          "policy": "careless",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 0,
+          "winRate": "0%",
+          "reachedBoss": 0,
+          "averageTurnsPerBattle": 6.67,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 4
+        },
+        {
+          "archetype": "architect",
+          "policy": "aggressive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 446,
+          "winRate": "89%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.62,
+          "averageIntegrityOnWin": 9.2,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "architect",
+          "policy": "adaptive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 443,
+          "winRate": "89%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.63,
+          "averageIntegrityOnWin": 9.3,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "warden",
+          "policy": "careless",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 0,
+          "winRate": "0%",
+          "reachedBoss": 0,
+          "averageTurnsPerBattle": 7.83,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 6
+        },
+        {
+          "archetype": "warden",
+          "policy": "aggressive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 493,
+          "winRate": "99%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.82,
+          "averageIntegrityOnWin": 12.4,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "warden",
+          "policy": "adaptive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 492,
+          "winRate": "98%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.87,
+          "averageIntegrityOnWin": 12.6,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "ghost",
+          "policy": "careless",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 0,
+          "winRate": "0%",
+          "reachedBoss": 0,
+          "averageTurnsPerBattle": 6.16,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 4
+        },
+        {
+          "archetype": "ghost",
+          "policy": "aggressive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 466,
+          "winRate": "93%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 4.95,
+          "averageIntegrityOnWin": 8.9,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "ghost",
+          "policy": "adaptive",
+          "build": "balanced",
+          "seeds": 500,
+          "wins": 479,
+          "winRate": "96%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.06,
+          "averageIntegrityOnWin": 9,
+          "averageLossSector": 7
+        }
+      ]
+    },
+    "mesh": {
+      "notes": "Deterministic lightweight bots, safest map route. These are regression probes, not a human difficulty estimate.",
+      "profiles": [
+        {
+          "archetype": "architect",
+          "policy": "careless",
+          "build": "mesh",
+          "seeds": 500,
+          "wins": 0,
+          "winRate": "0%",
+          "reachedBoss": 279,
+          "averageTurnsPerBattle": 4.75,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 5.7
+        },
+        {
+          "archetype": "architect",
+          "policy": "aggressive",
+          "build": "mesh",
+          "seeds": 500,
+          "wins": 360,
+          "winRate": "72%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.07,
+          "averageIntegrityOnWin": 7.1,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "architect",
+          "policy": "adaptive",
+          "build": "mesh",
+          "seeds": 500,
+          "wins": 349,
+          "winRate": "70%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.1,
+          "averageIntegrityOnWin": 7,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "warden",
+          "policy": "careless",
+          "build": "mesh",
+          "seeds": 500,
+          "wins": 0,
+          "winRate": "0%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.73,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "warden",
+          "policy": "aggressive",
+          "build": "mesh",
+          "seeds": 500,
+          "wins": 479,
+          "winRate": "96%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.35,
+          "averageIntegrityOnWin": 10.5,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "warden",
+          "policy": "adaptive",
+          "build": "mesh",
+          "seeds": 500,
+          "wins": 472,
+          "winRate": "94%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.45,
+          "averageIntegrityOnWin": 10.5,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "ghost",
+          "policy": "careless",
+          "build": "mesh",
+          "seeds": 500,
+          "wins": 0,
+          "winRate": "0%",
+          "reachedBoss": 172,
+          "averageTurnsPerBattle": 4.51,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 5
+        },
+        {
+          "archetype": "ghost",
+          "policy": "aggressive",
+          "build": "mesh",
+          "seeds": 500,
+          "wins": 390,
+          "winRate": "78%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 4.55,
+          "averageIntegrityOnWin": 6.9,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "ghost",
+          "policy": "adaptive",
+          "build": "mesh",
+          "seeds": 500,
+          "wins": 385,
+          "winRate": "77%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 4.63,
+          "averageIntegrityOnWin": 7.3,
+          "averageLossSector": 7
+        }
+      ]
+    },
+    "fortress": {
+      "notes": "Deterministic lightweight bots, safest map route. These are regression probes, not a human difficulty estimate.",
+      "profiles": [
+        {
+          "archetype": "architect",
+          "policy": "careless",
+          "build": "fortress",
+          "seeds": 500,
+          "wins": 0,
+          "winRate": "0%",
+          "reachedBoss": 279,
+          "averageTurnsPerBattle": 4.75,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 5.7
+        },
+        {
+          "archetype": "architect",
+          "policy": "aggressive",
+          "build": "fortress",
+          "seeds": 500,
+          "wins": 435,
+          "winRate": "87%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.41,
+          "averageIntegrityOnWin": 8.4,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "architect",
+          "policy": "adaptive",
+          "build": "fortress",
+          "seeds": 500,
+          "wins": 420,
+          "winRate": "84%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.46,
+          "averageIntegrityOnWin": 8.2,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "warden",
+          "policy": "careless",
+          "build": "fortress",
+          "seeds": 500,
+          "wins": 0,
+          "winRate": "0%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.75,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "warden",
+          "policy": "aggressive",
+          "build": "fortress",
+          "seeds": 500,
+          "wins": 485,
+          "winRate": "97%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.55,
+          "averageIntegrityOnWin": 11.5,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "warden",
+          "policy": "adaptive",
+          "build": "fortress",
+          "seeds": 500,
+          "wins": 487,
+          "winRate": "97%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.66,
+          "averageIntegrityOnWin": 11.8,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "ghost",
+          "policy": "careless",
+          "build": "fortress",
+          "seeds": 500,
+          "wins": 0,
+          "winRate": "0%",
+          "reachedBoss": 172,
+          "averageTurnsPerBattle": 4.51,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 5
+        },
+        {
+          "archetype": "ghost",
+          "policy": "aggressive",
+          "build": "fortress",
+          "seeds": 500,
+          "wins": 452,
+          "winRate": "90%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 4.77,
+          "averageIntegrityOnWin": 8.1,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "ghost",
+          "policy": "adaptive",
+          "build": "fortress",
+          "seeds": 500,
+          "wins": 456,
+          "winRate": "91%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 4.89,
+          "averageIntegrityOnWin": 8.6,
+          "averageLossSector": 7
+        }
+      ]
+    },
+    "burst": {
+      "notes": "Deterministic lightweight bots, safest map route. These are regression probes, not a human difficulty estimate.",
+      "profiles": [
+        {
+          "archetype": "architect",
+          "policy": "careless",
+          "build": "burst",
+          "seeds": 500,
+          "wins": 0,
+          "winRate": "0%",
+          "reachedBoss": 279,
+          "averageTurnsPerBattle": 4.75,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 5.7
+        },
+        {
+          "archetype": "architect",
+          "policy": "aggressive",
+          "build": "burst",
+          "seeds": 500,
+          "wins": 386,
+          "winRate": "77%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 4.91,
+          "averageIntegrityOnWin": 7.2,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "architect",
+          "policy": "adaptive",
+          "build": "burst",
+          "seeds": 500,
+          "wins": 373,
+          "winRate": "75%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 4.95,
+          "averageIntegrityOnWin": 6.7,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "warden",
+          "policy": "careless",
+          "build": "burst",
+          "seeds": 500,
+          "wins": 0,
+          "winRate": "0%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.71,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "warden",
+          "policy": "aggressive",
+          "build": "burst",
+          "seeds": 500,
+          "wins": 479,
+          "winRate": "96%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.21,
+          "averageIntegrityOnWin": 10.2,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "warden",
+          "policy": "adaptive",
+          "build": "burst",
+          "seeds": 500,
+          "wins": 480,
+          "winRate": "96%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 5.29,
+          "averageIntegrityOnWin": 10.6,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "ghost",
+          "policy": "careless",
+          "build": "burst",
+          "seeds": 500,
+          "wins": 0,
+          "winRate": "0%",
+          "reachedBoss": 172,
+          "averageTurnsPerBattle": 4.51,
+          "averageIntegrityOnWin": 0,
+          "averageLossSector": 5
+        },
+        {
+          "archetype": "ghost",
+          "policy": "aggressive",
+          "build": "burst",
+          "seeds": 500,
+          "wins": 403,
+          "winRate": "81%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 4.4,
+          "averageIntegrityOnWin": 6.8,
+          "averageLossSector": 7
+        },
+        {
+          "archetype": "ghost",
+          "policy": "adaptive",
+          "build": "burst",
+          "seeds": 500,
+          "wins": 411,
+          "winRate": "82%",
+          "reachedBoss": 500,
+          "averageTurnsPerBattle": 4.51,
+          "averageIntegrityOnWin": 7.6,
+          "averageLossSector": 7
+        }
+      ]
+    }
+  }
+}

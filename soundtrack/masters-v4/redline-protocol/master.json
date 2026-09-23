@@ -1,0 +1,15 @@
+{
+  "source": "../../instrumental-v4/redline-protocol/audio.flac",
+  "separation_model": "htdemucs_ft",
+  "included_stems": [
+    "drums",
+    "bass",
+    "other"
+  ],
+  "excluded_stems": [
+    "vocals"
+  ],
+  "instrumental_rms": 0.2193145602941513,
+  "removed_vocal_rms": 0.00013451669656205922,
+  "sample_rate": 44100
+}

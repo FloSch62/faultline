@@ -1,0 +1,624 @@
+{
+  "date": "2026-09-23",
+  "build": "vite preview of the current tree (base /)",
+  "notes": "Browser expeditions through the real controls (scripts/playthrough.ts, tactical bot plans each action; screens driven by clicks). Only the initial expedition is injected. Every transmission's saved result is compared with endTurn() applied to the same saved state; a reload is exercised after the 15th transmission. Regression probes, not human difficulty measurements.",
+  "runs": [
+    {
+      "archetype": "architect",
+      "seed": 2654435761,
+      "outcome": "lost",
+      "stage": 2,
+      "sector": 10,
+      "integrity": 0,
+      "maxIntegrity": 14,
+      "credits": 43,
+      "deck": 27,
+      "relics": [
+        "hot-swap",
+        "repair-drone",
+        "sdn-controller"
+      ],
+      "actions": 90,
+      "actionKinds": {
+        "ground": 18,
+        "link": 16,
+        "instant": 24,
+        "prepare": 8,
+        "scrub": 1,
+        "zone": 11,
+        "node": 5,
+        "protocol": 2,
+        "move": 5
+      },
+      "transmissions": 34,
+      "forecastsChecked": 34,
+      "rooms": {
+        "battle": 6,
+        "event": 1,
+        "elite": 1,
+        "forge": 1,
+        "boss": 1,
+        "shop": 1
+      },
+      "encounters": [
+        {
+          "stage": 1,
+          "sector": 1,
+          "room": "battle",
+          "enemy": "leech",
+          "before": 14,
+          "turns": 3,
+          "interrupts": 0,
+          "after": 14,
+          "damageDealt": 18
+        },
+        {
+          "stage": 1,
+          "sector": 3,
+          "room": "battle",
+          "enemy": "prophet",
+          "before": 14,
+          "turns": 3,
+          "interrupts": 0,
+          "after": 14,
+          "damageDealt": 28
+        },
+        {
+          "stage": 1,
+          "sector": 4,
+          "room": "elite",
+          "enemy": "sentinel",
+          "before": 14,
+          "turns": 6,
+          "interrupts": 0,
+          "after": 5,
+          "damageDealt": 37
+        },
+        {
+          "stage": 1,
+          "sector": 5,
+          "room": "battle",
+          "enemy": "prophet",
+          "before": 5,
+          "turns": 4,
+          "interrupts": 0,
+          "after": 4,
+          "damageDealt": 41
+        },
+        {
+          "stage": 1,
+          "sector": 7,
+          "room": "boss",
+          "enemy": "regent",
+          "before": 8,
+          "turns": 7,
+          "interrupts": 1,
+          "after": 2,
+          "damageDealt": 77,
+          "ultimates": [
+            {
+              "turn": 6,
+              "damage": 18,
+              "threshold": 12,
+              "incoming": 0,
+              "interrupted": true
+            }
+          ]
+        },
+        {
+          "stage": 2,
+          "sector": 1,
+          "room": "battle",
+          "enemy": "marshal",
+          "before": 8,
+          "turns": 5,
+          "interrupts": 0,
+          "after": 2,
+          "damageDealt": 34
+        },
+        {
+          "stage": 2,
+          "sector": 2,
+          "room": "battle",
+          "enemy": "choir",
+          "before": 2,
+          "turns": 4,
+          "interrupts": 0,
+          "after": 3,
+          "damageDealt": 43
+        },
+        {
+          "stage": 2,
+          "sector": 4,
+          "room": "battle",
+          "enemy": "storm",
+          "before": 3,
+          "turns": 2,
+          "interrupts": 0,
+          "after": 0,
+          "damageDealt": 13
+        }
+      ],
+      "errors": []
+    },
+    {
+      "archetype": "warden",
+      "seed": 2654435761,
+      "outcome": "lost",
+      "stage": 3,
+      "sector": 20,
+      "integrity": 0,
+      "maxIntegrity": 15,
+      "credits": 135,
+      "deck": 39,
+      "relics": [
+        "backpressure",
+        "reserve-cell",
+        "cold-start",
+        "jumbo-frames",
+        "grounded-core",
+        "bgp-hijack",
+        "watchdog"
+      ],
+      "actions": 233,
+      "actionKinds": {
+        "ground": 21,
+        "link": 32,
+        "prepare": 48,
+        "scrub": 1,
+        "zone": 21,
+        "console": 21,
+        "instant": 48,
+        "protocol": 17,
+        "node": 9,
+        "move": 13,
+        "junk": 2
+      },
+      "transmissions": 87,
+      "forecastsChecked": 87,
+      "rooms": {
+        "battle": 9,
+        "event": 1,
+        "elite": 4,
+        "boss": 3,
+        "shop": 2,
+        "cache": 1,
+        "forge": 1
+      },
+      "encounters": [
+        {
+          "stage": 1,
+          "sector": 1,
+          "room": "battle",
+          "enemy": "leech",
+          "before": 15,
+          "turns": 3,
+          "interrupts": 0,
+          "after": 15,
+          "damageDealt": 19
+        },
+        {
+          "stage": 1,
+          "sector": 3,
+          "room": "battle",
+          "enemy": "prophet",
+          "before": 15,
+          "turns": 3,
+          "interrupts": 0,
+          "after": 15,
+          "damageDealt": 26
+        },
+        {
+          "stage": 1,
+          "sector": 4,
+          "room": "elite",
+          "enemy": "sentinel",
+          "before": 15,
+          "turns": 6,
+          "interrupts": 0,
+          "after": 15,
+          "damageDealt": 38
+        },
+        {
+          "stage": 1,
+          "sector": 5,
+          "room": "battle",
+          "enemy": "prophet",
+          "before": 15,
+          "turns": 4,
+          "interrupts": 0,
+          "after": 13,
+          "damageDealt": 48
+        },
+        {
+          "stage": 1,
+          "sector": 6,
+          "room": "elite",
+          "enemy": "colossus",
+          "before": 13,
+          "turns": 6,
+          "interrupts": 0,
+          "after": 13,
+          "damageDealt": 50
+        },
+        {
+          "stage": 1,
+          "sector": 7,
+          "room": "boss",
+          "enemy": "regent",
+          "before": 13,
+          "turns": 7,
+          "interrupts": 0,
+          "after": 13,
+          "damageDealt": 65,
+          "ultimates": [
+            {
+              "turn": 6,
+              "damage": 10,
+              "threshold": 12,
+              "incoming": 0,
+              "interrupted": false
+            }
+          ]
+        },
+        {
+          "stage": 2,
+          "sector": 1,
+          "room": "battle",
+          "enemy": "marshal",
+          "before": 15,
+          "turns": 4,
+          "interrupts": 0,
+          "after": 15,
+          "damageDealt": 29
+        },
+        {
+          "stage": 2,
+          "sector": 2,
+          "room": "battle",
+          "enemy": "choir",
+          "before": 15,
+          "turns": 4,
+          "interrupts": 0,
+          "after": 15,
+          "damageDealt": 40
+        },
+        {
+          "stage": 2,
+          "sector": 4,
+          "room": "elite",
+          "enemy": "colossus",
+          "before": 15,
+          "turns": 6,
+          "interrupts": 0,
+          "after": 15,
+          "damageDealt": 51
+        },
+        {
+          "stage": 2,
+          "sector": 5,
+          "room": "battle",
+          "enemy": "storm",
+          "before": 15,
+          "turns": 6,
+          "interrupts": 0,
+          "after": 15,
+          "damageDealt": 59
+        },
+        {
+          "stage": 2,
+          "sector": 7,
+          "room": "boss",
+          "enemy": "cantor",
+          "before": 15,
+          "turns": 10,
+          "interrupts": 0,
+          "after": 15,
+          "damageDealt": 98,
+          "ultimates": [
+            {
+              "turn": 6,
+              "damage": 13,
+              "threshold": 15,
+              "incoming": 0,
+              "interrupted": false
+            }
+          ]
+        },
+        {
+          "stage": 3,
+          "sector": 1,
+          "room": "battle",
+          "enemy": "widow",
+          "before": 15,
+          "turns": 5,
+          "interrupts": 0,
+          "after": 15,
+          "damageDealt": 54
+        },
+        {
+          "stage": 3,
+          "sector": 2,
+          "room": "battle",
+          "enemy": "widow",
+          "before": 15,
+          "turns": 5,
+          "interrupts": 0,
+          "after": 15,
+          "damageDealt": 55
+        },
+        {
+          "stage": 3,
+          "sector": 4,
+          "room": "elite",
+          "enemy": "sentinel",
+          "before": 15,
+          "turns": 4,
+          "interrupts": 0,
+          "after": 8,
+          "damageDealt": 63
+        },
+        {
+          "stage": 3,
+          "sector": 5,
+          "room": "battle",
+          "enemy": "moth",
+          "before": 8,
+          "turns": 6,
+          "interrupts": 0,
+          "after": 8,
+          "damageDealt": 72
+        },
+        {
+          "stage": 3,
+          "sector": 7,
+          "room": "boss",
+          "enemy": "core",
+          "before": 13,
+          "turns": 8,
+          "interrupts": 0,
+          "after": 0,
+          "damageDealt": 104,
+          "ultimates": [
+            {
+              "turn": 6,
+              "damage": 17,
+              "threshold": 18,
+              "incoming": 6,
+              "interrupted": false
+            }
+          ]
+        }
+      ],
+      "errors": []
+    },
+    {
+      "archetype": "ghost",
+      "seed": 2654435761,
+      "outcome": "lost",
+      "stage": 3,
+      "sector": 20,
+      "integrity": 0,
+      "maxIntegrity": 12,
+      "credits": 99,
+      "deck": 40,
+      "relics": [
+        "deep-cache",
+        "grounded-core",
+        "jumbo-frames",
+        "repair-drone",
+        "bgp-hijack",
+        "watchdog"
+      ],
+      "actions": 221,
+      "actionKinds": {
+        "ground": 21,
+        "link": 30,
+        "instant": 77,
+        "prepare": 24,
+        "zone": 18,
+        "console": 12,
+        "node": 20,
+        "protocol": 18,
+        "move": 1
+      },
+      "transmissions": 64,
+      "forecastsChecked": 64,
+      "rooms": {
+        "battle": 9,
+        "event": 1,
+        "elite": 3,
+        "forge": 2,
+        "boss": 3,
+        "shop": 2,
+        "cache": 1
+      },
+      "encounters": [
+        {
+          "stage": 1,
+          "sector": 1,
+          "room": "battle",
+          "enemy": "leech",
+          "before": 12,
+          "turns": 2,
+          "interrupts": 0,
+          "after": 12,
+          "damageDealt": 17
+        },
+        {
+          "stage": 1,
+          "sector": 3,
+          "room": "battle",
+          "enemy": "prophet",
+          "before": 12,
+          "turns": 2,
+          "interrupts": 0,
+          "after": 12,
+          "damageDealt": 29
+        },
+        {
+          "stage": 1,
+          "sector": 4,
+          "room": "elite",
+          "enemy": "sentinel",
+          "before": 12,
+          "turns": 2,
+          "interrupts": 0,
+          "after": 8,
+          "damageDealt": 36
+        },
+        {
+          "stage": 1,
+          "sector": 5,
+          "room": "battle",
+          "enemy": "prophet",
+          "before": 8,
+          "turns": 4,
+          "interrupts": 0,
+          "after": 8,
+          "damageDealt": 45
+        },
+        {
+          "stage": 1,
+          "sector": 7,
+          "room": "boss",
+          "enemy": "regent",
+          "before": 12,
+          "turns": 4,
+          "interrupts": 0,
+          "after": 9,
+          "damageDealt": 73
+        },
+        {
+          "stage": 2,
+          "sector": 1,
+          "room": "battle",
+          "enemy": "marshal",
+          "before": 12,
+          "turns": 4,
+          "interrupts": 0,
+          "after": 12,
+          "damageDealt": 30
+        },
+        {
+          "stage": 2,
+          "sector": 2,
+          "room": "battle",
+          "enemy": "choir",
+          "before": 12,
+          "turns": 3,
+          "interrupts": 0,
+          "after": 12,
+          "damageDealt": 42
+        },
+        {
+          "stage": 2,
+          "sector": 4,
+          "room": "elite",
+          "enemy": "colossus",
+          "before": 12,
+          "turns": 5,
+          "interrupts": 0,
+          "after": 6,
+          "damageDealt": 47
+        },
+        {
+          "stage": 2,
+          "sector": 5,
+          "room": "battle",
+          "enemy": "storm",
+          "before": 6,
+          "turns": 3,
+          "interrupts": 0,
+          "after": 7,
+          "damageDealt": 50
+        },
+        {
+          "stage": 2,
+          "sector": 7,
+          "room": "boss",
+          "enemy": "cantor",
+          "before": 7,
+          "turns": 8,
+          "interrupts": 1,
+          "after": 8,
+          "damageDealt": 97,
+          "ultimates": [
+            {
+              "turn": 6,
+              "damage": 35,
+              "threshold": 15,
+              "incoming": 0,
+              "interrupted": true
+            }
+          ]
+        },
+        {
+          "stage": 3,
+          "sector": 1,
+          "room": "battle",
+          "enemy": "widow",
+          "before": 12,
+          "turns": 5,
+          "interrupts": 0,
+          "after": 12,
+          "damageDealt": 43
+        },
+        {
+          "stage": 3,
+          "sector": 2,
+          "room": "battle",
+          "enemy": "widow",
+          "before": 12,
+          "turns": 4,
+          "interrupts": 0,
+          "after": 12,
+          "damageDealt": 51
+        },
+        {
+          "stage": 3,
+          "sector": 4,
+          "room": "elite",
+          "enemy": "sentinel",
+          "before": 12,
+          "turns": 7,
+          "interrupts": 0,
+          "after": 8,
+          "damageDealt": 58
+        },
+        {
+          "stage": 3,
+          "sector": 5,
+          "room": "battle",
+          "enemy": "moth",
+          "before": 8,
+          "turns": 5,
+          "interrupts": 0,
+          "after": 9,
+          "damageDealt": 68
+        },
+        {
+          "stage": 3,
+          "sector": 7,
+          "room": "boss",
+          "enemy": "core",
+          "before": 9,
+          "turns": 6,
+          "interrupts": 0,
+          "after": 0,
+          "damageDealt": 94,
+          "ultimates": [
+            {
+              "turn": 6,
+              "damage": 15,
+              "threshold": 18,
+              "incoming": 12,
+              "interrupted": false
+            }
+          ]
+        }
+      ],
+      "errors": []
+    }
+  ]
+}

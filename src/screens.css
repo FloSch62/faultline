@@ -1,0 +1,416 @@
+/* Expedition screens (v3): selection & ascension, map, rewards, relics,
+ * sanctuary services, the market, unknown signals and outcomes. */
+
+/* ------------------------------------------------------------ shared */
+.credit-amount { display: inline-flex; align-items: center; gap: 6px; color: #f1d58f; font: 600 16px var(--condensed); letter-spacing: .02em; }
+.credit-amount svg { color: #e6c06b; filter: drop-shadow(0 0 5px #e8b95a55); }
+.credits-stat { color: #e8cf8c; }
+.credits-stat svg { color: #e2bb63; }
+.ascension-stat { color: #e0a6ff; cursor: help; }
+.ascension-stat b { color: #ecd2ff; }
+
+.relic-emblem {
+  --relic-color: #d8bb80;
+  display: inline-grid; place-items: center; flex-shrink: 0;
+  width: 1.9em; height: 1.9em; border-radius: 50%;
+  color: color-mix(in srgb, var(--relic-color) 80%, white);
+  background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--relic-color) 38%, #151d24), #0b1117 72%);
+  border: 1px solid color-mix(in srgb, var(--relic-color) 55%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--relic-color) 30%, transparent), inset 0 0 10px #0009;
+}
+.relic-emblem svg { width: 60%; height: 60%; }
+.relic-emblem.tier-boss { border-radius: 30%; transform: rotate(45deg); }
+.relic-emblem.tier-boss svg { transform: rotate(-45deg); }
+.carried-relic .relic-emblem { font-size: 14px; }
+
+.price-button, .price-tag {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-width: 92px; min-height: 36px; padding: 6px 14px;
+  border: 1px solid #d9b66f88; background: linear-gradient(180deg, #2a2418e6, #16130ee6);
+  box-shadow: inset 0 1px 0 #ffe7a922, 0 6px 18px #0007;
+  color: #f2d995; transition: transform .18s, border-color .18s, filter .18s, background .18s;
+}
+.price-button:hover:not(:disabled) { transform: translateY(-2px); border-color: #f4d58f; filter: brightness(1.15); background: linear-gradient(180deg, #3a301b, #1c170f); }
+.price-button:disabled { color: #8d8a80; border-color: #6f6a5b55; background: #11151acc; box-shadow: none; font: 600 13px var(--condensed); letter-spacing: .14em; text-transform: uppercase; }
+.short .price-button:not(:disabled), .short .price-tag { border-color: #b8646466; }
+.short .price-button:not(:disabled) .credit-amount, .short .price-tag .credit-amount { color: #d99a8c; }
+.short .price-button:not(:disabled) svg, .short .price-tag svg { color: #c07c6c; filter: none; }
+
+@keyframes screen-rise { from { opacity: 0; transform: translateY(14px); } }
+@keyframes screen-glow { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+@keyframes halo-turn { to { transform: rotate(360deg); } }
+
+/* ------------------------------------------------------------ title */
+.title-menu .menu-link small { font-size: 7.5px; }
+
+/* ------------------------------------------------------------ selection */
+.selection-screen.v3 { padding-top: 22px; padding-bottom: 18px; }
+.selection-screen.v3 .screen-heading h1 { margin: 10px 0 6px; }
+.selection-screen.v3 .chosen-story { max-width: 720px; margin: 0 auto; font: italic 14px/1.55 Georgia, serif; color: #b6b3a6; }
+.deck-link { position: absolute; right: 43px; top: 20px; display: flex; gap: 8px; align-items: center; font-size: 9px; letter-spacing: .18em; color: #b1b4ac; }
+.deck-link:hover { color: var(--pale); }
+.selection-screen.v3 .archetypes { gap: 20px; margin: 20px 0 16px; align-items: stretch; }
+.archetype.v3 { width: 292px; height: auto; min-height: 0; display: flex; flex-direction: column; background: linear-gradient(180deg, #0c141ce6, #0a1016f2); }
+.archetype.v3 .archetype-art { position: relative; inset: auto; height: 104px; flex-shrink: 0; background-image: var(--card-image, url("/art/card-atlas.png")); background-size: var(--art-size, 300% 300%); mask-image: linear-gradient(#000 55%, transparent); }
+.archetype.v3 .archetype-copy { position: relative; inset: auto; padding: 0 18px 14px; margin-top: -28px; flex: 1; }
+.archetype.v3 .archetype-copy > strong { font-size: 21px; margin-bottom: 8px; }
+.archetype.v3 .kit { display: grid; gap: 8px; margin-bottom: 10px; }
+.archetype.v3 .kit-row { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; padding-top: 8px; border-top: 1px solid #c9ad7a1f; }
+.archetype.v3 .kit-row > i { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); background: #0e1820; color: var(--accent); font-style: normal; }
+.archetype.v3 .kit-row > i .relic-emblem { font-size: 13px; border: 0; box-shadow: none; background: none; }
+.archetype.v3 .kit-row > span { display: grid; gap: 1px; min-width: 0; }
+.archetype.v3 .kit-row em { font: 7.5px var(--condensed); letter-spacing: .16em; color: #9d9884; margin: 0; }
+.archetype.v3 .kit-row b { font: 600 15px var(--condensed); color: #e8d7b5; letter-spacing: .02em; }
+.archetype.v3 .kit-row b + span { font: 11px/1.4 Barlow; color: #a3adad; }
+.archetype.v3 .archetype-health { margin-top: auto; }
+.archetype.v3:not(.chosen) { filter: saturate(.8) brightness(.9); }
+.archetype.v3.chosen { transform: translateY(-4px); }
+.archetype.v3.chosen .kit-row > i { background: color-mix(in srgb, var(--accent) 14%, #0e1820); }
+
+.selection-footer { display: flex; gap: 16px; align-items: stretch; justify-content: center; width: min(916px, 100%); margin: 0 auto; }
+.selection-footer .embark { min-width: 250px; min-height: 56px; max-height: 64px; align-self: center; }
+.ascension-panel {
+  flex: 1; min-width: 0; display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 10px 18px;
+  padding: 9px 18px; text-align: left;
+  border: 1px solid #b391d633; background: linear-gradient(90deg, #120f1acc, #0c131acc 60%, #120f1acc);
+  box-shadow: inset 0 0 0 1px #0006, 0 10px 30px #0005;
+}
+.asc-label { display: flex; align-items: center; gap: 9px; color: #cfa9f0; }
+.asc-label span { display: grid; }
+.asc-label small { font: 8px var(--condensed); letter-spacing: .22em; color: #a992bf; }
+.asc-label strong { font: 600 26px/1 var(--condensed); color: #f0dcff; }
+.asc-track { display: flex; gap: 3px; }
+.asc-pip {
+  width: 24px; height: 24px; display: grid; place-items: center; line-height: 1;
+  font: 600 11px var(--condensed); color: #c3b3d4; font-variant-numeric: tabular-nums;
+  border: 1px solid #8a74a266; background: #151220; transform: rotate(45deg) scale(.82);
+  transition: background .18s, border-color .18s, transform .18s, box-shadow .18s;
+}
+/* The number inside a rotated pip stays upright. */
+.asc-pip > * { transform: rotate(-45deg); }
+.asc-pip:hover:not(:disabled) { border-color: #d3adf5; transform: rotate(45deg) scale(.95); }
+.asc-pip.included { background: #3a2b4d; border-color: #9f7cc488; color: #e6d2f7; }
+.asc-pip.current { background: linear-gradient(135deg, #8d62bd, #caa0ef); color: #1b1025; border-color: #f0dbff; box-shadow: 0 0 16px #b183e088; transform: rotate(45deg) scale(1); }
+.asc-pip.locked { color: #5e566b; border-color: #3c354655; background: #0e0d13; cursor: not-allowed; }
+.asc-summary { margin: 0; font: 12px/1.4 Barlow; color: #aeb3b5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.asc-summary strong { font: 600 14px var(--condensed); color: #e5d1f5; letter-spacing: .03em; }
+.asc-more { color: #c29fe3; font: 11px var(--condensed); letter-spacing: .06em; cursor: help; border-bottom: 1px dotted #c29fe388; white-space: nowrap; }
+
+/* ------------------------------------------------------------ map */
+.type-shop .room-symbol { color: #ecc774; }
+.type-event .room-symbol { color: #9cc7e6; }
+.available.type-shop .room-symbol { box-shadow: 0 0 24px #e3b55a55; }
+.available.type-event .room-symbol { box-shadow: 0 0 24px #7fb6e055; border-color: #a9d3f0; color: #d3ecff; background: #1c2a36b0; }
+.map-condition .map-credits svg { color: #e2bb63; }
+.map-condition .map-credits strong { color: #f0d692; }
+.map-legend .legend-shop svg { color: #e2bb63; }
+.map-legend .legend-event svg { color: #9cc7e6; }
+.map-relics .carried-relic { cursor: help; }
+
+/* ------------------------------------------------------------ reward */
+.spoils {
+  display: inline-flex; align-items: center; gap: 12px; margin: 16px 0 0; padding: 8px 18px 8px 14px;
+  border: 1px solid #d8b56a55; background: linear-gradient(90deg, #2a2213cc, #14120ccc);
+  color: #e3cf9f; font: 14px var(--condensed); letter-spacing: .04em;
+  animation: screen-rise .6s .1s backwards;
+}
+.spoils svg { color: #eac06a; filter: drop-shadow(0 0 8px #eab85f88); }
+.spoils b { font: 600 20px var(--condensed); color: #ffe3a1; }
+.spoils small { font: 9px var(--condensed); letter-spacing: .16em; color: #a99a78; border-left: 1px solid #d8b56a44; padding-left: 12px; }
+.reward-screen.v3 .reward-cards { margin-top: 26px; }
+
+/* ------------------------------------------------------------ relics */
+.relic-screen.v3 { padding-top: 36px; }
+.relic-screen.v3 .relic-options { gap: 22px; margin-top: 34px; flex-wrap: wrap; justify-content: center; }
+.relic-screen.v3 .relic-option {
+  width: 250px; min-height: 318px; padding: 26px 20px 20px; gap: 10px; position: relative; overflow: hidden;
+  background: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 60%), linear-gradient(180deg, #0f1821f0, #0a1015f5);
+  animation: screen-rise .6s calc(var(--order) * .12s) backwards;
+}
+.relic-halo { position: relative; display: grid; place-items: center; width: 108px; height: 108px; margin-bottom: 6px; }
+.relic-halo::before { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent); animation: halo-turn 40s linear infinite; }
+.relic-halo::after { content: ""; position: absolute; inset: 14px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%); animation: screen-glow 4s ease-in-out infinite; }
+.relic-halo .relic-emblem { position: relative; z-index: 1; font-size: 36px; }
+.relic-screen.v3 .relic-option strong { font-size: 21px; }
+.relic-rules { font: 13px/1.6 Barlow; color: #a9b4b4; }
+.relic-claim { margin-top: auto; display: flex; align-items: center; gap: 8px; font: 10px var(--condensed); letter-spacing: .2em; color: #c9ad75; opacity: .7; transition: opacity .2s, gap .2s; }
+.relic-option:hover .relic-claim, .relic-option:focus-visible .relic-claim { opacity: 1; gap: 12px; }
+.relic-option > svg { display: none; }
+.boss-offer h1 { color: #f4d9b0; }
+.relic-option.boss-relic { width: 270px; min-height: 350px; border-color: color-mix(in srgb, var(--accent) 45%, #6b5634); box-shadow: 0 0 0 1px #0007, 0 18px 40px #0008, inset 0 0 40px color-mix(in srgb, var(--accent) 10%, transparent); }
+.relic-option.boss-relic::before { content: "BOSS RELIC"; position: absolute; top: 12px; left: 50%; transform: translateX(-50%); font: 8px var(--condensed); letter-spacing: .3em; color: var(--accent); opacity: .8; }
+.relic-boon, .relic-cost { display: flex; gap: 8px; align-items: flex-start; text-align: left; width: 100%; padding: 9px 10px; font: 13px/1.45 Barlow; }
+.relic-boon { color: #f1e2bd; background: #d9b86a14; border-left: 2px solid #e6c47a; }
+.relic-boon svg { color: #f2cd78; margin-top: 2px; }
+.relic-cost { color: #efb3a6; background: #b6524414; border-left: 2px solid #d9735f; }
+.relic-cost svg { color: #e5806b; margin-top: 2px; }
+
+/* ------------------------------------------------------------ sanctuary */
+.forge-screen.v3 { padding-top: 28px; }
+.forge-screen.v3 > p { max-width: 640px; }
+.service-row { display: flex; gap: 18px; margin: 30px 0 18px; flex-wrap: wrap; justify-content: center; }
+.service-card {
+  position: relative; width: 236px; min-height: 300px; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; padding: 0 18px 20px; text-align: center;
+  border: 1px solid #ac936848; background: linear-gradient(180deg, #0c161fe6, #091017f2);
+  box-shadow: 0 14px 34px #0006; transition: transform .22s, border-color .22s, box-shadow .22s;
+}
+.service-art { width: calc(100% + 36px); height: 138px; flex-shrink: 0; background-image: var(--card-image, url("/art/card-atlas.png")); background-size: var(--art-size, 300% 300%); background-position: var(--art-x) var(--art-y); mask-image: linear-gradient(#000 45%, transparent); filter: saturate(.85); transition: filter .3s, transform .5s; }
+.service-glyph { display: grid; place-items: center; width: 42px; height: 42px; margin-top: -24px; position: relative; color: #efd6a0; border: 1px solid #d6b77a88; background: #111a22; transform: rotate(45deg); box-shadow: 0 0 18px #c79c5533; }
+.service-glyph svg { transform: rotate(-45deg); }
+.service-card > .eyebrow { margin-top: 14px; }
+.service-card strong { font: 20px var(--display); color: #eadcc0; margin: 8px 0 8px; }
+.service-text { font: 12px/1.55 Barlow; color: #a7b3b4; }
+.service-card small { margin-top: auto; padding-top: 14px; font: 8px Barlow; letter-spacing: .12em; color: #bba27b; }
+.service-card:hover:not(:disabled), .service-card:focus-visible { border-color: #d7b784; transform: translateY(-6px); box-shadow: 0 20px 40px #0008, 0 0 0 1px #d7b78433; }
+.service-card:hover:not(:disabled) .service-art { filter: saturate(1.1) brightness(1.1); transform: scale(1.04); }
+.service-card:disabled { opacity: .45; filter: grayscale(.6); }
+
+/* ------------------------------------------------------------ deck picker */
+.picker-layer {
+  position: fixed; inset: 0; z-index: 95; display: flex; flex-direction: column; align-items: center; padding: 96px 28px 24px;
+  background: radial-gradient(ellipse at center, #0b1219e6, #05080cf5);
+  animation: screen-rise .35s backwards;
+  text-align: left;
+}
+.picker-panel { width: min(1180px, 100%); flex: 1; min-height: 0; display: flex; flex-direction: column; border: 1px solid #c3a5745c; background: linear-gradient(180deg, #101a22f5, #0b1117f8); box-shadow: 0 30px 80px #000c; }
+.picker-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; padding: 22px 28px 16px; border-bottom: 1px solid #c3a5742e; }
+.picker-head h2 { font-size: 26px; margin: 8px 0 6px; color: #eee0c3; }
+.picker-head p { margin: 0; font-size: 13px; color: #a5afb0; max-width: 560px; }
+.picker-meta { display: grid; justify-items: end; gap: 4px; font: 11px var(--condensed); letter-spacing: .08em; color: #b3a684; text-align: right; }
+.picker-meta small { font: 10px Barlow; color: #8e999b; }
+.picker-meta .text-button { font-size: 13px; }
+.picker-grid { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; display: grid; grid-template-columns: repeat(auto-fill, minmax(146px, 1fr)); gap: 18px 14px; padding: 22px 28px 28px; align-content: start; scrollbar-width: thin; scrollbar-color: #8a7449 #0b1118; }
+.pick-tile { position: relative; display: grid; justify-items: center; gap: 8px; padding: 0; animation: screen-rise .4s backwards; }
+.pick-face { display: block; transition: opacity .2s, transform .25s; }
+.pick-tile .game-card { --card-width: 146px; --card-height: 224px; --picture-height: 70px; pointer-events: none; animation: none; }
+.game-root .pick-tile .game-card .card-heading { font-size: 15px; min-height: 26px; }
+.game-root .pick-tile .game-card .card-rule { font-size: 10px; line-height: 1.3; }
+.game-root .pick-tile .game-card .card-type { font-size: 7px; margin-bottom: 4px; }
+.game-root .pick-tile .game-card .card-cost { width: 24px; height: 24px; font-size: 17px; }
+.pick-after { position: absolute; top: 0; opacity: 0; transform: translateY(6px); }
+.pick-upgrade:not(.blocked):hover .pick-before, .pick-upgrade:not(.blocked):focus-visible .pick-before { opacity: 0; }
+.pick-upgrade:not(.blocked):hover .pick-after, .pick-upgrade:not(.blocked):focus-visible .pick-after { opacity: 1; transform: translateY(-6px); }
+.pick-tile:not(.blocked):hover .pick-face, .pick-tile:not(.blocked):focus-visible .pick-face { transform: translateY(-6px); }
+.pick-upgrade:not(.blocked):hover .game-card, .pick-upgrade:not(.blocked):focus-visible .game-card { box-shadow: 0 0 0 2px #f0d28a, 0 0 30px #e8c26a66; }
+.pick-remove:not(.blocked):hover .game-card, .pick-transform:not(.blocked):hover .game-card,
+.pick-remove:not(.blocked):focus-visible .game-card, .pick-transform:not(.blocked):focus-visible .game-card { box-shadow: 0 0 0 2px #e0806b, 0 0 30px #c9594a55; filter: saturate(.6); }
+.pick-duplicate:not(.blocked):hover .game-card, .pick-duplicate:not(.blocked):focus-visible .game-card { box-shadow: 0 0 0 2px #9fd0f0, 0 0 30px #6fb6e055; }
+.pick-stamp { position: absolute; top: 88px; left: 50%; transform: translate(-50%, 8px); display: flex; align-items: center; gap: 6px; padding: 6px 12px; font: 600 12px var(--condensed); letter-spacing: .18em; color: #1b140b; background: linear-gradient(100deg, #b48c51, #f0d08f 55%, #b48b4d); opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; box-shadow: 0 6px 16px #000a; }
+.pick-remove .pick-stamp, .pick-transform .pick-stamp { background: linear-gradient(100deg, #9c4a3c, #e08b6f 55%, #9c4a3c); color: #1d0c08; }
+.pick-duplicate .pick-stamp { background: linear-gradient(100deg, #4f86a8, #a9dcf5 55%, #4f86a8); }
+.pick-upgrade .pick-stamp { top: auto; bottom: 34px; }
+.pick-tile:not(.blocked):hover .pick-stamp, .pick-tile:not(.blocked):focus-visible .pick-stamp { opacity: 1; transform: translate(-50%, 0); }
+.pick-caption { max-width: 146px; min-height: 16px; font: 10px/1.35 var(--condensed); letter-spacing: .06em; color: #b4a987; text-align: center; display: flex; gap: 5px; align-items: flex-start; justify-content: center; }
+.pick-tile.blocked { cursor: not-allowed; }
+.pick-tile.blocked .pick-face { opacity: .35; filter: grayscale(.8); }
+.pick-tile.blocked .pick-caption { color: #8f8a80; }
+
+/* ------------------------------------------------------------ market */
+.game-root[data-view="shop"] .scene-backdrop { background-image: url("/art/relay-bazaar.png"); filter: brightness(.55) saturate(.85); }
+.game-root[data-view="shop"] .scene-shade { background: linear-gradient(90deg, #070d16e0, #070d1680 45%, #070d16c0), linear-gradient(0deg, #060a10, transparent 40%); }
+.market-screen { padding: 18px 36px 22px; justify-content: flex-start; text-align: left; align-items: stretch; }
+.market-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; width: min(1180px, 100%); margin: 0 auto; }
+.market-head h1 { font-size: 30px; margin: 8px 0 6px; }
+.market-head p { margin: 0; font-size: 13px; color: #a4acab; max-width: 520px; }
+.purse { display: flex; align-items: center; gap: 12px; padding: 10px 22px 10px 16px; border: 1px solid #deb86e88; background: radial-gradient(ellipse at 20% 50%, #4a391a, #17130d 70%); box-shadow: 0 0 30px #d8a94a26, inset 0 0 0 3px #0005; color: #f0c86c; }
+.purse svg { filter: drop-shadow(0 0 10px #f0c86c88); }
+.purse span { display: grid; }
+.purse strong { font: 600 32px/1 var(--condensed); color: #ffe7a8; letter-spacing: .02em; }
+.purse small { font: 8px var(--condensed); letter-spacing: .26em; color: #c5a86a; }
+.market-shelf { display: flex; gap: 14px; justify-content: center; align-items: flex-end; flex-wrap: wrap; width: min(1180px, 100%); margin: 20px auto 16px; padding: 16px 12px 18px; border-top: 1px solid #d3b0703a; border-bottom: 1px solid #d3b0703a; background: linear-gradient(180deg, transparent, #150f0880 70%, #1c140b99); position: relative; }
+.market-shelf::after { content: ""; position: absolute; left: 4%; right: 4%; bottom: 0; height: 2px; background: linear-gradient(90deg, transparent, #e0b86a88, transparent); }
+.market-offer { position: relative; display: grid; justify-items: center; gap: 10px; animation: screen-rise .5s calc(var(--order) * .07s) backwards; }
+.market-offer .game-card { --card-width: 164px; --card-height: 252px; --picture-height: 88px; transition: transform .22s, box-shadow .22s; }
+.game-root .market-offer .game-card .card-heading { font-size: 16px; }
+.game-root .market-offer .game-card .card-rule { font-size: 11px; line-height: 1.35; }
+.market-offer:hover .game-card { transform: translateY(-8px); box-shadow: 0 16px 30px #000b, 0 0 0 1px #e3c68d; }
+.market-offer.sold .game-card { filter: grayscale(.9) brightness(.45); transform: none; box-shadow: none; }
+.market-offer.bench .game-card { box-shadow: 0 0 0 1px #7fd0c255, 0 0 24px #5fc8b422; }
+.offer-tag { position: absolute; z-index: 60; top: -9px; left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 3px 9px; font: 600 8px var(--condensed); letter-spacing: .2em; color: #d8c595; background: #151b21; border: 1px solid #9f8a5d66; display: flex; gap: 4px; align-items: center; }
+.market-offer.bench .offer-tag { color: #9fe3d6; border-color: #67b6a888; }
+.offer-tag.upgraded { color: #f5d98f; border-color: #e0bd70aa; box-shadow: 0 0 12px #e0bd7044; }
+.offer-tag.rarity-rare { color: #f0b98a; border-color: #c98a5c88; }
+.offer-tag.rarity-legendary { color: #f3b3ff; border-color: #c07fdcaa; box-shadow: 0 0 12px #b76ad455; }
+.offer-tag.rarity-uncommon { color: #a9c9ea; border-color: #6f93b888; }
+.sold-stamp { position: absolute; top: 96px; left: 50%; transform: translateX(-50%) rotate(-12deg); padding: 6px 16px; font: 600 18px var(--condensed); letter-spacing: .3em; color: #e0c38a; border: 2px solid #e0c38a; background: #0b0f14cc; pointer-events: none; }
+.market-lower { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) auto; gap: 18px; width: min(1180px, 100%); margin: 0 auto; align-items: stretch; }
+.market-relics, .market-services { display: grid; gap: 8px; align-content: start; }
+.market-relic, .market-service { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; padding: 10px 12px 10px 14px; border: 1px solid #b29a6b3d; background: linear-gradient(90deg, #111a22e6, #0c1218e6); text-align: left; transition: border-color .2s, background .2s; }
+.market-relic .relic-emblem { font-size: 22px; }
+.market-relic:hover, .market-service:hover:not(:disabled) { border-color: #d8b77a88; background: linear-gradient(90deg, #17222be6, #0e151ce6); }
+.market-relic-copy { display: grid; gap: 2px; min-width: 0; }
+.market-relic-copy small { font: 7.5px var(--condensed); letter-spacing: .18em; color: var(--accent); }
+.market-relic-copy strong, .market-service strong { font: 600 16px var(--condensed); color: #eadbbc; letter-spacing: .02em; }
+.market-relic-copy > span, .market-service > span:nth-child(2) > span { font: 11.5px/1.4 Barlow; color: #a4aeae; }
+.market-relic.sold { opacity: .45; }
+.market-service > span:nth-child(2) { display: grid; gap: 2px; }
+.market-service .service-glyph { width: 34px; height: 34px; margin: 0 6px 0 4px; }
+.market-service:disabled { opacity: .5; }
+.market-exit { display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; gap: 6px; min-width: 230px; }
+.market-exit .gold-button { min-height: 52px; }
+.market-empty { font-size: 12px; color: #8e9899; margin: 0; }
+
+/* ------------------------------------------------------------ events */
+.game-root[data-view="event"] .scene-backdrop { filter: brightness(.3) saturate(.6) blur(2px); }
+.event-screen { padding: 26px 36px 24px; justify-content: center; }
+.event-frame { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr); width: min(1180px, 100%); min-height: min(560px, 100%); border: 1px solid #c3a57459; background: #0b1117f0; box-shadow: 0 30px 80px #000b, inset 0 0 0 1px #0008; text-align: left; animation: screen-rise .6s backwards; }
+.event-art { position: relative; margin: 0; background-size: cover; background-position: center; min-height: 320px; overflow: hidden; }
+.event-art::before { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 55%, #0b1117), linear-gradient(0deg, #0b1117cc, transparent 40%); }
+.event-art i { position: absolute; inset: 14px; border: 1px solid #e3c58d40; pointer-events: none; }
+.event-art::after { content: ""; position: absolute; inset: -20%; background: radial-gradient(circle at 70% 30%, #f3c77a22, transparent 40%); animation: screen-glow 6s ease-in-out infinite; }
+.event-copy { display: flex; flex-direction: column; padding: 34px 36px 22px 16px; min-width: 0; }
+.event-copy > .eyebrow { display: flex; align-items: center; gap: 8px; color: #a9cde6; }
+.event-copy h1 { font-size: 30px; margin: 12px 0 14px; color: #efe1c5; text-align: left; }
+.event-text { font: 16px/1.65 Barlow, sans-serif; letter-spacing: .005em; color: #cdc8ba; margin: 0 0 22px; text-wrap: pretty; }
+.event-text::first-letter { font: 46px/.9 var(--display); float: left; margin: 5px 10px 0 0; color: #e6c98d; text-shadow: 0 0 18px #e6c98d33; }
+.event-choices { display: grid; gap: 10px; }
+.event-choice { display: grid; grid-template-columns: 34px 1fr auto; gap: 14px; align-items: center; padding: 13px 16px 13px 12px; text-align: left; border: 1px solid #b29a6b44; background: linear-gradient(90deg, #121c25, #0d141b); transition: border-color .2s, transform .2s, background .2s; animation: screen-rise .45s calc(.25s + var(--order) * .08s) backwards; }
+.event-choice:hover:not(.disabled), .event-choice:focus-visible { border-color: #e2c081; background: linear-gradient(90deg, #1b2530, #111920); transform: translateX(4px); }
+.choice-mark { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid #c9a86b88; transform: rotate(45deg); color: #ecd29a; font: 600 14px var(--condensed); }
+.choice-mark > * { transform: rotate(-45deg); }
+.choice-copy { display: grid; gap: 3px; min-width: 0; }
+.choice-copy strong { font: 600 17px var(--condensed); color: #efdfbd; letter-spacing: .02em; }
+.choice-copy > span { font: 13px/1.45 Barlow; color: #a9b3b3; }
+.choice-needs { font: 8px var(--condensed); letter-spacing: .18em; color: #9fcbe8; margin-top: 2px; }
+.choice-blocked { font: 11px var(--condensed); color: #c68e80; display: flex; gap: 5px; align-items: center; }
+.event-choice.disabled { opacity: .55; cursor: not-allowed; }
+.event-choice > svg { color: #c8aa70; }
+.event-outcome { padding: 16px 18px; border-left: 2px solid #e2c081; background: #d6b56c10; animation: screen-rise .5s backwards; }
+.event-outcome p { font: italic 15px/1.65 Georgia, serif; color: #e6dcc6; margin: 6px 0 16px; }
+.event-outcome .gold-button { min-width: 220px; }
+.event-status { margin-top: auto; padding-top: 16px; display: flex; align-items: center; gap: 10px; font: 12px var(--condensed); letter-spacing: .06em; color: #9ca5a6; }
+.event-status span { width: 1px; height: 12px; background: #c3a57444; }
+.event-status svg:first-child { color: #d8947f; }
+
+/* ------------------------------------------------------------ outcome */
+.outcome-screen.v3 .outcome-stats { gap: 42px; flex-wrap: wrap; justify-content: center; }
+.unlock-moment { display: flex; align-items: center; gap: 16px; margin: 6px 0 4px; padding: 14px 22px; text-align: left; border: 1px solid #c7a3eb88; background: radial-gradient(ellipse at 0% 50%, #3b2856, #140f1d 70%); box-shadow: 0 0 40px #9c6fd244; color: #e0c2ff; animation: screen-rise .8s .3s backwards; }
+.unlock-moment span { display: grid; gap: 3px; }
+.unlock-moment small { font: 8px var(--condensed); letter-spacing: .24em; color: #b596d6; }
+.unlock-moment strong { font: 22px var(--display); color: #f5e6ff; }
+.unlock-moment em { font: 12px Barlow; color: #c3b2d6; }
+
+/* ------------------------------------------------------------ responsive */
+@container game (min-width: 901px) and (max-height: 760px) {
+  .selection-screen.v3 { padding-top: 10px; padding-bottom: 10px; }
+  .selection-screen.v3 .screen-heading h1 { font-size: 25px; margin: 4px 0 2px; }
+  .selection-screen.v3 .chosen-story { display: none; }
+  .selection-screen.v3 .archetypes { margin: 10px 0 10px; }
+  .archetype.v3 .archetype-art { height: 70px; }
+  .archetype.v3 .archetype-copy { margin-top: -20px; padding-bottom: 10px; }
+  .archetype.v3 .archetype-copy > small { margin-bottom: 4px; }
+  .archetype.v3 .archetype-copy > strong { font-size: 18px; margin-bottom: 4px; }
+  .archetype.v3 .kit { gap: 5px; margin-bottom: 6px; }
+  .archetype.v3 .kit-row { padding-top: 5px; grid-template-columns: 24px 1fr; }
+  .archetype.v3 .kit-row > i { width: 24px; height: 24px; }
+  .archetype.v3 .kit-row b { font-size: 14px; }
+  .archetype.v3 .kit-row b + span { font-size: 10px; line-height: 1.3; }
+  .ascension-panel { padding: 6px 16px; }
+  .full-screen.v3 > .selection-note { display: none; }
+  .market-screen { padding-top: 10px; }
+  .market-head h1 { font-size: 24px; margin: 4px 0 2px; }
+  .market-head p { display: none; }
+  .market-shelf { margin: 12px auto 10px; padding: 14px 10px 12px; gap: 12px; }
+  .market-offer .game-card { --card-width: 150px; --card-height: 226px; --picture-height: 70px; }
+  .game-root .market-offer .game-card .card-rule { font-size: 10.5px; }
+  .reward-screen.v3 { padding-top: 12px; }
+  .reward-screen.v3 .reward-emblem { margin: 0 0 8px; }
+  .reward-screen.v3 h1 { margin: 6px 0 4px; }
+  .reward-screen.v3 .spoils { margin-top: 10px; padding: 5px 14px 5px 12px; }
+  .reward-screen.v3 .reward-cards { margin: 14px 0 8px; }
+  .game-root .reward-screen.v3 .reward-cards .game-card { --card-width: 200px; --card-height: 300px; --picture-height: 116px; }
+  .game-root .reward-screen.v3 .reward-cards .card-rule { font-size: 12.5px; }
+  .market-lower { gap: 12px; }
+  .market-relic, .market-service { padding: 6px 10px; gap: 10px; }
+  .market-relic .relic-emblem { font-size: 18px; }
+  .market-relic-copy > span, .market-service > span:nth-child(2) > span { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .market-relics, .market-services { gap: 6px; }
+  .price-button, .price-tag { min-height: 32px; min-width: 84px; padding: 4px 12px; }
+  .market-offer { gap: 7px; }
+  .service-row { margin-top: 18px; }
+  .service-card { min-height: 262px; }
+  .service-art { height: 110px; }
+  .relic-screen.v3 .relic-options { margin-top: 20px; }
+  .relic-halo { width: 86px; height: 86px; }
+  .relic-screen.v3 .relic-option { min-height: 280px; padding-top: 22px; }
+  .event-copy { padding-top: 22px; }
+  .event-copy h1 { font-size: 26px; margin: 8px 0 10px; }
+  .event-text { font-size: 14.5px; line-height: 1.6; margin-bottom: 14px; }
+  .event-choice { padding: 10px 14px 10px 10px; }
+}
+@container game (max-width: 1100px) {
+  .archetype.v3 { width: 268px; }
+  .ascension-panel { grid-template-columns: auto 1fr; }
+  .asc-summary { grid-column: 1 / -1; }
+  .market-lower { grid-template-columns: 1fr 1fr; }
+  .market-exit { grid-column: 1 / -1; flex-direction: row; justify-content: flex-end; align-items: center; }
+  .service-card { width: 210px; }
+  .market-shelf { gap: 10px; flex-wrap: nowrap; }
+  .market-offer .game-card { --card-width: 132px; --card-height: 212px; --picture-height: 58px; }
+  .game-root .market-offer .game-card .card-heading { font-size: 14px; }
+  .game-root .market-offer .game-card .card-rule { font-size: 10px; }
+  .price-button { min-width: 0; width: 100%; }
+}
+@container game (max-width: 900px) {
+  .selection-screen.v3 .archetypes { flex-direction: column; align-items: center; }
+  .archetype.v3 { width: min(460px, 100%); }
+  .archetype.v3 .archetype-art { height: 96px; }
+  .selection-footer { flex-direction: column; }
+  .selection-footer .embark { min-height: 52px; }
+  .asc-track { flex-wrap: wrap; }
+  .event-frame { grid-template-columns: 1fr; }
+  .event-art { min-height: 180px; }
+  .event-art::before { background: linear-gradient(0deg, #0b1117, transparent 60%); }
+  .event-copy { padding: 18px 22px 20px; }
+  .market-screen { padding-inline: 18px; }
+  .market-shelf { flex-wrap: wrap; }
+  .market-head { flex-wrap: wrap; }
+  .market-lower { grid-template-columns: 1fr; }
+  .picker-layer { padding: 70px 10px 10px; }
+  .picker-head { flex-direction: column; align-items: stretch; padding: 16px; }
+  .picker-meta { justify-items: start; text-align: left; }
+  .picker-grid { padding: 16px; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+}
+@container game (max-width: 600px) {
+  .service-card { width: 100%; min-height: 0; }
+  .service-art { height: 90px; }
+  .market-offer .game-card { --card-width: 140px; --card-height: 222px; --picture-height: 64px; }
+  .relic-screen.v3 .relic-option { width: 100%; }
+  .event-screen { padding: 12px 12px 18px; }
+  .event-copy { padding: 14px 16px 18px; }
+  .event-copy h1 { font-size: 24px; }
+  .purse strong { font-size: 26px; }
+  .outcome-screen.v3 .outcome-stats { gap: 22px; }
+}
+
+/* ------------------------------------------------------------ reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .spoils, .relic-screen.v3 .relic-option, .relic-halo::before, .relic-halo::after, .picker-layer, .pick-tile,
+  .market-offer, .event-frame, .event-art::after, .event-choice, .event-outcome, .unlock-moment { animation: none !important; }
+}
+.reduced-motion .spoils, .reduced-motion .relic-screen.v3 .relic-option, .reduced-motion .relic-halo::before,
+.reduced-motion .relic-halo::after, .reduced-motion .picker-layer, .reduced-motion .pick-tile,
+.reduced-motion .market-offer, .reduced-motion .event-frame, .reduced-motion .event-art::after,
+.reduced-motion .event-choice, .reduced-motion .event-outcome, .reduced-motion .unlock-moment { animation: none !important; }
+
+/* In battle the player plate shows integrity; the header leads with credits. */
+.is-battle .run-stats .integrity-stat + .stat-divider { display: none; }
+
+/* Scrolling screens keep their panels whole instead of squeezing them. */
+.event-screen, .market-screen, .forge-screen.v3, .relic-screen.v3, .selection-screen.v3 { justify-content: safe center; }
+.event-screen > *, .market-screen > *, .forge-screen.v3 > *, .relic-screen.v3 > *, .selection-screen.v3 > *, .picker-panel > * { flex-shrink: 0; }
+.picker-panel > .picker-grid { flex-shrink: 1; }
+.market-screen { justify-content: flex-start; }
+.archetype.v3 .archetype-number { top: 12px; bottom: auto; left: 14px; right: auto; }
+@container game (max-width: 600px) {
+  .archetype.v3 .archetype-number { left: auto; right: 14px; }
+}
+
+/* Phone width: the three map stats keep label and value on one line each. */
+@container game (max-width: 600px) {
+  .map-condition { gap: 12px; }
+  .map-condition > span { white-space: nowrap; gap: 5px; }
+  .map-condition strong { margin-left: 3px; white-space: nowrap; }
+  .map-condition small { font-size: 10px; }
+}

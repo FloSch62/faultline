@@ -22,6 +22,14 @@ try {
   await page.screenshot({ path: "artifacts/title.png" });
   const expedition = newExpedition("architect", 8);
   chooseRoom(expedition.run, "0-1");
+  // A reproducible late-deck illustration: signature cards are earned rewards,
+  // never guaranteed starter cards. Keep the fixture's piles consistent.
+  expedition.run.deck.push("containerlab", "clabernetes");
+  expedition.run.hand = ["router", "fiber", "fiber", "containerlab", "clabernetes", "guard"];
+  expedition.run.drawPile = [...expedition.run.deck];
+  for (const id of expedition.run.hand) {
+    expedition.run.drawPile.splice(expedition.run.drawPile.indexOf(id), 1);
+  }
   await page.evaluate(
     (e) => localStorage.setItem("faultline-expedition-v2", JSON.stringify(e)),
     expedition,

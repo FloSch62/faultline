@@ -7,7 +7,26 @@
   "mastering": "-19 LUFS target, -2 dBTP, 48 kHz stereo Vorbis quality 5",
   "tracks": [
     {
+      "file": "public/audio/a-light-left-on-instrumental.ogg",
+      "scene": "Sanctuary and relics",
+      "duration_seconds": 100.4,
+      "sample_rate": 48000,
+      "channels": 2,
+      "bytes": 1581833,
+      "sha256": "94e9a82ca7eeea2dcd8234984eb00814556a28c09e32ec2a0c7813cf4b89bc58"
+    },
+    {
+      "file": "public/audio/a-thousand-fractures-instrumental.ogg",
+      "scene": "Elite encounters",
+      "duration_seconds": 83.6,
+      "sample_rate": 48000,
+      "channels": 2,
+      "bytes": 1459216,
+      "sha256": "a09945c56bcba8d6f9413d822093d9c51144f618451140b0e3b2304754414e7e"
+    },
+    {
       "file": "public/audio/signal-and-steel-instrumental.ogg",
+      "scene": "Encounters",
       "duration_seconds": 118.0,
       "sample_rate": 48000,
       "channels": 2,
@@ -16,6 +35,7 @@
     },
     {
       "file": "public/audio/the-blackout-core-instrumental.ogg",
+      "scene": "Boss",
       "duration_seconds": 142.8,
       "sample_rate": 48000,
       "channels": 2,
@@ -23,12 +43,49 @@
       "sha256": "8cc564a67bd4449ffa9ade480fb71545c8215893d4d6d1b54a6342d0f15cd9de"
     },
     {
+      "file": "public/audio/the-copper-market-instrumental.ogg",
+      "scene": "Salvage exchange",
+      "duration_seconds": 68.9,
+      "sample_rate": 48000,
+      "channels": 2,
+      "bytes": 1127346,
+      "sha256": "308500e747b4d7758373316bf0a20cb781a6c516712cbe06ab5f899c68ef7eb7"
+    },
+    {
       "file": "public/audio/the-last-relay-instrumental.ogg",
+      "scene": "Title, map, rewards",
       "duration_seconds": 155.6,
       "sample_rate": 48000,
       "channels": 2,
       "bytes": 2649025,
       "sha256": "04307bea69197e5f3c9a2d87344631c8a1c8c8e6300557115952e45afb472c44"
+    },
+    {
+      "file": "public/audio/copperlight-pursuit-instrumental.ogg",
+      "scene": "Battle rotation",
+      "duration_seconds": 100.6,
+      "sample_rate": 48000,
+      "channels": 2,
+      "bytes": 2011944,
+      "sha256": "3a6778026a35d5bdf8c35f5eae1752194a8edcbf926c7fed2cbe070a107ce74d"
+    },
+    {
+      "file": "public/audio/ghosts-in-the-relay-instrumental.ogg",
+      "scene": "Battle rotation",
+      "duration_seconds": 100.0,
+      "sample_rate": 48000,
+      "channels": 2,
+      "bytes": 1760240,
+      "sha256": "93a60dc476e36c3f4066349e60d77bd2fd171a59ad53e5f485e914cee4e4634e"
+    },
+    {
+      "file": "public/audio/redline-protocol-instrumental.ogg",
+      "scene": "Battle rotation",
+      "duration_seconds": 91.0,
+      "sample_rate": 48000,
+      "channels": 2,
+      "bytes": 1829394,
+      "sha256": "66406b442895b0881eee99fe9e71ce4182cac8a0c69583c45e16cd32088f57ae"
     }
   ]
 }

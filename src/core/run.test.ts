@@ -1,3 +1,4 @@
+import { reachableRooms } from "./map.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
@@ -16,7 +17,8 @@ import {
   costFor,
   intentFor,
 } from "./run.ts";
-import { canLink, independentRouterPaths, paths } from "./graph.ts";
+import { canLink, paths } from "./graph.ts";
+import { combatPreview, RULES } from "./run.ts";
 import { topologyYaml } from "./export.ts";
 
 function firstBattle() {
@@ -72,7 +74,7 @@ test("two independent router routes survive a node outage", () => {
     { a: "alpha", b: "router2" },
     { a: "router2", b: "omega" },
   );
-  assert.ok(independentRouterPaths(run.topology, paths(run.topology)));
+  assert.equal(combatPreview(run).channels, 2);
   run.faultNode = "router1";
   assert.deepEqual(paths(run.topology, new Set(["router1"]))[0], [
     "alpha",
@@ -90,10 +92,14 @@ test("room route, reward, and forge change persistent run state", () => {
   assert.equal(run.deck.length, before + 1);
   assert.equal(run.floor, 1);
   assert.equal(run.phase, "map");
-  assert.equal(chooseRoom(run, "1-1").ok, true);
-  assert.equal(run.phase, "reward");
+  const battle = reachableRooms(run).find(room => room.type === "battle")!;
+  assert.equal(chooseRoom(run, battle.id).ok, true);
+  assert.equal(run.phase, "battle");
+  run.phase = "reward";
   assert.equal(chooseCardReward(run, null).ok, true);
-  assert.equal(chooseRoom(run, "2-0").ok, true);
+  const forge = run.map.find(room => room.floor === 2 && room.type === "forge")!;
+  run.map.find(room => room.id === run.lastRoom)!.exits = [forge.id];
+  assert.equal(chooseRoom(run, forge.id).ok, true);
   assert.equal(run.phase, "forge");
   run.integrity = 6;
   assert.equal(chooseForge(run, "repair").ok, true);
@@ -108,7 +114,7 @@ test("relics are unique and affect battle resources", () => {
   assert.equal(chooseRelic(run, "cold-start").ok, true);
   assert.equal(run.relics.includes("cold-start"), true);
   assert.equal(run.phase, "map");
-  assert.equal(chooseRoom(run, "1-0").ok, true);
+  assert.equal(chooseRoom(run, reachableRooms(run)[0].id).ok, true);
   assert.equal(run.energy, 6);
 });
 
@@ -146,13 +152,14 @@ test("firewall and Shield Array mitigate a telegraphed breach", () => {
   );
   assert.equal(intentFor(run)?.kind, "breach");
   const turn = endTurn(run);
-  assert.equal(turn.packetDamage, 6);
+  // v3: firewalls defend while online anywhere; they no longer add damage.
+  assert.equal(turn.packetDamage, 5);
   assert.equal(turn.integrityDamage, 0);
   assert.equal(run.integrity, 12);
   assert.equal(run.shieldArrayUsed, true);
 });
 
-test("map enforces adjacent routes and the boss can finish the act", () => {
+test("map enforces its routes and a guardian opens the next stage", () => {
   const run = createRun(99);
   const phase = () => run.phase;
   run.phase = "map";
@@ -163,7 +170,7 @@ test("map enforces adjacent routes and the boss can finish the act", () => {
   chooseCardReward(run, null);
   assert.equal(chooseRoom(run, "1-2").ok, false);
   for (let floor = 1; floor <= 6; floor++) {
-    const id = `${floor}-1`;
+    const id = reachableRooms(run)[0].id;
     assert.equal(chooseRoom(run, id).ok, true);
     if (phase() === "forge") chooseForge(run, "repair");
     else {
@@ -173,8 +180,9 @@ test("map enforces adjacent routes and the boss can finish the act", () => {
       if (phase() === "relic") chooseRelic(run, run.relicRewards[0]);
     }
   }
-  assert.equal(run.phase, "won");
-  assert.equal(run.floor, 7);
+  assert.equal(run.phase, "map");
+  assert.equal(run.stage, 1);
+  assert.equal(run.floor, 0);
 });
 
 test("export assigns one interface per link endpoint and rejects duplicates", () => {
@@ -193,8 +201,9 @@ test("export assigns one interface per link endpoint and rejects duplicates", ()
 
 test("Containerlab deploys an overclocked live route for three energy", () => {
   const run = firstBattle();
-  assert.ok(run.hand.includes("containerlab"));
-  assert.ok(run.deck.includes("clabernetes"));
+  assert.ok(!run.deck.includes("containerlab"));
+  assert.ok(!run.deck.includes("clabernetes"));
+  run.hand = ["containerlab"];
   assert.equal(playInstant(run, run.hand.indexOf("containerlab")).ok, true);
   assert.equal(run.energy, 2);
   assert.equal(run.topology.nodes.length, 3);
@@ -219,8 +228,8 @@ test("Clabernetes preserves overclock and links, shields both routers, and survi
     Math.hypot(routers[0].x - routers[1].x, routers[0].z - routers[1].z) >=
       1.55,
   );
-  assert.ok(independentRouterPaths(run.topology, signalPaths(run)));
-  assert.equal(damageFromPath(run, signalPaths(run)[0]), 9);
+  assert.equal(combatPreview(run).channels, 2);
+  assert.equal(damageFromPath(run, signalPaths(run)[0]), 7 + RULES.bandwidthPerChannel);
   run.faultLink = "alpha::router1";
   assert.deepEqual(signalPaths(run), [["alpha", "router2", "omega"]]);
   assert.equal(damageFromPath(run, signalPaths(run)[0]), 7);

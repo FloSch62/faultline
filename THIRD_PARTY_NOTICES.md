@@ -24,6 +24,19 @@ The music was generated locally with the official `m-a-p/YuE2-3B` model and `m-a
 
 YuE inference code is Apache-2.0. The official model-weight license is preserved separately in `soundtrack/licenses/YuE2-MODEL_LICENSE`, including its additional permissions; the model weights are not distributed with the game. Demucs code is MIT licensed. Their runtime tools are used during asset production, not embedded in the browser bundle.
 
+## Sound effects
+
+Kenney's [Impact Sounds](https://kenney.nl/assets/impact-sounds),
+[Casino Audio](https://kenney.nl/assets/casino-audio),
+[Sci-fi Sounds](https://kenney.nl/assets/sci-fi-sounds),
+[Interface Sounds](https://kenney.nl/assets/interface-sounds),
+[UI Audio](https://kenney.nl/assets/ui-audio), and
+[RPG Audio](https://kenney.nl/assets/rpg-audio) are Creative Commons Zero
+(CC0-1.0). Selected source recordings and original licenses are retained in
+`soundtrack/effects/sources/`. The layered delivery masters are bundled in
+`public/audio/effects/`. Recipes, hashes and measured levels are recorded in
+`soundtrack/effects/manifest.json`; reproduce them with `scripts/build_effects.py`.
+
 ## Runtime libraries
 
 Three.js is MIT licensed. Its license is supplied by the npm package. Vite, TypeScript and Playwright are development dependencies with their respective package license files. Versions and transitive dependencies are recorded in `package-lock.json`.

@@ -1,0 +1,32 @@
+{
+  "source": "audio.flac",
+  "source_sha256": "4be382b9ac870b14163282648a1486ae9204b119c736ed03d5c652c1f8dfc668",
+  "mix": "complete native YuE2 recording",
+  "processing": "lossless FLAC decode to WAV; no source separation or denoising",
+  "sample_rate": 48000,
+  "channels": 2,
+  "subtype": "PCM_24",
+  "frames": 6854336,
+  "duration_seconds": 142.79866666666666,
+  "instrumental_sha256": "afe74e74e96521e1046db93fc6b17df05769a72a575b373b2491864beb2ef21a",
+  "verification": {
+    "decoded_pcm_equal_to_source": true,
+    "max_abs_pcm_error": 0
+  },
+  "delivery": {
+    "file": "public/audio/the-blackout-core-instrumental.ogg",
+    "sha256": "008b81f7c52c91f799d6fb1d040614f053f4ebdd9f21c25c57552d5b90eaa8c0",
+    "bytes": 2678816,
+    "codec": "Vorbis",
+    "quality": 5,
+    "fade_in_seconds": 1.5,
+    "fade_out_seconds": 3,
+    "constant_gain_db": -4.49,
+    "target_lufs": -19,
+    "peak_ceiling_dbtp": -2,
+    "integrated_lufs": -18.99,
+    "true_peak_dbtp": -4.61,
+    "range_lu": 4.4
+  },
+  "generation_version": "v2"
+}

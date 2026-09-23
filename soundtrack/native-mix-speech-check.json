@@ -1,0 +1,122 @@
+{
+  "a-light-left-on-instrumental.ogg": {
+    "file": "public/audio/a-light-left-on-instrumental.ogg",
+    "sha256": "160e5f1b63c850cdb59d5cf6b0e4321a480b1dbbaf9cb44af0c0b2e347676719",
+    "model": "Systran/faster-whisper-small",
+    "language": "en",
+    "language_probability": 0.3531171679496765,
+    "segments": []
+  },
+  "a-thousand-fractures-instrumental.ogg": {
+    "file": "public/audio/a-thousand-fractures-instrumental.ogg",
+    "sha256": "79b7260810dc076947d328f9e911985282c0ac7a3d04eedfb0f3ba21c57f470d",
+    "model": "Systran/faster-whisper-small",
+    "language": "en",
+    "language_probability": 0.3531171679496765,
+    "segments": []
+  },
+  "copperlight-pursuit-instrumental.ogg": {
+    "file": "public/audio/copperlight-pursuit-instrumental.ogg",
+    "sha256": "2274c4e1ce575fc81d9581926aec9a15d5ac7782f5a9546ace1097f332112c27",
+    "model": "Systran/faster-whisper-small",
+    "language": "en",
+    "language_probability": 0.3531171679496765,
+    "segments": []
+  },
+  "deliver-the-dawn-instrumental.ogg": {
+    "file": "public/audio/deliver-the-dawn-instrumental.ogg",
+    "sha256": "20a9f5d99d2ee96926a3a5e1a671fc0a2ed1303988ddd5552533ae41034fd03e",
+    "model": "Systran/faster-whisper-small",
+    "language": "en",
+    "language_probability": 0.3531171679496765,
+    "segments": []
+  },
+  "ghosts-in-the-relay-instrumental.ogg": {
+    "file": "public/audio/ghosts-in-the-relay-instrumental.ogg",
+    "sha256": "457fccc3fca08d402757ae05cd35940ee1280b494728f1b232882a407aaa32f0",
+    "model": "Systran/faster-whisper-small",
+    "language": "en",
+    "language_probability": 0.3531171679496765,
+    "segments": []
+  },
+  "messages-in-the-dark-instrumental.ogg": {
+    "file": "public/audio/messages-in-the-dark-instrumental.ogg",
+    "sha256": "233b3c5ad708fd47689727f5995e4d6eb7c91b46bd219e96795d7c422524c3c3",
+    "model": "Systran/faster-whisper-small",
+    "language": "en",
+    "language_probability": 0.3531171679496765,
+    "segments": []
+  },
+  "paths-of-copper-instrumental.ogg": {
+    "file": "public/audio/paths-of-copper-instrumental.ogg",
+    "sha256": "3d6f0a72f842b1f7ec537fc2be75416cde54e22c8c81cb38686bf5d64a9e0f8c",
+    "model": "Systran/faster-whisper-small",
+    "language": "en",
+    "language_probability": 0.3531171679496765,
+    "segments": []
+  },
+  "prismatic-silence-instrumental.ogg": {
+    "file": "public/audio/prismatic-silence-instrumental.ogg",
+    "sha256": "0fb333779cf5279492f0b7f0ee1f44224ebbefeb8f79c4d97a46cad15b606118",
+    "model": "Systran/faster-whisper-small",
+    "language": "en",
+    "language_probability": 0.3531171679496765,
+    "segments": []
+  },
+  "redline-protocol-instrumental.ogg": {
+    "file": "public/audio/redline-protocol-instrumental.ogg",
+    "sha256": "15f979cbbc6df1371f04b77761c6edc550b9bf9592ea2b5f537bf1add2a14a9e",
+    "model": "Systran/faster-whisper-small",
+    "language": "en",
+    "language_probability": 0.3531171679496765,
+    "segments": []
+  },
+  "shatter-the-choir-instrumental.ogg": {
+    "file": "public/audio/shatter-the-choir-instrumental.ogg",
+    "sha256": "9601198fcac431b17cfce79042121f5b31ba74d586f83d5793cb3d284af6e25e",
+    "model": "Systran/faster-whisper-small",
+    "language": "en",
+    "language_probability": 0.3531171679496765,
+    "segments": []
+  },
+  "signal-and-steel-instrumental.ogg": {
+    "file": "public/audio/signal-and-steel-instrumental.ogg",
+    "sha256": "4bcb1e06ebbdec92f56fd45ad1da70deaa2592fa7fa89ad1055eaaf36afe55a3",
+    "model": "Systran/faster-whisper-small",
+    "language": "en",
+    "language_probability": 0.3531171679496765,
+    "segments": []
+  },
+  "the-blackout-core-instrumental.ogg": {
+    "file": "public/audio/the-blackout-core-instrumental.ogg",
+    "sha256": "008b81f7c52c91f799d6fb1d040614f053f4ebdd9f21c25c57552d5b90eaa8c0",
+    "model": "Systran/faster-whisper-small",
+    "language": "en",
+    "language_probability": 0.3531171679496765,
+    "segments": []
+  },
+  "the-copper-market-instrumental.ogg": {
+    "file": "public/audio/the-copper-market-instrumental.ogg",
+    "sha256": "64493487c3768454fb379070d6c1fb99470a6fc5dad397446b77156ddcbecd05",
+    "model": "Systran/faster-whisper-small",
+    "language": "en",
+    "language_probability": 0.3531171679496765,
+    "segments": []
+  },
+  "the-last-relay-instrumental.ogg": {
+    "file": "public/audio/the-last-relay-instrumental.ogg",
+    "sha256": "aa14fe3367a7230e2f7fde489680854c9c7f989b3ff1aa4c2a067ddca1c4e56a",
+    "model": "Systran/faster-whisper-small",
+    "language": "en",
+    "language_probability": 0.3531171679496765,
+    "segments": []
+  },
+  "the-second-way-home-instrumental.ogg": {
+    "file": "public/audio/the-second-way-home-instrumental.ogg",
+    "sha256": "ffc3b213ffd2202078e933d43938b251804d60a3ce385442a1254eeceb8ab9f1",
+    "model": "Systran/faster-whisper-small",
+    "language": "en",
+    "language_probability": 0.3531171679496765,
+    "segments": []
+  }
+}

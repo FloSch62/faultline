@@ -1,0 +1,32 @@
+{
+  "source": "audio.flac",
+  "source_sha256": "2a65ec0748a98768bc28b3e5a2d39ac31c20e3aaf0a48d583f4a079ac9a9d0da",
+  "mix": "complete native YuE2 recording",
+  "processing": "lossless FLAC decode to WAV; no source separation or denoising",
+  "sample_rate": 48000,
+  "channels": 2,
+  "subtype": "PCM_24",
+  "frames": 7468736,
+  "duration_seconds": 155.59866666666667,
+  "instrumental_sha256": "2d168f6e59e5c9fb8082fe8a0d34c85d110e01857b426edcb8d86278ca78d9ed",
+  "verification": {
+    "decoded_pcm_equal_to_source": true,
+    "max_abs_pcm_error": 0
+  },
+  "delivery": {
+    "file": "public/audio/the-last-relay-instrumental.ogg",
+    "sha256": "aa14fe3367a7230e2f7fde489680854c9c7f989b3ff1aa4c2a067ddca1c4e56a",
+    "bytes": 2555241,
+    "codec": "Vorbis",
+    "quality": 5,
+    "fade_in_seconds": 1.5,
+    "fade_out_seconds": 3,
+    "constant_gain_db": -8.99,
+    "target_lufs": -19,
+    "peak_ceiling_dbtp": -2,
+    "integrated_lufs": -18.99,
+    "true_peak_dbtp": -8.55,
+    "range_lu": 5.6
+  },
+  "generation_version": "v2"
+}

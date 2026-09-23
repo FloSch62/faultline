@@ -6,7 +6,7 @@ import { STAGES } from "./stages.ts";
 import { newExpedition, parseExpedition } from "./expedition.ts";
 import { createMap, reachableRooms } from "./map.ts";
 import { chooseRoom, chooseCardReward, chooseRelic, combatPreview, endTurn, intentFor } from "./run.ts";
-import { BATTLE_TRACKS, MusicRotation } from "./music.ts";
+import { MusicRotation, sceneTrack } from "./music.ts";
 
 function encounter(id: string, turn = 0) {
   const r = newExpedition("architect", 922).run;
@@ -137,14 +137,27 @@ test("new enraged enemies change the next intent without retroactively strengthe
   }
 });
 
-test("the battle playlist plays all four tracks before a repeat, including across bag boundaries", () => {
-  for (const random of [() => 0, () => .999, Math.random]) {
-    const rotation = new MusicRotation(random);
-    const heard = Array.from({ length: 80 }, () => rotation.next());
+test("each stage's battle playlist plays its full set before a repeat, including bag boundaries", () => {
+  for (const { music } of STAGES) for (const random of [() => 0, () => .999, Math.random]) {
+    const rotation = new MusicRotation(music.battle, random);
+    const size = music.battle.length;
+    const heard = Array.from({ length: size * 20 }, () => rotation.next());
     for (let i = 0; i < heard.length; i++) {
       if (i > 0) assert.notEqual(heard[i], heard[i - 1]);
-      if (i % 4 === 0) assert.deepEqual(heard.slice(i, i + 4).sort(), [...BATTLE_TRACKS].sort());
+      if (i % size === 0) assert.deepEqual(heard.slice(i, i + size).sort(), [...music.battle].sort());
     }
+  }
+});
+
+test("crossing stages changes exploration and guardian scores while title and services retain their themes", () => {
+  assert.deepEqual(STAGES.map((_, stage) => sceneTrack("explore", stage)),
+    ["paths-of-copper", "prismatic-silence", "messages-in-the-dark"]);
+  assert.deepEqual(STAGES.map((_, stage) => sceneTrack("boss", stage)),
+    ["the-second-way-home", "shatter-the-choir", "the-blackout-core"]);
+  assert.equal(sceneTrack("explore", null), "the-last-relay");
+  for (const stage of [null, 0, 1, 2]) {
+    assert.equal(sceneTrack("shop", stage), "the-copper-market");
+    assert.equal(sceneTrack("sanctuary", stage), "a-light-left-on");
   }
 });
 

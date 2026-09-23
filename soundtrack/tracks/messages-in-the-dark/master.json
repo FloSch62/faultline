@@ -1,0 +1,32 @@
+{
+  "source": "audio.flac",
+  "source_sha256": "1fdbded98d4b5c186693270ce1fcc10c3385ad61a3e9a325bcba95c8e6bd5704",
+  "mix": "complete native YuE2 recording",
+  "processing": "lossless FLAC decode to WAV; no source separation or denoising",
+  "sample_rate": 48000,
+  "channels": 2,
+  "subtype": "PCM_24",
+  "frames": 6257216,
+  "duration_seconds": 130.35866666666666,
+  "instrumental_sha256": "ddfb7bf2a93068e83318e4ecf6726f7e22a0d531a92d197fb27003144fb66e19",
+  "verification": {
+    "decoded_pcm_equal_to_source": true,
+    "max_abs_pcm_error": 0
+  },
+  "delivery": {
+    "file": "public/audio/messages-in-the-dark-instrumental.ogg",
+    "sha256": "233b3c5ad708fd47689727f5995e4d6eb7c91b46bd219e96795d7c422524c3c3",
+    "bytes": 1973219,
+    "codec": "Vorbis",
+    "quality": 5,
+    "fade_in_seconds": 1.5,
+    "fade_out_seconds": 3,
+    "constant_gain_db": -8.58,
+    "target_lufs": -19,
+    "peak_ceiling_dbtp": -2,
+    "integrated_lufs": -18.97,
+    "true_peak_dbtp": -8.41,
+    "range_lu": 5.9
+  },
+  "generation_version": "v5"
+}

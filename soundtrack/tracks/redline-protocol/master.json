@@ -1,0 +1,32 @@
+{
+  "source": "audio.flac",
+  "source_sha256": "f7c5a2c4b5b5a3715626e9e18b59dd856766b251cb55b03a716c9259e59c45ce",
+  "mix": "complete native YuE2 recording",
+  "processing": "lossless FLAC decode to WAV; no source separation or denoising",
+  "sample_rate": 48000,
+  "channels": 2,
+  "subtype": "PCM_24",
+  "frames": 4364096,
+  "duration_seconds": 90.91866666666667,
+  "instrumental_sha256": "530dbd55037631a5aad0da3df5a0d824208fabb2f6123516c1e43c3016c9bc4a",
+  "verification": {
+    "decoded_pcm_equal_to_source": true,
+    "max_abs_pcm_error": 0
+  },
+  "delivery": {
+    "file": "public/audio/redline-protocol-instrumental.ogg",
+    "sha256": "15f979cbbc6df1371f04b77761c6edc550b9bf9592ea2b5f537bf1add2a14a9e",
+    "bytes": 1795294,
+    "codec": "Vorbis",
+    "quality": 5,
+    "fade_in_seconds": 1.5,
+    "fade_out_seconds": 3,
+    "constant_gain_db": -7.8100000000000005,
+    "target_lufs": -19,
+    "peak_ceiling_dbtp": -2,
+    "integrated_lufs": -18.99,
+    "true_peak_dbtp": -7.28,
+    "range_lu": 7.0
+  },
+  "generation_version": "v4"
+}

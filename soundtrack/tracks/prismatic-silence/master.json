@@ -1,0 +1,32 @@
+{
+  "source": "audio.flac",
+  "source_sha256": "b7f48cfc4a5140a3213731465a050c5f42be78e030052eb71e14ae844ff407a5",
+  "mix": "complete native YuE2 recording",
+  "processing": "lossless FLAC decode to WAV; no source separation or denoising",
+  "sample_rate": 48000,
+  "channels": 2,
+  "subtype": "PCM_24",
+  "frames": 6238016,
+  "duration_seconds": 129.95866666666666,
+  "instrumental_sha256": "8ab11982c8336041f5d2dff299f3745f9def1dcc9d9576e19cfab8766e889d9f",
+  "verification": {
+    "decoded_pcm_equal_to_source": true,
+    "max_abs_pcm_error": 0
+  },
+  "delivery": {
+    "file": "public/audio/prismatic-silence-instrumental.ogg",
+    "sha256": "0fb333779cf5279492f0b7f0ee1f44224ebbefeb8f79c4d97a46cad15b606118",
+    "bytes": 2068441,
+    "codec": "Vorbis",
+    "quality": 5,
+    "fade_in_seconds": 1.5,
+    "fade_out_seconds": 3,
+    "constant_gain_db": 0.5899999999999999,
+    "target_lufs": -19,
+    "peak_ceiling_dbtp": -2,
+    "integrated_lufs": -18.97,
+    "true_peak_dbtp": -4.39,
+    "range_lu": 7.5
+  },
+  "generation_version": "v5"
+}

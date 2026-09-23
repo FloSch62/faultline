@@ -1,26 +1,38 @@
 # FAULTLINE — original score
 
-Nine original instrumental pieces, generated locally with **YuE2-3B** and **YuE2-Vae**, then mastered for the game. The active player only uses the `*-instrumental.ogg` files.
+Fifteen original instrumental pieces, generated locally with **YuE2-3B** and **YuE2-Vae**, then mastered for the game. Each expedition stage has its own exploration theme and combat score. The active player only uses the `*-instrumental.ogg` files.
 
 | Track | Scene | Length | Score |
 | --- | --- | --- | --- |
-| The Last Relay | Title, map, rewards | 2:35.6 | D minor, 78 BPM; piano, cello, analog ambience |
-| Signal & Steel | Encounters | 1:58.0 | D minor, 108 BPM; electronic pulse, strings, industrial percussion |
-| The Blackout Core | Boss | 2:22.8 | D minor, 120 BPM; low drums, brass, urgent piano |
-| The Copper Market | Salvage exchange / shop scene | 1:08.9 | D minor, 92 BPM; plucked strings, marimba, brushed percussion |
+| The Last Relay | Title and character selection | 2:35.6 | D minor, 78 BPM; piano, cello, analog ambience |
+| Signal & Steel | Copper Reach battle rotation | 1:57.9 | D minor, 108 BPM; electronic pulse, strings, industrial percussion |
+| The Blackout Core | Final guardian | 2:22.8 | D minor, 120 BPM; low drums, brass, urgent piano |
+| The Copper Market | Salvage exchange / shop scene | 1:08.8 | D minor, 92 BPM; plucked strings, marimba, brushed percussion |
 | A Light Left On | Sanctuary, relic discovery | 1:40.4 | D minor, 68 BPM; felt piano, cello, glass bells |
-| A Thousand Fractures | Elite encounters | 1:23.6 | D minor, 116 BPM; angular cello, broken beats, brass |
-| Copperlight Pursuit | Battle rotation | 1:40.6 | D minor, 124 BPM; analog bass, breakbeats, plucked cello |
-| Ghosts in the Relay | Battle rotation | 1:40.0 | D minor, 104 BPM; haunted piano, glass mallets, trip-hop drums |
-| Redline Protocol | Battle rotation | 1:31.0 | D minor, 138 BPM; sequencers, cello ostinato, brass |
+| A Thousand Fractures | Copper Reach elites | 1:23.6 | D minor, 116 BPM; angular cello, broken beats, brass |
+| Copperlight Pursuit | Copper Reach battle rotation | 1:40.6 | D minor, 124 BPM; analog bass, breakbeats, plucked cello |
+| Ghosts in the Relay | Glass Cathedral battle rotation | 1:39.9 | D minor, 104 BPM; haunted piano, glass mallets, trip-hop drums |
+| Redline Protocol | Blackout Heart battle rotation | 1:30.9 | D minor, 138 BPM; sequencers, cello ostinato, brass |
+| Paths of Copper | Stage I exploration and rewards | 2:06.8 | D minor, 78 BPM; felt piano, plucked cello, dulcimer, clockwork pulse |
+| The Second Way Home | Stage I battles and Iron Regent | 1:47.2 | D minor, 118 BPM; analog bass, cello, metal percussion, French horn |
+| Prismatic Silence | Stage II exploration and rewards | 2:10.0 | A minor, 72 BPM; celesta, glass marimba, vibraphone, viola harmonics |
+| Shatter the Choir | Stage II battles, elites and Hollow Choir | 1:51.6 | A minor, 112 BPM; crystalline mallets, prepared piano, syncopated drums |
+| Messages in the Dark | Stage III exploration and rewards | 2:10.4 | C minor, 76 BPM; low piano, bowed bass, analog pulses, cello |
+| Deliver the Dawn | Stage III battles and elites | 1:56.3 | C minor, 132 BPM; sequencers, cello ostinato, industrial drums, brass |
 
-## Instrumental revision
+## Native mix masters
 
-The first prompt-only drafts sometimes generated vocals. They were replaced after listening feedback. The new score plans leave the entire vocal part silent and contain no lyrics. Since a score alone does not guarantee instrumental output, the generated recordings were additionally separated with Demucs `htdemucs_ft`; only **drums + bass + other** were included in the final mix. The vocal stem is excluded and preserved separately in the local production workspace.
+The score plans leave the entire vocal part silent and contain no lyrics. All fifteen masters preserve the **complete native YuE2 recording**. Each song has one folder under `tracks/<track>/`: `instrumental.wav` is a lossless decode of the adjacent `audio.flac`, at the same 48 kHz stereo, 24-bit resolution. The production script verifies exact equality of every decoded PCM sample before installing the master.
 
-An optional local Faster Whisper small check with voice activity detection returned no speech segments for all nine delivered masters. The latest results are in `masters-v4/speech-check.json` for the battle additions and `masters-v3/speech-check.json` for the other six; the original check remains in `masters-v2/speech-check.json`. This is an automated check, not a claim that a human audition or perfect removal of every vocal timbre has been performed.
+The previous Demucs vocal-separation step damaged the music and was removed from all four production scripts after listening feedback. No stem removal, denoising, dynamic compression or resampling is applied to the WAV masters. Superseded local masters and stems are archived under the ignored `artifacts/rejected-audio-separation/`; they are never used by the game or the production scripts.
 
-The game crossfades tracks over 1.6 seconds. Battle music uses a shuffled four-track bag: each piece plays once before reshuffling, without repeating at a bag boundary. It changes between encounters and when a track ends, while card plays and turns preserve playback. Other scenes loop their dedicated piece. Files use brief entrance/exit fades. These are full musical tracks, not sample-perfect seamless loops.
+Browser copies add a 1.5-second fade in, a 3-second fade out and a constant gain adjustment, then encode to Vorbis. Gain aims for −19 LUFS while keeping the encoded true peak at or below −2 dBTP. Tracks remain quieter if reaching the loudness target would require compression. The per-track metadata records the actual delivery gain and measured levels.
+
+Optional Faster Whisper checks can flag recognized speech for listening review; they never change the audio. Superseded reports and draft recordings are archived locally under the ignored `artifacts/soundtrack-archive/`, outside the active soundtrack folders. Speech recognition cannot certify that music is free of singing or other vocal timbres.
+
+The current `native-mix-speech-check.json` records zero recognized speech segments for all fifteen restored delivery files, with SHA-256 hashes tying the report to those exact encodes.
+
+The game crossfades tracks over 1.6 seconds. Battle music uses a separate shuffled pool for each stage: each piece plays once before reshuffling, without repeating at a pool boundary. The Copper Reach has three battle tracks; the Glass Cathedral and Blackout Heart have two each. Music changes between encounters and when a battle track ends, while card plays and turns preserve playback. Stage exploration themes begin on the map after a guardian's relic is claimed, and saved runs restore the correct stage's score. Title, shop, sanctuary and guardian scenes loop their selected piece. Files use brief entrance/exit fades. These are full musical tracks, not sample-perfect seamless loops.
 
 ## Reproduction
 
@@ -32,8 +44,8 @@ Upstream: [official YuE repository](https://github.com/multimodal-art-projection
 - Listening decoder: [`m-a-p/YuE2-Vae`](https://huggingface.co/m-a-p/YuE2-Vae).
 - Unquantized inference; 32 synthesis steps; CUDA with AR offloading and a 16 GiB memory budget.
 - Generated on an NVIDIA RTX 4080 SUPER with 16 GB VRAM. The model is **not needed to play the game**.
-- Separation: [`demucs 4.0.1`, `htdemucs_ft`](https://github.com/facebookresearch/demucs); all four fine-tuned models, one shift, 25% overlap.
-- Mastering: FFmpeg fades and loudness normalization targeting −19 LUFS / −2 dBTP; stereo 48 kHz Vorbis, quality 5.
+- Masters: lossless native FLAC-to-WAV decoding with exact PCM verification. No source separation.
+- Delivery: FFmpeg fades and constant gain toward −19 LUFS with a −2 dBTP ceiling; stereo 48 kHz Vorbis, quality 5.
 
 From the project root, using a CUDA-capable machine with enough free model cache space:
 
@@ -41,13 +53,24 @@ From the project root, using a CUDA-capable machine with enough free model cache
 uv venv .venv-score --python 3.12
 uv pip install --python .venv-score/bin/python \
   'git+https://github.com/multimodal-art-projection/YuE.git@3968a270be318e5fb74d27dabc0add2ebb07e77f' \
-  'demucs==4.0.1' 'torchaudio==2.10.0' imageio-ffmpeg
+  'torchaudio==2.10.0' imageio-ffmpeg soundfile numpy
 .venv-score/bin/python scripts/instrumental_score.py
 .venv-score/bin/python scripts/zone_score.py
 .venv-score/bin/python scripts/battle_score.py
+.venv-score/bin/python scripts/stage_score.py
 ```
 
-The exact prompts, original ABC music and seeds are in `scripts/instrumental_score.py`, `scripts/zone_score.py`, and `scripts/battle_score.py`. It resumes when both native generation metadata and audio exist, or when separated WAV files already exist. The repository includes scores and metadata; native FLAC/WAV recordings and NumPy intermediates are created on the machine running the script. To make a new version, choose a new output directory and seeds rather than mixing new music with old intermediates. A fixed seed is recorded for traceability; output need not be bit-identical across different hardware or runtime versions.
+The exact prompts, original ABC music and seeds are in `scripts/instrumental_score.py`, `scripts/zone_score.py`, `scripts/battle_score.py` and `scripts/stage_score.py`. They reuse existing native generation metadata and audio from `tracks/<track>/`, then rebuild delivery files from the original recording through `scripts/master_score.py`. Existing WAV files are never treated as an authoritative source. The repository includes scores and metadata; native FLAC/WAV recordings and NumPy intermediates are created on the machine running the script. For a new take, archive the previous track folder under `artifacts/` and choose a new seed. Keep one accepted take per track instead of adding versioned folder trees. A fixed seed is recorded for traceability; output need not be bit-identical across different hardware or runtime versions.
+
+Rebuild all fifteen existing recordings without loading YuE2 or using the GPU:
+
+```sh
+.venv-score/bin/python scripts/master_score.py
+# One track, using its original FLAC:
+.venv-score/bin/python scripts/master_score.py --track paths-of-copper
+```
+
+The stage score uses six distinct ABC plans in D, A and C minor, with separate development sections, silent vocal voices and seeds 923051–923056. Generation and mastering can be resumed separately using `scripts/stage_score.py --phase generate` or `--phase master`; `--track <id>` selects a single piece. Release GPU memory from the image generator before running YuE2 on a 16 GB card.
 
 Optional speech regression check:
 
@@ -58,14 +81,34 @@ uv pip install --python .venv-score/bin/python 'faster-whisper==1.2.1'
 
 ## Files
 
-- `manifest.json` — delivered filenames, durations, sample format, source versions and SHA-256 hashes.
-- `instrumental-v2/<track>/` — original score, request and result metadata are tracked. Native YuE2 audio and NumPy arrays are generated locally and ignored.
-- `masters-v2/<track>/instrumental.wav` — locally generated accompaniment-only master before delivery encoding; ignored by Git.
-- `masters-v2/<track>/removed-vocals.wav` — locally generated excluded vocal stem; ignored by Git.
-- `masters-v2/<track>/master.json` — stem selection and measured RMS values.
-- `generated/` and `rejected-v1/` — local first-pass drafts; excluded from the repository and never loaded by the game.
-- `instrumental-v3/` and `masters-v3/` — fieldcraft score plans, generation metadata and accompaniment-only masters for the three additional scenes.
-- `instrumental-v4/` and `masters-v4/` — the three battle variations, their scores, seeds, generation metadata, mastering details and automated speech check.
+The three top-level folders are `tracks/`, `effects/` and `licenses/`.
+
+```text
+soundtrack/
+  tracks/<track>/
+    score.abc             Original instrumental score
+    request.json          Prompt and seed
+    config.json           Generation settings
+    plan.json             Score plan
+    plan_manifest.json    Plan hashes
+    result.json           Generation result and artifact hashes
+    master.json           Source and delivery hashes, PCM verification and levels
+    audio.flac            Native recording (local, ignored)
+    instrumental.wav      Lossless master (local, ignored)
+    *.npy                 Generation intermediates (local, ignored)
+  effects/                Effect recipes, licensed sources and provenance
+  licenses/               YuE2 license texts
+  manifest.json           All fifteen delivered tracks and their source paths
+  native-mix-speech-check.json
+  README.md
+```
+
+The original generation IDs retain their revision labels for traceability; they do not determine folder names. Browser-ready music lives in `public/audio/`.
+
+Production entry points:
+
+- `scripts/master_score.py` — shared lossless mastering and browser delivery for all fifteen recordings.
+- `scripts/stage_score.py` — reproduces the three exploration themes and three combat themes.
 - `scripts/battle_score.py` — reproduces Copperlight Pursuit, Ghosts in the Relay, and Redline Protocol.
 - `scripts/zone_score.py` — reproduces the three new tracks using separate seeds, arrangements and output paths.
 - `scripts/instrumental_score.py` — the current, reproducible score-production workflow.

@@ -1,0 +1,32 @@
+{
+  "source": "audio.flac",
+  "source_sha256": "f703ecde85dcd31018681e7c4b7e5ab36dca37fc0533de188519e48a00e7458e",
+  "mix": "complete native YuE2 recording",
+  "processing": "lossless FLAC decode to WAV; no source separation or denoising",
+  "sample_rate": 48000,
+  "channels": 2,
+  "subtype": "PCM_24",
+  "frames": 4817216,
+  "duration_seconds": 100.35866666666666,
+  "instrumental_sha256": "5552fedc841411c616808339d922fde5f6d1bbe91a720269f5ceba1c1640187e",
+  "verification": {
+    "decoded_pcm_equal_to_source": true,
+    "max_abs_pcm_error": 0
+  },
+  "delivery": {
+    "file": "public/audio/a-light-left-on-instrumental.ogg",
+    "sha256": "160e5f1b63c850cdb59d5cf6b0e4321a480b1dbbaf9cb44af0c0b2e347676719",
+    "bytes": 1519400,
+    "codec": "Vorbis",
+    "quality": 5,
+    "fade_in_seconds": 1.5,
+    "fade_out_seconds": 3,
+    "constant_gain_db": -6.289999999999999,
+    "target_lufs": -19,
+    "peak_ceiling_dbtp": -2,
+    "integrated_lufs": -18.95,
+    "true_peak_dbtp": -6.1,
+    "range_lu": 8.5
+  },
+  "generation_version": "v3"
+}

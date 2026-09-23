@@ -1,0 +1,32 @@
+{
+  "source": "audio.flac",
+  "source_sha256": "ed2ea8531b4d22c542d3f7f9207cfc1f99dfbcb2ae98286e0fee55979b6bfb02",
+  "mix": "complete native YuE2 recording",
+  "processing": "lossless FLAC decode to WAV; no source separation or denoising",
+  "sample_rate": 48000,
+  "channels": 2,
+  "subtype": "PCM_24",
+  "frames": 5660096,
+  "duration_seconds": 117.91866666666667,
+  "instrumental_sha256": "692c0d251d539286126938ffd7fad137def10d94c1bfb10a3af1e4dde8537a40",
+  "verification": {
+    "decoded_pcm_equal_to_source": true,
+    "max_abs_pcm_error": 0
+  },
+  "delivery": {
+    "file": "public/audio/signal-and-steel-instrumental.ogg",
+    "sha256": "4bcb1e06ebbdec92f56fd45ad1da70deaa2592fa7fa89ad1055eaaf36afe55a3",
+    "bytes": 2235387,
+    "codec": "Vorbis",
+    "quality": 5,
+    "fade_in_seconds": 1.5,
+    "fade_out_seconds": 3,
+    "constant_gain_db": -5.609999999999999,
+    "target_lufs": -19,
+    "peak_ceiling_dbtp": -2,
+    "integrated_lufs": -19.02,
+    "true_peak_dbtp": -5.51,
+    "range_lu": 5.4
+  },
+  "generation_version": "v2"
+}

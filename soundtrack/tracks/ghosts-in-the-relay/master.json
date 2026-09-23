@@ -1,0 +1,32 @@
+{
+  "source": "audio.flac",
+  "source_sha256": "5e0ee25546caf5930f547b60ac3cca5dc439c5762764c88d61c9788a3790a8eb",
+  "mix": "complete native YuE2 recording",
+  "processing": "lossless FLAC decode to WAV; no source separation or denoising",
+  "sample_rate": 48000,
+  "channels": 2,
+  "subtype": "PCM_24",
+  "frames": 4796096,
+  "duration_seconds": 99.91866666666667,
+  "instrumental_sha256": "c8ac1032614db8164fceebfa4907604986c2610952a9398b2e0d7b00e40f1e2a",
+  "verification": {
+    "decoded_pcm_equal_to_source": true,
+    "max_abs_pcm_error": 0
+  },
+  "delivery": {
+    "file": "public/audio/ghosts-in-the-relay-instrumental.ogg",
+    "sha256": "457fccc3fca08d402757ae05cd35940ee1280b494728f1b232882a407aaa32f0",
+    "bytes": 1738651,
+    "codec": "Vorbis",
+    "quality": 5,
+    "fade_in_seconds": 1.5,
+    "fade_out_seconds": 3,
+    "constant_gain_db": -3.59,
+    "target_lufs": -19,
+    "peak_ceiling_dbtp": -2,
+    "integrated_lufs": -18.99,
+    "true_peak_dbtp": -3.34,
+    "range_lu": 14.5
+  },
+  "generation_version": "v4"
+}

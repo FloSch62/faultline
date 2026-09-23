@@ -1,26 +1,7 @@
-import { MusicRotation } from "./core/music.ts";
+import { MusicRotation, sceneTrack, TRACK_TITLES, type ScoreScene } from "./core/music.ts";
+import { STAGES } from "./core/stages.ts";
 import { EffectsPlayer, type EffectKind, type EffectOptions } from "./audio-effects.ts";
-export type ScoreScene = "explore" | "battle" | "boss" | "shop" | "sanctuary" | "elite";
-const tracks: Record<ScoreScene, string> = {
-  explore: "the-last-relay",
-  battle: "signal-and-steel",
-  boss: "the-blackout-core",
-  shop: "the-copper-market",
-  sanctuary: "a-light-left-on",
-  elite: "a-thousand-fractures",
-};
-export const TRACK_NAMES: Record<ScoreScene, string> = {
-  explore: "The Last Relay",
-  battle: "Signal & Steel",
-  boss: "The Blackout Core",
-  shop: "The Copper Market",
-  sanctuary: "A Light Left On",
-  elite: "A Thousand Fractures",
-};
-const battleTitles: Record<string, string> = {
-  "signal-and-steel": "Signal & Steel", "copperlight-pursuit": "Copperlight Pursuit",
-  "ghosts-in-the-relay": "Ghosts in the Relay", "redline-protocol": "Redline Protocol",
-};
+export type { ScoreScene } from "./core/music.ts";
 export interface AudioSettings {
   music: number;
   effects: number;
@@ -35,8 +16,9 @@ export class Soundscape {
   private players = [new Audio(), new Audio()];
   private active = 0;
   private scene: ScoreScene = "explore";
-  private track = tracks.explore;
-  private readonly rotation = new MusicRotation();
+  private track = sceneTrack("explore", null);
+  private readonly rotations = STAGES.map(stage => new MusicRotation(stage.music.battle));
+  private battleStage = 0;
   private encounter = "";
   private battleTrack = "";
   private ready = false;
@@ -44,7 +26,7 @@ export class Soundscape {
   private transitioning = false;
   onUnavailable: (() => void) | null = null;
   onTrackChange: (() => void) | null = null;
-  get trackTitle() { return this.scene === "battle" ? battleTitles[this.track] : TRACK_NAMES[this.scene]; }
+  get trackTitle() { return TRACK_TITLES[this.track]; }
   constructor() {
     const defaults = { music: 0.5, effects: 0.65, muted: false, motion: true };
     try {
@@ -71,7 +53,7 @@ export class Soundscape {
       player.preload = "none";
       player.addEventListener("ended", () => {
         if (player !== this.players[this.active] || this.scene !== "battle") return;
-        this.battleTrack = this.track = this.rotation.next();
+        this.battleTrack = this.track = this.rotations[this.battleStage].next();
         this.switchTrack();
         this.onTrackChange?.();
       });
@@ -108,12 +90,14 @@ export class Soundscape {
       this.switchTrack(true);
     }
   }
-  setScene(scene: ScoreScene, encounter = "") {
-    if (scene === "battle" && (encounter !== this.encounter || !this.battleTrack)) {
+  setScene(scene: ScoreScene, encounter = "", stage: number | null = null) {
+    const battleStage = stage !== null && STAGES[stage] ? stage : 0;
+    if (scene === "battle" && (encounter !== this.encounter || battleStage !== this.battleStage || !this.battleTrack)) {
       this.encounter = encounter;
-      this.battleTrack = this.rotation.next();
+      this.battleStage = battleStage;
+      this.battleTrack = this.rotations[battleStage].next();
     }
-    const track = scene === "battle" ? this.battleTrack : tracks[scene];
+    const track = scene === "battle" ? this.battleTrack : sceneTrack(scene, stage);
     if (this.scene === scene && this.track === track) return;
     this.scene = scene;
     this.track = track;

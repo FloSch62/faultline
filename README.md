@@ -100,8 +100,8 @@ Fields belong to the ground: moving hardware changes which effects apply immedia
 - `src/main.ts` — input, view transitions, targeting, undo and autosave.
 - `src/audio.ts`, `src/audio-effects.ts` — music playback, crossfades, sampled effects, voice priority and combat ducking. The CUE GUIDE in `audio-effects.ts` lists exactly when each of the 44 cues plays.
 - `public/art/` — finished game artwork; [original art direction](docs/art-prompts.md) and [fieldcraft artwork prompts](docs/art-polish-prompts.md), and [expedition artwork prompts](docs/art-expedition-prompts.md).
-- `public/audio/` — nine instrumental Ogg masters and the material effects bank.
-- `soundtrack/` — prompts, original scores, generation metadata, provenance and licenses. Large production recordings and intermediate arrays are generated locally and ignored by Git.
+- `public/audio/` — fifteen instrumental Ogg masters, including exploration and combat themes for each stage, and the material effects bank.
+- `soundtrack/` — one folder per song in `tracks/`, alongside `effects/` and `licenses/`. Scores, generation metadata and provenance are tracked; large recordings and intermediate arrays remain local and ignored by Git.
 - [Soundtrack production](soundtrack/README.md) and [effects production](soundtrack/effects/README.md) — source material, licenses and reproduction steps.
 - [Third-party notices](THIRD_PARTY_NOTICES.md).
 
@@ -122,7 +122,7 @@ To publish a fork, enable GitHub Pages with **GitHub Actions** as the source, th
 
 Project code and project-created assets are available under the [MIT license](LICENSE), to the extent of the contributors' licensable rights. Bundled fonts, the Containerlab mark and third-party libraries retain their [original licenses](THIRD_PARTY_NOTICES.md). YuE2 model weights are not included; their separate license is preserved with the soundtrack provenance.
 
-Artwork was created with OpenAI image generation. The instrumental score was generated locally with YuE2, with vocal stems removed using Demucs. Prompts, score plans and production details are included.
+Artwork was created with OpenAI image generation and local Krea 2 Turbo. The soundtrack preserves the complete native YuE2 recordings, with fades and a constant volume adjustment for game playback. Prompts, score plans and production details are included.
 
 ![Battle layout with active fields](docs/screenshots/battle.png)
 

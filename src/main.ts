@@ -5,6 +5,8 @@ import "./battle.css";
 import { Soundscape, type ScoreScene } from "./audio.ts";
 import type { EffectKind } from "./audio-effects.ts";
 import { ENEMIES } from "./core/enemies.ts";
+import { STAGES } from "./core/stages.ts";
+import { TRACK_TITLES } from "./core/music.ts";
 import { CARDS, RULES } from "./core/cards.ts";
 import {
   ARCHETYPES,
@@ -209,6 +211,10 @@ function render(rebuild = true) {
   const debrief = !!practice && view === "run" && run.phase !== "battle" && !!run.enemy;
   const battle = view === "run" && (run.phase === "battle" || debrief);
   root.dataset.view = view === "run" ? (debrief ? "battle" : run.phase) : view;
+  const stage = STAGES[view === "run" ? run.stage : 0];
+  root.dataset.stage = view === "run" ? String(run.stage + 1) : "";
+  root.style.setProperty("--stage-panorama", `url("${import.meta.env.BASE_URL}art/${stage.art.panorama}")`);
+  root.style.setProperty("--stage-interior", `url("${import.meta.env.BASE_URL}art/${stage.art.battle}")`);
   root.classList.toggle("lesson-debrief", debrief);
   root.classList.toggle("is-battle", battle);
   root.classList.toggle("in-market", view === "run" && run.phase === "reward" && run.map.find(room=>room.id===run.currentRoom)?.type === "cache");
@@ -225,6 +231,7 @@ function render(rebuild = true) {
   );
   if (battle) {
     ensureWorld();
+    world?.setStage(run.stage);
     if (rebuild)
       world?.setBattle(run.topology, debrief ? null : run.enemy, run.faultNode, run.faultLink);
     const forecast = combatPreview(run);
@@ -305,7 +312,7 @@ function render(rebuild = true) {
   world?.setSelected(source ?? selectedNode);
   world?.setZoneTargeting(selected !== null && CARDS[run.hand[selected]]?.target === "zone");
   const scene = audioScene();
-  sound.setScene(scene, `${run.seed}:${run.stage}:${run.currentRoom}:${practice ? "practice" : "expedition"}`);
+  sound.setScene(scene, `${run.seed}:${run.stage}:${run.currentRoom}:${practice ? "practice" : "expedition"}`, view === "run" ? run.stage : null);
   renderTrack();
   if (
     expedition &&
@@ -401,7 +408,7 @@ function openModal(type: string) {
     content.innerHTML = alpha.libraryMarkup(libraryRun, libraryMode);
   }
   else if (type === "credits")
-    content.innerHTML = `<span class="eyebrow">THE PEOPLE & TOOLS BEHIND THE SIGNAL</span><h2>From an idea to an odyssey.</h2><div class="credits-copy"><h3>The Containerlab universe</h3><p>Inspired by Containerlab and the networks we build together. FAULTLINE is an independent fan project. The Containerlab mark is used under its original license.</p><h3>Original art</h3><p>Relay cathedral, sanctuary, ruined chamber, an expanded illustrated card collection, hostile creatures and painted interface pieces created for this game using OpenAI image generation. Typography: Cinzel and Barlow, under the SIL Open Font License.</p><h3>Original score · YuE2</h3><p>The Last Relay · Signal & Steel · The Blackout Core · The Copper Market · A Light Left On · A Thousand Fractures · Copperlight Pursuit · Ghosts in the Relay · Redline Protocol. Generated locally with the official YuE2 model and listening decoder. The score uses instrumental arrangements; vocal stems were removed with Demucs. Generation prompts and provenance are included in the project.</p><h3>Sound effects · Kenney</h3><p>Recorded card Foley, metal, glass and impact materials from Kenney’s CC0 Casino Audio, Impact Sounds and Sci-fi Sounds packs. Layered and mastered for FAULTLINE; source recordings, licenses and recipes are included.</p><h3>A real network, in miniature</h3><p>Packets and faults are simulated in your browser. You can export the topology to Containerlab; real routing requires device configuration and container images.</p></div>`;
+    content.innerHTML = `<span class="eyebrow">THE PEOPLE & TOOLS BEHIND THE SIGNAL</span><h2>From an idea to an odyssey.</h2><div class="credits-copy"><h3>The Containerlab universe</h3><p>Inspired by Containerlab and the networks we build together. FAULTLINE is an independent fan project. The Containerlab mark is used under its original license.</p><h3>Original art</h3><p>Relay cathedral, the Glass Cathedral and Blackout Heart environments, sanctuary, an expanded illustrated card collection, hostile creatures and painted interface pieces created for this game using OpenAI image generation and local Krea 2 Turbo. Artwork prompts and production details are included in the project. Typography: Cinzel and Barlow, under the SIL Open Font License.</p><h3>Original score · YuE2</h3><p>${Object.values(TRACK_TITLES).join(" · ")}. Generated locally with the official YuE2 model and listening decoder. Original instrumental arrangements retain their complete generated mix. Generation prompts and provenance are included in the project.</p><h3>Sound effects · Kenney</h3><p>Recorded card Foley, metal, glass and impact materials from Kenney’s CC0 Casino Audio, Impact Sounds and Sci-fi Sounds packs. Layered and mastered for FAULTLINE; source recordings, licenses and recipes are included.</p><h3>A real network, in miniature</h3><p>Packets and faults are simulated in your browser. You can export the topology to Containerlab; real routing requires device configuration and container images.</p></div>`;
   else if (type === "replace")
     content.innerHTML = `<span class="eyebrow">AN EXPEDITION IS ALREADY IN PROGRESS</span><h2>Leave this route behind?</h2><p class="modal-intro">Beginning a new expedition replaces your current saved run in stage ${run.stage + 1}, sector ${run.floor + 1}.</p><div class="confirm-actions"><button class="gold-button" data-action="confirm-replace">Begin a new expedition ${ui.icon("arrow")}</button><button class="text-button" data-action="close">Keep my current expedition</button></div>`;
   dialog.className = [

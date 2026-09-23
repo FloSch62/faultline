@@ -1,6 +1,8 @@
 # Painted artwork
 
-The final PNG assets are in `public/art/`. They were created with OpenAI image generation, then copied into this project. No external asset service is needed to run the game.
+The final PNG assets are in `public/art/`. The original set was created with OpenAI image generation; the individual card expansion also uses local Krea 2 Turbo. No external asset service is needed to run the game.
+
+The [September 23 card-art replacement pass](art-v3-prompts.md) adds individual paintings for all 22 v3 cards and the three earlier cards that shared illustrations. It replaces recolored crops and symbol overlays; every base card now has distinct artwork, shared only with its upgrade.
 
 ## Card and interface prompts
 

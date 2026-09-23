@@ -12,6 +12,7 @@ import { linkKey } from "../core/graph.ts";
 import type { Enemy, Malware, NetworkNode, Role, Terrain, Topology, Zone, ZoneEffect } from "../core/types.ts";
 import type { Intent } from "../core/run.ts";
 import { ENEMIES } from "../core/enemies.ts";
+import { STAGES } from "../core/stages.ts";
 import { EnemyActor } from "./EnemyActor.ts";
 import { cylinder, glow, mat, ring } from "./materials.ts";
 import { COLORS, addRoleBody, addSalvageScrap, animateDevice, newDeviceGroup, type DeviceGroup } from "./devices.ts";
@@ -87,6 +88,8 @@ export class World {
   private enemyFieldTexture!: THREE.Texture;
   private enemyExpeditionTexture!: THREE.Texture;
   private guardianTexture!: THREE.Texture;
+  private readonly stageBackdrops = new Map<string, THREE.Texture>();
+  private backdropPath = "";
   private enemyLight!: THREE.PointLight;
   private enemyUnderLight!: THREE.PointLight;
   private enemySize = 10.5;
@@ -188,11 +191,7 @@ export class World {
   constructor(canvas: HTMLCanvasElement, callbacks: WorldCallbacks) {
     this.canvas = canvas;
     this.callbacks = callbacks;
-    const backdrop = new THREE.TextureLoader().load(
-      `${import.meta.env.BASE_URL}art/relay-interior.png`,
-    );
-    backdrop.colorSpace = THREE.SRGBColorSpace;
-    this.scene.background = backdrop;
+    this.setStage(0);
     this.scene.backgroundIntensity = 0.62;
     this.camera.position.set(0, 12.8, 18.8);
     this.camera.lookAt(0, 0.2, -0.4);
@@ -956,6 +955,21 @@ export class World {
     for (const geometry of geometries) geometry.dispose();
     for (const material of materials) material.dispose();
     for (const texture of textures) texture.dispose();
+  }
+
+  /** CSS and WebGL use the same stage interior, including when resuming a save. */
+  setStage(stage: number) {
+    const path = (STAGES[stage] ?? STAGES[0]).art.battle;
+    if (path === this.backdropPath) return;
+    let backdrop = this.stageBackdrops.get(path);
+    if (!backdrop) {
+      backdrop = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}art/${path}`);
+      backdrop.colorSpace = THREE.SRGBColorSpace;
+      this.stageBackdrops.set(path, backdrop);
+    }
+    this.backdropPath = path;
+    this.scene.background = backdrop;
+    this.canvas.dataset.backdrop = path;
   }
 
   setBattle(
@@ -1859,8 +1873,9 @@ export class World {
     this.cableBeads.length = 0;
     this.zoneVisuals.clear();
     this.environment.dispose();
-    if (this.scene.background instanceof THREE.Texture)
-      this.scene.background.dispose();
+    this.scene.background = null;
+    for (const backdrop of this.stageBackdrops.values()) backdrop.dispose();
+    this.stageBackdrops.clear();
     this.controls.dispose();
     for (const pass of this.composer.passes) pass.dispose();
     this.composer.dispose();

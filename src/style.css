@@ -92,7 +92,7 @@ strong {
 .scene-backdrop {
   position: absolute;
   inset: -1%;
-  background: url("/art/relay-cathedral.png") center/cover;
+  background: var(--stage-panorama, url("/art/relay-cathedral.png")) center/cover;
   z-index: -5;
   transition:
     filter 1s,
@@ -476,7 +476,7 @@ strong {
   pointer-events: auto;
 }
 .game-root[data-view="battle"] .scene-backdrop {
-  background-image: url("/art/relay-interior.png");
+  background-image: var(--stage-interior, url("/art/relay-interior.png"));
   filter: brightness(0.65) saturate(0.75);
 }
 .game-root[data-view="battle"] .scene-shade {

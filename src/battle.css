@@ -251,28 +251,6 @@
 @keyframes buffer-orbit { to { transform: rotate(360deg); } }
 
 /* ------------------------------------------------------------ cards: art, upgrades, junk */
-.game-card .card-image { filter: var(--art-filter, none); }
-.card-sigil {
-  position: absolute;
-  z-index: 1;
-  top: 6px;
-  left: 6px;
-  right: 6px;
-  height: var(--picture-height, 105px);
-  display: grid;
-  place-items: center;
-  pointer-events: none;
-  color: color-mix(in srgb, var(--card-color, #e8c67e) 70%, #fff6dc);
-  background: radial-gradient(ellipse at 50% 55%, #050a10aa 0 26%, #050a1044 45%, transparent 70%);
-  border-radius: 4px 4px 0 0;
-}
-.card-sigil svg {
-  width: min(62%, calc(var(--picture-height, 105px) * .82));
-  height: auto;
-  filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 7px color-mix(in srgb, var(--card-color, #e8c67e) 80%, transparent));
-  overflow: visible;
-}
-.card-inspect .card-sigil, dialog .card-sigil { height: var(--picture-height, 111px); }
 .game-card.kind-protocol { border-color: #9ed7cf; }
 .game-card.kind-protocol .card-type { color: #9fe3dd; }
 .game-card.kind-protocol .card-gem { color: #9fe3dd; }
@@ -321,16 +299,8 @@
   background: repeating-linear-gradient(0deg, #ffffff0d 0 1px, transparent 1px 3px);
   mix-blend-mode: screen;
 }
-.game-card.junk-card .card-sigil { color: #d7dde4; animation: junk-glitch 3.2s steps(1) infinite; }
 .game-card.curse-card { border-color: #b0677d !important; }
-.game-card.curse-card .card-sigil { color: #ffb4c6; }
 .game-card.curse-card .card-heading { color: #f3c1cd; }
-@keyframes junk-glitch {
-  0%, 86%, 100% { transform: none; filter: none; }
-  88% { transform: translate(-2px, 1px); filter: drop-shadow(2px 0 #ff4d6d) drop-shadow(-2px 0 #4de1ff); }
-  91% { transform: translate(2px, -1px); }
-  94% { transform: none; filter: drop-shadow(-1px 0 #ff4d6d) drop-shadow(1px 0 #4de1ff); }
-}
 .card-cost.no-cost { color: #c5ccd3; font-size: 16px; background: radial-gradient(circle at 40% 20%, #4a4f57, #1b1e22); border-color: #8d949c; }
 
 /* ------------------------------------------------------------ relic tokens (v3 emblems) */
@@ -463,9 +433,9 @@
   .network-ledger .ledger-chip.is-terrain, .network-ledger .ledger-chip.is-next { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .console-button::after, .game-card.upgraded::after, .protocol-slot.will-trigger, .transmit-button.buffering::after, .game-card.junk-card .card-sigil, .engine-badge.at-risk { animation: none; }
+  .console-button::after, .game-card.upgraded::after, .protocol-slot.will-trigger, .transmit-button.buffering::after, .engine-badge.at-risk { animation: none; }
 }
-.reduced-motion .console-button::after, .reduced-motion .game-card.upgraded::after, .reduced-motion .protocol-slot.will-trigger, .reduced-motion .transmit-button.buffering::after, .reduced-motion .game-card.junk-card .card-sigil, .reduced-motion .engine-badge.at-risk { animation: none; }
+.reduced-motion .console-button::after, .reduced-motion .game-card.upgraded::after, .reduced-motion .protocol-slot.will-trigger, .reduced-motion .transmit-button.buffering::after, .reduced-motion .engine-badge.at-risk { animation: none; }
 
 /* ------------------------------------------------------------ art-direction pass
    Plate kickers part around the painted crest jewel instead of running under it. */

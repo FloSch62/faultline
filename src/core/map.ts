@@ -1,6 +1,6 @@
 import type { MapRoom, RoomType, RunState } from "./types.ts";
 
-const ROWS: RoomType[][] = [
+const ROUTES: RoomType[][][] = [[
   ["battle", "battle", "battle"],
   ["battle", "cache", "battle"],
   ["forge", "battle", "cache"],
@@ -8,10 +8,26 @@ const ROWS: RoomType[][] = [
   ["battle", "cache", "battle"],
   ["forge", "elite", "forge"],
   ["boss"],
-];
+], [
+  ["battle", "battle", "battle"],
+  ["cache", "battle", "battle"],
+  ["battle", "forge", "cache"],
+  ["elite", "battle", "elite"],
+  ["battle", "cache", "battle"],
+  ["forge", "elite", "forge"],
+  ["boss"],
+], [
+  ["battle", "battle", "battle"],
+  ["battle", "battle", "cache"],
+  ["cache", "forge", "battle"],
+  ["elite", "battle", "elite"],
+  ["cache", "battle", "cache"],
+  ["forge", "elite", "forge"],
+  ["boss"],
+]];
 
-export function createMap(): MapRoom[] {
-  return ROWS.flatMap((row, floor) =>
+export function createMap(stage = 0): MapRoom[] {
+  return ROUTES[stage].flatMap((row, floor) =>
     row.map((type, index) => ({
       id: `${floor}-${floor === 6 ? 1 : index}`,
       floor,

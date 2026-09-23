@@ -80,10 +80,10 @@ test("player vitals, every relic, fields and full card rules fit without collisi
   await page.keyboard.press('Escape');
 });
 
-test("the six local music tracks decode for browser playback",async({page})=>{
+test("the nine local music tracks decode for browser playback",async({page})=>{
   await page.goto('./');await page.locator('[data-action="new"]').click();
   const tracks=await page.evaluate(async()=>{
-    const names=['the-last-relay','signal-and-steel','the-blackout-core','the-copper-market','a-light-left-on','a-thousand-fractures'];
+    const names=['the-last-relay','signal-and-steel','the-blackout-core','the-copper-market','a-light-left-on','a-thousand-fractures','copperlight-pursuit','ghosts-in-the-relay','redline-protocol'];
     const base=document.baseURI;
     return Promise.all(names.map(async name=>{const a=new Audio(new URL(`audio/${name}-instrumental.ogg`,base).href);a.volume=0;try{await a.play();const result={name,duration:a.duration,ready:a.readyState};a.pause();a.removeAttribute('src');a.load();return result;}catch{return {name,duration:0,ready:0};}}));
   });

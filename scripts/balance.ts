@@ -3,6 +3,7 @@
  */
 import { CARDS } from "../src/core/cards.ts";
 import { newExpedition, type Archetype } from "../src/core/expedition.ts";
+import { ENEMIES } from "../src/core/enemies.ts";
 import { reachableRooms } from "../src/core/map.ts";
 import { canLink } from "../src/core/graph.ts";
 import {
@@ -200,6 +201,8 @@ function turn(r: RunState, policy: Policy) {
     }
     if (
       policy === "adaptive" &&
+      r.enemy && ENEMIES[r.enemy.id].jamBands &&
+      p.intent?.kind === "jam" &&
       p.hazardZone &&
       p.faultTarget &&
       r.energy > 0
@@ -217,7 +220,7 @@ function turn(r: RunState, policy: Policy) {
           ),
       );
       if (
-        endangered &&
+        endangered && zoneForNode(endangered) === p.hazardZone &&
         safe &&
         relocateNode(r, endangered.id, safe.x, safe.z).ok
       )
@@ -310,7 +313,7 @@ function turn(r: RunState, policy: Policy) {
     if (instant(r, "capacitor")) continue;
     return;
   }
-  throw new Error("Action limit exceeded: possible draw/energy loop");
+  throw new Error(`Action limit exceeded: ${JSON.stringify({policy, seed:r.seed, stage:r.stage, enemy:r.enemy, energy:r.energy, hand:r.hand, log:r.log})}`);
 }
 
 const output: Record<string, unknown>[] = [];
@@ -349,7 +352,7 @@ for (const archetype of ["architect", "warden", "ghost"] as Archetype[]) {
           chooseRoom(r, rooms[0].id);
           if (String(r.phase) === "battle") {
             battles++;
-            if (r.floor === 6) reachedBoss++;
+            if (r.floor === 6 && r.stage === 2) reachedBoss++;
           }
         } else if (r.phase === "battle") {
           turn(r, policy);
@@ -398,7 +401,7 @@ for (const archetype of ["architect", "warden", "ghost"] as Archetype[]) {
       if (r.phase === "won") {
         wins++;
         winIntegrity += r.integrity;
-      } else defeatedAt += r.floor + 1;
+      } else defeatedAt += r.stage * 7 + r.floor + 1;
     }
     output.push({
       archetype,

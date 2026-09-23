@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { newExpedition, type Expedition } from "../src/core/expedition.ts";
 import { CARDS } from "../src/core/cards.ts";
+import { ENEMIES } from "../src/core/enemies.ts";
 import { chooseRoom } from "../src/core/run.ts";
 
 const SAVE = "faultline-expedition-v2";
@@ -71,6 +72,8 @@ test("practice is optional and exiting it preserves the expedition and history",
     "data-view",
     "title",
   );
+  await expect(page.locator("[data-hand]")).toHaveCount(0);
+  await expect(page.locator("#hand-zone")).toBeHidden();
   expect(await saved(page)).toBe(before);
   expect(await page.evaluate((key) => localStorage.getItem(key), RECORDS)).toBe(
     history,
@@ -498,6 +501,7 @@ test("Sentinel armor is explained and routing through a firewall visibly bypasse
   run.nextNodeId = 2;
   run.hand = ["firewall", "fiber", "fiber"];
   run.enemy!.id = "sentinel";
+  run.enemy!.name = ENEMIES.sentinel.name;
   run.enemy!.hp = run.enemy!.maxHp = 100;
   run.enemy!.turn = 0;
   await installSave(page, expedition);
@@ -508,7 +512,7 @@ test("Sentinel armor is explained and routing through a firewall visibly bypasse
     .locator(".calculation-grid section")
     .first()
     .locator(".calculation-term")
-    .filter({ hasText: "Sentinel plating" });
+    .filter({ hasText: "GATE SENTINEL armor" });
   await expect(armor.locator("b")).toHaveText(/[−-]2/);
   await page.keyboard.press("Escape");
   await choose(page, "firewall");
@@ -520,7 +524,7 @@ test("Sentinel armor is explained and routing through a firewall visibly bypasse
   await page.locator('[data-action="combat-details"]').first().click();
   await expect(
     page.locator(".calculation-grid section").first(),
-  ).not.toContainText("Sentinel plating");
+  ).not.toContainText("GATE SENTINEL armor");
   await expect(page.locator(".route-trace")).toContainText("FIREWALL2");
 });
 
@@ -652,6 +656,7 @@ test("the Core's final reward completes the story and records victory exactly on
 }) => {
   const expedition = fixture();
   const run = expedition.run;
+  run.stage = 2;
   run.floor = 6;
   run.currentRoom = "6-1";
   run.lastRoom = "5-1";
@@ -762,9 +767,10 @@ test("a physical device drag cancelled by blur never spends energy or commits it
   await expect(page.locator(".energy-orb strong")).toHaveText("4");
 });
 
-test("all card rules fit above the footer at supported desktop sizes without clipping", async ({
+test("all card rules fit without clipping across narrow, short, zoomed and desktop windows", async ({
   page,
 }) => {
+  test.setTimeout(180_000);
   await installSave(page);
   await page.locator('[data-action="collection"]').click();
   const cards = await page
@@ -792,9 +798,17 @@ test("all card rules fit above the footer at supported desktop sizes without cli
   });
   await page.mouse.move(10, 10);
   for (const viewport of [
+    { width: 320, height: 740 },
+    { width: 390, height: 844 },
+    { width: 768, height: 1024 },
+    { width: 1024, height: 600 },
+    { width: 1164, height: 655 },
+    { width: 1242, height: 698 },
+    { width: 1280, height: 720 },
     { width: 1366, height: 768 },
     { width: 1440, height: 900 },
     { width: 1920, height: 1080 },
+    { width: 2560, height: 1440 },
   ]) {
     await page.setViewportSize(viewport);
     for (let index = 0; index < cards.length; index += 10) {

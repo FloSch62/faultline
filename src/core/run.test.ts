@@ -152,7 +152,7 @@ test("firewall and Shield Array mitigate a telegraphed breach", () => {
   assert.equal(run.shieldArrayUsed, true);
 });
 
-test("map enforces adjacent routes and the boss can finish the act", () => {
+test("map enforces adjacent routes and a guardian opens the next stage", () => {
   const run = createRun(99);
   const phase = () => run.phase;
   run.phase = "map";
@@ -173,8 +173,9 @@ test("map enforces adjacent routes and the boss can finish the act", () => {
       if (phase() === "relic") chooseRelic(run, run.relicRewards[0]);
     }
   }
-  assert.equal(run.phase, "won");
-  assert.equal(run.floor, 7);
+  assert.equal(run.phase, "map");
+  assert.equal(run.stage, 1);
+  assert.equal(run.floor, 0);
 });
 
 test("export assigns one interface per link endpoint and rejects duplicates", () => {

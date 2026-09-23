@@ -260,7 +260,7 @@ strong {
   background: var(--gold);
 }
 .title-copy h1 {
-  font-size: clamp(65px, 7.4vw, 114px);
+  font-size: clamp(65px, 7.4cqw, 114px);
   line-height: 1.15;
   letter-spacing: 0.055em;
   margin: 16px 0 2px;
@@ -1270,7 +1270,7 @@ strong {
   transform: translateX(-50%);
   text-align: center;
   width: max-content;
-  max-width: 54vw;
+  max-width: 54cqw;
   font-size: 10px;
   letter-spacing: 0.025em;
   color: #aab5b4;
@@ -1575,7 +1575,7 @@ strong {
   left: 50%;
   transform: translateX(-50%);
   z-index: 15;
-  max-width: 60vw;
+  max-width: 60cqw;
   pointer-events: none;
 }
 .target-options {
@@ -1825,9 +1825,9 @@ dialog {
   border: 1px solid #c3a5745c;
   background: #101921;
   color: #d7d6cb;
-  max-width: min(540px, calc(100vw - 36px));
+  max-width: min(540px, calc(100cqw - 36px));
   width: 100%;
-  max-height: calc(100dvh - 60px);
+  max-height: calc(100cqh - 60px);
   padding: 0;
   box-shadow: 0 30px 110px #000b;
   overflow: auto;
@@ -1837,7 +1837,7 @@ dialog::backdrop {
   backdrop-filter: blur(9px);
 }
 dialog.wide {
-  max-width: min(1060px, calc(100vw - 48px));
+  max-width: min(1060px, calc(100cqw - 48px));
 }
 .dialog-surface {
   padding: 43px 43px 34px;
@@ -2061,7 +2061,7 @@ input[type="range"]::-webkit-slider-thumb {
   border: 1px solid #9b906254;
   background: #121d25ed;
   padding: 11px 22px;
-  max-width: 80vw;
+  max-width: 80cqw;
   text-align: center;
   font: 12px Barlow;
   color: #e2d4b7;
@@ -2128,7 +2128,7 @@ input[type="range"]::-webkit-slider-thumb {
     opacity: 0.35;
   }
   100% {
-    transform: translate(-100px, -95vh);
+    transform: translate(-100px, -95cqh);
     opacity: 0;
   }
 }
@@ -2220,7 +2220,7 @@ input[type="range"]::-webkit-slider-thumb {
     opacity: 1;
   }
 }
-@media (min-width: 1700px) {
+@container game (min-width: 1700px) {
   .title-copy {
     top: 29%;
   }
@@ -2388,7 +2388,7 @@ input[type="range"]::-webkit-slider-thumb {
     margin-top: 65px;
   }
 }
-@media (max-width: 1250px) {
+@container game (max-width: 1250px) {
   .game-header {
     padding: 0 26px;
     height: 75px;
@@ -2518,7 +2518,7 @@ input[type="range"]::-webkit-slider-thumb {
   }
   #target-dock {
     bottom: 287px;
-    max-width: 57vw;
+    max-width: 57cqw;
   }
   .map-screen {
     inset: 82px 24px 26px;
@@ -2586,7 +2586,7 @@ input[type="range"]::-webkit-slider-thumb {
     padding-top: 40px;
   }
 }
-@media (max-height: 760px) and (min-width: 901px) {
+@container game (max-height: 760px) and (min-width: 901px) {
   .title-copy {
     top: 21%;
   }
@@ -2755,7 +2755,7 @@ input[type="range"]::-webkit-slider-thumb {
     padding-bottom: 30px;
   }
 }
-@media (max-width: 900px) {
+@container game (max-width: 900px) {
   .game-header {
     padding: 0 22px;
     height: 69px;
@@ -3067,14 +3067,14 @@ input[type="range"]::-webkit-slider-thumb {
   }
   .target-hint {
     top: -35px;
-    max-width: 67vw;
+    max-width: 67cqw;
   }
   .tutorial-callout {
     display: none;
   }
   #target-dock {
     bottom: 292px;
-    max-width: 70vw;
+    max-width: 70cqw;
   }
   .world-stage {
     inset: 60px -20px 124px;
@@ -3162,7 +3162,7 @@ input[type="range"]::-webkit-slider-thumb {
     font-size: 29px;
   }
 }
-@media (max-width: 600px) {
+@container game (max-width: 600px) {
   .game-header {
     height: 62px;
     padding: 0 15px;
@@ -3220,7 +3220,7 @@ input[type="range"]::-webkit-slider-thumb {
     max-width: 86%;
   }
   .title-copy h1 {
-    font-size: clamp(43px, 11.5vw, 68px);
+    font-size: clamp(43px, 11.5cqw, 68px);
     letter-spacing: 0.045em;
     margin-top: 17px;
   }
@@ -3664,7 +3664,7 @@ input[type="range"]::-webkit-slider-thumb {
   .target-hint {
     top: -64px;
     font-size: 9px;
-    width: calc(100vw - 27px);
+    width: calc(100cqw - 27px);
     max-width: none;
     padding: 6px 8px;
     line-height: 1.5;
@@ -3702,7 +3702,7 @@ input[type="range"]::-webkit-slider-thumb {
   #toast {
     top: 63px;
     font-size: 11px;
-    max-width: 90vw;
+    max-width: 90cqw;
     padding: 10px 16px;
   }
   .reward-screen {
@@ -3847,8 +3847,8 @@ input[type="range"]::-webkit-slider-thumb {
   }
   dialog,
   dialog.wide {
-    max-width: calc(100vw - 24px);
-    max-height: calc(100dvh - 26px);
+    max-width: calc(100cqw - 24px);
+    max-height: calc(100cqh - 26px);
   }
   .dialog-surface {
     padding: 40px 21px 26px;
@@ -3882,7 +3882,7 @@ input[type="range"]::-webkit-slider-thumb {
     gap: 20px 10px;
   }
   .collection-entry .game-card {
-    width: min(146px, 37vw);
+    width: min(146px, 37cqw);
     height: 215px;
   }
   .collection-entry .card-rule {
@@ -3993,7 +3993,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 /* The battle interface is a set of physical instruments in the relay chamber. */
-@media (min-width: 901px) {
+@container game (min-width: 901px) {
   .battle-plate {
     width: 218px;
     min-height: 344px;
@@ -4390,7 +4390,7 @@ input[type="range"]::-webkit-slider-thumb {
     bottom: 10px;
   }
 }
-@media (min-width: 901px) and (max-height: 800px) {
+@container game (min-width: 901px) and (max-height: 800px) {
   .battle-plate {
     top: 116px;
     min-height: 305px;
@@ -4500,7 +4500,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 /* Extra draws tighten the fan instead of covering the transmission dial. */
-@media (min-width: 901px) {
+@container game (min-width: 901px) {
   .card-fan {
     --fan-card-width: 164px;
   }
@@ -4514,17 +4514,17 @@ input[type="range"]::-webkit-slider-thumb {
     );
   }
 }
-@media (min-width: 1700px) {
+@container game (min-width: 1700px) {
   .card-fan {
     --fan-card-width: 183px;
   }
 }
-@media (min-width: 901px) and (max-width: 1250px) {
+@container game (min-width: 901px) and (max-width: 1250px) {
   .card-fan {
     --fan-card-width: 146px;
   }
 }
-@media (min-width: 901px) {
+@container game (min-width: 901px) {
   .battle-left .tutorial-callout {
     top: calc(100% + 10px);
     bottom: auto;

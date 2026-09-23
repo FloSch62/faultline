@@ -1,5 +1,6 @@
 import type { Archetype } from "./core/expedition.ts";
 import type { Intent } from "./core/run.ts";
+import { ENEMIES } from "./core/enemies.ts";
 
 export interface ChapterStory {
   title: string;
@@ -59,7 +60,7 @@ export function chapterForFloor(floor: number): ChapterStory {
   return CHAPTERS[Math.max(0, Math.min(CHAPTERS.length - 1, index))];
 }
 
-export type StoryEnemyId = "leech" | "wraith" | "storm" | "sentinel" | "core" | "prophet" | "widow" | "colossus";
+export type StoryEnemyId = "leech" | "wraith" | "storm" | "sentinel" | "core" | "prophet" | "widow" | "colossus" | "serpent" | "moth" | "marshal" | "choir" | "weaver" | "reaver" | "regent" | "cantor";
 
 export interface EnemyStory {
   name: string;
@@ -73,6 +74,62 @@ export interface EnemyStory {
 }
 
 export const ENEMY_STORIES: Record<StoryEnemyId, EnemyStory> = {
+  serpent: {
+    name: "Coil Serpent", title: "One route is a perfect snare",
+    motive: "A cable-recovery coil has learned to tighten around anything that still carries a signal. It follows a single route all the way to its heart.",
+    pattern: ENEMIES.serpent.pattern.map(p => p.kind),
+    telegraphs: { strike: "The copper spine draws tight. A second route would loosen its grip.", sever: "A hooked fang settles over a live cable.", corrupt: "Emerald venom beads against the table." },
+    counterplay: ENEMIES.serpent.trait, defeated: "The coils open. There is more than one way home.",
+  },
+  moth: {
+    name: "Ash Moth", title: "Cold wings over a living signal",
+    motive: "A maintenance drone follows the warmth of working relays. Its ruined cooling wings shed conductive ash over everything it tries to save.",
+    pattern: ENEMIES.moth.pattern.map(p => p.kind),
+    telegraphs: { corrupt: "Fine ash settles along your strongest route.", jam: "Its wings turn toward the marked band.", strike: "The lantern in its chest burns cold blue." },
+    counterplay: ENEMIES.moth.trait, defeated: "The wings fold around a lantern that no longer needs tending.",
+  },
+  marshal: {
+    name: "Null Marshal", title: "No passage without a firewall",
+    motive: "It once escorted engineers safely through the trust boundary. With every credential expired, its shield now bars the very people it was built to protect.",
+    pattern: ENEMIES.marshal.pattern.map(p => p.kind),
+    telegraphs: { breach: "The Marshal raises its final warrant.", jam: "A blue eye fixes on unprotected hardware.", strike: "The great shield turns edge-on." },
+    counterplay: ENEMIES.marshal.trait, defeated: "The warrant expires. The road belongs to the living.",
+  },
+  choir: {
+    name: "Glass Choir", title: "Three voices, one broken note",
+    motive: "Three announcement bells repeat different fragments of the same evacuation order. Their incompatible frequencies turn the ground to rust and silence.",
+    pattern: ENEMIES.choir.pattern.map(p => p.kind),
+    telegraphs: { corrupt: "A different bell begins the refrain. Watch which field it is casting.", strike: "Three glass faces draw breath together.", breach: "A single sharp note searches for an open boundary." },
+    counterplay: ENEMIES.choir.trait, defeated: "For a moment, all three bells agree on silence.",
+  },
+  weaver: {
+    name: "Wire Weaver", title: "Every extra thread tightens the trap",
+    motive: "The old exchange's wiring automaton cannot distinguish a repair from a snare. It keeps adding tension until every connected line is ready to snap.",
+    pattern: ENEMIES.weaver.pattern.map(p => p.kind),
+    telegraphs: { sever: "A hooked limb plucks at a live thread.", jam: "Gold filaments close around unprotected hardware.", strike: "The web tightens. Six cables give it something to pull against." },
+    counterplay: ENEMIES.weaver.trait, defeated: "The threads slacken. Your connections are yours again.",
+  },
+  reaver: {
+    name: "Grave Reaver", title: "A failing heart strikes twice as hard",
+    motive: "Built to dismantle dead reactors, it now hears every weak signal as permission to begin. Its own heart is the last machine it will ever take apart.",
+    pattern: ENEMIES.reaver.pattern.map(p => p.kind),
+    telegraphs: { breach: "The red heart tolls beneath its ribs.", strike: "Both scythes rise. The dying light makes them faster.", corrupt: "Ash from a thousand dismantled relays falls to the ground." },
+    counterplay: ENEMIES.reaver.trait, defeated: "The scythes lower. Its last task is finally over.",
+  },
+  regent: {
+    name: "The Iron Regent", title: "Keeper of the copper gates",
+    motive: "When the ring broke, the gatekeeper sealed the outer relays behind its own armor. It will only open for a network resilient enough to survive the road beyond.",
+    pattern: ENEMIES.regent.pattern.map(p => p.kind),
+    telegraphs: { breach: "The crown burns green. The gate issues its challenge.", sever: "An iron gauntlet closes on the strongest line.", strike: "The Regent draws back its great armored hand.", corrupt: "Centuries of tarnish spill from the opened plates." },
+    counterplay: ENEMIES.regent.trait, defeated: "The copper gates open. Beyond them, glass bells are ringing.",
+  },
+  cantor: {
+    name: "The Hollow Choir", title: "The silence behind every voice",
+    motive: "The cathedral gathered every voice the Blackout left unanswered. Its keeper cannot bear to let even one escape, so every new connection becomes another sealed bell.",
+    pattern: ENEMIES.cantor.pattern.map(p => p.kind),
+    telegraphs: { corrupt: "A ring of masks begins a new refrain.", jam: "One porcelain face turns toward your living route.", breach: "The great bell swings. The whole cathedral answers." },
+    counterplay: ENEMIES.cantor.trait, defeated: "The masks open their mouths. This time, the voices leave.",
+  },
   prophet: {
     name: "Rust Prophet", title: "The ground remembers every failure",
     motive: "Once a maintenance beacon, it now broadcasts the corrosion it was built to prevent. Every answered signal spreads another bloom of rust.",

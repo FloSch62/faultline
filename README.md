@@ -30,11 +30,11 @@ npx playwright install chromium
 npm run test:e2e    # Actual browser gameplay, desktop layout and audio playback
 ```
 
-Playing requires no API keys, GPU music model, Containerlab daemon, or external asset service. All artwork, fonts and playable music are bundled. Hardware-accelerated WebGL is recommended. Desktop is the primary target; this pass was checked at 1366×768, 1440×900 and 1920×1080.
+Playing requires no API keys, GPU music model, Containerlab daemon, or external asset service. All artwork, fonts and playable music are bundled. Hardware-accelerated WebGL is recommended. Desktop is the primary target. The game defaults to 110% interface scale while browser zoom stays at 100%; compact windows scroll instead of cropping essential controls.
 
 ## Inside the alpha
 
-- One complete seven-sector act with a branching route, recovered messages, eight distinct hostiles, elite rewards, sanctuaries and a two-phase Blackout Core.
+- Three seven-sector stages with distinct route maps, 16 hostiles, elite rewards and sanctuaries. The Iron Regent, Hollow Choir and Blackout Core guard the stage exits, with cinematic introductions and enraged second phases.
 - Three distinct starter decks: the Architect builds efficient routes, the Warden absorbs mistakes, and the Ghost trades protection for card flow and bursts.
 - **39 cards and nine persistent relics.** Common through legendary rewards support redundant networks, fortified circuits, persistent zone fields and burst turns. Powerful effects exhaust until the next encounter.
 - Router placement matters. Independent north/south circuits grant shield; moving installed hardware costs energy. A Wraith hunts your longest exposed cable; a Null Storm threatens a visible band.
@@ -43,11 +43,11 @@ Playing requires no API keys, GPU music model, Containerlab daemon, or external 
 - Local autosave, continuation, a shared UTC daily seed and local run records. Existing version-2 saves retain their progress and receive defaults for the new combat resources.
 - Distinct painted player and enemy frames. Player integrity, shield, damage, burst and every carried relic stay together; enemy health and next intent live opposite. Card rules have reserved space, with a scrollable hand and arrow controls for more than six cards.
 - Four field cards: Resonance, Aegis, Purge and Null. Allied fields last three transmissions; enemy corrosion and suppression last two. Cleanse a hostile band or relocate your hardware, with a destination and damage/shield forecast before dropping. Field actions have sound and table effects.
-- Rust Prophet, Prism Widow and Ferric Colossus join the hostiles with corrosion, suppression and armor that rewards independent routes. New expeditions include Resonance Field and Purge Field.
-- Expanded painted artwork, a sanctuary, the Copper Market salvage exchange, and **six original instrumental tracks**, including dedicated music for sanctuary, salvage and elite encounters.
+- Six additional roaming enemies: Coil Serpent, Ash Moth, Null Marshal, Glass Choir, Wire Weaver and Grave Reaver. Several hostiles combine device attacks and zone effects. Every threat is forecast, and new hostile fields activate next turn. New expeditions include Resonance Field and Purge Field.
+- Expanded painted artwork, a sanctuary, the Copper Market salvage exchange, and **nine original instrumental tracks**, including dedicated music for sanctuary, salvage and elite encounters. Four battle tracks rotate without immediate repeats; card plays and turns preserve the current song.
 - A Containerlab topology exporter. Combat is a browser simulation; exported labs need suitable images and real device configuration before they can route traffic.
 
-Read the [complete implemented game design](docs/game-design.md), [story and world](docs/narrative.md), and [current fieldcraft balance probe](docs/balance-fields.json). Simulated win rates are regression probes; human playtesting remains necessary to tune difficulty and enjoyment.
+Read the [complete implemented game design](docs/game-design.md), [story and world](docs/narrative.md), and [current three-stage balance probe](docs/balance-expedition.json). Simulated win rates are regression probes; human playtesting remains necessary to tune difficulty and enjoyment.
 
 ### Discover the signature cards
 
@@ -91,8 +91,8 @@ Fields belong to the ground: moving hardware changes which effects apply immedia
 - `src/story.ts` — chapters, enemy motivations, sanctuary discoveries and endings.
 - `src/main.ts` — input, view transitions, targeting, undo and autosave.
 - `src/audio.ts` — music playback, crossfades and synthesized interaction effects.
-- `public/art/` — finished game artwork; [original art direction](docs/art-prompts.md) and [fieldcraft artwork prompts](docs/art-polish-prompts.md).
-- `public/audio/` — the six final instrumental Ogg masters.
+- `public/art/` — finished game artwork; [original art direction](docs/art-prompts.md) and [fieldcraft artwork prompts](docs/art-polish-prompts.md), and [expedition artwork prompts](docs/art-expedition-prompts.md).
+- `public/audio/` — the nine final instrumental Ogg masters.
 - `soundtrack/` — prompts, original scores, generation metadata, provenance and licenses. Large production recordings and intermediate arrays are generated locally and ignored by Git.
 - [Soundtrack production](soundtrack/README.md) — exact model versions and reproduction steps.
 - [Third-party notices](THIRD_PARTY_NOTICES.md).
@@ -118,4 +118,4 @@ Artwork was created with OpenAI image generation. The instrumental score was gen
 
 ![Battle layout with active fields](docs/screenshots/battle.png)
 
-The presentation fixture above displays all nine relics to exercise the crowded layout. [View the Copper Market](docs/screenshots/market.png). To reproduce the visual review against the dev server: `FAULTLINE_ORIGIN=http://127.0.0.1:5174 node scripts/capture-polish.mjs`.
+The presentation fixture above displays all nine relics to exercise the crowded layout. [View the Copper Market](docs/screenshots/market.png). The [validation notes](docs/polish-validation.md) record the tested sizes and balance scenarios. To reproduce the layout audit against the dev server: `FAULTLINE_ORIGIN=http://127.0.0.1:5174 node --experimental-strip-types scripts/audit-layout.mjs`.

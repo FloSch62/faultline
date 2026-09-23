@@ -59,6 +59,33 @@
       "channels": 2,
       "bytes": 2649025,
       "sha256": "04307bea69197e5f3c9a2d87344631c8a1c8c8e6300557115952e45afb472c44"
+    },
+    {
+      "file": "public/audio/copperlight-pursuit-instrumental.ogg",
+      "scene": "Battle rotation",
+      "duration_seconds": 100.6,
+      "sample_rate": 48000,
+      "channels": 2,
+      "bytes": 2011944,
+      "sha256": "3a6778026a35d5bdf8c35f5eae1752194a8edcbf926c7fed2cbe070a107ce74d"
+    },
+    {
+      "file": "public/audio/ghosts-in-the-relay-instrumental.ogg",
+      "scene": "Battle rotation",
+      "duration_seconds": 100.0,
+      "sample_rate": 48000,
+      "channels": 2,
+      "bytes": 1760240,
+      "sha256": "93a60dc476e36c3f4066349e60d77bd2fd171a59ad53e5f485e914cee4e4634e"
+    },
+    {
+      "file": "public/audio/redline-protocol-instrumental.ogg",
+      "scene": "Battle rotation",
+      "duration_seconds": 91.0,
+      "sample_rate": 48000,
+      "channels": 2,
+      "bytes": 1829394,
+      "sha256": "66406b442895b0881eee99fe9e71ce4182cac8a0c69583c45e16cd32088f57ae"
     }
   ]
 }

@@ -100,6 +100,8 @@ export interface Enemy {
 export interface RunState {
   seed: number;
   rng: number;
+  stage: number;
+  bossIntroSeen: boolean;
   phase: Phase;
   map: MapRoom[];
   currentRoom: string | null;

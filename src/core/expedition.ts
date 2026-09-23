@@ -1,5 +1,6 @@
 import { CARDS, RELICS } from "./cards.ts";
 import { createRun } from "./run.ts";
+import { ENEMIES } from "./enemies.ts";
 import type { RunState, RelicId, CardId } from "./types.ts";
 
 export type Archetype = "architect" | "warden" | "ghost";
@@ -31,7 +32,7 @@ export const ARCHETYPES: Record<
     story:
       "You have watched a thousand firewalls fail. This one holds. This time, you are the boundary.",
     relic: "shield-array",
-    integrity: 16,
+    integrity: 15,
     art: "shield",
     color: "#dfb87a",
   },
@@ -93,7 +94,7 @@ export function newExpedition(
   if (archetype === "warden") {
     replace("router", "hardened-router");
     replace("firewall", "bastion");
-    replace("surge", "barrier");
+    replace("surge", "guard");
   }
   run.phase = "map";
   return {
@@ -144,6 +145,12 @@ export function parseExpedition(value: string | null): Expedition | null {
       r.floor > 7
     )
       return null;
+    // Legacy one-stage expeditions resume in their final stage, preserving the
+    // promised Core battle and completed outcomes instead of extending the save.
+    r.stage ??= 2;
+    if (!Number.isInteger(r.stage) || r.stage < 0 || r.stage > 2) return null;
+    r.bossIntroSeen ??= true;
+    if (typeof r.bossIntroSeen !== "boolean") return null;
     // Alpha adds transient combat resources without invalidating version-2 saves.
     r.exhaustPile ??= [];
     r.block ??= 0;
@@ -225,9 +232,7 @@ export function parseExpedition(value: string | null): Expedition | null {
     if (
       r.phase === "battle" &&
       (!r.enemy ||
-        !["leech", "wraith", "storm", "sentinel", "core", "prophet", "widow", "colossus"].includes(
-          r.enemy.id,
-        ) ||
+        !Object.hasOwn(ENEMIES, r.enemy.id) ||
         ![r.enemy.hp, r.enemy.maxHp, r.enemy.turn].every(Number.isFinite))
     )
       return null;

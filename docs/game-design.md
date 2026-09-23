@@ -6,19 +6,17 @@ This document describes the implemented alpha rules. It is also the balance refe
 
 ## The expedition
 
-One expedition is seven sectors long. Choose one reachable room in each sector; the next room must be in the same or an adjacent lane. The final room is always the Blackout Core.
+One expedition crosses **three stages of seven sectors each**. Choose one reachable room in each sector; the next room must be in the same or an adjacent lane. Each stage has its own route chart, encounter pool, chapter names and final guardian.
 
-| Sector | Left / center / right             |
-| ------ | --------------------------------- |
-| 1      | Battle / battle / battle          |
-| 2      | Battle / cache / battle           |
-| 3      | Maintenance / battle / cache      |
-| 4      | Elite / battle / elite            |
-| 5      | Battle / cache / battle           |
-| 6      | Maintenance / elite / maintenance |
-| 7      | Blackout Core                     |
+| Stage | Region | Final guardian | Guardian health |
+| --- | --- | --- | ---: |
+| I | The Copper Reach | The Iron Regent | 56 |
+| II | The Glass Cathedral | The Hollow Choir | 80 |
+| III | The Blackout Heart | Blackout Core | 110 |
 
-A victory or cache offers three different cards. Take one or skip; taking everything can dilute a useful deck. An elite additionally offers three unowned relics; take one. Maintenance grants one service: restore up to four integrity, choose a relic, or remove one deck card. Removal preserves at least ten cards, the last basic Core Router and the last two Optic Fibers. Earned rare or legendary cards may be removed normally.
+All charts offer early salvage and sanctuary choices, optional elites in sector four, a final sanctuary or elite choice in sector six, and their guardian in sector seven. Their exact lane arrangements live in `src/core/map.ts`. The first two guardians award a card and a relic, restore up to six integrity, then open a fresh stage map. The final Core awards a card before the victory ending. A guardian's introduction is shown once per encounter; dismissing it is saved.
+
+A victory or cache offers three different cards. Take one or skip; taking everything can dilute a useful deck. An elite or intermediate guardian additionally offers three unowned relics; take one. Maintenance grants one service: restore up to four integrity, choose a relic, or remove one deck card. Removal preserves at least ten cards, the last basic Core Router and the last two Optic Fibers. Earned rare or legendary cards may be removed normally.
 
 Integrity persists between rooms. Topology, faults, upgrades, protection, block, energy, exhaust and combat piles reset for every encounter. The deck and installed relics persist. Loss at zero integrity ends the expedition. Defeating the final boss and finishing its reward ends it in victory.
 
@@ -27,7 +25,7 @@ Integrity persists between rooms. Topology, faults, upgrades, protection, block,
 | Archetype | Integrity | Starting relic | Deck variation                                                                                 | Intended learning                                            |
 | --------- | --------: | -------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | Architect |        14 | Hot Swap       | One Fiber becomes Duplex; Switch becomes Relay. 19 cards.                                      | Build flexible infrastructure with the free first Fiber.     |
-| Warden    |        16 | Shield Array   | One Router becomes Hardened Router; Firewall becomes Bastion; Surge becomes Barrier. 19 cards. | Read incoming attacks and build a lasting firewall boundary. |
+| Warden    |        15 | Shield Array   | One Router becomes Hardened Router; Firewall becomes Bastion; Surge becomes an extra Packet Guard. 19 cards. | Read incoming attacks and build a lasting firewall boundary. |
 | Ghost     |        12 | Deep Cache     | Two Fibers become Crosslinks; Firewall becomes Pulse; one Patch becomes Deep Scan. 19 cards.   | Convert draw and limited burst into a quick decisive route.  |
 
 The standard deck is three Core Routers, one Edge Switch, one Trust Gate, six Optic Fibers, one Hot Patch, one Purge Field, one Faraday Shell, one Power Surge, one Packet Guard, one Resonance Field, one Startup Config, and one Clab Inspect.
@@ -137,7 +135,7 @@ If an ordinary untargeted jam hits an empty device grid, or a sever hits a grid 
 
 ## Enemies and pressure
 
-Normal health is `10 + 3 × zero-based sector`; elite health is `30 + 2 × zero-based sector`; the Blackout Core has **80 health**. A normal first encounter can be defeated by two uninterrupted basic five-damage transmissions. Enemy patterns repeat in order.
+Normal health is `10 + 3 × zero-based sector + 8 × zero-based stage`; elite health is `30 + 2 × zero-based sector + 10 × zero-based stage`. The three guardians have 56, 80 and 110 health. A normal first encounter can be defeated by two uninterrupted basic five-damage transmissions. Enemy patterns repeat in order.
 
 | Enemy         | Repeating intent pattern          | Distinct rule and counterplay                                                                                                                                                                          |
 | ------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -148,11 +146,21 @@ Normal health is `10 + 3 × zero-based sector`; elite health is `30 + 2 × zero-
 | Rust Prophet | Corrupt → strike 2 → breach 3 | Corrodes the busiest occupied band for two turns. Occupied corrosion adds 2 incoming damage per band. Cleanse it or move hardware. |
 | Prism Widow | Corrupt → sever → strike 3 | Suppresses the busiest band in the chosen live route for two turns. That band subtracts 3 route damage; cleanse or route elsewhere. |
 | Ferric Colossus | Strike 3 → corrupt → breach 4 | Absorbs 3 packet damage until two independent routes are live, and lays corrosion in the busiest occupied band. |
-| Blackout Core | Sever → breach 4 → jam → strike 4 | At half health, enrages for +3 strike/breach and 2 chip damage alongside jam/sever. Redundancy, separation, burst timing and defense all matter.                                                       |
+| Coil Serpent | Strike 2 → sever → corrupt | Strikes gain +2 unless two independent router routes are live. Leaves corrosion. |
+| Ash Moth | Corrupt → jam + suppression → strike 2 | Its jam and secondary suppression share the announced band. Band cycles North → Center → South. |
+| Null Marshal | Breach 3 → jam → strike 3 | Absorbs 3 packet damage unless the scored route includes a firewall. |
+| Glass Choir | Corrupt → strike 2 → corrupt → breach 3 | Alternates suppression and corrosion on its two field turns. |
+| Wire Weaver | Sever + suppression → jam → strike 3 | Six or more cables add +2 to strikes. Protect key cables and keep a compact route. |
+| Grave Reaver | Breach 3 + corrosion → strike 3 → corrupt | At half health, strikes and breaches gain +2. |
+| Iron Regent | Breach 4 → sever + corrosion → strike 3 → corrupt | Absorbs 3 damage without independent routes. At half health: +2 strikes/breaches; +1 alongside faults/fields. |
+| Hollow Choir | Corrupt → jam + suppression → corrupt → breach 4 + corrosion | Absorbs 2 damage without a routed firewall. Alternates primary field types. At half health: +2 breaches; +1 alongside jams/fields. |
+| Blackout Core | Sever + corrosion → breach 4 → jam + suppression → strike 4 | At half health, enrages for +3 strike/breach and 2 chip damage alongside jam/sever. Redundancy, separation, burst timing and defense all matter.                                                       |
 
-Pressure is `floor(enemy actions already taken / 3)`. Add it to strike and breach damage. The first three actions have no pressure bonus; later cycles grow progressively dangerous.
+Pressure is `floor(enemy actions already taken / 3)`. Add it to strike and breach damage, together with +1 in stage II or +2 in stage III. The first three actions have no pressure bonus; later cycles grow progressively dangerous.
 
 At half health or below, the Core is enraged. Add three more to strikes and breaches; its sever and jam actions also deal two integrity damage. Enrage is visible in the next intent after the threshold is crossed. All chip damage is blockable. Its disruption still targets only eligible unprotected devices/cables.
+
+Some intents combine a device/cable attack with a field. Both are advertised together, use the same forecast as resolution, and are cancelled by a lethal player transmission. Newly installed hostile fields start affecting the following player turn, leaving an opportunity to cleanse, defend, reroute or relocate before they deal damage. Crossing an enrage threshold also strengthens the next intent; it does not secretly change the already forecast retaliation.
 
 Disruption targeting is deterministic and visible. Wraith uses longest eligible cable, with cable ID as a stable distance tie-break. Storm filters eligible devices to its announced band. Other disruptions prefer an eligible device or cable on the best current signal route, then the first eligible table element. Card plays and paid relocation can change the forecast. End Turn resolves the displayed target and incoming damage exactly.
 
@@ -242,7 +250,7 @@ Warden deliberately has the most forgiving integrity budget. Choosing elites sho
 
 ## Presentation, learning and feedback contract
 
-The alpha interface exposes signal damage, incoming damage, available block, energy, pile counts, enemy intent and its exact target. Damage and defense details list their contributing terms. The reference guide distinguishes live-route bonuses, this-turn block, jam protection and exhaustion. Collection inspection exposes rarity, cost, target and effect before a card is chosen.
+The interface defaults to 110% scale with the browser at 100%. Responsive layouts use the scaled game viewport. Short windows scroll vertically, and large hands scroll horizontally with explicit arrow controls. The player frame groups integrity, shield, damage, burst, Details, Devices, Undo and all carried perks; the distinct enemy frame holds health and the full combined intent. It exposes signal damage, incoming damage, available block, energy, pile counts, enemy intent and its exact target. Damage and defense details list their contributing terms. The reference guide distinguishes live-route bonuses, this-turn block, jam protection and exhaustion. Collection inspection exposes rarity, cost, target and effect before a card is chosen.
 
 The optional seven-step tutorial is an isolated practice encounter. It teaches a Core Router plus two Fibers for five damage, then four block from Packet Guard against a two-damage strike before the second transmission. Players can undo, exit, replay, skip or disable it; practice never saves an expedition or records a score. The full rules reference remains available. Invalid actions explain the needed target without spending resources. Reward skipping, deck inspection, maintenance removal, keyboard targeting, reduced motion and volume settings serve repeated runs as well as first play.
 
@@ -250,11 +258,11 @@ Motion should explain causality: installation, a cable becoming live, a packet t
 
 ## Save compatibility and deterministic behavior
 
-Storage remains expedition version 2. Older saves receive an empty zone-effect list; existing decks are preserved. Field kinds, bands, durations and unique allied/hostile slots are validated on load. Existing runs receive empty exhausted piles and zero temporary block, boost, reserve energy and played-card counts. Cards already present in an older run, including signature cards, remain intact. Loading an old run never inserts missing Containerlab or Clabernetes cards; this prevents save-version flags from bypassing rarity. Oversized legacy hands are reduced to ten by moving overflow to discard. Invalid card IDs, bad topology references and invalid numeric combat values are rejected. Saves preserve RNG, topology, piles and faults so reload cannot reroll an enemy action.
+Storage remains expedition version 2. Saves predating stages resume as a final-stage expedition, preserving their existing map and promised Blackout Core ending. New runs begin in stage I. Stage index and guardian-introduction dismissal are validated and persisted. Older saves receive an empty zone-effect list; existing decks are preserved. Field kinds, bands, durations and unique allied/hostile slots are validated on load. Existing runs receive empty exhausted piles and zero temporary block, boost, reserve energy and played-card counts. Cards already present in an older run, including signature cards, remain intact. Loading an old run never inserts missing Containerlab or Clabernetes cards; this prevents save-version flags from bypassing rarity. Oversized legacy hands are reduced to ten by moving overflow to discard. Invalid card IDs, bad topology references and invalid numeric combat values are rejected. Saves preserve RNG, topology, piles and faults so reload cannot reroll an enemy action.
 
 Daily seeds derive from the UTC date. Player choices still change subsequent RNG consumption and rewards; identical seed, archetype and decisions repeat the expedition. There is no remote leaderboard or multiplayer authority in this alpha.
 
-## Measured alpha balance
+## Historical one-stage alpha balance
 
 Run `node --experimental-strip-types scripts/balance.ts 500` for the safe-route probe, add `--elite` for the risky route, or `--build=mesh`, `--build=fortress`, `--build=burst` for alternative card/relic priorities. Seeds are distributed across the 32-bit space rather than using correlated tiny initial xorshift states. Full results are stored in `docs/balance-alpha.json`.
 
@@ -272,7 +280,7 @@ Careless manual-route play won zero runs in every scenario. On elite routes, Arc
 
 Spatial defense is not automatically optimal: on the safe route the aggressive Architect policy won 81%, while the adaptive policy won 80%. The greedy adaptive policy sometimes spends movement energy when a faster kill would have been better. This is a useful regression signal about opportunity cost, not proof that players should ignore positioning. Mesh and burst priorities remain viable without starting with either signature orchestration card.
 
-The harness does not search full tactical lines, guarantee optimal switch/firewall placement, model learning or measure enjoyment. It favors simple direct routes and only greedily values relocation, so it is not an optimal spatial solver; it also knows the rules perfectly. Human sessions should measure first-run comprehension, avoidable versus unavoidable damage, reward skips, route diversity, boss duration and whether the same cards dominate choices. One act, eight enemy types, 39 cards and three archetypes are the complete alpha scope; more acts, metaprogression and competitive balance are future work, not hidden systems.
+The harness does not search full tactical lines, guarantee optimal switch/firewall placement, model learning or measure enjoyment. It favors simple direct routes and only greedily values relocation, so it is not an optimal spatial solver; it also knows the rules perfectly. Human sessions should measure first-run comprehension, avoidable versus unavoidable damage, reward skips, route diversity, boss duration and whether the same cards dominate choices. This historical probe covered one stage and eight enemy types. The current expedition has three stages and 16 hostiles; its results are recorded separately below.
 
 The core tests verify formula/resolution agreement, forecast purity, best-route selection, bounded draws, exhaustion, temporary effects, protected disruptions, boss pressure, relic timing, card targets, repair, rewards, removal and version-2 migration, rare/legendary availability, paid relocation, spatial independence, all enemy traits, signed armor/healing forecasts, and Wireshark capture scope, distinct roles, bounded draw, exhaustion and atomic failure, field expiration, hostile targeting, cleansing, relocation out of corruption, and old-save field migration. Browser acceptance covers the integrated flows separately.
 
@@ -280,3 +288,20 @@ The core tests verify formula/resolution agreement, forecast purity, best-route 
 ## Fieldcraft balance probe
 
 The additional seeded probe is in [balance-fields.json](balance-fields.json): 150 seeds for each of three archetypes and three policies (1,350 runs). The adaptive and aggressive bots now evaluate field cards using the shared forecast. This updates the encounter/card mix and includes all eight enemy types; the earlier alpha report remains a historical baseline. The harness still does not model human comprehension or every possible tactical line.
+
+
+## Current three-stage balance
+
+The current [expedition probe](balance-expedition.json) covers **6,300 runs**: 300 seeds per archetype/policy on the safe route, and 100 per archetype/policy for elite, mesh, fortress and burst scenarios. All 16 enemies and three guardians participate through their stage pools. New compound intents, stage attack bonuses, guardian health, and the Warden starting at 15 integrity with an extra Packet Guard are included. Existing saves retain their existing health and decks.
+
+| Adaptive policy / route | Architect wins | Warden wins | Ghost wins |
+| --- | ---: | ---: | ---: |
+| Balanced Safe | 64% | 86% | 65% |
+| Balanced Elite | 45% | 79% | 41% |
+| Mesh Safe | 45% | 74% | 45% |
+| Fortress Safe | 75% | 94% | 82% |
+| Burst Safe | 51% | 82% | 47% |
+
+Careless play wins zero runs in every scenario. On the safe route, aggressive play wins 25% / 58% / 23% for Architect / Warden / Ghost, compared with 64% / 86% / 65% when defending adaptively. Elite routes are now more dangerous than the safe route in this probe. Warden remains the forgiving class; fortress priorities are the strongest tested route and an explicit human-playtest watchpoint. These samples support a meaningful benefit from preparation and counterplay, not equal mastery curves or guaranteed human win rates.
+
+New fields never deal surprise damage during the action that creates them. Enrage applies to the following forecast after crossing half health. First encounters retain a guaranteed manual route and deterministic, visible targets; finishing blows cancel the entire retaliation, including secondary fields.

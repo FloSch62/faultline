@@ -57,7 +57,7 @@ test("a new expedition has working loadouts, map, settings, and isolated saves",
     (key) => JSON.parse(localStorage.getItem(key)!),
     key,
   );
-  expect(saved.run.integrity).toBe(16);
+  expect(saved.run.integrity).toBe(15);
   expect(saved.run.relics).toEqual(["shield-array"]);
   await page.getByRole("button", { name: "Open settings" }).click();
   await page.getByRole("slider", { name: "Music volume" }).fill("24");
@@ -68,7 +68,7 @@ test("a new expedition has working loadouts, map, settings, and isolated saves",
   ).toBeVisible();
   await page.reload();
   await page.getByRole("button", { name: /Continue expedition/ }).click();
-  await expect(page.locator(".integrity-stat")).toContainText("16");
+  await expect(page.locator(".integrity-stat")).toContainText("15");
   expect(
     await page.evaluate(() => localStorage.getItem("faultline-run-v1")),
   ).toBeNull();
@@ -216,14 +216,14 @@ test("painted desktop controls stay clear of the hand at laptop and full HD size
     await page.setViewportSize(viewport);
     const plaque = await page.locator(".battle-left").boundingBox();
     const note = await page.locator(".tutorial-callout").boundingBox();
-    if (note) {
-      expect(note.y).toBeGreaterThan(plaque!.y);
-      expect(note.y + note.height).toBeLessThanOrEqual(plaque!.y + plaque!.height);
-    }
     const transmit = page.getByRole("button", { name: /^Transmit/ });
     await expect(transmit).toBeInViewport();
     const a = await transmit.boundingBox();
     const b = await page.locator("#hand-zone").boundingBox();
+    if (note) {
+      expect(note.x).toBeGreaterThan(plaque!.x + plaque!.width);
+      expect(note.y + note.height).toBeLessThan(b!.y - 12);
+    }
     expect(a!.x).toBeGreaterThan(b!.x + b!.width);
     for (const side of [".battle-left", ".battle-right"]) {
       await expect(page.locator(side)).toBeInViewport();

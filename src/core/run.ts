@@ -8,9 +8,10 @@ import {
   roleInPath,
 } from "./graph.ts";
 import { createMap, reachableRooms } from "./map.ts";
+import { ENEMIES } from "./enemies.ts";
+import { STAGES } from "./stages.ts";
 import type {
   CardId,
-  Enemy,
   MapRoom,
   NetworkNode,
   RelicId,
@@ -37,47 +38,13 @@ export interface TurnResult {
 }
 export interface Intent {
   kind: "strike" | "sever" | "jam" | "breach" | "corrupt";
+  field?: "corrosion" | "suppression";
   label: string;
   amount: number;
   pressure: number;
   target?: string;
 }
 
-const ENEMIES: Record<string, Omit<Enemy, "hp" | "maxHp" | "turn">> = {
-  prophet: { id: "prophet", name: "RUST PROPHET", title: "Corrupts the ground beneath you", color: 0xe49b72 },
-  widow: { id: "widow", name: "PRISM WIDOW", title: "Silences your strongest circuit", color: 0xbba0e8 },
-  colossus: { id: "colossus", name: "FERRIC COLOSSUS", title: "An iron wall against a single route", color: 0xd9b079 },
-  leech: {
-    id: "leech",
-    name: "PACKET LEECH",
-    title: "Feeds on lost traffic",
-    color: 0x6ee4d4,
-  },
-  wraith: {
-    id: "wraith",
-    name: "CABLE WRAITH",
-    title: "Cuts exposed links",
-    color: 0xab8cff,
-  },
-  storm: {
-    id: "storm",
-    name: "NULL STORM",
-    title: "Disrupts active hardware",
-    color: 0x87b5ff,
-  },
-  sentinel: {
-    id: "sentinel",
-    name: "GATE SENTINEL",
-    title: "Tests your trust boundary",
-    color: 0xffad79,
-  },
-  core: {
-    id: "core",
-    name: "BLACKOUT CORE",
-    title: "The source of the signal collapse",
-    color: 0xff777e,
-  },
-};
 
 export function random(run: RunState): number {
   let x = run.rng || 0x6d2b79f5;
@@ -114,8 +81,9 @@ function guaranteedDraw(run: RunState, card: CardId) {
   if (index !== -1) run.hand.push(run.drawPile.splice(index, 1)[0]);
 }
 function cardRewards(run: RunState): CardId[] {
-  const elite =
-    run.map.find((room) => room.id === run.currentRoom)?.type === "elite";
+  const elite = ["elite", "boss"].includes(
+    run.map.find((room) => room.id === run.currentRoom)?.type ?? "",
+  );
   const options: CardId[] = [];
   for (let i = 0; i < 3; i++) {
     const roll = random(run);
@@ -151,6 +119,8 @@ export function createRun(seed = Date.now() >>> 0): RunState {
   return {
     seed,
     rng: seed || 1,
+    stage: 0,
+    bossIntroSeen: true,
     phase: "title",
     map: createMap(),
     currentRoom: null,
@@ -205,28 +175,25 @@ export function chooseRoom(run: RunState, roomId: string): ActionResult {
     ok: true,
     message:
       room.type === "boss"
-        ? "BLACKOUT CORE detected."
+        ? `${run.enemy!.name} detected.`
         : `Entered ${room.type.toUpperCase()} sector.`,
   };
 }
 
 function beginBattle(run: RunState, room: MapRoom) {
-  const enemyId =
-    room.type === "boss"
-      ? "core"
-      : room.type === "elite"
-        ? room.lane === 0
-          ? "sentinel"
-          : ["storm", "colossus", "prophet"][Math.floor(random(run) * 3)]
-        : ["leech", "wraith", "storm", "prophet", "widow", "colossus"][Math.floor(random(run) * 6)];
+  const stage = STAGES[run.stage];
+  const pool = room.type === "elite" ? stage.elites : stage.encounters;
+  const enemyId = room.type === "boss" ? stage.boss : pool[Math.floor(random(run) * pool.length)];
   const template = ENEMIES[enemyId];
   const hp =
     room.type === "boss"
-      ? 80
+      ? stage.bossHp
       : room.type === "elite"
-        ? 30 + room.floor * 2
-        : 10 + room.floor * 3;
-  run.enemy = { ...template, hp, maxHp: hp, turn: 0 };
+        ? 30 + room.floor * 2 + run.stage * 10
+        : 10 + room.floor * 3 + run.stage * 8;
+  const { id, name, title, color } = template;
+  run.enemy = { id, name, title, color, hp, maxHp: hp, turn: 0 };
+  run.bossIntroSeen = room.type !== "boss";
   run.phase = "battle";
   run.turn = 1;
   run.energy = 5 + Number(run.relics.includes("cold-start"));
@@ -254,66 +221,23 @@ function beginBattle(run: RunState, room: MapRoom) {
 
 export function intentFor(run: RunState): Intent | null {
   if (!run.enemy) return null;
-  const patterns: Record<string, Omit<Intent, "pressure">[]> = {
-    prophet: [
-      { kind: "corrupt", label: "SEED CORROSION", amount: 0 },
-      { kind: "strike", label: "RUST STRIKE", amount: 2 },
-      { kind: "breach", label: "OXIDE BREACH", amount: 3 },
-    ],
-    widow: [
-      { kind: "corrupt", label: "WEAVE NULL FIELD", amount: 0 },
-      { kind: "sever", label: "CUT A CABLE", amount: 0 },
-      { kind: "strike", label: "PRISM STRIKE", amount: 3 },
-    ],
-    colossus: [
-      { kind: "strike", label: "IRON FIST", amount: 3 },
-      { kind: "corrupt", label: "SCORCH THE GROUND", amount: 0 },
-      { kind: "breach", label: "FURNACE BREACH", amount: 4 },
-    ],
-    leech: [
-      { kind: "strike", label: "INTEGRITY STRIKE", amount: 2 },
-      { kind: "sever", label: "CUT A CABLE", amount: 0 },
-      { kind: "breach", label: "BREACH", amount: 3 },
-    ],
-    wraith: [
-      { kind: "sever", label: "CUT A CABLE", amount: 0 },
-      { kind: "strike", label: "INTEGRITY STRIKE", amount: 3 },
-      { kind: "jam", label: "JAM A DEVICE", amount: 0 },
-    ],
-    storm: [
-      { kind: "jam", label: "JAM A DEVICE", amount: 0 },
-      { kind: "strike", label: "INTEGRITY STRIKE", amount: 2 },
-      { kind: "sever", label: "CUT A CABLE", amount: 0 },
-    ],
-    sentinel: [
-      { kind: "breach", label: "SECURITY BREACH", amount: 4 },
-      { kind: "sever", label: "CUT A CABLE", amount: 0 },
-      { kind: "strike", label: "INTEGRITY STRIKE", amount: 3 },
-    ],
-    core: [
-      { kind: "sever", label: "CUT A CABLE", amount: 0 },
-      { kind: "breach", label: "SECURITY BREACH", amount: 4 },
-      { kind: "jam", label: "JAM A DEVICE", amount: 0 },
-      { kind: "strike", label: "INTEGRITY STRIKE", amount: 4 },
-    ],
-  };
-  const pattern = patterns[run.enemy.id];
+  const definition = ENEMIES[run.enemy.id];
+  const pattern = definition.pattern;
   const base = pattern[run.enemy.turn % pattern.length];
   const pressure = Math.floor(run.enemy.turn / 3);
-  const enraged =
-    run.enemy.id === "core" && run.enemy.hp <= run.enemy.maxHp / 2;
+  const enraged = definition.enrages && run.enemy.hp <= run.enemy.maxHp / 2;
   const amount =
     base.amount +
     (base.kind === "strike" || base.kind === "breach"
-      ? pressure + (enraged ? 3 : 0)
+      ? pressure + run.stage + (enraged ? definition.enrages!.attacks : 0)
       : enraged
-        ? 2
+        ? definition.enrages!.faults
         : 0);
   return {
     ...base,
     amount,
     pressure,
-    label: `${enraged ? "ENRAGED · " : ""}${base.label}${pressure ? ` +${pressure} PRESSURE` : ""}`,
+    label: `${enraged ? "ENRAGED · " : ""}${base.label}${run.stage && ["strike", "breach"].includes(base.kind) ? ` +${run.stage} STAGE THREAT` : ""}${pressure ? ` +${pressure} PRESSURE` : ""}`,
   };
 }
 
@@ -788,8 +712,9 @@ function damageTerms(
     if (routedZones.has(field.zone) && ["resonance", "suppression"].includes(field.kind))
       terms.push({ label: `${field.zone.toUpperCase()} · ${FIELD_RULES[field.kind].name}`, amount: field.kind === "resonance" ? 3 : -3 });
   }
-  if (run.enemy?.id === "colossus" && !independent)
-    terms.push({ label: "Ferric armor · needs independent routes", amount: -3 });
+  const armor = run.enemy && ENEMIES[run.enemy.id].armor;
+  if (armor && !(armor.bypass === "independent" ? independent : nodes.some(node => node.role === "firewall")))
+    terms.push({ label: `${run.enemy!.name} armor · needs ${armor.bypass === "independent" ? "independent routes" : "a routed firewall"}`, amount: -armor.amount });
   if (nodes.some((node) => node.role === "firewall"))
     terms.push({ label: "Firewall routing", amount: 1 });
   if (nodes.some((node) => node.configured))
@@ -819,11 +744,6 @@ function damageTerms(
     terms.push({ label: "Packet Lens", amount: 1 });
   if (run.packetBoost)
     terms.push({ label: "Packet boost this turn", amount: run.packetBoost });
-  if (
-    run.enemy?.id === "sentinel" &&
-    !nodes.some((node) => node.role === "firewall")
-  )
-    terms.push({ label: "Sentinel plating · no routed firewall", amount: -2 });
   return terms;
 }
 const sumTerms = (terms: CombatTerm[]) =>
@@ -865,20 +785,6 @@ function separatedCircuits(run: RunState, candidates: string[][]): boolean {
     south = eligible.filter((route) => route.south);
   return north.some((a) => south.some((b) => (a.mask & b.mask) === 0));
 }
-const TRAITS: Record<string, string> = {
-  prophet: "Rust Prophet corrupts the busiest band for 2 turns. Hardware in that band adds 2 incoming damage. Cleanse the field or relocate to clear ground.",
-  widow: "Prism Widow suppresses a band on your live route for 2 turns: routes through it lose 3 damage. Cleanse it or reroute through another band.",
-  colossus: "Ferric Colossus absorbs 3 damage unless you have two independent routes. It also scorches occupied ground with 2-turn corrosion.",
-  leech:
-    "Packet Leech restores up to 3 health when your transmission deals no damage.",
-  wraith:
-    "Cable Wraith severs the longest unarmored cable. A target longer than 6 units also deals 1 damage.",
-  storm:
-    "Null Storm jams only its announced band. Keep critical hardware outside it or protect it from jams.",
-  sentinel:
-    "Gate Sentinel plating absorbs 2 packet damage unless the signal route includes a firewall.",
-  core: "Blackout Core enrages at half health: +3 strike/breach damage; jam and sever also deal 2 damage.",
-};
 /** Pure forecast. Resolution uses these exact values and the same fault target. */
 export function combatPreview(run: RunState): CombatPreview {
   const candidates = signalPaths(run);
@@ -897,17 +803,30 @@ export function combatPreview(run: RunState): CombatPreview {
       ? [{ label: intent.label, amount: intent.amount }]
       : [];
   let raw = intent?.amount ?? 0;
-  let hazardZone: Zone | null =
-    run.enemy?.id === "storm" && intent?.kind === "jam"
+  const definition = run.enemy ? ENEMIES[run.enemy.id] : null;
+  if (intent?.kind === "strike" && run.enemy?.id === "serpent" && !independent) {
+    raw += 2;
+    incomingTerms.push({ label: "Coil pressure · no independent routes", amount: 2 });
+  }
+  if (intent?.kind === "strike" && run.enemy?.id === "weaver" && run.topology.links.length >= 6) {
+    raw += 2;
+    incomingTerms.push({ label: "Tension trap · six or more cables", amount: 2 });
+  }
+  const jamZone: Zone | null =
+    definition?.jamBands && intent?.kind === "jam"
       ? (["north", "center", "south"] as Zone[])[
-          Math.floor(run.enemy.turn / 3) % 3
+          Math.floor(run.enemy!.turn / definition.pattern.length) % 3
         ]
       : null;
+  let hazardZone = jamZone;
   let zoneThreat: ZoneEffect | null = null;
-  if (intent?.kind === "corrupt") {
-    const eligible = run.topology.nodes.filter(node => !node.fixed && (run.enemy?.id !== "widow" || signalPath.includes(node.id)));
-    hazardZone = (["center", "north", "south"] as Zone[]).sort((a,b) => eligible.filter(node => zoneForNode(node) === b).length - eligible.filter(node => zoneForNode(node) === a).length)[0];
-    zoneThreat = { zone: hazardZone, kind: run.enemy?.id === "widow" ? "suppression" : "corrosion", turns: 2 };
+  if (intent?.kind === "corrupt" || intent?.field) {
+    const corruption = intent.field ?? (definition?.corruption === "alternating"
+      ? Math.floor(run.enemy!.turn / 2) % 2 ? "corrosion" : "suppression"
+      : definition?.corruption ?? "corrosion");
+    const eligible = run.topology.nodes.filter(node => !node.fixed && (corruption !== "suppression" || signalPath.includes(node.id)));
+    hazardZone = jamZone ?? (["center", "north", "south"] as Zone[]).sort((a,b) => eligible.filter(node => zoneForNode(node) === b).length - eligible.filter(node => zoneForNode(node) === a).length)[0];
+    zoneThreat = { zone: hazardZone, kind: corruption, turns: 2 };
   }
   for (const field of run.zoneEffects) {
     const occupied = run.topology.nodes.some(node => !node.fixed && zoneForNode(node) === field.zone);
@@ -959,12 +878,12 @@ export function combatPreview(run: RunState): CombatPreview {
       (node) =>
         !node.fixed &&
         !node.shielded &&
-        (!hazardZone || zoneForNode(node) === hazardZone),
+        (!jamZone || zoneForNode(node) === jamZone),
     );
     const target =
       eligible.find((node) => signalPath.includes(node.id)) ?? eligible[0];
     if (target) faultTarget = target.id;
-    else if (!hazardZone && !run.topology.nodes.some((node) => !node.fixed)) {
+    else if (!jamZone && !run.topology.nodes.some((node) => !node.fixed)) {
       raw++;
       incomingTerms.push({ label: "Exposed backbone · no devices", amount: 1 });
     }
@@ -999,7 +918,7 @@ export function combatPreview(run: RunState): CombatPreview {
         : 0,
     rawPacketDamage,
     incomingTerms: lethal ? [] : incomingTerms,
-    traitDescription: run.enemy ? TRAITS[run.enemy.id] : "",
+    traitDescription: run.enemy ? ENEMIES[run.enemy.id].trait : "",
     alternatePath: pair
       ? (candidates.find((path) =>
           path
@@ -1116,7 +1035,16 @@ function advanceRoom(run: RunState) {
   run.zoneEffects = [];
   run.faultNode = null;
   run.faultLink = null;
-  run.phase = run.floor >= 7 ? "won" : "map";
+  if (run.floor >= 7 && run.stage < STAGES.length - 1) {
+    run.stage++;
+    run.floor = 0;
+    run.map = createMap(run.stage);
+    run.lastRoom = null;
+    const restored = Math.min(6, run.maxIntegrity - run.integrity);
+    run.integrity += restored;
+    log(run, `${STAGES[run.stage - 1].name} restored. +${restored} integrity. Enter ${STAGES[run.stage].name}.`);
+    run.phase = "map";
+  } else run.phase = run.floor >= 7 ? "won" : "map";
 }
 
 export function chooseCardReward(
@@ -1133,7 +1061,7 @@ export function chooseCardReward(
   }
   run.cardRewards = [];
   const room = run.map.find((item) => item.id === run.currentRoom);
-  if (room?.type === "elite") {
+  if (room?.type === "elite" || (room?.type === "boss" && run.stage < STAGES.length - 1)) {
     run.relicRewards = relicRewards(run);
     run.phase = run.relicRewards.length ? "relic" : "map";
     if (!run.relicRewards.length) advanceRoom(run);

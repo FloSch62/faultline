@@ -20,14 +20,14 @@ test("each archetype has its promised starting resources and survives a save rou
     if (id === "warden")
       assert.ok(
         e.run.deck.includes("bastion") &&
-          e.run.deck.includes("barrier") &&
+          e.run.deck.includes("guard") && !e.run.deck.includes("barrier") &&
           e.run.deck.includes("hardened-router"),
       );
     if (id === "ghost")
       assert.ok(
         e.run.deck.includes("diagnostic") && e.run.deck.includes("pulse"),
       );
-    assert.equal(e.run.integrity, { architect: 14, warden: 16, ghost: 12 }[id]);
+    assert.equal(e.run.integrity, { architect: 14, warden: 15, ghost: 12 }[id]);
     assert.equal(chooseRoom(e.run, "0-1").ok, true);
     assert.ok(e.run.hand.includes("router"));
     assert.ok(e.run.hand.filter((c) => c === "fiber").length >= 2);

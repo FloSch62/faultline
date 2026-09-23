@@ -1,7 +1,8 @@
 import "./style.css";
 import "./alpha.css";
 import "./polish.css";
-import { Soundscape, TRACK_NAMES, type ScoreScene } from "./audio.ts";
+import { Soundscape, type ScoreScene } from "./audio.ts";
+import { ENEMIES } from "./core/enemies.ts";
 import { CARDS } from "./core/cards.ts";
 import {
   ARCHETYPES,
@@ -100,6 +101,11 @@ sound.update({});
 sound.onUnavailable = () => {
   $("#now-playing").textContent = "Music could not load";
 };
+function renderTrack() {
+  $("#now-playing").innerHTML = `<span class="music-bars"><i></i><i></i><i></i></span><span>${sound.trackTitle}<small>ORIGINAL SOUNDTRACK</small></span>`;
+  $("#now-playing").classList.toggle("muted", sound.settings.muted);
+}
+sound.onTrackChange = renderTrack;
 function save() {
   if (!expedition || practice) return;
   expedition.run = run;
@@ -121,7 +127,7 @@ function audioScene(): ScoreScene {
   if (view === "run" && run.phase === "reward" && run.map.find(room => room.id === run.currentRoom)?.type === "cache") return "shop";
   if (view === "run" && run.phase === "battle" && run.map.find(room => room.id === run.currentRoom)?.type === "elite") return "elite";
   return view === "run" && run.phase === "battle"
-    ? run.enemy?.id === "core"
+    ? run.enemy && ENEMIES[run.enemy.id].boss
       ? "boss"
       : "battle"
     : "explore";
@@ -159,6 +165,7 @@ function clearSelection() {
 function playable() {
   return view === "run" && run.phase === "battle" && !busy && !dialog.open;
 }
+function interfaceScale() { return Number.parseFloat(getComputedStyle($("#app")).zoom) || 1; }
 function render(rebuild = true) {
   const battle = view === "run" && run.phase === "battle";
   root.dataset.view = view === "run" ? run.phase : view;
@@ -212,7 +219,9 @@ function render(rebuild = true) {
   const signature = battle
     ? `${run.currentRoom}|${run.turn}|${run.energy}|${run.firstFiberPlayed}|${run.hand.join(",")}`
     : "";
-  if (signature !== handKey) {
+  // Leaving a battle must clear the DOM even when practice reset the cache key.
+  $("#hand-zone").hidden = !battle;
+  if (!battle || signature !== handKey) {
     const scroll = document.querySelector(".card-fan")?.scrollLeft ?? 0;
     $("#hand-zone").innerHTML = battle ? ui.handMarkup(run, selected) : "";
     document.querySelector(".card-fan")?.scrollTo({left:scroll});
@@ -231,10 +240,8 @@ function render(rebuild = true) {
   world?.setSelected(source ?? selectedNode);
   world?.setZoneTargeting(selected !== null && CARDS[run.hand[selected]]?.target === "zone");
   const scene = audioScene();
-  sound.setScene(scene);
-  $("#now-playing").innerHTML =
-    `<span class="music-bars"><i></i><i></i><i></i></span><span>${TRACK_NAMES[scene]}<small>ORIGINAL SOUNDTRACK</small></span>`;
-  $("#now-playing").classList.toggle("muted", sound.settings.muted);
+  sound.setScene(scene, `${run.seed}:${run.stage}:${run.currentRoom}:${practice ? "practice" : "expedition"}`);
+  renderTrack();
   if (
     expedition &&
     !practice &&
@@ -247,7 +254,7 @@ function render(rebuild = true) {
       archetype: expedition.archetype,
       won: run.phase === "won",
       score: run.score,
-      floor: run.floor,
+      floor: run.stage * 7 + run.floor,
       at: Date.now(),
     });
     records = records.slice(0, 30);
@@ -257,6 +264,14 @@ function render(rebuild = true) {
       /* Optional history. */
     }
     save();
+  }
+  if (battle && !practice && !run.bossIntroSeen && run.enemy && ENEMIES[run.enemy.id].boss && !dialog.open) {
+    modal = "boss-intro";
+    dialog.className = "boss-intro";
+    $("#dialog-content").innerHTML = ui.bossIntroMarkup(run);
+    hideTooltip();
+    dialog.showModal();
+    sound.effect("boss");
   }
 }
 function renderTargetDock() {
@@ -312,9 +327,9 @@ function openModal(type: string) {
     content.innerHTML = alpha.libraryMarkup(libraryRun, libraryMode);
   }
   else if (type === "credits")
-    content.innerHTML = `<span class="eyebrow">THE PEOPLE & TOOLS BEHIND THE SIGNAL</span><h2>From an idea to an odyssey.</h2><div class="credits-copy"><h3>The Containerlab universe</h3><p>Inspired by Containerlab and the networks we build together. FAULTLINE is an independent fan project. The Containerlab mark is used under its original license.</p><h3>Original art</h3><p>Relay cathedral, sanctuary, ruined chamber, an expanded illustrated card collection, hostile creatures and painted interface pieces created for this game using OpenAI image generation. Typography: Cinzel and Barlow, under the SIL Open Font License.</p><h3>Original score · YuE2</h3><p>The Last Relay · Signal & Steel · The Blackout Core · The Copper Market · A Light Left On · A Thousand Fractures. Generated locally with the official YuE2 model and listening decoder. The score uses instrumental arrangements; vocal stems were removed with Demucs. Generation prompts and provenance are included in the project.</p><h3>A real network, in miniature</h3><p>Packets and faults are simulated in your browser. You can export the topology to Containerlab; real routing requires device configuration and container images.</p></div>`;
+    content.innerHTML = `<span class="eyebrow">THE PEOPLE & TOOLS BEHIND THE SIGNAL</span><h2>From an idea to an odyssey.</h2><div class="credits-copy"><h3>The Containerlab universe</h3><p>Inspired by Containerlab and the networks we build together. FAULTLINE is an independent fan project. The Containerlab mark is used under its original license.</p><h3>Original art</h3><p>Relay cathedral, sanctuary, ruined chamber, an expanded illustrated card collection, hostile creatures and painted interface pieces created for this game using OpenAI image generation. Typography: Cinzel and Barlow, under the SIL Open Font License.</p><h3>Original score · YuE2</h3><p>The Last Relay · Signal & Steel · The Blackout Core · The Copper Market · A Light Left On · A Thousand Fractures · Copperlight Pursuit · Ghosts in the Relay · Redline Protocol. Generated locally with the official YuE2 model and listening decoder. The score uses instrumental arrangements; vocal stems were removed with Demucs. Generation prompts and provenance are included in the project.</p><h3>A real network, in miniature</h3><p>Packets and faults are simulated in your browser. You can export the topology to Containerlab; real routing requires device configuration and container images.</p></div>`;
   else if (type === "replace")
-    content.innerHTML = `<span class="eyebrow">AN EXPEDITION IS ALREADY IN PROGRESS</span><h2>Leave this route behind?</h2><p class="modal-intro">Beginning a new expedition replaces your current saved run in sector ${run.floor + 1}.</p><div class="confirm-actions"><button class="gold-button" data-action="confirm-replace">Begin a new expedition ${ui.icon("arrow")}</button><button class="text-button" data-action="close">Keep my current expedition</button></div>`;
+    content.innerHTML = `<span class="eyebrow">AN EXPEDITION IS ALREADY IN PROGRESS</span><h2>Leave this route behind?</h2><p class="modal-intro">Beginning a new expedition replaces your current saved run in stage ${run.stage + 1}, sector ${run.floor + 1}.</p><div class="confirm-actions"><button class="gold-button" data-action="confirm-replace">Begin a new expedition ${ui.icon("arrow")}</button><button class="text-button" data-action="close">Keep my current expedition</button></div>`;
   dialog.className = [
     "deck",
     "collection",
@@ -332,8 +347,13 @@ function openModal(type: string) {
   if (!dialog.open) dialog.showModal();
 }
 function closeModal() {
+  if (modal === "boss-intro") {
+    run.bossIntroSeen = true;
+    save();
+  }
   modal = "";
   dialog.close();
+  dialog.className = "";
   render(false);
 }
 function begin() {
@@ -578,11 +598,13 @@ function transmit() {
       sound.effect("hit");
       floatText(`−${result.packetDamage}`, true);
     } else toast(result.signalPath.length ? "The signal was absorbed. Check armor and hostile fields." : "No live route. The signal could not reach OMEGA.", "error");
-    window.setTimeout(() => {
+    const resolve = () => {
       if (generation !== battleGeneration) return;
+      const becomesEnraged = !result.defeated && next.enemy && ENEMIES[next.enemy.id].enrages && run.enemy!.hp > run.enemy!.maxHp / 2 && next.enemy.hp <= next.enemy.maxHp / 2;
       run = next;
       expedition!.run = run;
       busy = false;
+      delete root.dataset.enemyAction;
       if (practice) {
         if (practice.step === 3) {
           practice.step = 4;
@@ -610,11 +632,22 @@ function transmit() {
         toast(result.enemyAction);
       }
       if (forecast.enemyHealing) floatText(`+${forecast.enemyHealing} siphoned`, true, "enemy-heal");
+      if (becomesEnraged) { sound.effect("enrage"); toast(`${run.enemy!.name} awakens. Its next intent is stronger.`, "error"); }
       const flash = $("#battle-flash");
       flash.classList.remove("active");
       void flash.offsetWidth;
       flash.classList.add("active");
-    }, preferences.fast || !sound.settings.motion ? 100 : 600);
+    };
+    window.setTimeout(() => {
+      if (generation !== battleGeneration) return;
+      if (!result.defeated && forecast.intent) {
+        const kind = forecast.intent.kind;
+        root.dataset.enemyAction = kind;
+        sound.effect(kind);
+        if (world) world.playEnemyAction(kind, forecast.faultTarget, forecast.hazardZone, resolve, preferences.fast);
+        else window.setTimeout(resolve, 160);
+      } else resolve();
+    }, preferences.fast || !sound.settings.motion ? 80 : 350);
   };
   if (result.signalPath.length && world && !preferences.fast && sound.settings.motion) {
     world.playPacket(result.signalPath, finish);
@@ -922,12 +955,17 @@ window.addEventListener("pointermove", (event) => {
     cardDrag.ghost = original.cloneNode(true) as HTMLElement;
     cardDrag.ghost.className += " drag-ghost";
     cardDrag.ghost.removeAttribute("data-hand");
-    document.body.append(cardDrag.ghost);
+    const style = getComputedStyle(original);
+    cardDrag.ghost.style.width = style.width;
+    cardDrag.ghost.style.height = style.height;
+    cardDrag.ghost.style.setProperty("--picture-height", style.getPropertyValue("--picture-height"));
+    root.append(cardDrag.ghost);
     world?.setPlacement(CARDS[run.hand[cardDrag.index]].role ?? null);
   }
   if (cardDrag.ghost) {
-    cardDrag.ghost.style.left = `${event.clientX}px`;
-    cardDrag.ghost.style.top = `${event.clientY}px`;
+    const origin = root.getBoundingClientRect(), scale = interfaceScale();
+    cardDrag.ghost.style.left = `${(event.clientX - origin.left) / scale}px`;
+    cardDrag.ghost.style.top = `${(event.clientY - origin.top) / scale}px`;
     world?.previewAt(event.clientX, event.clientY);
   }
 });
@@ -1068,9 +1106,12 @@ function showTooltip(target: HTMLElement) {
   el.textContent = tip.dataset.tooltip || "";
   el.className = "visible";
   const box = tip.getBoundingClientRect();
-  el.style.left = `${Math.max(12, Math.min(window.innerWidth - 276, box.x + box.width / 2 - 125))}px`;
-  el.style.top = `${Math.min(window.innerHeight - el.offsetHeight - 12, box.bottom + 12)}px`;
+  const scale = interfaceScale(), width = window.innerWidth / scale, height = window.innerHeight / scale;
+  const origin = root.getBoundingClientRect();
+  el.style.left = `${Math.max(10, Math.min(width - el.offsetWidth - 10, (box.x + box.width / 2) / scale - el.offsetWidth / 2)) - origin.left / scale}px`;
+  el.style.top = `${Math.max(10, Math.min(height - el.offsetHeight - 10, box.bottom / scale + 12)) - origin.top / scale}px`;
 }
+$("#app").addEventListener("scroll", hideTooltip);
 document.addEventListener("pointerover", e => showTooltip(e.target as HTMLElement));
 document.addEventListener("focusin", e => showTooltip(e.target as HTMLElement));
 document.addEventListener("pointerdown", hideTooltip);

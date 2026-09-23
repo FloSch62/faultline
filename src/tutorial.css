@@ -110,38 +110,46 @@
 }
 .training-current {
   margin: 0;
-  font-size: 12.5px;
-  color: #cfd8cf;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #e6e2d2;
+}
+
+/* The coach's objection when training rails stop a move. */
+#toast.coach {
+  border-color: #d8b57488;
+  color: #f0e3c4;
+  background: #1a2320f2;
+}
+/* One compact stepper row: the arc of the lesson at a glance, never competing with
+   the instruction below it. Labels live in tooltips and the coach's step heading. */
+.training-progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 10px;
 }
 .training-goals {
   list-style: none;
-  margin: 0 0 10px;
+  margin: 0;
   padding: 0;
-  display: grid;
-  gap: 5px;
+  display: flex;
+  gap: 7px;
 }
-.training-goals li {
-  display: grid;
-  grid-template-columns: 20px 1fr;
-  gap: 9px;
-  align-items: center;
-  font-size: 12.5px;
-  line-height: 1.35;
-  color: #8e9a99;
-  transition: color 0.3s;
-}
+.training-goals li { display: block; }
 .training-goals li i {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   display: grid;
   place-items: center;
-  font: 600 10px var(--condensed, "Barlow Condensed", sans-serif);
+  font: 600 10.5px var(--condensed, "Barlow Condensed", sans-serif);
   font-style: normal;
-  border: 1px solid #7d88864d;
+  border: 1px solid #7d888669;
   border-radius: 50%;
-  color: #8e9a99;
+  color: #99a5a4;
+  transition: background 0.3s, color 0.3s;
 }
-.training-goals li.current { color: #efe2c5; }
 .training-goals li.current i {
   color: #20190f;
   background: var(--training-gold);
@@ -149,13 +157,17 @@
   box-shadow: 0 0 0 4px #d8b57422;
   animation: training-pulse 1.8s ease-in-out infinite;
 }
-.training-goals li.done { color: #a9c7ad; }
-.training-goals li.done span { text-decoration: line-through; text-decoration-color: #a9c7ad66; }
 .training-goals li.done i {
   color: #173020;
   background: #9fd29d;
   border-color: #c9ecc2;
   animation: training-pop 0.35s ease-out;
+}
+.training-count {
+  font: 600 8.5px Barlow, sans-serif;
+  letter-spacing: 0.2em;
+  color: #9d8966;
+  white-space: nowrap;
 }
 @keyframes training-pulse {
   50% { box-shadow: 0 0 0 7px #d8b57400; }
@@ -166,16 +178,17 @@
 }
 .training-coach {
   position: relative;
-  padding: 10px 12px 9px 14px;
-  background: linear-gradient(90deg, #d8b5741a, transparent);
+  padding: 11px 12px 10px 14px;
+  background: linear-gradient(90deg, #d8b57422, transparent);
   border-left: 2px solid var(--training-gold);
 }
 .training-label {
   display: block;
-  font: 600 8px Barlow, sans-serif;
-  letter-spacing: 0.24em;
+  font: 600 9.5px Barlow, sans-serif;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
   color: #c8a86f;
-  margin-bottom: 3px;
+  margin-bottom: 5px;
 }
 .training-coach p {
   margin: 0;
@@ -183,6 +196,24 @@
   line-height: 1.55;
   color: #d3dcd4;
 }
+/* The instruction reads first: short, bright, key terms in gold. The why sits under it. */
+.training-coach .coach-do {
+  font-size: 15px;
+  line-height: 1.5;
+  color: #f2ecd9;
+}
+.training-coach .coach-do b,
+.training-current b {
+  font-weight: 600;
+  color: #f1cf87;
+}
+.training-coach .coach-why {
+  margin-top: 6px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #a7b5b3;
+}
+.training-coach .coach-why b { font-weight: 600; color: #cfc3a2; }
 .training-panel.is-complete .training-coach {
   border-left-color: #9fd29d;
   background: linear-gradient(90deg, #9fd29d1c, transparent);
@@ -230,7 +261,7 @@
 }
 .training-hint-button:hover,
 .training-link:hover { color: #e3f4f6; }
-.training-complete { margin-top: 12px; }
+.training-complete { margin: 2px 0 12px; }
 .training-banner {
   display: inline-flex;
   gap: 7px;
@@ -930,6 +961,8 @@ button.lesson-card:focus-visible {
   .training-head h3 { font-size: 14.5px; }
   .training-seal { width: 30px; height: 30px; }
   .training-coach p { font-size: 12px; }
+  .training-coach .coach-do { font-size: 13px; }
+  .training-coach .coach-why { font-size: 11.5px; }
   .training-goals li { font-size: 11.5px; }
   .training-foot span { display: none; }
   .lesson-variants { grid-template-columns: 1fr; }
@@ -976,3 +1009,73 @@ button.lesson-card:focus-visible {
 }
 .reduced-motion .lesson-focus { animation: none; }
 @media (prefers-reduced-motion: reduce) { .lesson-focus { animation: none; } }
+
+/* The dimmer: everything falls back except the one control the step needs. The hole
+   is a positioned window whose giant shadow paints the dim, so the target itself stays
+   at full brightness and clickable; the caret above it bobs toward the target. */
+#lesson-spotlight {
+  position: absolute;
+  inset: 0;
+  z-index: 18;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.35s;
+}
+#lesson-spotlight.active { opacity: 1; }
+#lesson-spotlight i {
+  position: absolute;
+  border-radius: 12px;
+  border: 1px solid #f1cf8770;
+  box-shadow: 0 0 0 9999px #040a0c85;
+  transition:
+    left 0.4s cubic-bezier(0.2, 0.8, 0.2, 1),
+    top 0.4s cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 0.4s cubic-bezier(0.2, 0.8, 0.2, 1),
+    height 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+#lesson-spotlight i::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border: 1px solid #f1cf87;
+  border-radius: 14px;
+  opacity: 0.8;
+  animation: spot-breathe 1.8s ease-in-out infinite;
+}
+#lesson-spotlight i::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -24px;
+  width: 11px;
+  height: 11px;
+  border-right: 2px solid #f1cf87;
+  border-bottom: 2px solid #f1cf87;
+  transform: translateX(-50%) rotate(45deg);
+  filter: drop-shadow(0 0 6px #f1cf87aa);
+  animation: spot-bob 1.3s ease-in-out infinite;
+}
+@keyframes spot-breathe { 50% { inset: -8px; opacity: 0.3; } }
+@keyframes spot-bob { 50% { top: -17px; } }
+.reduced-motion #lesson-spotlight i::before,
+.reduced-motion #lesson-spotlight i::after { animation: none; }
+.reduced-motion #lesson-spotlight,
+.reduced-motion #lesson-spotlight i { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  #lesson-spotlight i::before,
+  #lesson-spotlight i::after { animation: none; }
+  #lesson-spotlight,
+  #lesson-spotlight i { transition: none; }
+}
+
+/* Cards outside the current step rest in the hand: visibly parked, still inspectable.
+   Clicking one gets the coach's explanation instead of a play. */
+.is-practice .card-fan .game-card.lesson-parked {
+  filter: grayscale(0.6) brightness(0.62);
+  transition: filter 0.3s;
+}
+.is-practice .card-fan .game-card.lesson-parked:hover,
+.is-practice .card-fan .game-card.lesson-parked:focus-visible {
+  filter: grayscale(0.3) brightness(0.85);
+}

@@ -5,8 +5,8 @@
  * Progress is sticky: pass the previous progress back in and completed goals stay done.
  * No DOM, no import.meta — this module runs in node tests. */
 import { ENEMIES } from "../core/enemies.ts";
-import { RULES } from "../core/cards.ts";
-import { beginBattle, combatPreview, createRun, signalPaths, zoneForNode, type TurnResult } from "../core/run.ts";
+import { CARDS, RULES } from "../core/cards.ts";
+import { beginBattle, combatPreview, costFor, createRun, signalPaths, zoneForNode, type TurnResult } from "../core/run.ts";
 import type { Archetype, CardId, MapRoom, NetworkLink, NetworkNode, RelicId, RunState, Zone } from "../core/types.ts";
 
 export type LessonId =
@@ -46,7 +46,10 @@ export interface LessonProgress {
   goals: (LessonGoal & { done: boolean })[];
   /** Index of the first unfinished goal, or goals.length when complete. */
   current: number;
+  /** The move to make now, one short sentence. `**text**` marks key terms. */
   coach: string;
+  /** Why the move matters — secondary reading below the instruction. */
+  detail: string;
   hint: string;
   /** Short warning when the player is about to make a costly mistake. */
   warning: string;
@@ -544,12 +547,19 @@ function goalChecks(id: LessonId, ctx: Context): Record<string, boolean> {
 }
 
 interface Coach {
+  /** The move to make now — one short imperative sentence. `**text**` marks key terms. */
   coach: string;
+  /** Why the move matters, or what to read while making it. */
+  detail?: string;
   hint: string;
   warning?: string;
   /** CSS selector of the control this step is about; the UI spotlights it. */
   focus?: string;
 }
+
+const card = (base: string) => `#hand-zone [data-card-id="${base}"], #hand-zone [data-card-id="${base}+"]`;
+const TRANSMIT = ".transmit-button";
+const CONSOLE = ".console-button";
 
 function coachFor(id: LessonId, ctx: Context, done: Record<string, boolean>): Coach {
   const { run, preview } = ctx;
@@ -560,191 +570,266 @@ function coachFor(id: LessonId, ctx: Context, done: Record<string, boolean>): Co
   switch (id) {
     case "first-signal":
       if (!done.router) return {
-        coach: "Every signal needs a router. Play Core Router (2 energy) and place it on the table — the centre sits close to both terminals.",
-        hint: "Click the Core Router card, then click an empty spot on the table or use “Deploy in a free socket”.",
+        coach: "Play the **Core Router** card and set it near the middle of the table.",
+        detail: "Every signal needs a router between ALPHA and OMEGA. Hardware stays on the table for the whole battle.",
+        hint: "Click the Core Router card, then click an empty spot on the table — or use “Deploy in a free socket”.",
+        focus: card("router"),
       };
       if (!done.source) return {
-        coach: "Your router is dark. Play an Optic Fiber: select ALPHA, then your router. Cables are undirected and stay for the encounter.",
+        coach: "Play an **Optic Fiber**, then click **ALPHA** and then your **router**.",
+        detail: "Cables are undirected and stay for the encounter. This one lights the router's uplink.",
         hint: "Select Optic Fiber, then click ALPHA and your router — on the table or in the device strip below.",
+        focus: card("fiber"),
       };
       if (!done.route) return {
-        coach: "One cable to go. Run the second Optic Fiber from your router to OMEGA and the route comes alive.",
+        coach: "Run the second **Optic Fiber** from your **router** to **OMEGA**.",
+        detail: "That closes the path ALPHA → router → OMEGA: your first live route.",
         hint: "Select the other Optic Fiber, then your router, then OMEGA.",
+        focus: card("fiber"),
       };
       if (!done.transmit) return {
-        coach: `The route is live. The number on Transmit is your damage: ${damage}. Transmitting ends your turn — then the hostile acts, exactly as its intent announced.`,
+        coach: "Press **Transmit** to send the signal.",
+        detail: `The number on the button is your damage: ${damage}. Transmitting ends your turn — then the hostile acts, exactly as its intent announced.`,
         hint: "Press Transmit or the Space bar.",
-        focus: ".transmit-button",
+        focus: TRANSMIT,
       };
       return { coach: "Signal delivered. Your router and cables stay: next turn the same route fires again for free.", hint: "" };
     case "read-the-enemy":
       if (!done.cover) return {
-        coach: `Read the right plate: the hostile will ${intent?.kind === "strike" ? "STRIKE" : intent?.kind?.toUpperCase() ?? "act"} for ${preview?.incomingRaw ?? 0} after your transmission. Your plate forecasts ${incoming} integrity lost. Play Packet Guard until that reads 0.`,
+        coach: "Play **Packet Guard** until your plate reads **0 integrity at risk**.",
+        detail: `The right plate announces the hostile's move: ${intent?.kind === "strike" ? "STRIKE" : intent?.kind?.toUpperCase() ?? "act"} for ${preview?.incomingRaw ?? 0} after your transmission. Right now ${incoming} would get through.`,
         hint: "Packet Guard gives 4 shield for this turn only. Watch “integrity at risk” drop as you play it.",
         warning: noEnergy && incoming > 0 ? "Out of energy with damage still coming — undo (Z) and try a different order." : undefined,
+        focus: card("guard"),
       };
       if (!done.burst) return {
-        coach: "Covered. Shield beyond the forecast is wasted — it expires after the enemy acts. Put spare energy into damage instead: Packet Burst adds 3 to this transmission.",
+        coach: "Play **Packet Burst** — put the spare energy into damage.",
+        detail: "Shield beyond the forecast is wasted: it expires after the enemy acts. Burst adds 3 to this transmission.",
         hint: "Play Packet Burst. Burst lasts only for this transmission.",
+        focus: card("pulse"),
       };
       if (!done.safe) return {
-        coach: `Forecast: you deal ${damage}, you lose ${incoming}. Every number has a cause — open Details for the exact terms. Transmit when ready.`,
+        coach: "**Transmit** when ready.",
+        detail: `Forecast: you deal ${damage}, you lose ${incoming}. Every number has a cause — open Details for the exact terms.`,
         hint: "Press Transmit (Space).",
         warning: incoming > 0 ? `This transmission still lets ${incoming} through.` : undefined,
+        focus: TRANSMIT,
       };
       return { coach: "Clean exchange: damage out, nothing in. That is the rhythm of every fight.", hint: "" };
     case "reroute":
       if (!done.channel) return {
-        coach: `The hostile will CUT a cable on your only route — a broken route deals nothing. Build a second channel: a new router with its own two cables. It must share no device with the first route; each extra channel also adds +${RULES.bandwidthPerChannel} bandwidth damage.`,
+        coach: "Build a **second channel**: deploy the new **Core Router**, then fiber **ALPHA → router → OMEGA**.",
+        detail: `The hostile will CUT a cable on your only route — a broken route deals nothing. Channels share no device, and each extra one adds +${RULES.bandwidthPerChannel} bandwidth damage.`,
         hint: "Deploy the Core Router (the South band is open), then Fiber ALPHA → router and router → OMEGA.",
+        focus: run.topology.nodes.filter(node => node.role === "router").length < 2 ? card("router") : card("fiber"),
       };
       if (!run.protocols.length && !transmitted(run)) return {
-        coach: `Two channels (${channels(ctx)}): the cut can only take one, and bandwidth raised your damage to ${damage}. Optional: arm Failover Policy (1) — protocols trigger on their own and this one cancels the cut entirely.`,
+        coach: "Optional: arm **Failover Policy**, then **Transmit**.",
+        detail: `Two channels (${channels(ctx)}): the cut can only take one, and bandwidth raised your damage to ${damage}. Protocols fire on their own — this one cancels the cut entirely.`,
         hint: "Play Failover Policy to arm it, then Transmit.",
-        focus: "#hand-zone [data-card-id=\"failover-policy\"]",
+        focus: card("failover-policy"),
       };
       if (!done.survive) return {
-        coach: "Ready. Transmit — your channels carry the signal while the enemy swings at a cable.",
+        coach: "**Transmit** — your channels carry the signal.",
+        detail: "The enemy swings at a cable; the other channel keeps the route alive.",
         hint: "Press Transmit (Space).",
+        focus: TRANSMIT,
       };
       if (!done.restore) return {
-        coach: `The cut landed on ${String(run.faultLink ?? run.faultNode ?? "a cable").toUpperCase().replace("::", " ↔ ")}, but your other channel kept the signal alive. Play Hot Patch to reconnect it and restore full bandwidth. A jammed device can also be routed around: relocate it for 1 energy.`,
+        coach: "Play **Hot Patch** to reconnect the cut line.",
+        detail: `The cut landed on ${String(run.faultLink ?? run.faultNode ?? "a cable").toUpperCase().replace("::", " ↔ ")}, but your other channel kept the signal alive. A jammed device can also be routed around: relocate it for 1 energy.`,
         hint: "Play Hot Patch — it clears the active cut or jam and draws a card.",
+        focus: card("patch"),
       };
       return { coach: "Rerouted. Redundancy turned a silenced turn into a small dent.", hint: "" };
     case "online":
       if (!done.firewall) return {
-        coach: "The Trust Gate in the South is offline: no live route passes through it, so it does nothing. Cable it into a route — ALPHA → firewall → router — and it will block the incoming breach, wherever it sits.",
+        coach: "Cable the **Trust Gate** into your route: fiber **ALPHA → firewall**, then **firewall → router**.",
+        detail: "A device only works while a live route passes through it. The firewall in the South is dark — online, it blocks the incoming breach, wherever it sits on the route.",
         hint: "Fiber ALPHA → firewall, then Fiber firewall → router. A route needs a router; the firewall can be anywhere on it.",
+        focus: card("fiber"),
       };
       if (!done.transmit) return {
-        coach: `Online. The shield forecast now counts the firewall against the breach — incoming ${incoming}. Online firewalls also get past hostile plating. Transmit.`,
+        coach: "**Transmit**.",
+        detail: `The shield forecast now counts the firewall against the breach — incoming ${incoming}. Online firewalls also get past hostile plating.`,
         hint: "Press Transmit (Space).",
+        focus: TRANSMIT,
       };
-      if (!done.cache) return {
-        coach: run.faultLink || run.faultNode
-          ? "The breach was blocked, but the hostile's cut is still in place — and a device is only online if a live route passes through it. Hot Patch first, then deploy the Cache Server and cable it into a route."
-          : "New hardware arrived. A Cache Server draws +1 card at the start of your turn — but only while online. Deploy it and cable it into a route; the forecast shows next turn's draw. PoE Injectors (+1 energy) and Load Balancers (+1 damage per channel) follow the same rule.",
+      if (!done.cache) return run.faultLink || run.faultNode ? {
+        coach: "Play **Hot Patch** first, then cable the **Cache Server** into a route.",
+        detail: "The hostile's cut is still in place — and a device is only online if a live route passes through it.",
+        hint: "Hot Patch clears the cut. Then deploy Cache Server and cable it between ALPHA and your router.",
+        focus: card("patch"),
+      } : {
+        coach: "Deploy the **Cache Server** and cable it into a route.",
+        detail: "Online, it draws +1 card at the start of your turn; the forecast shows next turn's draw. PoE Injectors (+1 energy) and Load Balancers (+1 damage per channel) follow the same rule.",
         hint: "Deploy Cache Server, then cable it between ALPHA and your router (two Fibers).",
+        focus: hasRole(run, "cache") ? card("fiber") : card("cache-server"),
       };
       return { coach: "Online devices are your engine: firewall defending, cache drawing. A cut can take them offline — protect what matters.", hint: "" };
     case "bands":
       if (!done.suppression && !done.jam) return {
-        coach: "Your router sits in NORTH, under a Suppression field (−3 damage), and the storm will jam every unprotected device in NORTH next. Two problems, one answer: move the router out. Drag it to CENTER, or select it and choose a band (1 energy). Purge Field would only clear the suppression.",
+        coach: "Move your **router** out of NORTH: drag it to CENTER, or click it and pick a band (1 energy).",
+        detail: "It sits under a Suppression field (−3 damage), and the storm will jam every unprotected device in NORTH next. One move answers both; Purge Field would only clear the suppression.",
         hint: "Click your router on the table, then pick CENTER in the device bar — or drag it across the band line.",
       };
       if (!done.suppression) return {
-        coach: "Suppression still weakens your route. Purge Field cleanses a band's hostile fields (and draws a card), or move the hardware out.",
+        coach: "Play **Purge Field** on NORTH — or move the hardware out.",
+        detail: "Suppression weakens every route through the band. Purge cleanses a band's hostile fields and draws a card.",
         hint: "Play Purge Field on NORTH, or relocate the router.",
+        focus: card("purge-field"),
       };
       if (!done.jam) return {
-        coach: `The storm has marked ${String(preview?.hazardZone ?? "a band").toUpperCase()}. Get your route out of it, or give it a second channel elsewhere.`,
+        coach: `Get your route out of **${String(preview?.hazardZone ?? "the marked band").toUpperCase()}** — or give it a second channel elsewhere.`,
+        detail: "The storm strikes every unprotected device in the band it marked.",
         hint: "Relocate the router to another band for 1 energy.",
       };
       if (!done.resonance) return {
-        coach: "Now claim ground: Resonance Field adds +3 for 3 turns to routes crossing that band. Cast it on the band your route passes through.",
+        coach: "Play **Resonance Field** on the band your route crosses.",
+        detail: "+3 damage for 3 turns to routes crossing that band. Claim the ground you stand on.",
         hint: "Play Resonance Field, then click the field seal of your router's band.",
+        focus: card("resonance-field"),
       };
       if (!done.transmit) return {
-        coach: "Tip: three online devices in one band form a cluster (+2 damage) — but crowded bands feed corrosion and band attacks. Spreading routers North and South on separate channels earns separated-circuit shield instead. Transmit.",
+        coach: "**Transmit**.",
+        detail: "Tip: three online devices in one band form a cluster (+2 damage), but crowded bands feed corrosion and band attacks. Routers spread North and South on separate channels earn separated-circuit shield instead.",
         hint: "Press Transmit (Space).",
+        focus: TRANSMIT,
       };
       return { coach: "You read the ground and moved before the storm. That is zone play.", hint: "" };
     case "traps":
       if (!done.honeypot) return {
-        coach: "The hostile will JAM a device next — your router, unless it sees something tastier. Deploy a Honeypot and cable it: while cabled, it draws jams and cable cuts first, and each one it absorbs hurts the attacker.",
+        coach: "Deploy a **Honeypot** and fiber it to any device.",
+        detail: "The hostile will JAM a device next — your router, unless it sees something tastier. A cabled honeypot draws jams and cable cuts first, and each one it absorbs hurts the attacker.",
         hint: "Deploy Honeypot, then Fiber it to any device.",
+        focus: hasRole(run, "honeypot") ? card("fiber") : card("honeypot"),
       };
       if (!done.armed) return {
-        coach: "Now set a protocol. Protocols are armed face-down (up to 2) and fire by themselves in the enemy's turn when their trigger happens. Port Security cancels a jam and deals 4; Rate Limiter cuts a strike by 5.",
+        coach: "Arm a protocol: **Port Security** or **Rate Limiter**.",
+        detail: "Protocols are armed face-down (up to 2) and fire by themselves in the enemy's turn when their trigger happens. Port Security cancels a jam and deals 4; Rate Limiter cuts a strike by 5.",
         hint: "Play Port Security or Rate Limiter — it moves to your armed protocol slots.",
-        focus: "#hand-zone [data-card-id=\"port-security\"], #hand-zone [data-card-id=\"rate-limiter\"]",
+        focus: `${card("port-security")}, ${card("rate-limiter")}`,
       };
       if (!done.sprung) return {
-        coach: `Trap set${preview?.protocolTriggers?.length ? `: ${preview.protocolTriggers.map(trigger => trigger.name).join(" + ")} will fire` : ""}. The forecast already includes it. Transmit and watch.`,
+        coach: "**Transmit** and watch the trap spring.",
+        detail: `${preview?.protocolTriggers?.length ? `${preview.protocolTriggers.map(trigger => trigger.name).join(" + ")} will fire — the` : "The"} forecast already includes it.`,
         hint: "Press Transmit (Space).",
+        focus: TRANSMIT,
       };
       return { coach: "Sprung. You answered the attack before it happened.", hint: "" };
     case "console-architect":
       if (!done.patch) return {
-        coach: "Your console command sits beside your hand: Patch Cable (1 energy, once per turn) connects two devices without a card. Finish the route: router → OMEGA.",
+        coach: "Use **Patch Cable** to finish the route: your **router → OMEGA**.",
+        detail: "Your console command sits beside your hand: 1 energy, once per turn, and it connects two devices without a card.",
         hint: "Click Patch Cable, then your router, then OMEGA.",
-        focus: ".console-button",
+        focus: CONSOLE,
       };
       if (!done.channels) return {
-        coach: `Now go wide. Deploy the second router and cable it on both sides — Hot Swap makes your first Fiber each turn free. Every extra channel adds +${RULES.bandwidthPerChannel} bandwidth.`,
+        coach: "Go wide: deploy the second **Core Router** and cable it on both sides.",
+        detail: `Hot Swap makes your first Fiber each turn free, and every extra channel adds +${RULES.bandwidthPerChannel} bandwidth.`,
         hint: "Deploy the Core Router, then two Fibers: ALPHA → router → OMEGA.",
+        focus: run.topology.nodes.filter(node => node.role === "router").length < 2 ? card("router") : card("fiber"),
       };
-      if (!done.transmit) return { coach: `Two channels: ${damage} damage. Transmit.`, hint: "Press Transmit (Space)." };
+      if (!done.transmit) return {
+        coach: "**Transmit**.",
+        detail: `Two channels: ${damage} damage.`,
+        hint: "Press Transmit (Space).",
+        focus: TRANSMIT,
+      };
       return { coach: `Width is power. Three channels would add +${RULES.bandwidthPerChannel * 2}, Load Balancers +1 per channel each.`, hint: "" };
     case "console-warden":
       if (!done.harden) return {
-        coach: `Your console command is Harden (1 energy): ${RULES.hardenShield} shield, +${RULES.hardenPerFirewall} per online firewall. With Backpressure, ${Number(RULES.backpressureRatio) === 1 ? "every point" : "half (rounded up)"} of the damage you prevent is stored and returns in your next transmission.`,
+        coach: "Use **Harden**, the console command beside your hand.",
+        detail: `1 energy: ${RULES.hardenShield} shield, +${RULES.hardenPerFirewall} per online firewall. With Backpressure, ${Number(RULES.backpressureRatio) === 1 ? "every point" : "half (rounded up)"} of the damage you prevent is stored and returns in your next transmission.`,
         hint: "Click Harden beside your hand.",
-        focus: ".console-button",
+        focus: CONSOLE,
       };
       if (!done.stored) return {
-        coach: `Shield ${preview?.shield ?? 0} against ${preview?.incomingRaw ?? 0} incoming: the prevented part becomes backpressure (+${preview?.backpressureGain ?? 0}). Transmit to absorb the hit.`,
+        coach: "**Transmit** and absorb the hit.",
+        detail: `Shield ${preview?.shield ?? 0} against ${preview?.incomingRaw ?? 0} incoming: the prevented part becomes backpressure (+${preview?.backpressureGain ?? 0}).`,
         hint: "Press Transmit (Space).",
+        focus: TRANSMIT,
       };
       if (!done.release) return {
-        coach: `Backpressure stored: +${run.backpressure}. It joins your next transmission automatically — look for the Backpressure term. Harden again to keep the cycle going.`,
+        coach: "**Transmit** again to release it.",
+        detail: `Backpressure stored: +${run.backpressure}. It joins your next transmission automatically — look for the Backpressure term. Harden again to keep the cycle going.`,
         hint: "Transmit again to release it.",
+        focus: TRANSMIT,
       };
       return { coach: "Defense became damage. The more the enemy hits your wall, the harder you hit back.", hint: "" };
     case "console-ghost":
       if (!done.buffer) return {
-        coach: `Your console command is Buffer (free, once per turn): this turn's transmission is stored ×${RULES.bufferMultiplier} instead of dealt. Your next normal transmission releases the whole buffer. Switch it on.`,
+        coach: "Switch on **Buffer**, the console command beside your hand.",
+        detail: `Free, once per turn: this turn's transmission is stored ×${RULES.bufferMultiplier} instead of dealt. Your next normal transmission releases the whole buffer.`,
         hint: "Click Buffer beside your hand. Click again to cancel before transmitting.",
-        focus: ".console-button",
+        focus: CONSOLE,
       };
       if (!done.stored) return {
-        coach: `Buffering: +${preview?.bufferGain ?? 0} will be stored. Burst played now is buffered too. The hostile's next move is not a cut — a safe turn to hold. Transmit.`,
+        coach: "**Transmit** into the buffer.",
+        detail: `+${preview?.bufferGain ?? 0} will be stored, and burst played now is buffered too. The hostile's next move is not a cut — a safe turn to hold.`,
         hint: "Press Transmit (Space).",
+        focus: TRANSMIT,
       };
       if (!done.protect) {
         if (run.buffering && preview?.bufferAtRisk) return {
-          coach: `Buffering again with an unprotected line: the hostile will CUT your only route, your next turn would start with no live route, and all ${preview.bufferGain + run.buffer} buffered damage would be lost. Arm Failover Policy or build a second channel first.`,
+          coach: "Protect the line: arm **Failover Policy**, or build a second channel.",
+          detail: `The hostile will CUT your only route. A turn that starts with no live route loses the whole buffer — all ${preview.bufferGain + run.buffer} of it.`,
           hint: "Arm Failover Policy (1), or deploy a router with two Fibers for a second channel.",
           warning: "Packet loss ahead: the coming cut leaves you with no live route.",
+          focus: card("failover-policy"),
         };
         return {
-          coach: `Buffer: ${run.buffer}. A normal transmission now would flush it safely before the cut — the simple answer. The Ghost's real game is stacking: but the hostile will CUT your only route, and a turn that starts with no live route loses the whole buffer. Protect the line, then switch Buffer on again.`,
+          coach: "Protect the line — arm **Failover Policy** — then switch **Buffer** on again.",
+          detail: `Buffer: ${run.buffer}. A normal transmission now would flush it safely before the cut — the simple answer. The Ghost's real game is stacking a second buffered turn behind a protected line.`,
           hint: "Arm Failover Policy (or build a second channel), then click Buffer.",
+          focus: card("failover-policy"),
         };
       }
       if (!done.release) return run.buffering ? {
-        coach: `Protected and stacking: +${preview?.bufferGain ?? 0} more goes into the buffer. Transmit, then flush it all next turn.`,
+        coach: "**Transmit** — protected, the buffer stacks.",
+        detail: `+${preview?.bufferGain ?? 0} more goes into the buffer. Flush it all next turn.`,
         hint: "Press Transmit (Space).",
+        focus: TRANSMIT,
       } : {
-        coach: `Buffer: ${run.buffer}. Now flush: a normal transmission (Buffer off) adds everything stored to this hit.`,
+        coach: "Flush it: make sure **Buffer** is off, then **Transmit**.",
+        detail: `A normal transmission adds everything stored (${run.buffer}) to this hit.`,
         hint: "Make sure Buffer is off, then Transmit.",
+        focus: TRANSMIT,
       };
       return { coach: "Held, protected, released. The Ghost's rhythm: wait for a safe window, then strike once.", hint: "" };
     case "danger": {
       const ultimateTurn = !!intent?.ultimate;
       if (!done.scrub) return {
-        coach: `The Regent is charging its ultimate — you have one turn to prepare. First, clean up: malware on your table costs −2 damage every transmission. Click it and scrub it (1 energy).`,
+        coach: "Click the **malware crystal** on the table and scrub it (1 energy).",
+        detail: "The Regent is charging its ultimate — you have one turn to prepare. Malware on your table costs −2 damage every transmission.",
         hint: "Click the malware crystal on the table.",
       };
       if (!done.worm) return {
-        coach: "A Worm is in your hand: if it is still there when you transmit, it deals 2 to you. Delete it (1 energy). Junk like this is injected by enemies and disappears after the encounter.",
+        coach: "Play the **Worm** to delete it (1 energy).",
+        detail: "If it is still in your hand when you transmit, it deals 2 to you. Junk like this is injected by enemies and disappears after the encounter.",
         hint: "Play the Worm card to delete it.",
-        focus: "#hand-zone [data-card-id=\"worm\"]",
+        focus: card("worm"),
       };
       if (!done.prepare) return {
-        coach: "Next turn is the ultimate. Hold your answer: the Prepare slot (+ PREPARE, bottom left, beside your Draw and Discard piles) sets one card aside for free — it replaces a draw next turn. Prepare Zero Day, your biggest burst.",
+        coach: "Prepare **Zero Day**: press **P**, or click **+ PREPARE** at the bottom left.",
+        detail: "The Prepare slot — beside your Draw and Discard piles — holds one card for next turn, free; it replaces a draw. Next turn is the ultimate: hold your biggest burst.",
         hint: "Press P, or click + PREPARE at the bottom left under your energy, then choose Zero Day.",
         focus: ".prepared-pile",
       };
       if (!done.charge) return {
-        coach: "Charge turns deal no direct damage. Spend what's left on damage or shield, then transmit.",
+        coach: "Spend what's left on damage or shield, then **Transmit**.",
+        detail: "Charge turns deal no direct damage — the blow comes next turn.",
         hint: "Press Transmit (Space).",
+        focus: TRANSMIT,
       };
-      if (!done.ultimate) return {
-        coach: ultimateTurn
-          ? `CROWNFALL: ${preview?.incomingRaw ?? 0} damage unless you deal ${preview?.breakDamage ?? 12} this transmission (now ${damage}). Interrupt with your prepared burst — it also exposes the guardian (+3, armor bypassed) — or brace with enough shield. Your call.`
-          : "Survive the next exchange without losing integrity.",
+      if (!done.ultimate) return ultimateTurn ? {
+        coach: `**Interrupt**: deal ${preview?.breakDamage ?? 12} this transmission (now ${damage}) — or **brace** with enough shield. Your call.`,
+        detail: `CROWNFALL lands for ${preview?.incomingRaw ?? 0} otherwise. Interrupting with your prepared burst also exposes the guardian (+3, armor bypassed). If the forecast reads CANCELLED, your transmission kills first and nothing lands.`,
+        hint: "Zero Day + Packet Burst reaches the threshold. Or: Aegis Protocol + Packet Guard covers the whole hit.",
+        warning: incoming > 0 && !preview?.interrupted ? `${incoming} damage will get through as things stand.` : undefined,
+        focus: `${card("zero-day")}, ${card("pulse")}`,
+      } : {
+        coach: "Survive the next exchange without losing integrity.",
         hint: "Zero Day + Packet Burst reaches the threshold. Or: Aegis Protocol + Packet Guard covers the whole hit.",
         warning: incoming > 0 && !preview?.interrupted ? `${incoming} damage will get through as things stand.` : undefined,
       };
@@ -786,11 +871,182 @@ export function lessonProgress(
     goals,
     current: current === -1 ? goals.length : current,
     coach: complete ? lesson.takeaway : coach.coach,
+    detail: complete ? "" : coach.detail ?? "",
     hint: complete ? "" : coach.hint,
     warning,
     focus: complete ? "" : coach.focus ?? "",
     complete,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Guard rails: in training the coach stops a clearly wrong move before it lands.
+
+export type LessonAction =
+  | { kind: "card"; card: CardId }
+  /** A cable between two devices — a link card, or the Architect's Patch Cable (no card). */
+  | { kind: "link"; a: string; b: string; card?: CardId }
+  | { kind: "ground"; card: CardId; zone: Zone }
+  | { kind: "zone"; card: CardId; zone: Zone }
+  | { kind: "move"; node: string; zone: Zone }
+  | { kind: "prepare"; card: CardId }
+  | { kind: "transmit" };
+
+/** Cards (base ids) the CURRENT goal allows — one step at a time, nothing else lifts.
+ * "any" marks a step that is the player's own call; a goal missing from its lesson's
+ * map needs no cards at all. */
+const GOAL_CARDS: Partial<Record<LessonId, Record<string, readonly string[] | "any">>> = {
+  "first-signal": { router: ["router"], source: ["fiber"], route: ["fiber"] },
+  "read-the-enemy": { cover: ["guard"], burst: ["pulse"] },
+  reroute: { channel: ["router", "switch", "fiber"], survive: ["failover-policy"], restore: ["patch", "fiber", "router", "switch"] },
+  online: { firewall: ["fiber"], cache: ["cache-server", "fiber", "patch"] },
+  bands: { suppression: ["purge-field"], jam: ["router", "fiber"], resonance: ["resonance-field"] },
+  traps: { honeypot: ["honeypot", "fiber"], armed: ["port-security", "rate-limiter", "failover-policy"] },
+  "console-architect": { channels: ["router", "fiber", "load-balancer"] },
+  "console-warden": { release: ["pulse"] },
+  "console-ghost": { stored: ["pulse"], protect: ["failover-policy", "router", "fiber"], release: ["pulse"] },
+  danger: { charge: "any", ultimate: "any" },
+};
+/** Shield is an emergency exit: allowed whenever the coming hit would end the drill. */
+const DEFENSE = ["guard", "barrier"];
+
+const affordable = (run: RunState, bases: readonly string[]) =>
+  run.hand.some((id, index) => bases.includes(CARDS[id].base) && costFor(run, index) <= run.energy);
+
+/** Whether a player action is off the drill's script. Returns the coach's objection —
+ * with the way forward — or null to allow it. Every block leaves an affordable way to
+ * continue, so the guard can never strand a lesson. */
+export function lessonGuard(id: LessonId, run: RunState, progress: LessonProgress, action: LessonAction): string | null {
+  if (progress.complete || run.phase !== "battle" || !run.enemy) return null;
+  const done: Record<string, boolean> = {};
+  for (const goal of progress.goals) done[goal.id] = goal.done;
+  const preview = combatPreview(run);
+
+  if (action.kind === "card") {
+    const definition = CARDS[action.card];
+    if (!definition || definition.junk || definition.curse) return null;
+    const goals = GOAL_CARDS[id];
+    if (!goals) return null;
+    const current = progress.goals[progress.current];
+    const allowed = current ? goals[current.id] ?? [] : [];
+    if (allowed === "any" || allowed.includes(definition.base)) return null;
+    if (preview.incoming >= run.integrity && DEFENSE.includes(definition.base)) return null;
+    return `Keep ${definition.name} for later — the current step: ${current?.label ?? "finish the drill"}.`;
+  }
+
+  if (action.kind === "link") {
+    const role = (end: string) => run.topology.nodes.find(node => node.id === end)?.role;
+    const touches = (wanted: NetworkNode["role"]) => role(action.a) === wanted || role(action.b) === wanted;
+    switch (id) {
+      case "first-signal":
+      case "console-architect": {
+        // The classic dead end: a cable that touches no router carries nothing.
+        const building = id === "first-signal" ? !done.route : !done.patch;
+        if (building && !touches("router"))
+          return "A route needs a router in the middle — a straight ALPHA → OMEGA cable carries no signal. Connect to your router.";
+        if (id === "console-architect" && !done.channels) {
+          const taken = new Set(signalPaths(run).flat());
+          if ([action.a, action.b].some(end => taken.has(end) && !["alpha", "omega"].includes(end)))
+            return "An independent channel shares no device with your first route. Cable ALPHA to the new router, then the new router to OMEGA.";
+        }
+        return null;
+      }
+      case "reroute": {
+        if (done.channel) return null;
+        const taken = new Set(signalPaths(run).flat());
+        if ([action.a, action.b].some(end => taken.has(end) && !["alpha", "omega"].includes(end)))
+          return "An independent channel shares no device with your first route. Cable ALPHA to the new router, then the new router to OMEGA.";
+        return null;
+      }
+      case "online":
+        if (!done.firewall && !touches("firewall"))
+          return "Cable the Trust Gate first: ALPHA → firewall, then firewall → router.";
+        if (done.firewall && done.transmit && !done.cache) {
+          if (!hasRole(run, "cache")) return "Deploy the Cache Server first — then cable it into a route.";
+          if (!touches("cache")) return "Cable the Cache Server into a route: ALPHA → cache → router works.";
+        }
+        return null;
+      case "traps":
+        if (!done.honeypot) {
+          if (!hasRole(run, "honeypot")) return "Deploy the Honeypot first — then cable it.";
+          if (!touches("honeypot")) return "Cable the Honeypot, so the jam finds the decoy instead of your router.";
+        }
+        return null;
+      default:
+        return null;
+    }
+  }
+
+  if (action.kind === "ground" || action.kind === "move") {
+    // Holding the ground is lesson five's whole point: never into the storm's band.
+    if (id === "bands" && !done.jam) {
+      const marked = preview.hazardZone;
+      if (marked && action.zone === marked)
+        return `The storm strikes ${marked.toUpperCase()} next — put your hardware in another band.`;
+    }
+    return null;
+  }
+
+  if (action.kind === "zone") {
+    if (id !== "bands") return null;
+    const base = CARDS[action.card].base;
+    if (base === "purge-field" && !run.zoneEffects.some(effect => effect.zone === action.zone))
+      return "Purge cleanses a hostile field — cast it on the band where the suppression sits.";
+    if (base === "resonance-field") {
+      const crossed = new Set(signalPaths(run).flat()
+        .map(end => run.topology.nodes.find(node => node.id === end))
+        .filter(node => !!node)
+        .map(node => zoneForNode(node)));
+      if (crossed.size && !crossed.has(action.zone))
+        return "Your route doesn't cross that band — cast Resonance where your signal runs.";
+    }
+    return null;
+  }
+
+  if (action.kind === "prepare") {
+    if (id === "danger" && !done.prepare && !["zero-day", "pulse"].includes(CARDS[action.card].base))
+      return "Hold your answer to the ultimate: prepare Zero Day, your biggest burst.";
+    return null;
+  }
+
+  // Transmissions that would waste the drill's setup, each with an affordable escape.
+  switch (id) {
+    case "first-signal":
+      if (!done.route && affordable(run, hasRole(run, "router") ? ["fiber"] : ["router"]))
+        return "Not yet — without a live route the transmission does nothing. Finish ALPHA → router → OMEGA first.";
+      break;
+    case "read-the-enemy":
+      if (!done.cover && preview.incoming > 0 && affordable(run, ["guard"]))
+        return `You would lose ${preview.incoming} integrity. Play Packet Guard until the forecast reads 0, then transmit.`;
+      break;
+    case "reroute":
+      if (!done.channel && affordable(run, ["router", "switch", "fiber"]))
+        return "The coming cut would silence your only route. Build the second channel first, then transmit.";
+      break;
+    case "online":
+      if (!done.firewall && affordable(run, ["fiber"]))
+        return "The Trust Gate is still offline, so the breach will land. Cable it into your route first.";
+      break;
+    case "bands":
+      if (!done.jam && run.energy >= RULES.relocateCost)
+        return "The storm would jam your route where it stands. Move your router out of the marked band first (1 energy).";
+      break;
+    case "traps":
+      if ((!done.honeypot && affordable(run, ["honeypot", "fiber"])) || (!done.armed && affordable(run, ["port-security", "rate-limiter", "failover-policy"])))
+        return "Set the trap before the attack: a cabled Honeypot and an armed protocol. Then transmit.";
+      break;
+    case "console-architect":
+      if (!done.patch && run.consoleUses === 0 && run.energy >= 1)
+        return "The route is unfinished, so a transmission does nothing. Use Patch Cable beside your hand to close it first.";
+      break;
+    case "console-ghost":
+      if (run.buffering && preview.bufferAtRisk)
+        return "Packet loss ahead: the coming cut would spill the whole buffer. Protect the line first — or click Buffer again to cancel and flush now.";
+      break;
+  }
+  if (preview.incoming >= run.integrity && !preview.lethal && !preview.enemyDefeatedByTraps && affordable(run, DEFENSE))
+    return `That transmission would end the drill: ${preview.incoming} incoming against ${run.integrity} integrity. Shield first, or undo (Z).`;
+  return null;
 }
 
 // ---------------------------------------------------------------------------

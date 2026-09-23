@@ -372,25 +372,36 @@
     width: calc(var(--rail) + 64px);
     max-height: var(--training-room, 320px);
     padding: 12px 14px 10px;
-    overflow-y: auto;
+    /* Vertical scroll only when a note truly runs long; never a horizontal bar. */
+    overflow: hidden auto;
     scrollbar-width: thin;
     /* A visible thumb tells the player a long coach note continues below. */
     scrollbar-color: #c3a26a99 #0a141a66;
-    scrollbar-gutter: stable;
     animation-name: training-dock;
   }
+  /* The corner brackets poke outside the box; inside a scroll container they would
+     conjure scrollbars, so the docked coach goes without them. */
+  .is-battle.is-practice #lesson-layer .training-panel::before,
+  .is-battle.is-practice #lesson-layer .training-panel::after { display: none; }
+  /* The stepper dots carry the progress; the meter only spent vertical room. */
+  .is-battle.is-practice #lesson-layer .training-panel:not(.is-collapsed) .training-meter { display: none; }
+  .is-battle.is-practice #lesson-layer .kicker-realm { display: none; }
+  .is-battle.is-practice #lesson-layer .training-foot span { display: none; }
   /* Docked coach: compact type; finished goals fold away except the latest one. */
   .is-practice #lesson-layer .training-head { gap: 9px; }
   .is-practice #lesson-layer .training-seal { width: 30px; height: 30px; }
   .is-practice #lesson-layer .training-kicker { font-size: 7.5px; letter-spacing: .16em; }
   .is-practice #lesson-layer .training-head h3 { font-size: 15px; line-height: 1.15; }
   .is-practice #lesson-layer .training-meter { margin: 9px 0 8px; }
-  .is-practice #lesson-layer .training-goals { gap: 3px; margin-bottom: 8px; }
-  .is-practice #lesson-layer .training-goals li { font-size: 11.5px; gap: 7px; grid-template-columns: 18px 1fr; }
-  .is-practice #lesson-layer .training-goals li i { width: 18px; height: 18px; }
-  .is-practice #lesson-layer .training-panel:not(.is-complete) .training-goals li.done:not(:has(+ li.current)) { display: none; }
+  .is-practice #lesson-layer .training-progress { margin: 10px 0 8px; }
+  .is-practice #lesson-layer .training-goals { gap: 5px; }
+  .is-practice #lesson-layer .training-goals li i { width: 19px; height: 19px; font-size: 9.5px; }
+  .is-practice #lesson-layer .training-coach { padding: 9px 10px 8px 12px; }
   .is-practice #lesson-layer .training-coach p { font-size: 12px; line-height: 1.45; }
-  .is-practice #lesson-layer .training-panel.is-complete .training-goals { display: none; }
+  .is-practice #lesson-layer .training-coach .coach-do { font-size: 13.5px; }
+  .is-practice #lesson-layer .training-coach .coach-why { font-size: 11.5px; line-height: 1.45; margin-top: 4px; }
+  .is-practice #lesson-layer .training-hint-button { margin-top: 6px; }
+  .is-practice #lesson-layer .training-foot { margin-top: 8px; padding-top: 7px; }
   .is-practice #lesson-layer .training-foot { flex-wrap: wrap; row-gap: 4px; }
   .is-battle.is-practice #lesson-layer .training-panel.is-collapsed { max-height: none; }
   .is-battle.is-practice .battle-left { top: auto; bottom: calc(var(--hand-height) + 22px); padding-top: 14px; padding-bottom: 14px; }
@@ -516,13 +527,9 @@
   .is-battle.is-practice #lesson-layer .training-kicker { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .is-battle.is-practice #lesson-layer .training-head h3 { font-size: 14px; }
 }
-@container game (min-width: 901px) and (max-height: 900px) {
-  /* Only the goal in hand is listed; the meter shows how far the lesson has come. */
-  .is-battle.is-practice #lesson-layer .training-panel:not(.is-complete) .training-goals li:not(.current) { display: none; }
-}
 /* Short tables: the card keeps only what a lesson needs (integrity and the three
    numbers), so the coach has room to speak. */
-@container game (min-width: 901px) and (max-height: 800px) {
+@container game (min-width: 901px) and (max-height: 960px) {
   .is-battle.is-practice .battle-left .combatant-identity,
   .is-battle.is-practice .survival-forecast,
   .is-battle.is-practice .player-tools { display: none; }

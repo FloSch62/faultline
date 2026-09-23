@@ -28,6 +28,7 @@ npm test            # Deterministic game rules and save migration
 npm run balance -- 500 # Reproducible seeded balance probe
 npx playwright install chromium
 npm run test:e2e    # Actual browser gameplay, desktop layout and audio playback
+npm run test:smoke  # A quick @smoke subset of the browser suite
 ```
 
 Playing requires no API keys, GPU music model, Containerlab daemon, or external asset service. All artwork, fonts and playable music are bundled. Hardware-accelerated WebGL is recommended. Desktop is the primary target. The game defaults to 110% interface scale while browser zoom stays at 100%; compact windows scroll instead of cropping essential controls.

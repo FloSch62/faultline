@@ -9,6 +9,7 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { FXAAShader } from "three/addons/shaders/FXAAShader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { linkKey } from "../core/graph.ts";
+import { wreckCrossings } from "../core/terrain.ts";
 import type { Enemy, Malware, NetworkNode, Role, Terrain, Topology, Zone, ZoneEffect } from "../core/types.ts";
 import type { Intent } from "../core/run.ts";
 import { ENEMIES } from "../core/enemies.ts";
@@ -67,6 +68,17 @@ interface CableVisual {
 
 /** Primary route is gold; every other independent channel is cyan. */
 export const CHANNEL_COLORS = { primary: 0xf2c46d, secondary: 0x6fe0f0 } as const;
+/** Unarmored cable crossing wreckage. */
+const FRAYED_COLOR = 0xd08a52;
+/** Cable spans arc over the table; the xz projection stays linear in t, so a
+ * span fraction from the rules maps straight onto the curve. */
+function cableCurve(from: WorldPoint, to: WorldPoint) {
+  const start = new THREE.Vector3(from.x, 0.62, from.z);
+  const end = new THREE.Vector3(to.x, 0.62, to.z);
+  const center = start.clone().add(end).multiplyScalar(0.5);
+  center.y += Math.min(0.38 + start.distanceTo(end) * 0.07, 1.13);
+  return new THREE.QuadraticBezierCurve3(start, center, end);
+}
 /** The hostile rises from behind the far rail: the table hides its lower body and its
  * crown reaches the header band. Sized so the head stays on screen from 1280×720 up. */
 const ENEMY_HOME = new THREE.Vector3(0, 0.7, -10.6);
@@ -157,6 +169,8 @@ export class World {
     reversed: boolean;
     routed: boolean;
   }[] = [];
+  /** Embers where frayed cables cross wreckage; they flicker. */
+  private readonly frayEmbers: { material: THREE.MeshBasicMaterial; phase: number; base: number }[] = [];
   private readonly placement: THREE.Group;
   private placementMaterials: THREE.MeshBasicMaterial[] = [];
   private scanMaterial!: THREE.ShaderMaterial;
@@ -174,6 +188,11 @@ export class World {
   private selected: string | null = null;
   private placementRole: Role | null = null;
   private linkSource: string | null = null;
+  /** The pending cable is armored and cannot fray. */
+  private linkArmored = false;
+  /** Ghost cable from the link source to the hovered device. */
+  private linkGhost: THREE.Group | null = null;
+  private linkGhostTarget: string | null = null;
   private pointerDown: {
     id: string | null;
     pointerId: number;
@@ -873,15 +892,12 @@ export class World {
     const from = this.topology.nodes.find((node) => node.id === a);
     const to = this.topology.nodes.find((node) => node.id === b);
     if (!from || !to) return;
-    const start = new THREE.Vector3(from.x, 0.62, from.z);
-    const end = new THREE.Vector3(to.x, 0.62, to.z);
-    const center = start.clone().add(end).multiplyScalar(0.5);
-    center.y += Math.min(0.38 + start.distanceTo(end) * 0.07, 1.13);
-    const curve = new THREE.QuadraticBezierCurve3(start, center, end);
+    const curve = cableCurve(from, to);
     const key = linkKey(a, b);
     const link = this.topology.links.find((edge) => linkKey(edge.a, edge.b) === key);
     const faulty = key === this.faultLink;
-    const color = faulty ? 0xec755d : link?.boosted ? 0x8ce6ef : link?.armored ? 0xf5d196 : 0xe4c58f;
+    const crossings = link && !link.armored && this.terrain ? wreckCrossings(from, to, this.terrain.debris) : [];
+    const color = faulty ? 0xec755d : link?.boosted ? 0x8ce6ef : link?.armored ? 0xf5d196 : crossings.length ? FRAYED_COLOR : 0xe4c58f;
     const cable = new THREE.Group();
     const geometry = new THREE.TubeGeometry(curve, 48, 0.055, 8, false);
     const body = new THREE.Mesh(
@@ -909,6 +925,7 @@ export class World {
         cable.add(collar);
       }
     }
+    for (const t of crossings) cable.add(this.frayMark(curve, t, true));
     const hit = new THREE.Mesh(
       new THREE.TubeGeometry(curve, 48, 0.17, 5, false),
       glow(0x000000, 0),
@@ -929,6 +946,32 @@ export class World {
     this.cableCurves.set(key, curve);
     this.cableVisuals.set(key, { body: body.material, filament: filament.material, haze: haze.material, color, faulty, source: a });
     this.dynamic.add(cable);
+  }
+
+  /** Split sheath over a wreck: splayed strands around a live ember. */
+  private frayMark(curve: THREE.Curve<THREE.Vector3>, t: number, flicker: boolean) {
+    const mark = new THREE.Group();
+    mark.position.copy(curve.getPoint(t));
+    const phase = t * 17 + mark.position.x;
+    const ember = glow(0xffa05a, 0.95);
+    ember.transparent = true;
+    mark.add(new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 10), ember));
+    const halo = glow(0xff7a3a, 0.24);
+    mark.add(new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 10), halo));
+    if (flicker) this.frayEmbers.push({ material: ember, phase, base: 0.95 }, { material: halo, phase, base: 0.24 });
+    const tangent = curve.getTangent(t);
+    const strand = glow(0xffc88a, 0.9);
+    for (let i = 0; i < 7; i++) {
+      const angle = (i / 7) * Math.PI * 2 + t * 5;
+      const direction = new THREE.Vector3(Math.cos(angle), Math.sin(angle) * 0.8 + 0.25, Math.sin(angle * 1.7))
+        .addScaledVector(tangent, i % 2 ? 0.7 : -0.7).normalize();
+      const length = 0.22 + (i % 3) * 0.07;
+      const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.017, length, 4), strand);
+      wire.position.copy(direction).multiplyScalar(length / 2);
+      wire.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+      mark.add(wire);
+    }
+    return mark;
   }
 
   private disposeObject(object: THREE.Object3D) {
@@ -999,6 +1042,8 @@ export class World {
     this.cableCurves.clear();
     this.cableVisuals.clear();
     this.cableBeads.length = 0;
+    this.frayEmbers.length = 0;
+    this.showLinkGhost(null);
     for (const link of topology.links) this.addCable(link.a, link.b);
     for (const node of topology.nodes) {
       const group = this.createDevice(node);
@@ -1113,7 +1158,8 @@ export class World {
     }
   }
 
-  /** Wreckage in blocked sockets. Rebuilt only when the layout changes. */
+  /** Wreckage in blocked sockets. Rebuilt only when the layout changes. Call it
+   * before setBattle: cables read the wreckage to know whether they fray. */
   setTerrain(terrain: Terrain | null) {
     const signature = JSON.stringify(terrain?.debris ?? null);
     this.terrain = terrain;
@@ -1307,9 +1353,11 @@ export class World {
     this.bolts.push({ mesh, curve: new THREE.QuadraticBezierCurve3(from, middle, to), start: performance.now(), duration: 520, done });
   }
 
-  setPlacement(role: Role | null, linkSource: string | null = null) {
+  setPlacement(role: Role | null, linkSource: string | null = null, linkArmored = false) {
+    if (linkSource !== this.linkSource || linkArmored !== this.linkArmored) this.showLinkGhost(null);
     this.placementRole = role;
     this.linkSource = linkSource;
+    this.linkArmored = linkArmored;
     this.placement.visible = false;
     this.refreshSelection();
     this.canvas.style.cursor = role
@@ -1421,11 +1469,38 @@ export class World {
       return;
     }
     this.previewAt(event.clientX, event.clientY);
-    if (!this.placementRole && !this.linkSource) {
+    if (this.linkSource) {
+      const target = this.hit(event).node;
+      this.showLinkGhost(target && target !== this.linkSource ? target : null);
+    } else if (!this.placementRole) {
       const hit = this.hit(event);
       this.canvas.style.cursor = hit.node || hit.malware ? "pointer" : "grab";
     }
   };
+
+  /** Previews the pending cable to `target`: cyan when clean, amber with an
+   * ember at each wreck it would fray over. Existing cables show nothing. */
+  private showLinkGhost(target: string | null) {
+    if (target === this.linkGhostTarget) return;
+    this.linkGhostTarget = target;
+    if (this.linkGhost) {
+      this.scene.remove(this.linkGhost);
+      this.disposeObject(this.linkGhost);
+      this.linkGhost = null;
+    }
+    const from = this.topology.nodes.find((node) => node.id === this.linkSource);
+    const to = this.topology.nodes.find((node) => node.id === target);
+    if (!from || !to || this.topology.links.some((link) => linkKey(link.a, link.b) === linkKey(from.id, to.id))) return;
+    const curve = cableCurve(from, to);
+    const crossings = this.linkArmored || !this.terrain ? [] : wreckCrossings(from, to, this.terrain.debris);
+    const color = crossings.length ? 0xffa860 : 0x80ffe6;
+    const ghost = new THREE.Group();
+    ghost.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.035, 6, false), glow(color, 0.75)));
+    ghost.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.12, 6, false), glow(color, 0.12)));
+    for (const t of crossings) ghost.add(this.frayMark(curve, t, false));
+    this.linkGhost = ghost;
+    this.scene.add(ghost);
+  }
   private onPointerUp = (event: PointerEvent) => {
     const down = this.pointerDown;
     this.pointerDown = null;
@@ -1461,6 +1536,7 @@ export class World {
   }
   private onPointerLeave = () => {
     this.placement.visible = false;
+    this.showLinkGhost(null);
   };
 
   playPacket(path: string[], onDone?: () => void, color = 0x8affea, count?: number) {
@@ -1756,6 +1832,8 @@ export class World {
     for (const group of this.devices.values()) animateDevice(group, time, motion, reducedMotion);
     for (const group of this.terrainGroup.children) animateProp(group as PropGroup, time, motion, reducedMotion);
     for (const group of this.malwareGroup.children) animateProp(group as PropGroup, time, motion, reducedMotion);
+    for (const { material, phase, base } of this.frayEmbers)
+      material.opacity = base * (reducedMotion ? 1 : 0.4 + 0.6 * Math.abs(Math.sin(time * 6 + phase) * Math.sin(time * 17 + phase * 2)));
     for (const item of this.cableBeads) {
       if (item.active && !reducedMotion) {
         const progress = (time * (item.routed ? 0.28 : 0.15) + item.offset) % 1;
@@ -1871,6 +1949,8 @@ export class World {
     this.cableCurves.clear();
     this.cableVisuals.clear();
     this.cableBeads.length = 0;
+    this.frayEmbers.length = 0;
+    this.linkGhost = null;
     this.zoneVisuals.clear();
     this.environment.dispose();
     this.scene.background = null;

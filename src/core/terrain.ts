@@ -1,7 +1,38 @@
 /** Encounter terrain: every fight starts on a different table.
  * Generated from seed + stage + room with a local generator; it never consumes
  * the run's card/threat RNG, so terrain is identical across reloads and choices. */
-import type { NetworkNode, Role, Terrain, Zone, ZoneEffect } from "./types.ts";
+import { RULES } from "./cards.ts";
+import { linkKey } from "./graph.ts";
+import type { NetworkNode, Role, Terrain, Topology, Zone, ZoneEffect } from "./types.ts";
+
+type Point = { x: number; z: number };
+
+/** Where the straight span a → b passes through a wreck's scorched ring: the
+ * span fraction (0–1) of its closest approach, one per wreck crossed. */
+export function wreckCrossings(a: Point, b: Point, debris: readonly Point[]): number[] {
+  const dx = b.x - a.x, dz = b.z - a.z, span = dx * dx + dz * dz;
+  const crossings: number[] = [];
+  for (const spot of debris) {
+    const t = span ? Math.max(0, Math.min(1, ((spot.x - a.x) * dx + (spot.z - a.z) * dz) / span)) : 0;
+    if (Math.hypot(a.x + t * dx - spot.x, a.z + t * dz - spot.z) < RULES.debrisClearance) crossings.push(t);
+  }
+  return crossings;
+}
+export function crossesWreckage(a: Point, b: Point, debris: readonly Point[]): boolean {
+  return wreckCrossings(a, b, debris).length > 0;
+}
+/** Unarmored cables that cross wreckage, by link key. Derived from positions,
+ * so relocating a device frays or mends its cables at once. */
+export function frayedLinks(topology: Topology, terrain: Terrain | null): Set<string> {
+  const frayed = new Set<string>();
+  if (!terrain?.debris.length) return frayed;
+  for (const link of topology.links) {
+    if (link.armored) continue;
+    const a = topology.nodes.find((node) => node.id === link.a), b = topology.nodes.find((node) => node.id === link.b);
+    if (a && b && crossesWreckage(a, b, terrain.debris)) frayed.add(linkKey(link.a, link.b));
+  }
+  return frayed;
+}
 
 export interface TerrainLayout {
   terrain: Terrain;
@@ -21,9 +52,9 @@ function generator(seed: number, stage: number, room: string) {
   };
 }
 
-/** Wreck positions. None sits within 2 units of the centre socket, so the
- * classic ALPHA → centre router → OMEGA opener always exists, and each band
- * keeps several legal sockets. */
+/** Wreck positions. None sits within 2 units of the centre socket or within
+ * reach of the centre line, so the classic ALPHA → centre router → OMEGA opener
+ * always exists and never frays, and each band keeps several legal sockets. */
 const DEBRIS_SPOTS = [
   { x: -2.5, z: -2.4 }, { x: 2.5, z: -2.4 }, { x: -2.5, z: 2.4 }, { x: 2.5, z: 2.4 },
   { x: 0, z: -3.9 }, { x: 0, z: 3.9 }, { x: -3.6, z: -1.4 }, { x: 3.6, z: 1.4 },

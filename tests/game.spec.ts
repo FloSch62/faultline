@@ -46,7 +46,7 @@ async function wire(page: Page, from: string, to: string) {
   await page.locator(`[data-node="${from}"]`).click();
   await page.locator(`[data-node="${to}"]`).click();
 }
-test("a new expedition has working loadouts, map, settings, and isolated saves", async ({
+test("a new expedition has working loadouts, map, settings, and isolated saves", { tag: "@smoke" }, async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -77,7 +77,7 @@ test("a new expedition has working loadouts, map, settings, and isolated saves",
   ).toBeNull();
   expect(errors).toEqual([]);
 });
-test("build, undo, connect, transmit, recover a fault, and take a reward", async ({
+test("build, undo, connect, transmit, recover a fault, and take a reward", { tag: "@smoke" }, async ({
   page,
 }) => {
   test.setTimeout(100_000);
@@ -236,7 +236,7 @@ test("painted desktop controls stay clear of the hand at laptop and full HD size
     }
   }
 });
-test("all soundtrack files play and bundled typography loads locally", async ({
+test("all soundtrack files play and bundled typography loads locally", { tag: "@smoke" }, async ({
   page,
 }) => {
   const failures: string[] = [];

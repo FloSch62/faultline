@@ -44,6 +44,8 @@ import {
   useConsole,
   consoleState,
   isBlocked,
+  cableFrays,
+  laysArmoredCable,
   type ActionResult,
   type TurnResult,
 } from "./core/run.ts";
@@ -232,12 +234,13 @@ function render(rebuild = true) {
   if (battle) {
     ensureWorld();
     world?.setStage(run.stage);
+    // Terrain first: cables read the wreckage to know whether they fray.
+    world?.setTerrain?.(run.terrain);
     if (rebuild)
       world?.setBattle(run.topology, debrief ? null : run.enemy, run.faultNode, run.faultLink);
     const forecast = combatPreview(run);
     root.dataset.guardianWindow = forecast.lethal ? "" : forecast.interrupted ? "break" : forecast.intent?.ultimate ? "ultimate" : forecast.intent?.kind === "charge" ? "charge" : run.enemy?.exposed ? "exposed" : "";
     root.classList.toggle("is-buffering", run.buffering);
-    world?.setTerrain?.(run.terrain);
     world?.setMalware?.(run.malware, forecast.malwareTarget);
     world?.setOnline?.(forecast.online);
     if (world?.setChannels) world.setChannels(forecast.channelPaths);
@@ -306,7 +309,7 @@ function render(rebuild = true) {
   spotlightLesson();
   renderTargetDock();
   if (selected !== null && run.hand[selected])
-    world?.setPlacement(CARDS[run.hand[selected]].role ?? null, source);
+    world?.setPlacement(CARDS[run.hand[selected]].role ?? null, source, laysArmoredCable(run.hand[selected]));
   else if (consoleTargeting) world?.setPlacement(null, source);
   else world?.setPlacement(null);
   world?.setSelected(source ?? selectedNode);
@@ -349,12 +352,17 @@ function render(rebuild = true) {
     sound.effect("boss");
   }
 }
+/** Cable target button: warns before a new cable would fray over wreckage. */
+function cableTarget(id: string, cardId: CardId | null) {
+  const frayed = !!source && source !== id && cableFrays(run, source, id, cardId);
+  return `<button data-node="${id}" class="${source === id ? "active" : ""}${frayed ? " frays" : ""}"${frayed ? ` data-tooltip="Crosses wreckage: frayed, −${RULES.frayedCableDamage} damage on your primary route. Armored cables don't fray."` : ""}>${id.toUpperCase()}${frayed ? " · FRAYS" : ""}</button>`;
+}
 function renderTargetDock() {
   let markup = "";
   if (view === "run" && run.phase === "battle") {
     if (consoleTargeting) {
       markup = `<div class="target-options console-targets"><span>PATCH CABLE · ${source ? "CONNECT TO" : "CHOOSE DEVICE"}</span>${run.topology.nodes
-        .map(n => `<button data-node="${n.id}" class="${source === n.id ? "active" : ""}">${n.fixed ? n.id.toUpperCase() : n.id.toUpperCase()}</button>`)
+        .map(n => cableTarget(n.id, null))
         .join("")}<button data-action="cancel">CANCEL ×</button></div>`;
     } else if (selected !== null) {
       const c = CARDS[run.hand[selected]];
@@ -368,9 +376,10 @@ function renderTargetDock() {
             (n) =>
               c.target === "link" || canTargetNode(run, selected!, n.id),
           )
-          .map(
-            (n) =>
-              `<button data-node="${n.id}" class="${source === n.id ? "active" : ""}">${n.id === "alpha" ? "ALPHA" : n.id === "omega" ? "OMEGA" : n.id.toUpperCase()}</button>`,
+          .map((n) =>
+            c.target === "link"
+              ? cableTarget(n.id, run.hand[selected!])
+              : `<button data-node="${n.id}" class="${source === n.id ? "active" : ""}">${n.id.toUpperCase()}</button>`,
           )
           .join("")}</div>`;
     }

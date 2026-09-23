@@ -661,7 +661,7 @@ test("a physical device drag cancelled by blur never spends energy or commits it
   ) {
     await page.mouse.move(x, y);
     if (
-      await canvas.evaluate((element) => element.style.cursor === "pointer")
+      await canvas.evaluate((element) => element.dataset.cursor === "pointer")
     ) {
       hitY = y;
       break;
@@ -677,11 +677,11 @@ test("a physical device drag cancelled by blur never spends energy or commits it
   await page.mouse.move(x, hitY!);
   await page.mouse.down();
   await page.mouse.move(x + 90, hitY! + 35, { steps: 6 });
-  await expect(canvas).toHaveCSS("cursor", "grabbing");
+  await expect(canvas).toHaveAttribute("data-cursor", "grabbing");
   await expect(page.locator("#movement-preview")).toContainText("RELOCATE ROUTER1");
   await expect(page.locator("#movement-preview")).toContainText("Shield");
   await page.evaluate(() => window.dispatchEvent(new Event("blur")));
-  await expect(canvas).toHaveCSS("cursor", "grab");
+  await expect(canvas).toHaveAttribute("data-cursor", "grab");
   await expect(page.locator("#movement-preview")).toHaveCount(0);
   await page.mouse.move(x + 110, hitY! + 45);
   await page.mouse.up();

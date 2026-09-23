@@ -92,6 +92,9 @@ export class World {
   readonly renderer: THREE.WebGLRenderer;
   readonly controls: OrbitControls;
   private readonly composer: EffectComposer;
+  /** Minimum ms between frames; 0 draws every animation frame. */
+  private readonly frameInterval: number;
+  private lastFrame = 0;
   private readonly antialias: ShaderPass;
   private readonly environment: THREE.WebGLRenderTarget;
   private readonly enemyActor = new EnemyActor();
@@ -215,17 +218,21 @@ export class World {
     this.scene.backgroundIntensity = 0.62;
     this.camera.position.set(0, 12.8, 18.8);
     this.camera.lookAt(0, 0.2, -0.4);
+    // Browser tests set __faultlineTestRender: the same scene and rules, drawn without bloom,
+    // shadows or full resolution at 20 fps, so a software-rendered suite can run in parallel.
+    const cheap = (globalThis as { __faultlineTestRender?: boolean }).__faultlineTestRender === true;
+    this.frameInterval = cheap ? 50 : 0;
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: true,
+      antialias: !cheap,
       alpha: true,
       powerPreference: "high-performance",
     });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+    this.renderer.setPixelRatio(cheap ? 0.5 : Math.min(devicePixelRatio, 1.5));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.96;
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.enabled = !cheap;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.setClearColor(0x000000, 0);
     const pmrem = new THREE.PMREMGenerator(this.renderer);
@@ -246,12 +253,12 @@ export class World {
     this.controls.target.set(0, 0.15, -0.3);
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.composer.addPass(
+    if (!cheap) this.composer.addPass(
       new UnrealBloomPass(new THREE.Vector2(1, 1), 0.38, 0.3, 0.95),
     );
     this.composer.addPass(new OutputPass());
     this.antialias = new ShaderPass(FXAAShader);
-    this.composer.addPass(this.antialias);
+    if (!cheap) this.composer.addPass(this.antialias);
 
     this.scene.add(new THREE.HemisphereLight(0xb7cad6, 0x31251c, 1.0));
     const key = new THREE.DirectionalLight(0xffdda3, 2.4);
@@ -451,17 +458,20 @@ export class World {
   }
 
   private tableInscription(text: string, width: number, color: number) {
+    // Drawn at twice the size so the engraving stays sharp on large, oblique views.
     const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 128;
+    canvas.width = 1024;
+    canvas.height = 256;
     const context = canvas.getContext("2d")!;
+    context.scale(2, 2);
     context.textAlign = "center";
     context.textBaseline = "middle";
     context.fillStyle = "#ffffff";
-    context.font = "600 88px Barlow Condensed, sans-serif";
-    context.fillText(text, 256, 64, 488);
+    context.font = "700 78px Cinzel, serif";
+    context.fillText(text, 256, 66, 488);
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = 4;
     const material = new THREE.MeshBasicMaterial({
       color, map: texture, transparent: true, opacity: 0.72, depthWrite: false,
     });
@@ -667,33 +677,56 @@ export class World {
     this.enemyGroup.visible = false;
   }
 
+  /** A device nameplate: an iron tag with clipped corners, a rim in the device's
+   * colour, a brass hairline inside it and the name in Grenze, sized to fit. */
   private makeLabel(name: string, color: number): THREE.Sprite {
     const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 112;
+    canvas.width = 1024;
+    canvas.height = 224;
     const context = canvas.getContext("2d")!;
-    context.fillStyle = "rgba(12, 17, 20, .93)";
-    context.beginPath();
-    context.moveTo(34, 22);
-    context.lineTo(478, 22);
-    context.lineTo(490, 34);
-    context.lineTo(490, 78);
-    context.lineTo(478, 90);
-    context.lineTo(34, 90);
-    context.lineTo(22, 78);
-    context.lineTo(22, 34);
-    context.closePath();
+    context.scale(2, 2);
+    const plate = (inset: number) => {
+      const [l, t, r, b, c] = [22 + inset, 22 + inset, 490 - inset, 90 - inset, 12];
+      context.beginPath();
+      context.moveTo(l + c, t);
+      context.lineTo(r - c, t);
+      context.lineTo(r, t + c);
+      context.lineTo(r, b - c);
+      context.lineTo(r - c, b);
+      context.lineTo(l + c, b);
+      context.lineTo(l, b - c);
+      context.lineTo(l, t + c);
+      context.closePath();
+    };
+    const fill = context.createLinearGradient(0, 22, 0, 90);
+    fill.addColorStop(0, "rgba(34, 30, 24, .95)");
+    fill.addColorStop(0.55, "rgba(13, 15, 17, .95)");
+    fill.addColorStop(1, "rgba(20, 20, 20, .95)");
+    plate(0);
+    context.fillStyle = fill;
     context.fill();
     context.strokeStyle = `#${color.toString(16).padStart(6, "0")}`;
-    context.lineWidth = 2;
+    context.lineWidth = 3;
     context.stroke();
-    context.fillStyle = "#effcff";
-    context.font = "600 44px Barlow Condensed, sans-serif";
+    plate(6);
+    context.strokeStyle = "rgba(201, 162, 99, .38)";
+    context.lineWidth = 1.2;
+    context.stroke();
+    const text = name.slice(0, 26);
+    let size = 56;
+    context.font = `600 ${size}px Grenze, serif`;
+    while (context.measureText(text).width > 424 && size > 30) context.font = `600 ${(size -= 2)}px Grenze, serif`;
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.fillText(name.slice(0, 26), 256, 57, 428);
+    context.lineJoin = "round";
+    context.lineWidth = 4;
+    context.strokeStyle = "rgba(0, 0, 0, .7)";
+    context.strokeText(text, 256, 58);
+    context.fillStyle = "#f6eedb";
+    context.fillText(text, 256, 58);
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = 4;
     const sprite = new THREE.Sprite(
       new THREE.SpriteMaterial({
         map: texture,
@@ -1383,11 +1416,7 @@ export class World {
     this.linkArmored = linkArmored;
     this.placement.visible = false;
     this.refreshSelection();
-    this.canvas.style.cursor = role
-      ? "crosshair"
-      : linkSource
-        ? "cell"
-        : "grab";
+    this.canvas.dataset.cursor = role || linkSource ? "target" : "grab";
   }
   setSelected(id: string | null) {
     this.selected = id;
@@ -1467,7 +1496,7 @@ export class World {
     if (this.targetingZone) {
       const point = this.pointFromScreen(event.clientX,event.clientY);
       this.setZonePreview(point ? point.z < -1.3 ? "north" : point.z > 1.3 ? "south" : "center" : null);
-      this.canvas.style.cursor = point ? "crosshair" : "default";
+      this.canvas.dataset.cursor = point ? "target" : "default";
       return;
     }
     if (
@@ -1487,7 +1516,7 @@ export class World {
       if (this.pointerDown.moved) {
         const point = this.pointFromScreen(event.clientX, event.clientY);
         this.callbacks.onMove(this.pointerDown.id, point, false);
-        this.canvas.style.cursor = "grabbing";
+        this.canvas.dataset.cursor = "grabbing";
       }
       return;
     }
@@ -1497,7 +1526,7 @@ export class World {
       this.showLinkGhost(target && target !== this.linkSource ? target : null);
     } else if (!this.placementRole) {
       const hit = this.hit(event);
-      this.canvas.style.cursor = hit.node || hit.malware ? "pointer" : "grab";
+      this.canvas.dataset.cursor = hit.node || hit.malware ? "pointer" : "grab";
     }
   };
 
@@ -1553,7 +1582,7 @@ export class World {
     this.pointerDown = null;
     this.controls.enabled = true;
     this.placement.visible = false;
-    this.canvas.style.cursor = "grab";
+    this.canvas.dataset.cursor = "grab";
     if (pointerId !== undefined && this.canvas.hasPointerCapture(pointerId))
       this.canvas.releasePointerCapture(pointerId);
   }
@@ -1839,6 +1868,11 @@ export class World {
   private tick = () => {
     if (!this.active) return;
     this.frame = requestAnimationFrame(this.tick);
+    if (this.frameInterval) {
+      const now = performance.now();
+      if (now - this.lastFrame < this.frameInterval) return;
+      this.lastFrame = now;
+    }
     const dt = Math.min(this.clock.getDelta(), 0.05);
     if (this.impactEndsAt && performance.now() >= this.impactEndsAt) {
       this.impactEndsAt = 0;

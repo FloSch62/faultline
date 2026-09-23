@@ -12,7 +12,7 @@ The deterministic network game rules and the initial Three.js scene were adapted
 
 ## Typography
 
-Cinzel, Barlow and Barlow Condensed are bundled locally. The fonts were obtained from Google Fonts and are distributed under the SIL Open Font License 1.1. Their license texts are in `public/fonts/Cinzel-OFL.txt`, `public/fonts/Barlow-OFL.txt` and `public/fonts/BarlowCondensed-OFL.txt`.
+Cinzel, Grenze, Grenze Gotisch, Alegreya and Alegreya Sans SC are bundled locally as Latin WOFF2 subsets. The fonts were obtained from the Google Fonts repository and are distributed under the SIL Open Font License 1.1. The subsets map digits to each face's own lining figures; no glyphs were redrawn. Their license texts are in `public/fonts/Cinzel-OFL.txt`, `public/fonts/Grenze-OFL.txt`, `public/fonts/GrenzeGotisch-OFL.txt`, `public/fonts/Alegreya-OFL.txt` and `public/fonts/AlegreyaSansSC-OFL.txt`.
 
 ## Artwork
 

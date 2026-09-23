@@ -19,8 +19,9 @@ const devConfig = process.env.FAULTLINE_NO_WATCH === "true" ? " --config tests/v
 export default defineConfig({
   testDir: "./tests",
   timeout: 60_000,
-  fullyParallel: false,
-  workers: 1,
+  // Tests draw a cheap 3D table (see helpers.ts), so several can share the CPU.
+  fullyParallel: true,
+  workers: process.env.CI ? 2 : 8,
   use: {
     baseURL,
     viewport: { width: 1440, height: 900 },

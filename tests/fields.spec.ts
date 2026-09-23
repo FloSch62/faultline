@@ -77,7 +77,7 @@ test("player vitals, every relic, fields and full card rules fit without collisi
     expect(assets.every(Boolean)).toBe(true);
   }
   await page.locator('.relic-token').first().click();
-  await expect(page.getByRole('heading',{name:'Power that stays with you.'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Relics',exact:true})).toBeVisible();
   await expect(page.locator('dialog .relic-ledger p')).toHaveCount(Object.keys(RELICS).length);
   await expect(page.locator('dialog .history-list')).toHaveCount(0);
   await page.screenshot({path:'artifacts/relic-journal.png',animations:'disabled'});

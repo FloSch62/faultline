@@ -62,6 +62,10 @@ export function icon(name: string, size = 18): string {
     next: '<path d="M4 12h12m-4-5 5 5-5 5M20 5v14"/>',
     scrub: '<path d="m4 20 8-8m2-6 4 4-7 7-4-4 7-7Z"/><path d="M15 3l6 6"/>',
     warning: '<path d="M12 3 22 20H2L12 3Z"/><path d="M12 9v5m0 3h.01"/>',
+    mouse: '<rect x="6" y="3" width="12" height="18" rx="6"/><path d="M12 3v6M6 9h12"/><path d="M12 3a6 6 0 0 1 6 6h-6V3Z" fill="currentColor" stroke="none"/>',
+    rise: '<path d="m5 15 7-7 7 7"/>',
+    "chevron-left": '<path d="m15 4-8 8 8 8"/>',
+    "chevron-right": '<path d="m9 4 8 8-8 8"/>',
   };
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p[name] || p.bolt}</svg>`;
 }
@@ -127,7 +131,9 @@ export function artStyle(id: string) {
   return atlasStyle(art[0], art[1]);
 }
 
-const ARCHETYPE_MARK: Record<string, string> = { architect: "ARCHITECT", warden: "WARDEN", ghost: "GHOST" };
+const ARCHETYPE_MARK: Record<string, string> = { architect: "Architect", warden: "Warden", ghost: "Ghost" };
+/** Type lines are set in the label face's small caps: "HOST BRIDGE" reads "Host Bridge". */
+const typeWords = (text: string) => text.toLowerCase().replace(/\b\w/g, ch => ch.toUpperCase()).replace(/\bQos\b/, "QoS");
 export function cardMarkup(
   id: CardId,
   index = 0,
@@ -144,8 +150,10 @@ export function cardMarkup(
   const blocked = inHand && (c.unplayable || cost > run!.energy);
   const kind = c.protocol ? "protocol" : junk ? "junk" : c.target;
   const type = junk
-    ? `${c.curse ? "CURSE" : "JUNK"}${c.unplayable ? " · UNPLAYABLE" : " · DELETE IT"}`
-    : `${c.subtitle.split(" / ").at(-1)}${c.protocol ? " · ARMED" : ""}${c.exhaust ? " · EXHAUST" : ""}`;
+    ? `${c.curse ? "Curse" : "Junk"} · ${c.unplayable ? "Unplayable" : "Delete it"}`
+    : `${typeWords(c.subtitle.split(" / ").at(-1)!)}${c.protocol ? " · Armed" : ""}${c.exhaust ? " · Exhaust" : ""}`;
+  const rarity = c.rarity === "special" ? (c.curse ? "Curse" : "Junk") : typeWords(c.rarity);
   const label = `${c.name}, ${c.unplayable ? "unplayable" : `${cost} energy`}. ${c.rules}`;
-  return `<button class="game-card rarity-${c.rarity} kind-${kind} ${upgradedCard ? "upgraded" : ""} ${junk ? "junk-card" : ""} ${c.curse ? "curse-card" : ""} ${selected ? "selected" : ""} ${blocked ? "unplayable" : ""}" data-${variant}="${variant === "hand" ? index : id}" data-card-id="${id}" style="${artStyle(id)};--card-color:${c.color};--angle:${Math.max(-10, Math.min(10, central * 3))}deg;--lift:${Math.min(15, Math.abs(central) * 5)}px;--order:${index}" aria-label="${esc(label)}"><span class="card-image"></span><span class="card-etch"></span><span class="card-cost ${c.unplayable ? "no-cost" : ""}">${c.unplayable ? "✕" : cost}</span>${upgradedCard ? '<span class="card-upgrade-mark" aria-hidden="true">+</span>' : ""}<span class="card-heading">${esc(c.name)}</span><span class="card-copy"><span class="card-type">${type}</span><span class="card-rule">${esc(c.rules)}</span></span><span class="card-footer"><span>${c.rarity === "special" ? (c.curse ? "curse" : "junk") : c.rarity}${c.archetype ? ` · ${ARCHETYPE_MARK[c.archetype]}` : ""}</span><span class="card-gem">${c.protocol ? "⌁" : "◆"}</span><span>${variant === "hand" ? `<kbd>${index === 9 ? "0" : index + 1}</kbd>` : upgradedCard ? "UPGRADED" : "CLAB"}</span></span></button>`;
+  // --name-len lets the nameplate shrink a long name to fit instead of wrapping it.
+  return `<button class="game-card rarity-${c.rarity} kind-${kind} ${upgradedCard ? "upgraded" : ""} ${junk ? "junk-card" : ""} ${c.curse ? "curse-card" : ""} ${selected ? "selected" : ""} ${blocked ? "unplayable" : ""}" data-${variant}="${variant === "hand" ? index : id}" data-card-id="${id}" style="${artStyle(id)};--card-color:${c.color};--angle:${Math.max(-10, Math.min(10, central * 3))}deg;--lift:${Math.min(15, Math.abs(central) * 5)}px;--order:${index};--name-len:${Math.max(10, c.name.length)}" aria-label="${esc(label)}"><span class="card-image"></span><span class="card-etch"></span><span class="card-cost ${c.unplayable ? "no-cost" : ""}">${c.unplayable ? icon("close", 14) : cost}</span>${upgradedCard ? '<span class="card-upgrade-mark" aria-hidden="true">+</span>' : ""}<span class="card-heading"><span class="card-name">${esc(c.name)}</span></span><span class="card-copy"><span class="card-type">${type}</span><span class="card-rule">${esc(c.rules)}</span></span><span class="card-footer"><span>${rarity}</span><span class="card-gem" aria-hidden="true"></span><span>${variant === "hand" ? `<kbd>${index === 9 ? "0" : index + 1}</kbd>` : c.archetype ? ARCHETYPE_MARK[c.archetype] : ""}</span></span></button>`;
 }

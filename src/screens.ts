@@ -2,14 +2,15 @@
  * sanctuary, market, events and outcomes. Battle UI lives in ui.ts.
  * Screens emit `data-screen` controls; main.ts forwards them to screenAction. */
 import "./screens.css";
+import "./shell.css";
 import { ENEMIES } from "./core/enemies.ts";
 import { STAGES } from "./core/stages.ts";
-import { BASE_CARD_IDS, CARDS, RELICS, RULES, canUpgrade, upgraded } from "./core/cards.ts";
+import { TRACK_TITLES } from "./core/music.ts";
+import { CARDS, RELICS, RULES, canUpgrade, upgraded } from "./core/cards.ts";
 import {
   ARCHETYPES,
   type Archetype,
   type Expedition,
-  type RunRecord,
 } from "./core/expedition.ts";
 import { reachableRooms, connectsTo, encounterHealth } from "./core/map.ts";
 import {
@@ -39,7 +40,7 @@ import type { CardId, MapRoom, RelicId, RunState } from "./core/types.ts";
 import type { AudioSettings } from "./audio.ts";
 import type { EffectKind } from "./audio-effects.ts";
 import type { Preferences } from "./preferences.ts";
-import { chapterForFloor, ARCHETYPE_STORIES, sanctuaryStory, OUTCOMES } from "./story.ts";
+import { chapterForFloor, ARCHETYPE_STORIES, sanctuaryStory, OUTCOMES, enemyStory } from "./story.ts";
 import { asset, esc, icon, artStyle, cardMarkup } from "./ui.ts";
 
 // ------------------------------------------------------------------ helpers
@@ -61,6 +62,7 @@ const EXTRA_ICONS: Record<string, string> = {
   frames: '<rect x="2" y="7" width="20" height="10" rx="1"/><path d="M7 7v10m5-10v10m5-10v10"/>',
   warn: '<path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.2" r=".6" fill="currentColor"/>',
   spark: '<path d="M12 2v5m0 10v5M2 12h5m10 0h5M5 5l3.5 3.5m7 7L19 19M5 19l3.5-3.5m7-7L19 5"/>',
+  severed: '<path d="M10 8l4-4a5 5 0 0 1 7 7l-4 4M14 16l-4 4a5 5 0 0 1-7-7l4-4M12 8.5V6.5M8.5 12h-2M15.5 12h2M12 15.5v2"/>',
 };
 /** ui.icon plus the expedition-only glyphs. */
 export function sicon(name: string, size = 18): string {
@@ -300,14 +302,15 @@ export function screenAction(run: RunState, data: DOMStringMap): ScreenOutcome {
 
 // ------------------------------------------------------------------ deck picker
 
-const PICKER_COPY: Record<PickerMode, { eyebrow: string; heading: string; verb: string; icon: string }> = {
-  "forge-upgrade": { eyebrow: "SANCTUARY · THE WORKBENCH", heading: "Improve one card, for good.", verb: "Upgrade", icon: "upgrade" },
-  "forge-remove": { eyebrow: "SANCTUARY · TRAVEL LIGHTER", heading: "Leave one card behind.", verb: "Remove", icon: "remove" },
-  "shop-upgrade": { eyebrow: "THE MARKET · FIRMWARE BENCH", heading: "Pay to improve one card.", verb: "Upgrade", icon: "upgrade" },
-  "shop-remove": { eyebrow: "THE MARKET · SCRAP DEALER", heading: "Pay to remove one card.", verb: "Remove", icon: "remove" },
-  event: { eyebrow: "UNKNOWN SIGNAL", heading: "Choose a card.", verb: "Choose", icon: "check" },
+const PICKER_COPY: Record<PickerMode, { heading: string; detail: string; verb: string; icon: string }> = {
+  "forge-upgrade": { heading: "Upgrade a Card", detail: "The change is permanent.", verb: "Upgrade", icon: "upgrade" },
+  "forge-remove": { heading: "Remove a Card", detail: "A lighter deck draws its best cards more often.", verb: "Remove", icon: "remove" },
+  "shop-upgrade": { heading: "Upgrade a Card", detail: "One upgrade per visit.", verb: "Upgrade", icon: "upgrade" },
+  "shop-remove": { heading: "Remove a Card", detail: "One removal per visit.", verb: "Remove", icon: "remove" },
+  event: { heading: "Choose a Card", detail: "", verb: "Choose", icon: "check" },
 };
 const NEED_VERB = { upgrade: "Upgrade", remove: "Remove", transform: "Transform", duplicate: "Duplicate" } as const;
+const NEED_ICON = { upgrade: "upgrade", remove: "remove", transform: "spark", duplicate: "deck" } as const;
 
 const VALUE_NAMES: Record<string, string> = {
   block: "Block", burst: "Burst", draw: "Draw", drawOffline: "Draw without a route", energy: "Energy", nextEnergy: "Energy next turn",
@@ -330,25 +333,27 @@ function upgradeSummary(id: CardId): string {
 
 function deckPickerMarkup(run: RunState, active: Picker): string {
   const copy = PICKER_COPY[active.mode];
-  let heading = copy.heading, verb = copy.verb, detail = "";
+  let heading = copy.heading, verb = copy.verb, detail = esc(copy.detail), kicker = "", glyph = copy.icon;
   let blocker: (i: number) => string | null;
   let kind: "upgrade" | "remove" | "transform" | "duplicate";
   if (active.mode === "event") {
     const choice = eventView(run)?.choices[active.choice ?? -1];
     kind = choice?.needsCard ?? "remove";
     verb = NEED_VERB[kind];
-    heading = choice ? choice.label : heading;
-    detail = choice?.detail ?? "";
+    glyph = NEED_ICON[kind];
+    heading = `${verb} a Card`;
+    kicker = choice?.label ?? "";
+    detail = esc(choice?.detail ?? "");
     blocker = i => cardChoiceBlocker(run, kind, i);
   } else if (active.mode.endsWith("upgrade")) {
     kind = "upgrade";
     blocker = i => upgradeBlocker(run, i);
-    detail = active.mode === "shop-upgrade" ? `Costs ${run.shop?.upgradePrice ?? 0} credits. One upgrade per visit.` : "This is your sanctuary service. The change is permanent.";
   } else {
     kind = "remove";
     blocker = i => removalBlocker(run, i);
-    detail = active.mode === "shop-remove" ? `Costs ${run.shop?.removePrice ?? 0} credits. One removal per visit.` : "This is your sanctuary service. A lighter deck draws its best cards more often.";
   }
+  const price = active.mode === "shop-upgrade" ? run.shop?.upgradePrice : active.mode === "shop-remove" ? run.shop?.removePrice : undefined;
+  if (price !== undefined) detail = `${credits(price, 15)} <span>${detail}</span>`;
   const order = run.deck.map((id, i) => ({ id, i })).sort((a, b) =>
     CARDS[a.id].name.localeCompare(CARDS[b.id].name) || a.i - b.i);
   const available = order.filter(({ i }) => !blocker(i)).length;
@@ -356,17 +361,18 @@ function deckPickerMarkup(run: RunState, active: Picker): string {
     const blocked = blocker(i);
     const preview = kind === "upgrade" && !blocked;
     const label = `${verb} ${CARDS[id].name}${blocked ? `. Unavailable: ${blocked}` : preview ? `. ${upgradeSummary(id)}. After: ${CARDS[upgraded(id)].rules}` : ""}`;
+    const caption = blocked ? `${sicon("lock", 13)} ${esc(blocked)}` : preview ? `${sicon("upgrade", 13)} ${esc(upgradeSummary(id))}` : "";
     return `<button class="pick-tile pick-${kind} ${blocked ? "blocked" : ""}" data-screen="pick" data-index="${i}" ${blocked ? `disabled data-tooltip="${esc(blocked)}"` : ""} aria-label="${esc(label)}">
       <span class="pick-face pick-before">${cardFace(id)}</span>
       ${preview ? `<span class="pick-face pick-after">${cardFace(upgraded(id))}</span>` : ""}
-      <span class="pick-stamp">${sicon(copy.icon, 16)} ${verb.toUpperCase()}</span>
-      <span class="pick-caption">${blocked ? `${sicon("lock", 12)} ${esc(blocked)}` : preview ? `${sicon("upgrade", 12)} ${esc(upgradeSummary(id))}` : esc(CARDS[id].subtitle.split(" / ")[1] ?? "")}</span>
+      <span class="pick-stamp">${sicon(glyph, 15)} ${verb}</span>
+      ${caption ? `<span class="pick-caption">${caption}</span>` : ""}
     </button>`;
   }).join("");
   return `<div class="picker-layer" role="dialog" aria-modal="true" aria-labelledby="picker-title">
     <div class="picker-panel">
-      <header class="picker-head"><div><span class="eyebrow">${copy.eyebrow}</span><h2 id="picker-title">${esc(heading)}</h2><p>${esc(detail)}</p></div>
-      <div class="picker-meta"><span>${available} of ${run.deck.length} cards eligible</span>${kind === "upgrade" ? "<small>Hover or focus a card to preview its upgrade.</small>" : ""}<button class="text-button" data-screen="pick-cancel">${icon("back", 14)} Back · Esc</button></div></header>
+      <header class="picker-head"><div class="picker-title">${kicker ? `<span class="eyebrow">${esc(kicker)}</span>` : ""}<h2 id="picker-title">${heading}</h2>${detail ? `<p>${detail}</p>` : ""}</div>
+      <div class="picker-meta"><span class="picker-count"><b>${available}</b> of ${run.deck.length} eligible</span><button class="plate-button" data-screen="pick-cancel">Back <kbd>Esc</kbd></button></div></header>
       <div class="picker-grid">${tiles}</div>
     </div>
   </div>`;
@@ -374,14 +380,17 @@ function deckPickerMarkup(run: RunState, active: Picker): string {
 
 // ------------------------------------------------------------------ title & selection
 
-export function titleMarkup(saved: Expedition | null, records: RunRecord[]) {
+/** The main menu: the logotype, a vertical list of engraved items, a version mark. */
+export function titleMarkup(saved: Expedition | null) {
   const canContinue = saved && !["won", "lost"].includes(saved.run.phase);
-  const progress = loadProgress();
-  const highest = Math.max(-1, ...Object.values(progress.cleared).map(v => v ?? -1));
-  const discoveries = BASE_CARD_IDS.filter(id => !CARDS[id].junk && !CARDS[id].curse).length;
-  const wins = records.filter(r => r.won).length;
-  const ascension = canContinue && saved.run.ascension ? ` · A${saved.run.ascension}` : "";
-  return `<section class="title-screen"><div class="title-copy"><div class="eyebrow title-eyebrow"><i></i>A CONTAINERLAB ODYSSEY</div><h1>FAULTLINE</h1><div class="title-subtitle"><span></span>Every connection matters.<span></span></div><p>At the edge of a silent world,<br>one signal is still alive.</p><nav class="title-menu" aria-label="Main menu">${canContinue ? `<button class="menu-primary" data-action="continue"><span><small>STAGE ${STAGES[saved.run.stage].numeral} · SECTOR ${Math.min(7, saved.run.floor + 1)} · ${ARCHETYPES[saved.archetype].name.replace(/^The /, "").toUpperCase()}${ascension}</small>Continue expedition</span>${icon("arrow", 22)}</button>` : ""}<button class="${canContinue ? "menu-link" : "menu-primary"}" data-action="new"><span>${canContinue ? "" : "<small>THE SIGNAL IS CALLING</small>"}New expedition</span>${canContinue ? "<small>THREE STAGES · THREE GUARDIANS</small>" : icon("arrow", 22)}</button><button class="menu-link" data-action="daily"><span>Daily expedition</span><small>ONE SHARED SIGNAL · EVERY DAY</small></button><button class="menu-link" data-action="tutorial"><span>Field training</span><small>LEARN EVERY SYSTEM · PLAY IT</small></button><button class="menu-link" data-action="help"><span>Handbook</span><small>RULES · DANGER PLAYBOOK</small></button><button class="menu-link" data-action="collection"><span>Card archive</span><small>${discoveries} DISCOVERIES</small></button></nav><div class="title-progress">${records.length ? `${wins} BACKBONE${wins === 1 ? "" : "S"} RESTORED <span>·</span> BEST ${Math.max(...records.map((r) => r.score)).toLocaleString()}${highest >= 0 ? ` <span>·</span> ASCENSION ${highest} CLEARED` : ""}` : "BUILD YOUR NETWORK <span>·</span> DEFEND THE SIGNAL"}</div></div><div class="world-caption"><span>01 / THE SUNKEN RELAY</span><p>Some things are worth reconnecting.</p><i></i></div><div class="title-bottom"><span>ALPHA · STRATEGY. CONSEQUENCE. CONNECTION.</span><span>HEADPHONES RECOMMENDED ${icon("sound", 14)}</span></div></section>`;
+  const where = canContinue
+    ? `Stage ${STAGES[saved.run.stage].numeral} · Sector ${Math.min(7, saved.run.floor + 1)} · ${ARCHETYPES[saved.archetype].name.replace(/^The /, "")}${saved.run.ascension ? ` · Ascension ${saved.run.ascension}` : ""}`
+    : "";
+  const item = (action: string, label: string, extra = "") =>
+    `<button class="menu-item" data-action="${action}"><span>${label}</span>${extra}</button>`;
+  return `<section class="title-screen"><div class="title-copy"><h1 class="logotype">FAULTLINE</h1><p class="logo-subtitle"><i></i><span>A Containerlab Odyssey</span><i></i></p>
+    <nav class="title-menu" aria-label="Main menu">${canContinue ? item("continue", "Continue expedition", `<small>${where}</small>`) : ""}${item("new", "New expedition")}${item("daily", "Daily expedition")}<i class="menu-gap" aria-hidden="true"></i>${item("tutorial", "Field training")}${item("help", "Handbook")}${item("collection", "Card archive")}${item("settings", "Options")}</nav>
+  </div><span class="version-mark">v${__APP_VERSION__}</span></section>`;
 }
 
 function ascensionPanel(archetype: Archetype): string {
@@ -389,54 +398,60 @@ function ascensionPanel(archetype: Archetype): string {
   const pips = Array.from({ length: MAX_ASCENSION + 1 }, (_, n) => {
     const locked = n > unlocked;
     const rule = n === 0 ? "The standard expedition." : ASCENSION_LEVELS[n - 1].rule;
-    return `<button class="asc-pip ${n === level ? "current" : ""} ${n < level ? "included" : ""} ${locked ? "locked" : ""}" data-screen="ascension" data-for="${archetype}" data-level="${n}" ${locked ? "disabled" : ""} aria-pressed="${n === level}" aria-label="Ascension ${n}${locked ? ", locked. Win at ascension " + (n - 1) + " to unlock" : ": " + rule}" data-tooltip="${esc(locked ? `Locked · win with ${ARCHETYPES[archetype].name} at ascension ${n - 1}` : n === 0 ? "Ascension 0 · the standard expedition" : `Ascension ${n} · ${ASCENSION_LEVELS[n - 1].name}: ${rule}`)}">${locked ? sicon("lock", 11) : `<span>${n}</span>`}</button>`;
+    return `<button class="asc-pip ${n === level ? "current" : ""} ${n < level ? "included" : ""} ${locked ? "locked" : ""}" data-screen="ascension" data-for="${archetype}" data-level="${n}" ${locked ? "disabled" : ""} aria-pressed="${n === level}" aria-label="Ascension ${n}${locked ? ", locked. Win at ascension " + (n - 1) + " to unlock" : ": " + rule}">${locked ? sicon("lock", 12) : `<span>${n}</span>`}</button>`;
   }).join("");
   const earlier = ASCENSION_LEVELS.slice(0, Math.max(0, level - 1));
   const current = level ? ASCENSION_LEVELS[level - 1] : null;
   const summary = current
-    ? `<strong>${esc(current.name)}</strong> <span>${esc(current.rule)}</span>${earlier.length ? ` <span class="asc-more" tabindex="0" data-tooltip="${esc(earlier.map(a => `${a.level} · ${a.rule}`).join("  "))}" aria-label="${esc(`Also in effect: ${earlier.map(a => a.rule).join(" ")}`)}">+ ${earlier.length} earlier rule${earlier.length > 1 ? "s" : ""}</span>` : ""}`
-    : `<strong>Standard expedition.</strong> <span>${unlocked ? `Ascension 1–${unlocked} unlocked for ${ARCHETYPES[archetype].name}.` : `Win with ${ARCHETYPES[archetype].name} to unlock ascension 1.`}</span>`;
-  return `<div class="ascension-panel" role="group" aria-label="Ascension">
-    <div class="asc-label">${sicon("ascend", 18)}<span><small>ASCENSION</small><strong>${level}</strong></span></div>
-    <div class="asc-track" role="group" aria-label="Choose ascension level">${pips}</div>
-    <p class="asc-summary">${summary}</p>
+    ? `<strong>${esc(current.name)}</strong> ${esc(current.rule)}${earlier.length ? ` <span class="asc-more" tabindex="0" data-tooltip="${esc(earlier.map(a => `${a.level} · ${a.rule}`).join("  "))}" aria-label="${esc(`Also in effect: ${earlier.map(a => a.rule).join(" ")}`)}">+ ${earlier.length} earlier rule${earlier.length > 1 ? "s" : ""}</span>` : ""}`
+    : `<strong>Standard expedition</strong> ${unlocked ? `Ascension 1–${unlocked} unlocked for ${ARCHETYPES[archetype].name}.` : `Win with ${ARCHETYPES[archetype].name} to unlock ascension 1.`}`;
+  return `<div class="ascension-panel inlay" role="group" aria-label="Ascension">
+    <div class="asc-label">${sicon("ascend", 20)}<span><small>Ascension</small><strong>${level}</strong></span></div>
+    <div class="asc-body"><div class="asc-track" role="group" aria-label="Choose ascension level">${pips}</div>
+    <p class="asc-summary">${summary}</p></div>
   </div>`;
 }
 
-export function selectMarkup(selected: Archetype, daily: boolean, replace: boolean) {
+const sentence = (text: string) => text.charAt(0) + text.slice(1).toLowerCase();
+export function selectMarkup(selected: Archetype, daily: boolean) {
   const ids = Object.keys(ARCHETYPES) as Archetype[];
-  const cards = ids.map((id, i) => {
+  const cards = ids.map(id => {
     const a = ARCHETYPES[id], consoleDef = CONSOLES[a.console], engine = ENGINES[id], relic = RELICS[a.relic];
-    const consoleSummary = consoleDef.rules.split(/(?<=\.)\s+/)[0];
-    return `<button class="archetype v3 ${selected === id ? "chosen" : ""}" data-archetype="${id}" aria-pressed="${selected === id}" style="${artStyle(a.art)};--accent:${a.color}" aria-label="${esc(`${a.name}. ${a.title}. Console: ${consoleDef.name}, ${consoleDef.rules} Relic: ${relic.name}, ${relic.rules} Engine: ${engine.name}. ${a.integrity} integrity.`)}">
-      <span class="archetype-art"></span><span class="archetype-number">0${i + 1}</span><span class="selection-tick">${icon("check", 16)}</span>
-      <span class="archetype-copy"><small>${a.title}</small><strong>${a.name}</strong>
+    // Short console rules read in full; a long one keeps its first sentence (the engine row explains the rest).
+    const consoleSummary = consoleDef.rules.length < 80 ? consoleDef.rules : consoleDef.rules.split(/(?<=\.)\s+/)[0];
+    return `<button class="archetype ${selected === id ? "chosen" : ""}" data-archetype="${id}" aria-pressed="${selected === id}" style="${artStyle(a.art)};--accent:${a.color}" aria-label="${esc(`${a.name}. ${a.title}. Console: ${consoleDef.name}, ${consoleDef.rules} Relic: ${relic.name}, ${relic.rules} Engine: ${engine.name}. ${a.integrity} integrity.`)}">
+      <span class="archetype-art"></span>${selected === id ? '<span class="lit-stone"></span>' : ""}
+      <span class="archetype-copy"><strong>${a.name}</strong><em class="archetype-epithet">${sentence(a.title)}</em>
         <span class="kit">
-          <span class="kit-row" data-tooltip="${esc(consoleDef.rules)}"><i>${sicon("console", 15)}</i><span><em>CONSOLE · ${consoleDef.cost} ENERGY</em><b>${consoleDef.name}</b><span>${esc(consoleSummary)}</span></span></span>
-          <span class="kit-row"><i>${relicEmblem(a.relic, 14)}</i><span><em>STARTING RELIC</em><b>${relic.name}</b><span>${esc(relic.rules)}</span></span></span>
-          <span class="kit-row"><i>${sicon("engine", 15)}</i><span><em>ENGINE</em><b>${engine.name}</b><span>${esc(engine.rules)}</span></span></span>
+          <span class="kit-row"><i>${sicon("console", 16)}</i><span><em>Console · ${consoleDef.cost} energy</em><b>${consoleDef.name}</b><span>${esc(consoleSummary)}</span></span></span>
+          <span class="kit-row"><i>${relicEmblem(a.relic, 15)}</i><span><em>Starting relic</em><b>${relic.name}</b><span>${esc(relic.rules)}</span></span></span>
+          <span class="kit-row"><i>${sicon("engine", 16)}</i><span><em>Engine</em><b>${engine.name}</b><span>${esc(engine.rules)}</span></span></span>
         </span>
-        <span class="archetype-health">${icon("heart", 13)} ${a.integrity} INTEGRITY</span>
+        <span class="archetype-health">${icon("heart", 16)}<b>${a.integrity}</b><small>Integrity</small></span>
       </span></button>`;
   }).join("");
-  return `<section class="selection-screen full-screen v3"><button class="back-link" data-action="title">${icon("back")} RETURN</button><button class="deck-link" data-action="loadout">${icon("deck", 14)} STARTING DECK</button><div class="screen-heading"><span class="eyebrow">${daily ? "THE DAILY EXPEDITION" : "A NEW EXPEDITION"}</span><h1>Who carries the signal?</h1><p class="chosen-story">${esc(ARCHETYPE_STORIES[selected].story)}</p></div><div class="archetypes">${cards}</div><div class="selection-footer">${ascensionPanel(selected)}<button class="gold-button embark" data-action="embark">Enter the Faultline ${icon("arrow", 20)}</button></div><p class="selection-note">${replace ? "Starting this expedition replaces your current saved run." : daily ? "A shared daily seed. Progress saves automatically." : "Three stages. Three guardians. Progress saves automatically."}</p></section>`;
+  return `<section class="selection-screen full-screen"><button class="back-control text-button" data-action="title"><kbd>Esc</kbd>Return</button><button class="plate-button deck-plate" data-action="loadout">${icon("deck", 16)}Starting deck</button><div class="screen-heading">${daily ? '<span class="eyebrow">Daily Expedition</span>' : ""}<h1>Choose Your Keeper</h1><p class="chosen-story">${esc(ARCHETYPE_STORIES[selected].story)}</p></div><div class="archetypes">${cards}</div><div class="selection-footer">${ascensionPanel(selected)}<button class="gold-button embark" data-action="embark">Enter the Faultline</button></div></section>`;
 }
 
 // ------------------------------------------------------------------ header & map
 
+/** The in-run HUD bar: expedition vitals on the left, brass studs for sound, fullscreen and Options on the right.
+ *  The title and keeper select wear no bar; the logotype is the brand. */
 export function headerMarkup(e: Expedition | null, inTitle: boolean, settings: AudioSettings) {
   const r = e?.run;
-  return `<div class="brand"><img src="${asset("containerlab-mark.svg")}" alt="Containerlab"/><span>${inTitle ? "CONTAINERLAB" : "FAULTLINE"}<small>${inTitle ? "TRANSMISSIONS FROM THE EDGE" : "A CONTAINERLAB ODYSSEY"}</small></span></div>${!inTitle && r ? `<div class="run-stats"><span class="integrity-stat" data-tooltip="Integrity persists between encounters">${icon("heart", 17)} <b>${r.integrity}</b><small>/${r.maxIntegrity}</small></span><span class="stat-divider"></span><span class="credits-stat" data-tooltip="Credits: spend them at a Market" aria-label="${r.credits} credits">${sicon("coins", 17)} <b>${r.credits}</b></span><span class="stat-divider"></span><button data-action="deck" data-tooltip="View your deck" aria-label="View your deck, ${r.deck.length} cards">${icon("deck", 17)} ${r.deck.length}</button><span class="stat-divider"></span><span class="stage-stat" data-tooltip="${STAGES[r.stage].name}">STAGE <b>${STAGES[r.stage].numeral}</b><small> / III</small></span><span class="stat-divider"></span><span class="sector-stat">SECTOR <b>${String(Math.min(r.floor + 1, 7)).padStart(2, "0")}</b> / 07</span>${r.ascension ? `<span class="stat-divider"></span><span class="ascension-stat" data-tooltip="${esc(ASCENSION_LEVELS.slice(0, r.ascension).map(a => `${a.level}. ${a.rule}`).join(" "))}">${sicon("ascend", 15)} <b>${r.ascension}</b></span>` : ""}</div>` : ""}<nav class="header-controls" aria-label="Game controls"><button data-action="sound" aria-label="${settings.muted ? "Enable" : "Mute"} audio" data-tooltip="${settings.muted ? "Enable" : "Mute"} audio">${icon(settings.muted ? "mute" : "sound")}</button><button data-action="fullscreen" aria-label="Toggle fullscreen" data-tooltip="Fullscreen">${icon("full")}</button><button data-action="settings" aria-label="Open settings" data-tooltip="Settings">${icon("settings", 20)}</button></nav>`;
+  if (inTitle || !r) return "";
+  const gem = '<i class="stat-divider" aria-hidden="true"></i>';
+  return `<div class="run-stats"><span class="integrity-stat" data-tooltip="Integrity persists between encounters" aria-label="Integrity ${r.integrity} of ${r.maxIntegrity}">${icon("heart", 18)}<b>${r.integrity}</b><small>/${r.maxIntegrity}</small></span>${gem}<span class="credits-stat" data-tooltip="Credits: spend them at a Market" aria-label="${r.credits} credits">${sicon("coins", 18)}<b>${r.credits}</b></span>${gem}<button class="deck-stat" data-action="deck" data-tooltip="View your deck" aria-label="View your deck, ${r.deck.length} cards">${icon("deck", 18)}<b>${r.deck.length}</b></button>${gem}<span class="stage-stat" data-tooltip="${STAGES[r.stage].name}"><small>Stage</small><b>${STAGES[r.stage].numeral}</b></span><span class="sector-stat"><small>Sector</small><b>${Math.min(r.floor + 1, 7)}</b><small>/ 7</small></span>${r.ascension ? `${gem}<span class="ascension-stat" data-tooltip="${esc(ASCENSION_LEVELS.slice(0, r.ascension).map(a => `${a.level}. ${a.rule}`).join(" "))}">${sicon("ascend", 17)}<b>${r.ascension}</b></span>` : ""}</div><nav class="header-controls" aria-label="Game controls"><button class="icon-button" data-action="sound" aria-label="${settings.muted ? "Enable" : "Mute"} audio" data-tooltip="${settings.muted ? "Enable" : "Mute"} audio">${icon(settings.muted ? "mute" : "sound")}</button><button class="icon-button" data-action="fullscreen" aria-label="Toggle fullscreen" data-tooltip="Fullscreen">${icon("full")}</button><button class="icon-button" data-action="settings" aria-label="Open settings" data-tooltip="Options">${icon("settings", 19)}</button></nav>`;
 }
 
 export const roomNames: Record<MapRoom["type"], string> = {
-  battle: "Hostile signal",
-  elite: "Elite threat",
-  cache: "Salvage cache",
+  battle: "Hostile Signal",
+  elite: "Elite Threat",
+  cache: "Salvage Cache",
   forge: "Sanctuary",
-  boss: "Stage guardian",
+  boss: "Stage Guardian",
   shop: "Market",
-  event: "Unknown signal",
+  event: "Unknown Signal",
 };
 const roomIcons: Record<MapRoom["type"], string> = {
   battle: "sword",
@@ -449,7 +464,7 @@ const roomIcons: Record<MapRoom["type"], string> = {
 };
 function roomDetail(r: RunState, n: MapRoom): string {
   const scout = n.enemyId ? ENEMIES[n.enemyId] : null;
-  if (scout) return `${scout.name} · ${encounterHealth(r.stage, n, r.ascension)} integrity. ${scout.trait}`;
+  if (scout) return `${title(scout.name)} · ${encounterHealth(r.stage, n, r.ascension)} integrity. ${scout.trait}`;
   return {
     forge: `Sanctuary · one service: repair ${repairAmount(r)} integrity, upgrade a card, remove a card, or trade ${SALVAGE_COST} maximum integrity for a relic.`,
     cache: "Salvage cache · choose one card, and recover a few credits.",
@@ -461,7 +476,7 @@ function roomDetail(r: RunState, n: MapRoom): string {
 export function mapMarkup(e: Expedition) {
   const r = e.run, stage = STAGES[r.stage],
     reachable = new Set(reachableRooms(r).map((n) => n.id));
-  const pos = (n: MapRoom) => ({ x: 18 + n.lane * 30 + (n.floor % 2 ? 3 : -3), y: 86 - n.floor * 12 });
+  const pos = (n: MapRoom) => ({ x: 18 + n.lane * 30 + (n.floor % 2 ? 3 : -3), y: 90 - n.floor * 13.4 });
   const lines = r.map.flatMap((n) => r.map.filter((t) => connectsTo(n, t)).map((t) => {
     const a = pos(n), b = pos(t);
     const active = n.cleared && (t.cleared || reachable.has(t.id));
@@ -471,27 +486,38 @@ export function mapMarkup(e: Expedition) {
     const p = pos(n), available = reachable.has(n.id);
     const scout = n.enemyId ? ENEMIES[n.enemyId] : null;
     const detail = roomDetail(r, n);
-    const name = n.type === "boss" ? stage.chapters[6] : roomNames[n.type];
-    return `<button class="route-room type-${n.type} ${available ? "available" : ""} ${n.cleared ? "cleared" : ""}" data-room="${n.id}" data-tooltip="${esc(detail)}" style="left:${p.x}%;top:${p.y}%" ${available ? "" : "disabled"} aria-label="Sector ${n.floor + 1}: ${esc(name)}${scout ? `, ${esc(scout.name)}, ${encounterHealth(r.stage, n, r.ascension)} integrity` : ""}. ${esc(detail)}"><span class="room-orbit"></span><span class="room-symbol">${sicon(n.cleared ? "check" : roomIcons[n.type], n.type === "boss" ? 28 : 20)}</span><span class="room-label">${esc(name)}${scout && n.type !== "boss" ? `<small class="room-scout">${esc(scout.name.replace(/^THE /, ""))}</small>` : ""}</span>${available ? '<span class="room-enter">ENTER</span>' : ""}</button>`;
+    const name = n.type === "boss" ? stage.chapters[6] : scout ? title(scout.name) : roomNames[n.type];
+    // The icon and its colour carry the room type; the caption names what waits there.
+    const caption = scout && n.type !== "boss" ? `<span class="room-scout">${esc(name)}</span>` : esc(name);
+    return `<button class="route-room type-${n.type} ${available ? "available" : ""} ${n.cleared ? "cleared" : ""}" data-room="${n.id}" data-tooltip="${esc(detail)}" style="left:${p.x}%;top:${p.y}%" ${available ? "" : "disabled"} aria-label="Sector ${n.floor + 1}: ${esc(roomNames[n.type])}${scout ? `, ${esc(name)}, ${encounterHealth(r.stage, n, r.ascension)} integrity` : ""}. ${esc(detail)}"><span class="room-orbit"></span><span class="room-symbol">${sicon(n.cleared ? "check" : roomIcons[n.type], n.type === "boss" ? 28 : 20)}</span><span class="room-label">${caption}</span></button>`;
   }).join("");
   const legend = (["battle", "elite", "event", "shop", "cache", "forge"] as const)
-    .map((k) => `<span class="legend-${k}">${sicon(roomIcons[k], 13)} ${roomNames[k]}</span>`).join("");
-  return `<section class="map-screen"><aside class="map-story"><span class="eyebrow">STAGE ${stage.numeral} · ${stage.name.toUpperCase()}${r.ascension ? ` · ASCENSION ${r.ascension}` : ""}</span><div class="chapter-sigil">${icon("map", 46)}</div><h1>${stage.chapters[Math.min(r.floor, 6)]}</h1><p>${r.stage === 0 && r.floor < 3 ? chapterForFloor(r.floor).description : stage.description}</p><blockquote class="story-fragment">“${stage.fragment}”</blockquote><div class="map-condition"><span>${icon("heart")} Integrity <strong>${r.integrity}<small> / ${r.maxIntegrity}</small></strong></span><span class="map-credits">${sicon("coins")} Credits <strong>${r.credits}</strong></span><span>${icon("deck")} Your deck <strong>${r.deck.length}<small> cards</small></strong></span></div><div class="map-relics"><span class="eyebrow">RELICS CARRIED</span>${r.relics.map((id) => `<span class="carried-relic" data-tooltip="${esc(RELICS[id].rules)}" tabindex="0" aria-label="${esc(`${RELICS[id].name}: ${RELICS[id].rules}`)}">${relicEmblem(id, 13)} ${RELICS[id].name}</span>`).join("")}</div><button class="text-button" data-action="deck">Examine deck ${icon("arrow", 16)}</button></aside><div class="route-scroll" role="region" tabindex="0" aria-label="Route chart. Scroll to scout future sectors."><div class="route-chart"><div class="map-rings" aria-hidden="true"></div><svg class="map-paths" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${lines}</svg>${rooms}<div class="chart-start">${icon("arrow", 16)} YOUR JOURNEY</div></div></div><div class="map-bottom"><span>SCROLL TO SCOUT · CHOOSE A LIT RELAY</span><div class="map-legend">${legend}</div><span>SEED ${r.seed.toString(16).toUpperCase()}</span></div></section>`;
+    .map((k) => `<span class="legend-${k}"><i>${sicon(roomIcons[k], 13)}</i>${roomNames[k]}</span>`).join("");
+  const relics = r.relics.map((id) => `<span class="carried-relic" data-tooltip="${esc(RELICS[id].rules)}" tabindex="0" aria-label="${esc(`${RELICS[id].name}: ${RELICS[id].rules}`)}">${relicEmblem(id, 13)}<span>${RELICS[id].name}</span></span>`).join("");
+  return `<section class="map-screen"><aside class="map-story"><span class="eyebrow">STAGE ${stage.numeral} · ${stage.name.toUpperCase()}${r.ascension ? ` · ASCENSION ${r.ascension}` : ""}</span><div class="chapter-sigil">${icon("map", 40)}</div><h1>${stage.chapters[Math.min(r.floor, 6)]}</h1><p>${r.stage === 0 && r.floor < 3 ? chapterForFloor(r.floor).description : stage.description}</p><blockquote class="story-fragment">“${stage.fragment}”</blockquote><div class="map-condition" role="group" aria-label="Expedition status"><span class="map-stat map-integrity">${icon("heart", 17)}<strong>${r.integrity}<small>/${r.maxIntegrity}</small></strong><small>Integrity</small></span><span class="map-stat map-credits">${sicon("coins", 17)}<strong>${r.credits}</strong><small>Credits</small></span><span class="map-stat">${icon("deck", 17)}<strong>${r.deck.length}</strong><small>Cards</small></span></div><div class="map-relics"><h2 class="map-section">Relics</h2><div class="relic-list">${relics}</div></div><div class="map-actions"><button class="plate-button" data-action="deck">${icon("deck", 16)} Examine deck</button><span class="map-seed">Seed <b>${r.seed.toString(16).toUpperCase()}</b></span></div></aside><div class="map-main"><div class="route-scroll" role="region" tabindex="0" aria-label="Route chart. Scroll to scout future sectors."><div class="route-chart"><div class="map-rings" aria-hidden="true"></div><svg class="map-paths" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${lines}</svg>${rooms}</div></div><footer class="map-bottom"><div class="map-legend" aria-label="Map key">${legend}</div></footer></div></section>`;
 }
 
 // ------------------------------------------------------------------ rewards & relics
 
+/** A screen's heading: the name of the place or choice, an optional line of flavour. */
+const screenHead = (heading: string, flavour = "", kicker = "") =>
+  `<header class="panel-head screen-head">${kicker ? `<span class="eyebrow">${kicker}</span>` : ""}<h1>${heading}</h1>${flavour ? `<p>${flavour}</p>` : ""}</header>`;
+/** The defeated hostile's proper name, for the spoils heading. */
+function foeName(r: RunState, room?: MapRoom): string {
+  const id = r.enemy?.id ?? room?.enemyId;
+  if (!id || !ENEMIES[id]) return "Hostile";
+  return enemyStory(id)?.name ?? title(ENEMIES[id].name);
+}
+
 export function rewardMarkup(r: RunState) {
   const room = r.map.find(room => room.id === r.currentRoom);
-  const cache = room?.type === "cache", boss = room?.type === "boss", elite = room?.type === "elite", event = room?.type === "event";
-  const description = cache ? "A tool for the road, signal keeper. Take one with you."
-    : boss ? r.stage === STAGES.length - 1 ? "Claim your last discovery. The backbone is waiting."
-      : "Choose a card. Then choose a guardian's relic: great power, with a price."
-      : elite ? "Choose a card. A relic waits for you after this choice."
-        : event ? "The static clears. Choose a card to carry onward."
-          : "Choose a card to carry into the next sector.";
+  const cache = room?.type === "cache", boss = room?.type === "boss", elite = room?.type === "elite";
+  const final = boss && r.stage === STAGES.length - 1;
+  const kicker = cache ? "" : boss ? `STAGE ${STAGES[r.stage].numeral} · GUARDIAN DEFEATED` : `${foeName(r, room)} silenced`;
+  const cue = boss ? final ? "Choose your last card" : "Choose a card, then a guardian's relic"
+    : elite ? "Choose a card, then a relic" : "Choose a card";
   const earned = r.creditsEarned ?? 0;
-  return `<section class="reward-screen full-screen v3"><div class="reward-emblem">${icon(cache ? "cache" : "crown", 36)}</div><span class="eyebrow">${cache ? "THE SALVAGE CACHE" : boss ? `STAGE ${STAGES[r.stage].numeral} · GUARDIAN DEFEATED` : elite ? "ELITE THREAT SILENCED" : "HOSTILE SIGNAL SILENCED"}</span><h1>${cache ? "Something worth carrying." : boss ? "The gate stands open." : "A connection restored."}</h1><p>${description}</p>${earned ? `<div class="spoils" role="status">${sicon("coins", 18)}<span><b>+${earned}</b> credits recovered</span><small>${r.credits} carried</small></div>` : ""}<div class="reward-cards">${r.cardRewards.map((id, i) => cardMarkup(id, i, "reward")).join("")}</div><button class="text-button" data-action="skip-reward">Leave these behind ${icon("arrow", 16)}</button><span class="reward-footer">YOUR DECK · ${r.deck.length} CARDS</span></section>`;
+  return `<section class="reward-screen full-screen v3"><div class="reward-emblem">${icon(cache ? "cache" : boss ? "crown" : "sword", 30)}</div>${screenHead(cache ? "Salvage Cache" : "Victory", "", kicker)}<p class="screen-cue">${cue}</p>${earned ? `<div class="spoils" role="status">${sicon("coins", 20)}<b>+${earned}</b><span>credits</span></div>` : ""}<div class="reward-cards">${r.cardRewards.map((id, i) => cardMarkup(id, i, "reward")).join("")}</div><button class="plate-button reward-skip" data-action="skip-reward">Skip</button></section>`;
 }
 
 export function relicMarkup(r: RunState) {
@@ -499,14 +525,16 @@ export function relicMarkup(r: RunState) {
   const boss = r.relicRewards.some(id => RELICS[id].tier === "boss");
   const options = r.relicRewards.map((id, i) => {
     const relic = RELICS[id];
+    const kind = `<small class="relic-kind">${relic.subtitle.replace(/^BOSS · /, "")}</small>`;
     if (boss) {
       const { boon, cost } = relicTerms(id);
-      return `<button class="relic-option boss-relic" data-relic="${id}" style="--accent:${relic.color};--order:${i}" aria-label="${esc(`${relic.name}. ${relic.rules}`)}"><span class="relic-halo">${relicEmblem(id, 40)}</span><small>${relic.subtitle}</small><strong>${relic.name}</strong><span class="relic-boon">${sicon("spark", 14)} ${esc(boon)}</span>${cost ? `<span class="relic-cost">${sicon("warn", 14)} ${esc(cost)}</span>` : ""}<span class="relic-claim">CLAIM ${icon("arrow", 16)}</span></button>`;
+      return `<button class="relic-option boss-relic" data-relic="${id}" style="--accent:${relic.color};--order:${i}" aria-label="${esc(`${relic.name}. ${relic.rules}`)}"><span class="relic-halo">${relicEmblem(id, 40)}</span>${kind}<strong>${relic.name}</strong><span class="relic-boon">${sicon("spark", 15)}<span>${esc(boon)}</span></span>${cost ? `<span class="relic-cost">${sicon("warn", 15)}<span>${esc(cost)}</span></span>` : ""}</button>`;
     }
-    return `<button class="relic-option" data-relic="${id}" style="--accent:${relic.color};--order:${i}" aria-label="${esc(`${relic.name}. ${relic.rules}`)}"><span class="relic-halo">${relicEmblem(id, 36)}</span><small>${relic.subtitle}</small><strong>${relic.name}</strong><span class="relic-rules">${esc(relic.rules)}</span><span class="relic-claim">TAKE ${icon("arrow", 16)}</span></button>`;
+    return `<button class="relic-option" data-relic="${id}" style="--accent:${relic.color};--order:${i}" aria-label="${esc(`${relic.name}. ${relic.rules}`)}"><span class="relic-halo">${relicEmblem(id, 36)}</span>${kind}<strong>${relic.name}</strong><span class="relic-rules">${esc(relic.rules)}</span></button>`;
   }).join("");
-  const guardian = room?.type === "boss";
-  return `<section class="relic-screen full-screen v3 ${boss ? "boss-offer" : ""}"><span class="eyebrow">${boss ? "A GUARDIAN'S RELIC · POWER WITH A PRICE" : room?.type === "forge" ? "SALVAGED FROM THE SANCTUARY" : "A FRAGMENT OF THE OLD WORLD"}</span><h1>${boss ? "Its power is yours. So is its price." : "Power that stays with you."}</h1><p>${boss ? "Choose one boss relic. Each rewrites a rule of your network for the rest of the expedition." : "Choose one relic. Its effect lasts for the expedition."}${guardian ? " Enter the next stage with up to 6 integrity restored." : ""}</p><div class="relic-options">${options}</div></section>`;
+  // Clearing a guardian carries the expedition into the next stage with some integrity back.
+  const mend = room?.type === "boss" && r.stage < STAGES.length - 1 ? Math.min(6, r.maxIntegrity - r.integrity) : 0;
+  return `<section class="relic-screen full-screen v3 ${boss ? "boss-offer" : ""}">${screenHead("Choose a Relic", boss ? "Its power is yours. So is its price." : "")}<p class="screen-cue">${boss ? "Each rewrites a rule of your network for the rest of the expedition" : "Its effect lasts for the whole expedition"}</p>${mend ? `<div class="spoils" role="status">${icon("heart", 18)}<b>+${mend}</b><span>integrity on entering Stage ${STAGES[r.stage + 1].numeral}</span></div>` : ""}<div class="relic-options">${options}</div></section>`;
 }
 
 // ------------------------------------------------------------------ sanctuary
@@ -515,21 +543,27 @@ export function forgeMarkup(r: RunState) {
   const story = sanctuaryStory(r.floor, r.map.find(n => n.id === r.currentRoom)?.lane);
   const repair = Math.min(repairAmount(r), r.maxIntegrity - r.integrity);
   const noRelics = !relicPool(r, "common").length;
-  const salvageBlocked = noRelics ? "ALL RELICS RECOVERED"
-    : r.maxIntegrity - SALVAGE_COST < SALVAGE_MIN_INTEGRITY ? `REQUIRES ${SALVAGE_MIN_INTEGRITY + SALVAGE_COST}+ MAXIMUM INTEGRITY` : "";
+  const salvageBlocked = noRelics ? "All relics recovered"
+    : r.maxIntegrity - SALVAGE_COST < SALVAGE_MIN_INTEGRITY ? `Requires <b>${SALVAGE_MIN_INTEGRITY + SALVAGE_COST}</b> max integrity` : "";
   const upgradable = r.deck.filter(id => canUpgrade(id)).length;
   const removable = r.deck.filter((_, i) => !removalBlocker(r, i)).length;
-  const service = (verb: string, art: string, eyebrow: string, heading: string, text: string, note: string, disabled = false, glyph = "") =>
-    `<button class="service-card" data-screen="${verb}" style="${artStyle(art)}" ${disabled ? "disabled" : ""}><span class="service-art"></span>${glyph ? `<span class="service-glyph">${sicon(glyph, 22)}</span>` : ""}<span class="eyebrow">${eyebrow}</span><strong>${heading}</strong><span class="service-text">${text}</span><small>${note}</small></button>`;
-  return `<section class="forge-screen full-screen v3"><div class="reward-emblem">${icon("forge", 34)}</div><span class="eyebrow">SANCTUARY · NO HOSTILE SIGNALS · ONE SERVICE</span><h1>${story.title}.</h1><p>${story.description}</p><div class="service-row">${[
-    service("forge-repair", "patch", "REPAIR", "Mend the backbone", repair ? `Restore ${repair} integrity.` : "Your integrity is already full.", `${r.integrity} / ${r.maxIntegrity} INTEGRITY`, false, "heart"),
-    service("forge-upgrade", "startup-config", "UPGRADE", "Refine a card", "One card becomes its upgraded version, for good.", `${upgradable} CARD${upgradable === 1 ? "" : "S"} CAN IMPROVE`, !upgradable, "upgrade"),
-    service("forge-remove", "crosslink", "REMOVE", "Travel lighter", "Leave one card behind. Curses too.", `${removable} CARD${removable === 1 ? "" : "S"} CAN GO`, !removable, "remove"),
-    service("forge-salvage", "firmware", "SALVAGE", "Bind a relic", `Sacrifice ${SALVAGE_COST} maximum integrity for one of three relics.`, salvageBlocked || `MAX INTEGRITY ${r.maxIntegrity} → ${r.maxIntegrity - SALVAGE_COST}`, !!salvageBlocked, "elite"),
-  ].join("")}</div><span class="reward-footer">YOUR DECK · ${r.deck.length} CARDS</span>${activePicker(r) ? deckPickerMarkup(r, activePicker(r)!) : ""}</section>`;
+  const service = (verb: string, art: string, heading: string, text: string, note: string, disabled: boolean, glyph: string) =>
+    `<button class="service-card" data-screen="${verb}" style="${artStyle(art)}" ${disabled ? "disabled" : ""}><span class="service-art"></span><span class="service-glyph">${sicon(glyph, 22)}</span><strong>${heading}</strong><span class="service-text">${text}</span><span class="service-note">${note}</span></button>`;
+  const cards = (n: number) => `<b>${n}</b> card${n === 1 ? "" : "s"}`;
+  // The first sentence of the sanctuary's story is what you find as you step in.
+  const discovery = story.description.split(/(?<=\.)\s+/)[0];
+  return `<section class="forge-screen full-screen v3"><div class="reward-emblem">${icon("forge", 30)}</div>${screenHead("Sanctuary", esc(discovery))}<p class="screen-cue">Choose one service</p><div class="service-row">${[
+    service("forge-repair", "patch", "Repair", repair ? `Restore ${repair} integrity.` : "Your integrity is already full.", `${icon("heart", 14)} <b>${r.integrity} / ${r.maxIntegrity}</b>`, false, "heart"),
+    service("forge-upgrade", "startup-config", "Upgrade", "One card becomes its upgraded version, for good.", `${cards(upgradable)} can improve`, !upgradable, "upgrade"),
+    service("forge-remove", "crosslink", "Remove", "Leave one card behind. Curses too.", `${cards(removable)} can go`, !removable, "remove"),
+    service("forge-salvage", "firmware", "Salvage", `Sacrifice ${SALVAGE_COST} maximum integrity for one of three relics.`, salvageBlocked || `Max integrity <b>${r.maxIntegrity} → ${r.maxIntegrity - SALVAGE_COST}</b>`, !!salvageBlocked, "elite"),
+  ].join("")}</div>${activePicker(r) ? deckPickerMarkup(r, activePicker(r)!) : ""}</section>`;
 }
 
 // ------------------------------------------------------------------ market
+
+/** Each stage's market takes its name from the stage: The Copper Market, The Glass Market… */
+const marketName = (stage: number) => `The ${STAGES[stage].name.split(" ")[1]} Market`;
 
 export function shopMarkup(r: RunState) {
   const shop = r.shop;
@@ -537,15 +571,15 @@ export function shopMarkup(r: RunState) {
   const cards = shop.cards.map((offer, i) => {
     const card = CARDS[offer.id], afford = r.credits >= offer.price;
     const bench = i === 0 && offer.id === "router";
-    return `<div class="market-offer ${offer.sold ? "sold" : ""} ${!offer.sold && !afford ? "short" : ""} ${bench ? "bench" : ""}" style="--order:${i}">${bench ? `<span class="offer-tag">HARDWARE BENCH</span>` : offer.id.endsWith("+") ? `<span class="offer-tag upgraded">${sicon("upgrade", 11)} UPGRADED</span>` : `<span class="offer-tag rarity-${card.rarity}">${card.rarity.toUpperCase()}</span>`}${cardFace(offer.id)}${offer.sold ? '<span class="sold-stamp">SOLD</span>' : ""}<button class="price-button" data-screen="buy-card" data-index="${i}" ${offer.sold ? "disabled" : ""} aria-label="${esc(offer.sold ? `${card.name}, sold` : `Buy ${card.name} for ${offer.price} credits${afford ? "" : ", not enough credits"}. ${card.rules}`)}">${offer.sold ? "Sold" : credits(offer.price, 14)}</button></div>`;
+    return `<div class="market-offer ${offer.sold ? "sold" : ""} ${!offer.sold && !afford ? "short" : ""} ${bench ? "bench" : ""}" style="--order:${i}">${cardFace(offer.id)}${offer.sold ? '<span class="sold-stamp">Sold</span>' : ""}<button class="price-button" data-screen="buy-card" data-index="${i}" ${offer.sold ? "disabled" : ""} aria-label="${esc(offer.sold ? `${card.name}, sold` : `Buy ${card.name} for ${offer.price} credits${afford ? "" : ", not enough credits"}. ${card.rules}`)}">${offer.sold ? "Sold" : credits(offer.price, 15)}</button></div>`;
   }).join("");
   const relics = shop.relics.map((offer, i) => {
     const relic = RELICS[offer.id], afford = r.credits >= offer.price;
-    return `<div class="market-relic ${offer.sold ? "sold" : ""} ${!offer.sold && !afford ? "short" : ""}" style="--accent:${relic.color}">${relicEmblem(offer.id, 26)}<span class="market-relic-copy"><small>${relic.subtitle}</small><strong>${relic.name}</strong><span>${esc(relic.rules)}</span></span><button class="price-button" data-screen="buy-relic" data-index="${i}" ${offer.sold ? "disabled" : ""} aria-label="${esc(offer.sold ? `${relic.name}, sold` : `Buy ${relic.name} for ${offer.price} credits${afford ? "" : ", not enough credits"}. ${relic.rules}`)}">${offer.sold ? "Sold" : credits(offer.price, 14)}</button></div>`;
+    return `<div class="market-relic ${offer.sold ? "sold" : ""} ${!offer.sold && !afford ? "short" : ""}" style="--accent:${relic.color}">${relicEmblem(offer.id, 24)}<span class="market-relic-copy"><strong>${relic.name}</strong><span>${esc(relic.rules)}</span></span><button class="price-button" data-screen="buy-relic" data-index="${i}" ${offer.sold ? "disabled" : ""} aria-label="${esc(offer.sold ? `${relic.name}, sold` : `Buy ${relic.name} for ${offer.price} credits${afford ? "" : ", not enough credits"}. ${relic.rules}`)}">${offer.sold ? "Sold" : credits(offer.price, 15)}</button></div>`;
   }).join("");
   const service = (verb: "shop-remove" | "shop-upgrade", used: boolean, price: number, glyph: string, heading: string, text: string) =>
-    `<button class="market-service ${used ? "sold" : ""} ${!used && r.credits < price ? "short" : ""}" data-screen="${verb}" ${used ? "disabled" : ""}><span class="service-glyph">${sicon(glyph, 20)}</span><span><strong>${heading}</strong><span>${used ? "Done for this visit." : text}</span></span><span class="price-tag">${used ? "Used" : credits(price, 14)}</span></button>`;
-  return `<section class="market-screen full-screen"><header class="market-head"><div><span class="eyebrow">THE MARKET · ${STAGES[r.stage].name.toUpperCase()}</span><h1>Salvage, sold by lantern light.</h1><p>Every price is fixed. Every credit spent here is a turn you will not have to survive.</p></div><div class="purse" role="status" aria-label="${r.credits} credits">${sicon("coins", 26)}<span><strong>${r.credits}</strong><small>CREDITS</small></span></div></header><div class="market-shelf" aria-label="Cards for sale">${cards}</div><div class="market-lower"><section class="market-relics" aria-label="Relics for sale"><span class="eyebrow">RELICS</span>${relics || '<p class="market-empty">No relics left to trade.</p>'}</section><section class="market-services" aria-label="Services"><span class="eyebrow">SERVICES · ONCE PER VISIT</span>${service("shop-remove", shop.removed, shop.removePrice, "remove", "Remove a card", "Curses and dead weight, gone.")}${service("shop-upgrade", shop.upgraded, shop.upgradePrice, "upgrade", "Upgrade a card", "One card becomes its + version.")}</section><div class="market-exit"><button class="gold-button" data-screen="leave-shop">Leave the market ${icon("arrow", 18)}</button><button class="text-button" data-action="deck">Examine deck · ${r.deck.length} cards</button></div></div>${activePicker(r) ? deckPickerMarkup(r, activePicker(r)!) : ""}</section>`;
+    `<button class="market-service ${used ? "sold" : ""} ${!used && r.credits < price ? "short" : ""}" data-screen="${verb}" ${used ? "disabled" : ""}><span class="service-glyph">${sicon(glyph, 18)}</span><span class="market-service-copy"><strong>${heading}</strong><span>${used ? "Done for this visit." : text}</span></span><span class="price-tag">${used ? "Used" : credits(price, 15)}</span></button>`;
+  return `<section class="market-screen full-screen"><header class="market-head"><div><h1>${marketName(r.stage)}</h1><p>Salvage, sold by lantern light.</p></div><div class="purse" role="status" aria-label="${r.credits} credits">${sicon("coins", 24)}<strong>${r.credits}</strong><small>Credits</small></div></header><div class="market-shelf" aria-label="Cards for sale">${cards}</div><div class="market-lower"><section class="market-relics" aria-label="Relics for sale"><h2 class="market-section">Relics</h2>${relics || '<p class="market-empty">No relics left to trade.</p>'}</section><section class="market-services" aria-label="Services"><h2 class="market-section">Services <small>Once per visit</small></h2>${service("shop-remove", shop.removed, shop.removePrice, "remove", "Remove a card", "Curses and dead weight, gone.")}${service("shop-upgrade", shop.upgraded, shop.upgradePrice, "upgrade", "Upgrade a card", "One card becomes its + version.")}</section><div class="market-exit"><button class="gold-button" data-screen="leave-shop">Leave market</button><button class="plate-button" data-action="deck">${icon("deck", 15)} Examine deck</button></div></div>${activePicker(r) ? deckPickerMarkup(r, activePicker(r)!) : ""}</section>`;
 }
 
 // ------------------------------------------------------------------ events
@@ -554,8 +588,8 @@ export function eventMarkup(r: RunState) {
   const view = eventView(r);
   if (!view) return "";
   const art = asset(`art/${view.art ?? "relay-interior"}.png`);
-  const choices = view.choices.map((choice, i) => `<button class="event-choice ${choice.disabled ? "disabled" : ""}" data-screen="event-choice" data-index="${i}" ${choice.disabled ? `aria-disabled="true"` : ""} style="--order:${i}"><span class="choice-mark">${choice.needsCard ? sicon("deck", 15) : `<span>${i + 1}</span>`}</span><span class="choice-copy"><strong>${esc(choice.label)}</strong><span>${esc(choice.detail)}</span>${choice.disabled ? `<small class="choice-blocked">${sicon("lock", 12)} ${esc(choice.disabled)}</small>` : choice.needsCard ? `<small class="choice-needs">${NEED_VERB[choice.needsCard].toUpperCase()} A CARD FROM YOUR DECK</small>` : ""}</span>${choice.disabled ? "" : icon("arrow", 16)}</button>`).join("");
-  return `<section class="event-screen full-screen ${view.resolved ? "resolved" : ""}"><div class="event-frame"><figure class="event-art" aria-hidden="true" style="background-image:url('${art}')"><i></i></figure><div class="event-copy"><span class="eyebrow">${sicon("signal", 14)} ${esc(view.kicker)}</span><h1>${esc(view.title)}</h1><p class="event-text">${esc(view.text)}</p>${view.resolved ? `<div class="event-outcome" role="status"><span class="eyebrow">WHAT REMAINS</span><p>${esc(view.outcome ?? "")}</p><button class="gold-button" data-screen="event-leave">Continue ${icon("arrow", 18)}</button></div>` : `<div class="event-choices" role="group" aria-label="Your answer">${choices}</div>`}<div class="event-status">${icon("heart", 13)} ${r.integrity}/${r.maxIntegrity} <span></span>${sicon("coins", 13)} ${r.credits} <span></span>${icon("deck", 13)} ${r.deck.length} cards</div></div></div>${activePicker(r) ? deckPickerMarkup(r, activePicker(r)!) : ""}</section>`;
+  const choices = view.choices.map((choice, i) => `<button class="event-choice ${choice.disabled ? "disabled" : ""}" data-screen="event-choice" data-index="${i}" ${choice.disabled ? `aria-disabled="true"` : ""} style="--order:${i}"><span class="choice-mark"><span>${i + 1}</span></span><span class="choice-copy"><strong>${esc(choice.label)}</strong><span>${esc(choice.detail)}</span>${choice.disabled ? `<small class="choice-blocked">${sicon("lock", 13)} ${esc(choice.disabled)}</small>` : choice.needsCard ? `<small class="choice-needs">${sicon("deck", 13)} ${NEED_VERB[choice.needsCard]} a card from your deck</small>` : ""}</span></button>`).join("");
+  return `<section class="event-screen full-screen ${view.resolved ? "resolved" : ""}"><div class="event-frame"><figure class="event-art" aria-hidden="true" style="background-image:url('${art}')"><i></i></figure><div class="event-copy"><span class="eyebrow">${sicon("signal", 14)} ${esc(view.kicker)}</span><h1>${esc(view.title)}</h1><p class="event-text">${esc(view.text)}</p>${view.resolved ? `<div class="event-outcome" role="status"><p>${esc(view.outcome ?? "")}</p><button class="gold-button" data-screen="event-leave">Continue</button></div>` : `<div class="event-choices" role="group" aria-label="Your answer">${choices}</div>`}</div></div>${activePicker(r) ? deckPickerMarkup(r, activePicker(r)!) : ""}</section>`;
 }
 
 // ------------------------------------------------------------------ guardian intro, outcome, settings
@@ -566,11 +600,11 @@ export function bossIntroMarkup(r: RunState) {
   const y = art.rows === 1 ? 0 : Math.floor(art.index / art.columns) / (art.rows - 1) * 100;
   return `<section class="guardian-entrance guardian-${enemy.id}" aria-labelledby="guardian-name" style="--guardian-color:#${enemy.color.toString(16).padStart(6,"0")}">
     <div class="guardian-portrait" aria-hidden="true"><i></i><span style="background-image:url('${asset(`art/${art.file}.png`)}');background-size:${art.columns * 100}% ${art.rows * 100}%;background-position:${x}% ${y}%"></span></div>
-    <div class="guardian-introduction"><div class="guardian-stages">${STAGES.map((s,i)=>`<span class="${i === r.stage ? "current" : i < r.stage ? "cleared" : ""}">${i < r.stage ? icon("check",14) : s.numeral}</span>`).join('<i></i>')}</div>
+    <div class="guardian-introduction"><div class="guardian-stages" aria-label="Stage ${stage.numeral} of ${STAGES.length}">${STAGES.map((s,i)=>`<span class="${i === r.stage ? "current" : i < r.stage ? "cleared" : ""}"><b>${i < r.stage ? icon("check",13) : s.numeral}</b></span>`).join('<i></i>')}</div>
     <span class="eyebrow">STAGE ${stage.numeral} · ${stage.name.toUpperCase()}</span><p class="guardian-arrival">${enemy.boss!.entrance}</p>
     <h1 id="guardian-name">${title(enemy.name.replace(/^THE /,""))}</h1><span class="guardian-subtitle">${enemy.title}</span>
-    <div class="guardian-challenge"><span>${icon("heart",18)} ${r.enemy!.maxHp} INTEGRITY</span><span>${icon("elite",18)} STAGE GUARDIAN</span></div>
-    <p class="guardian-warning">${enemy.boss!.warning}</p><button class="gold-button" data-action="close" autofocus>Face the guardian ${icon("arrow",20)}</button><small class="guardian-skip">ENTER TO BEGIN · ESC TO SKIP</small></div>
+    <div class="guardian-challenge"><span>${icon("heart",17)}<b>${r.enemy!.maxHp}</b> Integrity</span><span>${icon("boss",17)} Stage guardian</span></div>
+    <p class="guardian-warning">${enemy.boss!.warning}</p><div class="guardian-actions"><button class="gold-button" data-action="close" autofocus>Face the guardian</button><small class="guardian-skip"><kbd>Enter</kbd> Begin <i></i> <kbd>Esc</kbd> Skip</small></div></div>
   </section>`;
 }
 
@@ -579,9 +613,43 @@ export function outcomeMarkup(e: Expedition) {
   const progress = loadProgress();
   const unlock = won && progress.lastUnlock && progress.lastUnlock.seed === r.seed && progress.lastUnlock.archetype === e.archetype ? progress.lastUnlock.level : null;
   const sectors = Math.min(21, r.stage * 7 + r.floor);
-  return `<section class="outcome-screen full-screen v3 ${won ? "victory" : ""}"><div class="outcome-symbol">${icon(won ? "crown" : "link", 54)}</div><span class="eyebrow">${story.eyebrow}</span><h1>${story.title}</h1><p>${story.description}${won ? ` ${ARCHETYPE_STORIES[e.archetype].epilogue}` : ""}</p>${unlock !== null ? `<div class="unlock-moment" role="status">${sicon("ascend", 22)}<span><small>${ARCHETYPES[e.archetype].name.toUpperCase()}</small><strong>Ascension ${unlock} unlocked</strong><em>${esc(ASCENSION_LEVELS[unlock - 1]?.name ?? "")} · ${esc(ASCENSION_LEVELS[unlock - 1]?.rule ?? "")}</em></span></div>` : ""}<div class="outcome-stats"><span><strong>${r.score.toLocaleString()}</strong>SCORE</span><span><strong>${sectors} / 21</strong>SECTORS</span><span><strong>${r.deck.length}</strong>CARDS</span><span><strong>${r.relics.length}</strong>RELICS</span><span><strong>${r.ascension}</strong>ASCENSION</span></div><button class="gold-button" data-action="new">Another expedition ${icon("arrow")}</button><button class="text-button" data-action="title">Return to the relay</button></section>`;
+  const stat = (value: string | number, label: string) => `<span><strong>${value}</strong><small>${label}</small></span>`;
+  return `<section class="outcome-screen full-screen v3 ${won ? "victory" : "defeat"}"><div class="outcome-symbol">${sicon(won ? "crown" : "severed", 46)}</div>${screenHead(won ? "Backbone Restored" : "Signal Lost", story.title, ARCHETYPES[e.archetype].name.toUpperCase())}<p class="outcome-story">${story.description}${won ? ` ${ARCHETYPE_STORIES[e.archetype].epilogue}` : ""}</p>${unlock !== null ? `<div class="unlock-moment" role="status">${sicon("ascend", 22)}<span><strong>Ascension ${unlock} unlocked</strong><em>${esc(ASCENSION_LEVELS[unlock - 1]?.name ?? "")} · ${esc(ASCENSION_LEVELS[unlock - 1]?.rule ?? "")}</em></span></div>` : ""}<div class="outcome-stats">${stat(r.score.toLocaleString(), "Score")}${stat(`${sectors}<small>/21</small>`, "Sectors")}${stat(r.deck.length, "Cards")}${stat(r.relics.length, "Relics")}${r.ascension ? stat(r.ascension, "Ascension") : ""}</div><div class="button-row outcome-actions"><button class="gold-button" data-action="new">New expedition</button><button class="plate-button" data-action="title">Return to title</button></div></section>`;
 }
 
-export function settingsMarkup(s: AudioSettings, inRun: boolean, preferences: Preferences) {
-  return `<div class="settings-content"><span class="eyebrow">TAKE A BREATH</span><h2>At your frequency.</h2><label class="setting-slider"><span>Music <output>${Math.round(s.music * 100)}%</output></span><input type="range" min="0" max="100" value="${s.music * 100}" data-setting="music" aria-label="Music volume"/></label><label class="setting-slider"><span>Sound effects <output>${Math.round(s.effects * 100)}%</output></span><input type="range" min="0" max="100" value="${s.effects * 100}" data-setting="effects" aria-label="Sound effects volume"/></label><label class="setting-toggle"><span>Motion & screen shake</span><input type="checkbox" data-setting="motion" ${s.motion ? "checked" : ""}/><i></i></label><label class="setting-toggle"><span>Contextual field notes</span><input type="checkbox" data-preference="tips" ${preferences.tips ? "checked" : ""}/><i></i></label><label class="setting-toggle"><span>Quick transmissions</span><input type="checkbox" data-preference="fast" ${preferences.fast ? "checked" : ""}/><i></i></label><div class="settings-actions"><button class="gold-button" data-action="close">${inRun ? "Return to expedition" : "Return"} ${icon("arrow")}</button>${inRun ? '<button class="text-button" data-action="save-exit">Save & return to title</button>' : ""}<button class="text-button" data-action="credits">Art & soundtrack credits</button></div></div>`;
+const NOTE = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5.5l11-2.5v12.5"/><ellipse cx="6.5" cy="18" rx="2.5" ry="2"/><ellipse cx="17.5" cy="15.5" rx="2.5" ry="2"/><path d="m9 9 11-2.5"/></svg>';
+/** The soundtrack notice: an engraved plate that names a new track, then fades. */
+export function trackMarkup(title: string) {
+  return `${NOTE}${sicon("warn", 16)}<span class="track-title">${esc(title)}</span>`;
+}
+
+export function settingsMarkup(s: AudioSettings, inRun: boolean, preferences: Preferences, fullscreen: boolean) {
+  const volume = (key: "music" | "effects", label: string) => {
+    const value = Math.round(s[key] * 100);
+    return `<label class="setting-row setting-slider"><span>${label}</span><input type="range" min="0" max="100" value="${value}" style="--value:${value}%" data-setting="${key}" aria-label="${label} volume"/><output>${value}%</output></label>`;
+  };
+  const toggle = (label: string, attr: string, on: boolean) =>
+    `<label class="setting-row setting-toggle"><span>${label}</span><input type="checkbox" ${attr} ${on ? "checked" : ""}/><i></i></label>`;
+  return `<div class="settings-content"><div class="panel-head"><h2>Options</h2></div>
+    <section class="settings-group"><h3>Audio</h3>${toggle("Sound", 'data-setting="sound"', !s.muted)}${volume("music", "Music")}${volume("effects", "Sound effects")}</section>
+    <section class="settings-group"><h3>Gameplay</h3>${toggle("Motion & screen shake", 'data-setting="motion"', s.motion)}${toggle("Contextual field notes", 'data-preference="tips"', preferences.tips)}${toggle("Quick transmissions", 'data-preference="fast"', preferences.fast)}</section>
+    <section class="settings-group"><h3>Display</h3>${toggle("Fullscreen", 'data-setting="fullscreen"', fullscreen)}</section>
+    <div class="settings-actions button-row"><button class="gold-button" data-action="close">Return</button>${inRun ? '<button class="plate-button" data-action="save-exit">Save & return to title</button>' : ""}<button class="text-button" data-action="credits">Credits</button></div></div>`;
+}
+
+export function creditsMarkup() {
+  const section = (head: string, body: string) => `<section><h3>${head}</h3><p>${body}</p></section>`;
+  return `<div class="panel-head"><h2>Credits</h2></div><div class="credits-copy">${[
+    section("The Containerlab universe", "Inspired by Containerlab and the networks we build together. FAULTLINE is an independent fan project. The Containerlab mark is used under its original license."),
+    section("Original art", "Relay cathedral, the Glass Cathedral and Blackout Heart environments, sanctuary, an expanded illustrated card collection, hostile creatures and painted interface pieces created for this game using OpenAI image generation and local Krea 2 Turbo. Artwork prompts and production details are included in the project."),
+    section("Typography", "Cinzel, Grenze, Alegreya and Alegreya Sans SC, under the SIL Open Font License."),
+    section("Original score · YuE2", `${Object.values(TRACK_TITLES).join(" · ")}. Generated locally with the official YuE2 model and listening decoder. Original instrumental arrangements retain their complete generated mix. Generation prompts and provenance are included in the project.`),
+    section("Sound effects · Kenney", "Recorded card Foley, metal, glass and impact materials from Kenney’s CC0 Casino Audio, Impact Sounds and Sci-fi Sounds packs. Layered and mastered for FAULTLINE; source recordings, licenses and recipes are included."),
+    section("A real network, in miniature", "Packets and faults are simulated in your browser. You can export the topology to Containerlab; real routing requires device configuration and container images."),
+  ].join("")}</div><div class="button-row credits-actions"><button class="plate-button" data-action="settings">Back</button></div>`;
+}
+
+/** Starting over asks once, plainly. */
+export function replaceMarkup(run: RunState) {
+  return `<div class="panel-head"><h2>Abandon expedition?</h2></div><p class="confirm-copy">Your saved expedition in Stage ${STAGES[run.stage].numeral}, Sector ${Math.min(7, run.floor + 1)} will be lost.</p><div class="confirm-actions button-row"><button class="gold-button" data-action="confirm-replace">Begin anew</button><button class="plate-button" data-action="close">Keep current</button></div>`;
 }

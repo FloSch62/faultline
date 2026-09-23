@@ -2,6 +2,7 @@ import "./style.css";
 import "./alpha.css";
 import "./polish.css";
 import "./battle.css";
+import "./game-ui.css";
 import { Soundscape, type ScoreScene } from "./audio.ts";
 import type { EffectKind } from "./audio-effects.ts";
 import { ENEMIES } from "./core/enemies.ts";
@@ -103,6 +104,8 @@ let libraryRun: RunState | null = null;
 let libraryRarity = "all";
 let libraryQuery = "";
 let inspectReturn: alpha.LibraryMode | null = null;
+/** Where the player was in a library when they opened a card, restored by Back. */
+let libraryScroll = 0;
 /** A running Field Training lesson. The real expedition is parked and restored on exit. */
 let practice: {
   id: training.LessonId;
@@ -132,19 +135,44 @@ let cardDrag: {
 let ignoreClick = false;
 let deviceDragging = false;
 const undoStack: RunState[] = [];
+/** The screen last shown, so a new one can fade up instead of swapping like a page. */
+let lastScreen = "";
 
 
 $("#app").innerHTML =
-  `<main class="game-root"><div class="scene-backdrop"></div><div class="scene-shade"></div><div class="motes" aria-hidden="true">${Array.from({ length: 22 }, (_, i) => `<i style="--x:${(i * 47) % 100}%;--duration:${14 + (i % 8) * 3}s;--delay:-${i * 2.7}s;--size:${(i % 3) + 1}px"></i>`).join("")}</div><div class="world-stage"><canvas id="world" aria-label="Network battlefield. Use cards and the device targeting controls to build your route."></canvas></div><div class="texture"></div><header id="header" class="game-header"></header><div id="screen"></div><div id="battle-hud"></div><div id="hand-zone"></div><div id="target-dock"></div><div id="lesson-spotlight" aria-hidden="true"><i></i></div><div id="lesson-layer"></div><div id="game-tooltip" role="tooltip"></div><div id="impact-layer" aria-hidden="true"></div><div id="battle-flash"></div><div id="toast" role="status" aria-live="polite"></div><div class="now-playing" id="now-playing"></div></main><dialog id="dialog" aria-label="Field journal"><div class="dialog-surface"><button class="dialog-close" data-action="close" aria-label="Close dialog">${ui.icon("close", 22)}</button><div id="dialog-content"></div></div></dialog>`;
+  `<main class="game-root"><div class="scene-backdrop"></div><div class="scene-shade"></div><div class="motes" aria-hidden="true">${Array.from({ length: 22 }, (_, i) => `<i style="--x:${(i * 47) % 100}%;--duration:${14 + (i % 8) * 3}s;--delay:-${i * 2.7}s;--size:${(i % 3) + 1}px"></i>`).join("")}</div><div class="world-stage"><canvas id="world" aria-label="Network battlefield. Use cards and the device targeting controls to build your route."></canvas></div><div class="texture"></div><header id="header" class="game-header"></header><div id="screen"></div><div id="battle-hud"></div><div id="hand-zone"></div><div id="target-dock"></div><div id="lesson-spotlight" aria-hidden="true"><i></i></div><div id="lesson-layer"></div><div id="game-tooltip" role="tooltip"></div><div id="impact-layer" aria-hidden="true"></div><div id="battle-flash"></div><div id="toast" role="status" aria-live="polite"></div><div class="now-playing" id="now-playing"></div></main><dialog id="dialog" aria-label="Field journal"><button class="dialog-close" data-action="close" aria-label="Close dialog">${ui.icon("close", 16)}</button><div class="dialog-surface"><div id="dialog-content"></div></div></dialog>`;
 const root = $(".game-root"),
   dialog = $<HTMLDialogElement>("#dialog");
 sound.update({});
+/** The soundtrack notice names each new track for a few seconds once the score is audible.
+ *  The current title always stays in the element; a load failure shows over it for longer. */
+let trackShown = "", trackTimer = 0, audioStarted = false;
+function noticeTrack(ms = 5000) {
+  const el = $("#now-playing");
+  clearTimeout(trackTimer);
+  el.classList.remove("show");
+  void el.offsetWidth;
+  el.classList.add("show");
+  trackTimer = window.setTimeout(() => el.classList.remove("show", "failed"), ms);
+}
 sound.onUnavailable = () => {
-  $("#now-playing").textContent = "Some audio could not load";
+  const el = $("#now-playing");
+  el.dataset.alert = "Some audio could not load";
+  el.classList.add("failed");
+  noticeTrack(8000);
 };
+/** Name the track whenever the score becomes audible: first sound, unmute, or music raised from silence. */
+function announceTrack() {
+  if (audioStarted && !sound.settings.muted && sound.settings.music > 0) noticeTrack();
+}
 function renderTrack() {
-  $("#now-playing").innerHTML = `<span class="music-bars"><i></i><i></i><i></i></span><span>${sound.trackTitle}<small>ORIGINAL SOUNDTRACK</small></span>`;
-  $("#now-playing").classList.toggle("muted", sound.settings.muted);
+  const el = $("#now-playing");
+  if (sound.trackTitle === trackShown) return;
+  trackShown = sound.trackTitle;
+  el.innerHTML = screens.trackMarkup(trackShown);
+  if (el.classList.contains("failed")) return;
+  el.classList.remove("show");
+  announceTrack();
 }
 sound.onTrackChange = renderTrack;
 function save() {
@@ -257,13 +285,9 @@ function render(rebuild = true) {
   world?.setVisible(battle);
   let screen = "";
   if (debrief) screen = "";
-  else if (view === "title") screen = screens.titleMarkup(expedition, records);
+  else if (view === "title") screen = screens.titleMarkup(expedition);
   else if (view === "select")
-    screen = screens.selectMarkup(
-      archetype,
-      daily,
-      Boolean(expedition && !["won", "lost"].includes(run.phase)),
-    );
+    screen = screens.selectMarkup(archetype, daily);
   else if (run.phase === "map") screen = screens.mapMarkup(expedition!);
   else if (run.phase === "reward") screen = screens.rewardMarkup(run);
   else if (run.phase === "relic") screen = screens.relicMarkup(run);
@@ -273,6 +297,16 @@ function render(rebuild = true) {
   else if (run.phase === "won" || run.phase === "lost")
     screen = screens.outcomeMarkup(expedition!);
   $("#screen").innerHTML = screen;
+  const screenKey = debrief ? "" : `${view}|${view === "run" ? `${run.phase}|${run.currentRoom}` : ""}`;
+  if (screenKey !== lastScreen) {
+    lastScreen = screenKey;
+    const el = $("#screen");
+    el.classList.remove("screen-enter");
+    if (screen) {
+      void el.offsetWidth;
+      el.classList.add("screen-enter");
+    }
+  }
   if (view === "run" && run.phase === "map") {
     const chart = $<HTMLElement>(".route-scroll"), nextRoom = chart.querySelector<HTMLElement>(".route-room.available");
     if (nextRoom) {
@@ -359,23 +393,24 @@ function render(rebuild = true) {
 /** Cable target button: warns before a new cable would fray over wreckage. */
 function cableTarget(id: string, cardId: CardId | null) {
   const frayed = !!source && source !== id && cableFrays(run, source, id, cardId);
-  return `<button data-node="${id}" class="${source === id ? "active" : ""}${frayed ? " frays" : ""}"${frayed ? ` data-tooltip="Crosses wreckage: frayed, −${RULES.frayedCableDamage} damage on your primary route. Armored cables don't fray."` : ""}>${id.toUpperCase()}${frayed ? " · FRAYS" : ""}</button>`;
+  return `<button data-node="${id}" class="${source === id ? "active" : ""}${frayed ? " frays" : ""}"${frayed ? ` data-tooltip="Crosses wreckage: frayed, −${RULES.frayedCableDamage} damage on your primary route. Armored cables don't fray."` : ""}>${id.toUpperCase()}${frayed ? " · frays" : ""}</button>`;
 }
+const bandName = (zone: string) => zone[0].toUpperCase() + zone.slice(1);
 function renderTargetDock() {
   let markup = "";
   if (view === "run" && run.phase === "battle") {
     if (consoleTargeting) {
-      markup = `<div class="target-options console-targets"><span>PATCH CABLE · ${source ? "CONNECT TO" : "CHOOSE DEVICE"}</span>${run.topology.nodes
+      markup = `<div class="target-options console-targets"><span>Patch Cable · ${source ? "connect to" : "choose a device"}</span>${run.topology.nodes
         .map(n => cableTarget(n.id, null))
-        .join("")}<button data-action="cancel">CANCEL ×</button></div>`;
+        .join("")}<button data-action="cancel" class="target-cancel">Cancel <kbd>Esc</kbd></button></div>`;
     } else if (selected !== null) {
       const c = CARDS[run.hand[selected]];
       if (c?.target === "ground")
-        markup = `<div class="target-options"><span>PLACE ON THE TABLE OR</span><button data-action="auto-place">${ui.icon("cache", 14)} Deploy in a free socket</button>${(["north", "center", "south"] as const).map(zone => `<button data-deploy-zone="${zone}">${zone.toUpperCase()} BAND</button>`).join("")}</div>`;
+        markup = `<div class="target-options"><span>Place on the table, or</span><button data-action="auto-place">${ui.icon("cache", 14)} Deploy in a free socket</button>${(["north", "center", "south"] as const).map(zone => `<button data-deploy-zone="${zone}">${bandName(zone)} band</button>`).join("")}</div>`;
       else if (c?.target === "zone")
-        markup = `<div class="target-options"><span>${ui.esc(c.name.toUpperCase())} · SELECT A FIELD SEAL</span></div>`;
+        markup = `<div class="target-options"><span>${ui.esc(c.name)} · choose a band or a field seal</span></div>`;
       else if (c?.target === "link" || c?.target === "node")
-        markup = `<div class="target-options"><span>${source ? "CONNECT TO" : "CHOOSE DEVICE"}</span>${run.topology.nodes
+        markup = `<div class="target-options"><span>${source ? "Connect to" : "Choose a device"}</span>${run.topology.nodes
           .filter(
             (n) =>
               c.target === "link" || canTargetNode(run, selected!, n.id),
@@ -390,7 +425,7 @@ function renderTargetDock() {
     if (selected === null && selectedNode) {
       const node = run.topology.nodes.find(n => n.id === selectedNode);
       const online = node && !node.fixed && combatPreview(run).online.includes(node.id);
-      if (node) markup = `<div class="target-options device-controls"><span>${ui.esc(node.id.toUpperCase())} · ${zoneForNode(node).toUpperCase()}${node.fixed ? "" : online ? " · ONLINE" : " · OFFLINE"}${node.configured ? " · CONFIGURED" : ""}${node.upgraded ? " · OVERCLOCKED" : ""}${node.shielded ? " · JAM PROTECTED" : ""}${node.salvage ? " · SALVAGED" : ""}</span>${node.fixed ? "" : `<span>RELOCATE · ${RULES.relocateCost} ENERGY</span>${(["north", "center", "south"] as const).map(zone => `<button data-relocate-zone="${zone}" ${run.energy < RULES.relocateCost ? "disabled" : ""}>${zone.toUpperCase()}</button>`).join("")}`}<button data-action="cancel">CLOSE ×</button></div>`;
+      if (node) markup = `<div class="target-options device-controls"><span><b>${ui.esc(node.id.toUpperCase())}</b> · ${bandName(zoneForNode(node))}${node.fixed ? "" : online ? " · online" : " · offline"}${node.configured ? " · configured" : ""}${node.upgraded ? " · overclocked" : ""}${node.shielded ? " · jam protected" : ""}${node.salvage ? " · salvaged" : ""}</span>${node.fixed ? "" : `<span>Relocate · ${RULES.relocateCost} energy</span>${(["north", "center", "south"] as const).map(zone => `<button data-relocate-zone="${zone}" ${run.energy < RULES.relocateCost ? "disabled" : ""}>${bandName(zone)}</button>`).join("")}`}<button data-action="cancel" class="target-cancel">Close <kbd>Esc</kbd></button></div>`;
     }
     if (webglFailed)
       markup += `<div class="fallback-network">${run.topology.links.map((l) => `${ui.esc(l.a)} ↔ ${ui.esc(l.b)}`).join(" · ") || "ALPHA · No connections · OMEGA"}</div>`;
@@ -405,7 +440,7 @@ function openModal(type: string) {
   const content = $("#dialog-content");
   if (type === "relic-journal") content.innerHTML = alpha.relicJournalMarkup(run);
   else if (type === "settings")
-    content.innerHTML = screens.settingsMarkup(sound.settings, view === "run", preferences);
+    content.innerHTML = screens.settingsMarkup(sound.settings, view === "run", preferences, !!document.fullscreenElement);
   else if (type === "help") content.innerHTML = training.handbookMarkup();
   else if (type === "training") content.innerHTML = training.lessonMenuMarkup(training.loadCompletedLessons());
   else if (type === "combat-details") content.innerHTML = alpha.combatDetailsMarkup(run);
@@ -414,16 +449,14 @@ function openModal(type: string) {
   else if (type === "devices") content.innerHTML = alpha.devicesMarkup(run);
   else if (type === "prepare") content.innerHTML = alpha.prepareMarkup(run);
   else if (["deck", "collection", "draw-pile", "discard-pile", "exhaust-pile", "loadout"].includes(type)) {
-    libraryMode = type === "loadout" ? "deck" : type as alpha.LibraryMode;
+    libraryMode = type as alpha.LibraryMode;
     libraryRun = type === "loadout" ? newExpedition(archetype, 1).run : run;
     libraryRarity = "all";
     libraryQuery = "";
     content.innerHTML = alpha.libraryMarkup(libraryRun, libraryMode);
   }
-  else if (type === "credits")
-    content.innerHTML = `<span class="eyebrow">THE PEOPLE & TOOLS BEHIND THE SIGNAL</span><h2>From an idea to an odyssey.</h2><div class="credits-copy"><h3>The Containerlab universe</h3><p>Inspired by Containerlab and the networks we build together. FAULTLINE is an independent fan project. The Containerlab mark is used under its original license.</p><h3>Original art</h3><p>Relay cathedral, the Glass Cathedral and Blackout Heart environments, sanctuary, an expanded illustrated card collection, hostile creatures and painted interface pieces created for this game using OpenAI image generation and local Krea 2 Turbo. Artwork prompts and production details are included in the project. Typography: Cinzel and Barlow, under the SIL Open Font License.</p><h3>Original score · YuE2</h3><p>${Object.values(TRACK_TITLES).join(" · ")}. Generated locally with the official YuE2 model and listening decoder. Original instrumental arrangements retain their complete generated mix. Generation prompts and provenance are included in the project.</p><h3>Sound effects · Kenney</h3><p>Recorded card Foley, metal, glass and impact materials from Kenney’s CC0 Casino Audio, Impact Sounds and Sci-fi Sounds packs. Layered and mastered for FAULTLINE; source recordings, licenses and recipes are included.</p><h3>A real network, in miniature</h3><p>Packets and faults are simulated in your browser. You can export the topology to Containerlab; real routing requires device configuration and container images.</p></div>`;
-  else if (type === "replace")
-    content.innerHTML = `<span class="eyebrow">AN EXPEDITION IS ALREADY IN PROGRESS</span><h2>Leave this route behind?</h2><p class="modal-intro">Beginning a new expedition replaces your current saved run in stage ${run.stage + 1}, sector ${run.floor + 1}.</p><div class="confirm-actions"><button class="gold-button" data-action="confirm-replace">Begin a new expedition ${ui.icon("arrow")}</button><button class="text-button" data-action="close">Keep my current expedition</button></div>`;
+  else if (type === "credits") content.innerHTML = screens.creditsMarkup();
+  else if (type === "replace") content.innerHTML = screens.replaceMarkup(run);
   dialog.className = [
     "deck",
     "collection",
@@ -436,9 +469,10 @@ function openModal(type: string) {
     "training",
   ].includes(type)
     ? `wide${type === "help" ? " handbook-dialog" : type === "training" ? " training-dialog" : ""}`
-    : "";
+    : type === "devices" ? "medium" : "";
   hideTooltip();
   if (!dialog.open) dialog.showModal();
+  resetDialogScroll();
 }
 function closeModal() {
   if (modal === "boss-intro") {
@@ -965,6 +999,7 @@ async function action(name: string) {
     await sound.unlock();
     sound.update({ muted: !sound.settings.muted });
     render(false);
+    announceTrack();
     return;
   }
   if (name === "fullscreen") {
@@ -1003,6 +1038,7 @@ async function action(name: string) {
     modal = inspectReturn;
     $("#dialog-content").innerHTML = alpha.libraryMarkup(libraryRun ?? run, inspectReturn, libraryRarity, libraryQuery);
     dialog.className = "wide";
+    dialog.querySelector(".dialog-surface")!.scrollTop = libraryScroll;
     return;
   }
   if (
@@ -1096,7 +1132,11 @@ async function action(name: string) {
 }
 document.addEventListener("click", (event) => {
   const target = event.target as HTMLElement;
-  void sound.unlock();
+  void sound.unlock().then(() => {
+    if (audioStarted) return;
+    audioStarted = true;
+    announceTrack();
+  });
   const button = target.closest<HTMLButtonElement>("button");
   if (button?.disabled) return;
   const name = target.closest<HTMLElement>("[data-action]")?.dataset.action;
@@ -1247,19 +1287,38 @@ document.addEventListener("input", (event) => {
     input.dataset.setting === "music" ||
     input.dataset.setting === "effects"
   ) {
+    const silent = sound.settings.music === 0;
     sound.update({ [input.dataset.setting]: Number(input.value) / 100 });
+    if (silent && sound.settings.music > 0) announceTrack();
     input.closest("label")!.querySelector("output")!.textContent =
       `${input.value}%`;
+    input.style.setProperty("--value", `${input.value}%`);
   }
   if (input.dataset.setting === "motion")
     sound.update({ motion: input.checked });
+  if (input.dataset.setting === "sound") {
+    void sound.unlock();
+    sound.update({ muted: !input.checked });
+    render(false);
+    announceTrack();
+  }
+  if (input.dataset.setting === "fullscreen")
+    void action("fullscreen").then(() => { input.checked = !!document.fullscreenElement; });
+});
+// The Options switch follows fullscreen however it changed (Esc, F11, the switch itself).
+document.addEventListener("fullscreenchange", () => {
+  const toggle = document.querySelector<HTMLInputElement>('[data-setting="fullscreen"]');
+  if (toggle) toggle.checked = !!document.fullscreenElement;
 });
 dialog.addEventListener("cancel", (event) => {
   event.preventDefault();
   closeModal();
 });
+// Only a click on the darkened backdrop closes a panel; its painted frame belongs to the panel.
 dialog.addEventListener("click", (event) => {
-  if (event.target === dialog) closeModal();
+  if (event.target !== dialog) return;
+  const box = dialog.getBoundingClientRect();
+  if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) closeModal();
 });
 // Drag hardware cards directly onto the table; cables and upgrades use explicit targeting.
 document.addEventListener("pointerdown", (event) => {
@@ -1342,6 +1401,23 @@ document.addEventListener("keydown", (event) => {
     const card = ((event.target as HTMLElement).closest<HTMLElement>("[data-card-id]")?.dataset.cardId ?? (selected !== null ? run.hand[selected] : undefined)) as CardId | undefined;
     if (card) { event.preventDefault(); inspectCard(card); return; }
   }
+  // Menus answer the arrow keys: up/down walks the main menu, left/right turns the keepers.
+  if (view === "title" && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+    const items = Array.from(document.querySelectorAll<HTMLButtonElement>(".title-menu button"));
+    const at = items.indexOf(document.activeElement as HTMLButtonElement);
+    const next = at < 0 ? (event.key === "ArrowDown" ? 0 : items.length - 1) : (at + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+    event.preventDefault();
+    items[next]?.focus();
+    return;
+  }
+  if (view === "select" && (event.key === "ArrowLeft" || event.key === "ArrowRight") && !(event.target as HTMLElement).closest(".ascension-panel")) {
+    const ids = Object.keys(ARCHETYPES) as Archetype[];
+    const next = ids[(ids.indexOf(archetype) + (event.key === "ArrowRight" ? 1 : -1) + ids.length) % ids.length];
+    event.preventDefault();
+    document.querySelector<HTMLElement>(`[data-archetype="${next}"]`)?.click();
+    document.querySelector<HTMLElement>(`[data-archetype="${next}"]`)?.focus();
+    return;
+  }
   if (event.key === "Escape") {
     event.preventDefault();
     if (selected !== null || selectedNode || deviceDragging || cardDrag || consoleTargeting) {
@@ -1395,10 +1471,14 @@ function inspectCard(id: CardId) {
   if (busy || !CARDS[id]) return;
   clearSelection();
   render(false);
-  if (modal !== "inspect") inspectReturn = modal === "loadout" ? "deck" : ["collection", "deck", "draw-pile", "discard-pile", "exhaust-pile"].includes(modal) ? modal as alpha.LibraryMode : null;
+  if (modal !== "inspect") {
+    inspectReturn = alpha.LIBRARY_MODES.includes(modal) ? modal as alpha.LibraryMode : null;
+    libraryScroll = inspectReturn ? dialog.querySelector(".dialog-surface")!.scrollTop : 0;
+  }
   modal = "inspect";
-  $("#dialog-content").innerHTML = alpha.inspectMarkup(id, inspectReturn ? libraryRun ?? run : run, !!inspectReturn);
+  $("#dialog-content").innerHTML = alpha.inspectMarkup(id, inspectReturn ? libraryRun ?? run : run, inspectReturn);
   dialog.className = "wide inspect-dialog";
+  resetDialogScroll();
   hideTooltip();
   if (!dialog.open) dialog.showModal();
 }
@@ -1414,6 +1494,7 @@ function openLesson(id: training.LessonId) {
     modal = "walkthrough";
     $("#dialog-content").innerHTML = training.walkthroughMarkup(0);
     dialog.className = "wide walkthrough-dialog";
+    resetDialogScroll();
     hideTooltip();
     if (!dialog.open) dialog.showModal();
     sound.effect("navigate");
@@ -1586,7 +1667,7 @@ function showTerrainTitle() {
   const el = document.createElement("div");
   el.className = "terrain-title";
   el.setAttribute("role", "status");
-  el.innerHTML = `<span>${ui.icon("terrain", 14)} ENCOUNTER GROUND</span><strong>${ui.esc(run.terrain.name)}</strong><p>${ui.esc(run.terrain.description)}</p>`;
+  el.innerHTML = `<span>${ui.icon("terrain", 15)} Encounter ground</span><strong>${ui.esc(run.terrain.name)}</strong><i class="ornament-rule"></i><p>${ui.esc(run.terrain.description)}</p>`;
   root.append(el);
   // A short beat: it leaves on its own, or the moment the player acts.
   const dismiss = () => { el.classList.add("leaving"); window.setTimeout(() => el.remove(), 260); };
@@ -1595,22 +1676,41 @@ function showTerrainTitle() {
   document.addEventListener("pointerdown", early, { once: true, capture: true });
   document.addEventListener("keydown", early, { once: true, capture: true });
 }
+// No browser menu anywhere in the game: right-click inspects a card, and does nothing elsewhere.
 document.addEventListener("contextmenu", event => {
-  const id = (event.target as HTMLElement).closest<HTMLElement>("[data-card-id]")?.dataset.cardId as CardId | undefined;
-  if (id) { event.preventDefault(); inspectCard(id); }
+  const target = event.target as HTMLElement;
+  if (target.closest("input, textarea")) return;
+  event.preventDefault();
+  const id = target.closest<HTMLElement>("[data-card-id]")?.dataset.cardId as CardId | undefined;
+  if (id) inspectCard(id);
 });
+// Artwork is part of the table, not a draggable web image.
+document.addEventListener("dragstart", event => event.preventDefault());
 function hideTooltip() { $("#game-tooltip").className = ""; }
+/** "Name: rules" tips get a nameplate line; everything else is plain reading text. */
+function tooltipMarkup(text: string) {
+  const named = /^([^:.]{2,30}): (.+)$/s.exec(text);
+  return named ? `<b>${ui.esc(named[1])}</b>${ui.esc(named[2])}` : ui.esc(text);
+}
 function showTooltip(target: HTMLElement) {
   const tip = target.closest<HTMLElement>("[data-tooltip]");
   if (!tip || dialog.open) { hideTooltip(); return; }
   const el = $("#game-tooltip");
-  el.textContent = tip.dataset.tooltip || "";
+  el.innerHTML = tooltipMarkup(tip.dataset.tooltip || "");
   el.className = "visible";
-  const box = tip.getBoundingClientRect();
+  // Below the control when it fits, otherwise above it; always inside the window.
+  const box = tip.getBoundingClientRect(), gap = 12, edge = 10;
   const scale = interfaceScale(), width = window.innerWidth / scale, height = window.innerHeight / scale;
   const origin = root.getBoundingClientRect();
-  el.style.left = `${Math.max(10, Math.min(width - el.offsetWidth - 10, (box.x + box.width / 2) / scale - el.offsetWidth / 2)) - origin.left / scale}px`;
-  el.style.top = `${Math.max(10, Math.min(height - el.offsetHeight - 10, box.bottom / scale + 12)) - origin.top / scale}px`;
+  const w = el.offsetWidth, h = el.offsetHeight, centre = (box.x + box.width / 2) / scale;
+  const below = box.bottom / scale + gap, above = box.top / scale - gap - h;
+  const flip = below + h > height - edge && above >= edge;
+  const left = Math.max(edge, Math.min(width - w - edge, centre - w / 2));
+  const top = flip ? above : Math.max(edge, Math.min(height - h - edge, below));
+  el.dataset.side = flip ? "above" : "below";
+  el.style.setProperty("--arrow-x", `${Math.max(12, Math.min(w - 12, centre - left))}px`);
+  el.style.left = `${left - origin.left / scale}px`;
+  el.style.top = `${top - origin.top / scale}px`;
 }
 $("#app").addEventListener("scroll", hideTooltip);
 document.addEventListener("pointerover", e => showTooltip(e.target as HTMLElement));
@@ -1618,4 +1718,22 @@ document.addEventListener("focusin", e => showTooltip(e.target as HTMLElement));
 document.addEventListener("pointerdown", hideTooltip);
 document.addEventListener("focusout", hideTooltip);
 
-render();
+/** Boot: the veil in index.html holds until the typefaces and the first panorama
+ *  are ready, so no text ever appears in a fallback face and no art pops in.
+ *  It never waits longer than a moment. */
+async function boot() {
+  const faces = ["500 16px Cinzel", "600 16px Grenze", "16px Alegreya", "italic 16px Alegreya", "700 12px 'Alegreya Sans SC'"];
+  const panorama = new Image();
+  panorama.src = `${import.meta.env.BASE_URL}art/${STAGES[0].art.panorama}`;
+  await Promise.race([
+    Promise.allSettled([...faces.map(face => document.fonts.load(face)), panorama.decode()]),
+    new Promise(resolve => window.setTimeout(resolve, 2500)),
+  ]);
+  render();
+  const veil = document.getElementById("boot");
+  if (veil) {
+    veil.classList.add("done");
+    window.setTimeout(() => veil.remove(), 700);
+  }
+}
+void boot();

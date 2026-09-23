@@ -77,7 +77,7 @@ test("the seeded chart scouts the enemy that actually appears and respects saved
   await page.locator('[data-action="continue"]').click();
   await expect(page.locator(".route-room.available")).toHaveCount(1);
   const room = page.locator(`[data-room="${destination.id}"]`);
-  await expect(room.locator(".room-scout")).toHaveText(ENEMIES[destination.enemyId!].name);
+  await expect(room.locator(".room-scout")).toHaveText(ENEMIES[destination.enemyId!].name, { ignoreCase: true });
   const health = encounterHealth(0, destination, e.run.ascension);
   await expect(room).toHaveAttribute("data-tooltip", new RegExp(`${health} integrity`));
   for (const [width, height] of [[1024, 600], [1280, 720], [1440, 900], [390, 844]]) {

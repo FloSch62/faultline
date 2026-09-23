@@ -32,8 +32,16 @@ const PATHS: Record<string, string> = {
   hint: '<path d="M9 18h6m-5 3h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3Z"/>',
   chevron: '<path d="m6 9 6 6 6-6"/>',
   warning: '<path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4m0 3v.5"/>',
+  // Route-chart rooms, as drawn on the real map.
+  stall: '<path d="M3 9h18l-2-5H5L3 9Zm0 0v2a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0V9M5 14v7h14v-7M10 21v-4h4v4"/>',
+  unknown: '<path d="M9.2 9a3 3 0 1 1 4.3 2.7c-.9.4-1.5 1.2-1.5 2.1v.7"/><circle cx="12" cy="17.6" r=".6" fill="currentColor"/><path d="m12 2 10 10-10 10L2 12 12 2Z"/>',
 };
 
 export function icon(name: string, size = 18): string {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PATHS[name] ?? PATHS.bolt}</svg>`;
+}
+
+/** The same icon nested inside an SVG diagram, centred on (x, y). */
+export function glyph(name: string, size: number, x = 0, y = 0): string {
+  return `<svg class="hb-glyph" x="${x - size / 2}" y="${y - size / 2}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${PATHS[name] ?? PATHS.bolt}</svg>`;
 }

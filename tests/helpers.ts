@@ -122,6 +122,8 @@ export function watchErrors(page: Page): string[] {
 /** Every test fails on any page error or console error, wherever it happened. */
 export const test = base.extend<{ errors: string[] }>({
   errors: [async ({ page }, use) => {
+    // Cheaper 3D table: no bloom or shadows, half resolution, 20 fps (see World.ts).
+    await page.addInitScript(() => { (globalThis as { __faultlineTestRender?: boolean }).__faultlineTestRender = true; });
     const errors = watchErrors(page);
     await use(errors);
     expect(errors, "page and console errors").toEqual([]);

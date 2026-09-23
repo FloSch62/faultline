@@ -1,2 +1,10 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><meta name="theme-color" content="#10151a" /><meta name="description" content="Every connection matters. A cinematic network deckbuilding roguelike in the Containerlab universe." /><link rel="icon" type="image/svg+xml" href="./containerlab-mark.svg" /><link rel="stylesheet" href="%BASE_URL%fonts/fonts.css" /><title>FAULTLINE — A Containerlab Odyssey</title></head><body><div id="app"></div><script type="module" src="/src/main.ts"></script></body></html>
+<html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><meta name="theme-color" content="#0b1118" /><meta name="description" content="Every connection matters. A cinematic network deckbuilding roguelike in the Containerlab universe." /><link rel="icon" type="image/svg+xml" href="./containerlab-mark.svg" /><link rel="preload" href="%BASE_URL%fonts/cinzel-var.woff2" as="font" type="font/woff2" crossorigin /><link rel="preload" href="%BASE_URL%fonts/alegreya-var.woff2" as="font" type="font/woff2" crossorigin /><link rel="preload" href="%BASE_URL%fonts/alegreya-sans-sc-700.woff2" as="font" type="font/woff2" crossorigin /><link rel="preload" href="%BASE_URL%fonts/grenze-var.woff2" as="font" type="font/woff2" crossorigin /><link rel="stylesheet" href="%BASE_URL%fonts/fonts.css" /><title>FAULTLINE — A Containerlab Odyssey</title>
+<style>
+html,body{margin:0;background:#070a0f}
+#boot{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 55%,#111820,#05070b 70%);transition:opacity .6s ease;pointer-events:none}
+#boot img{width:44px;height:54px;opacity:.55;filter:sepia(1) saturate(.6) brightness(1.1);animation:boot-breathe 1.8s ease-in-out infinite}
+#boot.done{opacity:0}
+@keyframes boot-breathe{50%{opacity:.9}}
+@media (prefers-reduced-motion:reduce){#boot img{animation:none}}
+</style></head><body><div id="boot" aria-hidden="true"><img src="./containerlab-mark.svg" alt="" /></div><div id="app"></div><script type="module" src="/src/main.ts"></script></body></html>

@@ -1,84 +1,77 @@
+/* FAULTLINE type: engraved Cinzel capitals, Grenze nameplates and numerals,
+   Alegreya for everything that is read, Alegreya Sans SC for instrument labels.
+   Latin subsets, SIL Open Font License 1.1 (see the *-OFL.txt files). Digits map to
+   each face's lining figures (its own lnum glyphs), so game numbers read level
+   even though every CSS font shorthand resets font-variant-numeric.
+   font-display: block — the boot veil waits for these, so text never flashes
+   in a fallback face. */
 @font-face {
-  font-family: 'Barlow';
+  font-family: "Cinzel";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: block;
+  src: url(cinzel-var.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Grenze";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: block;
+  src: url(grenze-var.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Grenze";
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: block;
+  src: url(grenze-italic-var.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Grenze Gotisch";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: block;
+  src: url(grenze-gotisch-var.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Alegreya";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: block;
+  src: url(alegreya-var.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Alegreya";
+  font-style: italic;
+  font-weight: 400 900;
+  font-display: block;
+  src: url(alegreya-italic-var.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Alegreya Sans SC";
   font-style: normal;
   font-weight: 400;
-  font-display: swap;
-  src: url(7cHpv4kjgoGqM7EPCw.ttf) format('truetype');
+  font-display: block;
+  src: url(alegreya-sans-sc-400.woff2) format("woff2");
 }
 @font-face {
-  font-family: 'Barlow';
+  font-family: "Alegreya Sans SC";
   font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url(7cHqv4kjgoGqM7E3_-gc4A.ttf) format('truetype');
+  font-weight: 500 600;
+  font-display: block;
+  src: url(alegreya-sans-sc-500.woff2) format("woff2");
 }
 @font-face {
-  font-family: 'Barlow';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url(7cHqv4kjgoGqM7E30-8c4A.ttf) format('truetype');
-}
-@font-face {
-  font-family: 'Barlow';
+  font-family: "Alegreya Sans SC";
   font-style: normal;
   font-weight: 700;
-  font-display: swap;
-  src: url(7cHqv4kjgoGqM7E3t-4c4A.ttf) format('truetype');
+  font-display: block;
+  src: url(alegreya-sans-sc-700.woff2) format("woff2");
 }
 @font-face {
-  font-family: 'Barlow Condensed';
+  font-family: "Alegreya Sans SC";
   font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url(HTxwL3I-JCGChYJ8VI-L6OO_au7B4-Lw_3E.ttf) format('truetype');
-}
-@font-face {
-  font-family: 'Barlow Condensed';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url(HTxwL3I-JCGChYJ8VI-L6OO_au7B4873_3E.ttf) format('truetype');
-}
-@font-face {
-  font-family: 'Barlow Condensed';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url(HTxwL3I-JCGChYJ8VI-L6OO_au7B46r2_3E.ttf) format('truetype');
-}
-@font-face {
-  font-family: 'Barlow Condensed';
-  font-style: normal;
-  font-weight: 800;
-  font-display: swap;
-  src: url(HTxwL3I-JCGChYJ8VI-L6OO_au7B47b1_3E.ttf) format('truetype');
-}
-@font-face {
-  font-family: 'Cinzel';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url(8vIU7ww63mVu7gtR-kwKxNvkNOjw-tbnTYo.ttf) format('truetype');
-}
-@font-face {
-  font-family: 'Cinzel';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url(8vIU7ww63mVu7gtR-kwKxNvkNOjw-uTnTYo.ttf) format('truetype');
-}
-@font-face {
-  font-family: 'Cinzel';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url(8vIU7ww63mVu7gtR-kwKxNvkNOjw-gjgTYo.ttf) format('truetype');
-}
-@font-face {
-  font-family: 'Cinzel';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url(8vIU7ww63mVu7gtR-kwKxNvkNOjw-jHgTYo.ttf) format('truetype');
+  font-weight: 800 900;
+  font-display: block;
+  src: url(alegreya-sans-sc-800.woff2) format("woff2");
 }

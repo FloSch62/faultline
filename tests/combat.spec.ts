@@ -143,7 +143,7 @@ async function malwareOnTable(page: Page) {
   points.sort((a, b) => Math.hypot(a.x - centre.x, a.y - centre.y) - Math.hypot(b.x - centre.x, b.y - centre.y));
   for (const point of points) {
     await page.mouse.move(point.x, point.y);
-    if (await canvas.evaluate(el => (el as HTMLCanvasElement).style.cursor) === "pointer") return point;
+    if (await canvas.evaluate(el => (el as HTMLCanvasElement).dataset.cursor) === "pointer") return point;
   }
   throw new Error("No hoverable malware near the table centre");
 }

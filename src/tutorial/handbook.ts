@@ -13,23 +13,23 @@ import { esc, icon } from "./icons.ts";
 export interface HandbookChapter {
   id: string;
   title: string;
-  kicker: string;
   icon: string;
 }
 export const HANDBOOK_CHAPTERS: readonly HandbookChapter[] = [
-  { id: "start", title: "Your First Turn", kicker: "THE LOOP", icon: "play" },
-  { id: "routes", title: "Routes & Channels", kicker: "DAMAGE", icon: "link" },
-  { id: "devices", title: "Online Devices", kicker: "THE NETWORK IS YOUR ARMY", icon: "field" },
-  { id: "defense", title: "Intents & Shield", kicker: "READING THE ENEMY", icon: "shield" },
-  { id: "zones", title: "Bands & Fields", kicker: "NORTH · CENTER · SOUTH", icon: "map" },
-  { id: "rerouting", title: "Rerouting", kicker: "WHEN THE LINE IS CUT", icon: "undo" },
-  { id: "tools", title: "Protocols & Console", kicker: "ANSWERS IN ADVANCE", icon: "eye" },
-  { id: "archetypes", title: "The Three Keepers", kicker: "ARCHITECT · WARDEN · GHOST", icon: "crown" },
-  { id: "danger", title: "Danger Playbook", kicker: "WHAT TO DO WHEN…", icon: "heart" },
-  { id: "guardians", title: "Guardians", kicker: "CHARGE · ULTIMATE · EXPOSED", icon: "boss" },
-  { id: "cards", title: "Cards & Keywords", kicker: "GLOSSARY", icon: "deck" },
-  { id: "expedition", title: "The Expedition", kicker: "MAP · MARKET · RELICS", icon: "coins" },
+  { id: "start", title: "Your First Turn", icon: "play" },
+  { id: "routes", title: "Routes & Channels", icon: "link" },
+  { id: "devices", title: "Online Devices", icon: "field" },
+  { id: "defense", title: "Intents & Shield", icon: "shield" },
+  { id: "zones", title: "Bands & Fields", icon: "map" },
+  { id: "rerouting", title: "Rerouting", icon: "undo" },
+  { id: "tools", title: "Protocols & Console", icon: "eye" },
+  { id: "archetypes", title: "The Three Keepers", icon: "crown" },
+  { id: "danger", title: "Danger Playbook", icon: "heart" },
+  { id: "guardians", title: "Guardians", icon: "boss" },
+  { id: "cards", title: "Cards & Keywords", icon: "deck" },
+  { id: "expedition", title: "The Expedition", icon: "coins" },
 ];
+const NUMERALS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV"];
 
 const R = RULES;
 const card = (id: BaseCardId) => CARDS[id];
@@ -37,11 +37,13 @@ const name = (id: BaseCardId) => esc(card(id)?.name ?? id);
 const rules = (id: BaseCardId) => esc(card(id)?.rules ?? "");
 const strong = (text: string | number) => `<strong>${text}</strong>`;
 
+/** A ledger: engraved header, banded rows, the first column a nameplate. */
 function table(headers: string[], rows: string[][], cls = "") {
   return `<div class="hb-table-wrap"><table class="hb-table ${cls}"><thead><tr>${headers.map(h => `<th scope="col">${h}</th>`).join("")}</tr></thead><tbody>${rows.map(row => `<tr>${row.map((cell, i) => i === 0 ? `<th scope="row">${cell}</th>` : `<td>${cell}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
 }
+/** An inlaid plate: a seal for its kind, a nameplate, the note. */
 function tip(title: string, body: string, kind: "tip" | "warn" | "rule" = "tip") {
-  return `<aside class="hb-note ${kind}"><b>${title}</b><p>${body}</p></aside>`;
+  return `<aside class="hb-note ${kind}"><span class="hb-note-seal" aria-hidden="true">${icon(kind === "warn" ? "warning" : kind === "rule" ? "book" : "hint", 18)}</span><div><b>${title}</b><p>${body}</p></div></aside>`;
 }
 function figure(svg: string, caption: string) {
   return `<figure class="hb-figure">${svg}<figcaption>${caption}</figcaption></figure>`;
@@ -168,27 +170,27 @@ const CHAPTER_BODIES: Record<string, () => string> = {
     <h4 class="hb-subhead">${icon("play", 16)} Console commands</h4>
     <p>Every keeper has a command beside the hand: no card needed, once per turn.</p>
     <div class="hb-console-row">
-      ${(["patch", "harden", "buffer"] as ConsoleId[]).map(id => `<div class="hb-console ${id}"><span class="hb-console-cost">${c[id].cost}</span><b>${esc(c[id].name)}</b><small>${id === "patch" ? "ARCHITECT" : id === "harden" ? "WARDEN" : "GHOST"}</small><p>${esc(c[id].rules)}</p></div>`).join("")}
+      ${(["patch", "harden", "buffer"] as ConsoleId[]).map(id => `<div class="hb-console ${id}"><span class="hb-console-cost">${c[id].cost}</span><b>${esc(c[id].name)}</b><small>${id === "patch" ? "Architect" : id === "harden" ? "Warden" : "Ghost"}</small><p>${esc(c[id].rules)}</p></div>`).join("")}
     </div>
     ${tip("Honeypot", `A cabled honeypot pulls jams and cable cuts onto itself; each one it absorbs deals ${R.honeypotDamage} to the attacker. It works even when offline. (The Cable Wraith is not fooled — it hunts long cables.)`)}`;
   },
 
   archetypes: () => `
     <div class="hb-keepers">
-      <article class="hb-keeper architect"><span class="eyebrow">ARCHITECT · MESH</span><h4>Make a way through</h4>
+      <article class="hb-keeper architect"><header><h4>Architect</h4><p class="hb-motto">Make a way through</p></header><div>
         <p><b>Engine:</b> width. Hot Swap makes your first Fiber each turn free and Patch Cable runs a cable without a card, so every router quickly becomes another channel (+${R.bandwidthPerChannel} each). Load Balancers and clusters multiply it.</p>
         <p><b>Play:</b> open with a route, then add a channel every turn you can. Spread routers North and South for separated-circuit shield.</p>
-        <p><b>Risk:</b> many cables — Wire Weaver punishes ${R.weaverCables}+ cables, and long spans feed the Wraith.</p></article>
-      <article class="hb-keeper warden"><span class="eyebrow">WARDEN · FORTRESS</span><h4>Hold what remains</h4>
+        <p><b>Risk:</b> many cables — Wire Weaver punishes ${R.weaverCables}+ cables, and long spans feed the Wraith.</p></div></article>
+      <article class="hb-keeper warden"><header><h4>Warden</h4><p class="hb-motto">Hold what remains</p></header><div>
         <p><b>Engine:</b> Backpressure. Every point of damage your shield prevents is stored and added to your next transmission. Harden and stacked firewalls turn every enemy attack into your next hit.</p>
         <p><b>Play:</b> put firewalls online early, Harden on attack turns, then release the stored damage.</p>
-        <p><b>Risk:</b> it only charges when the enemy attacks — fields, cuts and charges give nothing to reflect.</p></article>
-      <article class="hb-keeper ghost"><span class="eyebrow">GHOST · BUFFER</span><h4>Find the hidden path</h4>
+        <p><b>Risk:</b> it only charges when the enemy attacks — fields, cuts and charges give nothing to reflect.</p></div></article>
+      <article class="hb-keeper ghost"><header><h4>Ghost</h4><p class="hb-motto">Find the hidden path</p></header><div>
         <p><b>Engine:</b> Buffer. Store a transmission at ×${R.bufferMultiplier} and release everything at once. Store and Forward and Replay Attack grow it further. It counts toward interrupting ultimates.</p>
         <p><b>Play:</b> buffer when the enemy isn't cutting you, flush when it matters — charge turns are perfect.</p>
-        <p><b>Risk:</b> packet loss. If a turn starts with no live route, the whole buffer is lost. Buffered turns deal nothing (Packet Leech heals).</p></article>
+        <p><b>Risk:</b> packet loss. If a turn starts with no live route, the whole buffer is lost. Buffered turns deal nothing (Packet Leech heals).</p></div></article>
     </div>
-    ${figure(bufferDiagram(R.bufferMultiplier), "Ghost: a buffered 8 becomes 12, released on top of the next transmission.")}
+    ${figure(bufferDiagram(R.bufferMultiplier), `Ghost: a buffered 8 becomes ${Math.floor(8 * R.bufferMultiplier)}, released on top of the next transmission.`)}
     ${tip("Archetype cards", "Some rewards belong to one keeper only — ECMP and Spine-Leaf for the Architect, Deep Packet Inspection and Reflect for the Warden, Store and Forward and Replay Attack for the Ghost.")}`,
 
   danger: () => `
@@ -268,15 +270,16 @@ export function handbookMarkup(chapter = "start"): string {
   const index = HANDBOOK_CHAPTERS.indexOf(current);
   const previous = HANDBOOK_CHAPTERS[index - 1], next = HANDBOOK_CHAPTERS[index + 1];
   return `<div class="handbook" data-chapter="${current.id}">
-    <header class="hb-header"><span class="eyebrow">THE SIGNAL KEEPER'S HANDBOOK</span><h2>Your network is your weapon.</h2>
-      <button class="gold-button hb-training" data-action="tutorial">${icon("play", 16)} Field training</button></header>
     <div class="hb-layout">
-      <nav class="hb-nav" aria-label="Handbook chapters">${HANDBOOK_CHAPTERS.map((item, i) => `<button data-handbook="${item.id}" class="${item.id === current.id ? "current" : ""}" ${item.id === current.id ? 'aria-current="page"' : ""}><b>${String(i + 1).padStart(2, "0")}</b><span>${item.title}</span></button>`).join("")}</nav>
+      <nav class="hb-nav" aria-label="Handbook chapters">
+        <h2 class="hb-book-title">Handbook</h2>
+        ${HANDBOOK_CHAPTERS.map((item, i) => `<button data-handbook="${item.id}" class="${item.id === current.id ? "current" : ""}" ${item.id === current.id ? 'aria-current="page"' : ""}><b>${NUMERALS[i]}</b><span>${item.title}</span></button>`).join("")}
+        <button class="plate-button hb-training" data-action="tutorial">${icon("play", 14)} Field Training</button>
+      </nav>
       <article class="hb-chapter" aria-labelledby="hb-title">
-        <span class="hb-kicker">${icon(current.icon, 14)} ${current.kicker}</span>
-        <h3 id="hb-title">${current.title}</h3>
+        <header class="hb-chapter-head"><span class="hb-seal" aria-hidden="true">${icon(current.icon, 22)}</span><span class="hb-numeral">Chapter ${NUMERALS[index]}</span><h3 id="hb-title">${current.title}</h3></header>
         ${CHAPTER_BODIES[current.id]()}
-        <footer class="hb-pager">${previous ? `<button data-handbook="${previous.id}">${icon("back", 14)} ${previous.title}</button>` : "<span></span>"}${next ? `<button data-handbook="${next.id}">${next.title} ${icon("arrow", 14)}</button>` : ""}</footer>
+        <footer class="hb-pager">${previous ? `<button class="text-button" data-handbook="${previous.id}">${icon("back", 15)} ${previous.title}</button>` : "<span></span>"}${next ? `<button class="text-button" data-handbook="${next.id}">${next.title} ${icon("arrow", 15)}</button>` : ""}</footer>
       </article>
     </div>
   </div>`;

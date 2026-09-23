@@ -161,14 +161,14 @@ Lethal and trap-lethal forecasts show zero incoming damage and no disruption tar
 
 ## Routes, channels and online devices
 
-A signal travels from ALPHA to OMEGA through at least one router. Cables are undirected. A jammed device or cut cable cannot carry a signal. Malware and wreckage are not part of the graph.
+A signal travels from ALPHA to OMEGA through at least one router. Cables are undirected. A jammed device or cut cable cannot carry a signal. Malware and wreckage are not part of the graph, but an unarmored cable whose straight span passes within 1.3 of a wreck is **frayed** (derived from positions, so relocating a device frays or mends its cables).
 
 - **Route**: a simple ALPHA → … → OMEGA path through live cables containing at least one router. A direct terminal cable or a switch-only path is not a route.
 - **Primary route**: the route with the highest route damage (below). Ties: fewer devices, then stable topology order (earliest-installed devices first). Only the primary route's devices contribute route terms.
 - **Channels**: the maximum number of routes that share no intermediate device (ALPHA and OMEGA are shared). Computed exactly over at most twelve deployed devices. The forecast lists one maximum disjoint set, primary route first when it belongs to one; when it cannot, the list is the primary route followed by that set (so it may list one more path than the channel count).
 - **Online device**: a non-terminal device that lies on at least one live route (any route, not only the channel set). Offline devices do nothing, with one exception: a cabled Honeypot decoys anywhere.
 
-Enumeration keeps one strongest representative per visited device set and endpoint, so a better route behind a dense branch is never missed; the forecast stays under 5 ms on a full fourteen-socket table (tested).
+Enumeration keeps one strongest representative per visited device set and endpoint (for one device set, the path with the best amplified-minus-frayed cable signal), so a better route behind a dense branch is never missed; the forecast stays under 5 ms on a full fourteen-socket table (tested as the best of several batches; shared CI runners get a 15 ms budget).
 
 ### Why a transmission deals that much damage
 
@@ -180,6 +180,7 @@ Enumeration keeps one strongest representative per visited device set and endpoi
 | Overclocked routers on the primary route | +2 each | No cap |
 | Compressed switches on the primary route | +2 each | No cap |
 | Amplified cables on the primary route (Amplified Fiber, VXLAN) | +1 each | No cap |
+| Frayed cables on the primary route (unarmored, crossing wreckage) | −1 each | No cap |
 | Resonance on a band crossed by primary-route hardware | +3 | Per field per band (terrain and cast fields stack) |
 | Suppression on a band crossed by primary-route hardware | −3 | Per field per band (terrain and cast fields stack) |
 | Spanning Tree (boss relic) | + the route subtotal above (×2) | Replaces bandwidth and balancers |
@@ -312,7 +313,7 @@ Deterministic auto-deployment (Containerlab, Emergency Rebuild, Clabernetes repl
 Every battle starts on a different table (`src/core/terrain.ts`), generated from seed, stage and room with a local generator that never consumes the run RNG:
 
 - The first fight of an expedition is always calm: no wreckage, salvage or field.
-- Otherwise **1–2 wreck sockets** in stage I and **1–3** later, chosen from fixed spots that are never within 2 units of the centre, so the classic ALPHA → centre router → OMEGA opener always exists.
+- Otherwise **1–2 wreck sockets** in stage I and **1–3** later, chosen from fixed spots that are never within 2 units of the centre or 1.3 of the centre line, so the classic ALPHA → centre router → OMEGA opener always exists and never frays (tested). No device may sit within 1.3 of a wreck, and an unarmored cable crossing that scorched ring frays: −1 damage while it is on the primary route. Armored Fiber, VXLAN and Dark Fiber never fray. Link targeting marks devices a new cable would fray to, and the table previews the cable before you commit.
 - 50 %: one **salvage** device pre-placed unconnected: switch or firewall in stage I; switch, firewall, cache or power in stage II; cache, power, balancer or firewall in stage III. It is yours once cabled.
 - 30 %: a permanent terrain field in one band: **Crystal vein** (Resonance, 55 %) or **Interference** (Suppression, can be purged). A terrain field and a cast field of the same kind stack (e.g. Resonance Field on a Crystal vein band gives +6).
 - A name and one-line description ("Collapsed rack row", "Flooded conduit", "Crystal vein", …) open the encounter.
@@ -396,10 +397,10 @@ Card targets: **ground** places hardware, **link** connects two devices without 
 | Aegis Field | 1 | uncommon | zone | all | Choose a band. While an online device sits in it, gain 3 shield each turn. 3 turns. | cost 1 → 0 |
 | Aegis Protocol | 2 | uncommon | instant | all | Gain 8 block this turn. | Gain 12 block this turn. |
 | Amplified Fiber | 1 | uncommon | link | all | Connect two devices. This cable adds +1 while on your primary route. | cost 1 → 0 |
-| Armored Fiber | 1 | uncommon | link | all | Connect two devices with a cable immune to cuts. | cost 1 → 0 |
+| Armored Fiber | 1 | uncommon | link | all | Connect two devices with a cable immune to cuts and fraying. | cost 1 → 0 |
 | Cache Server | 2 | uncommon | ground | all | Place a cache server. Online at the start of your turn: draw 1 more card. | cost 2 → 1 |
 | Crosslink | 0 | uncommon | link | all | Connect two devices for free. Draw 1. Exhaust. | Connect two devices for free. Draw 2. Exhaust. |
-| Dark Fiber | 0 | uncommon | link | ghost | Connect two devices with a cut-immune cable. Exhaust. | Connect two devices with a cut-immune cable. Draw 1. Exhaust. |
+| Dark Fiber | 0 | uncommon | link | ghost | Connect two devices with a cut- and fray-proof cable. Exhaust. | Connect two devices with a cut- and fray-proof cable. Draw 1. Exhaust. |
 | Emergency Rebuild | 2 | uncommon | instant | all | Deploy a router cabled to both terminals: a new 5-damage route. Exhaust. | cost 2 → 1 |
 | Equal-Cost Multipath | 1 | uncommon | instant | architect | Needs a live route. +2 burst for every live channel. | Needs a live route. +3 burst for every live channel. |
 | Faraday Shell | 1 | uncommon | node | all | Protect a device from jams this battle and clear its jam. Exhaust. | cost 1 → 0 |
@@ -417,7 +418,7 @@ Card targets: **ground** places hardware, **link** connects two devices without 
 | Quarantine Rule | 1 | uncommon | protocol | all | Arm. When the enemy casts a hostile field: cancel the field. | cost 1 → 0 |
 | Stateful Firewall | 2 | uncommon | ground | warden | Place a firewall that blocks double: 4 of a breach or 2 of a strike while online. | Place a jam-protected firewall that blocks double: 4 of a breach or 2 of a strike while online. |
 | Trust Gate | 2 | uncommon | ground | all | Place a firewall. While online it blocks 2 of a breach or 1 of a strike. Firewalls stack. | Place a firewall. While online it blocks 2 of a breach or 1 of a strike. Firewalls stack. Gain 3 block. |
-| VXLAN Tunnel | 2 | uncommon | link | all | Connect two devices with a cut-immune cable that adds +1 on your primary route. | cost 2 → 1 |
+| VXLAN Tunnel | 2 | uncommon | link | all | Connect two devices with a cut- and fray-proof cable that adds +1 on your primary route. | cost 2 → 1 |
 | Wireshark | 1 | uncommon | instant | all | Capture your primary route: draw 2 and +1 burst for every distinct device type on it. Exhaust. | Capture your primary route: draw 3 and +1 burst for every distinct device type on it. Exhaust. |
 | Bastion Firewall | 3 | rare | ground | all | Place a jam-protected firewall (online: blocks 2 breach / 1 strike). Gain 5 block. | Place a jam-protected firewall (online: blocks 2 breach / 1 strike). Gain 8 block. |
 | Containerlab | 3 | rare | instant | all | Deploy an overclocked router cabled to both terminals: a 7-damage route. Exhaust. | cost 3 → 2 |

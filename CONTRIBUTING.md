@@ -22,7 +22,7 @@ VITE_BASE_PATH=/faultline/ npm run build
 VITE_BASE_PATH=/faultline/ FAULTLINE_TEST_BUILD=true npm run test:e2e
 ```
 
-The browser suite launches a preview server on port 4174 for that production check. GitHub Actions runs the same checks before publishing `main` to Pages. Pull requests run checks without deploying.
+The browser suite launches a preview server on port 4174 for that production check. `npm run test:smoke` runs only the tests tagged `@smoke` (a new expedition through a first battle, save and reload, the core battle loop, local audio and fonts) for a quick check. GitHub Actions runs the unit tests and the Pages build before publishing `main`. Browser tests are too slow on its GPU-less runners, so run `npm run test:e2e` locally before a pull request. Pull requests run checks without deploying.
 
 ## Working on the game
 

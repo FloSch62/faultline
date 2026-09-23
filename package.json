@@ -9,6 +9,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --experimental-strip-types --test src/core/*.test.ts",
     "test:e2e": "playwright test",
+    "test:smoke": "playwright test --grep @smoke",
     "balance": "node --experimental-strip-types scripts/balance.ts"
   },
   "dependencies": {

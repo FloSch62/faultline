@@ -1,0 +1,32 @@
+{
+  "source": "audio.flac",
+  "source_sha256": "3df785393ccfff6e61182ef94f07945b80b0f075367c859a003352040b35fba3",
+  "mix": "complete native YuE2 recording",
+  "processing": "lossless FLAC decode to WAV; no source separation or denoising",
+  "sample_rate": 48000,
+  "channels": 2,
+  "subtype": "PCM_24",
+  "frames": 5583296,
+  "duration_seconds": 116.31866666666667,
+  "instrumental_sha256": "ffd5f46816b6f2746fbd799f95d1848d12d3217555d4a7ef8fd03d50b28d3487",
+  "verification": {
+    "decoded_pcm_equal_to_source": true,
+    "max_abs_pcm_error": 0
+  },
+  "delivery": {
+    "file": "public/audio/deliver-the-dawn-instrumental.ogg",
+    "sha256": "20a9f5d99d2ee96926a3a5e1a671fc0a2ed1303988ddd5552533ae41034fd03e",
+    "bytes": 1983211,
+    "codec": "Vorbis",
+    "quality": 5,
+    "fade_in_seconds": 1.5,
+    "fade_out_seconds": 3,
+    "constant_gain_db": -6.470000000000001,
+    "target_lufs": -19,
+    "peak_ceiling_dbtp": -2,
+    "integrated_lufs": -19.01,
+    "true_peak_dbtp": -6.29,
+    "range_lu": 9.3
+  },
+  "generation_version": "v5"
+}

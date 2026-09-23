@@ -16,13 +16,15 @@ Cinzel, Barlow and Barlow Condensed are bundled locally. The fonts were obtained
 
 ## Artwork
 
-The environment paintings, card illustrations, hostile sprites and interface textures in `public/art/` were generated for this game using OpenAI image generation. The final refinement prompts and asset paths are documented in `docs/art-prompts.md`. No Slay the Spire art, music, characters or code is bundled.
+The original environment paintings, original card illustrations, hostile sprites and interface textures in `public/art/` were generated for this game using OpenAI image generation. The individual paintings in `public/art/cards/` use OpenAI image generation for Honeypot and Cache Server, and local Krea 2 Turbo for the other 23 cards. The four later-stage environments in `public/art/stages/` were generated with local Krea 2 Turbo, guided by the original relay cathedral painting. Prompts, seeds, production settings and asset paths are documented in `docs/art-prompts.md`, `docs/art-v3-prompts.md`, `docs/art-v3-manifest.json` and `docs/art-stage-manifest.json`. No Slay the Spire art, music, characters or code is bundled.
+
+Krea 2 is provided under the Krea 2 Community License, preserved in `public/art/cards/KREA-2-COMMUNITY-LICENSE.txt`. Its commercial-use terms for the model and its outputs include a company-wide annual revenue threshold below USD 1 million. Those terms remain applicable to Krea-generated artwork. The model weights and the ComfyUI production environment are not distributed with this game.
 
 ## Soundtrack
 
-The music was generated locally with the official `m-a-p/YuE2-3B` model and `m-a-p/YuE2-Vae` listening decoder, using original instrumental score plans. Demucs `htdemucs_ft` was used to exclude vocal stems; FFmpeg was used for delivery mastering. See `soundtrack/README.md` for source versions, the production pipeline and limitations of automated speech checks. The prompts, score files and master metadata are published in `soundtrack/`. Native recordings and separated stems are generated locally and excluded from Git.
+The music was generated locally with the official `m-a-p/YuE2-3B` model and `m-a-p/YuE2-Vae` listening decoder, using original instrumental score plans. The complete native recordings are preserved; FFmpeg applies delivery fades, a constant volume adjustment and browser encoding. No source separation or denoising is applied. See `soundtrack/README.md` for source versions, the production pipeline and limitations of automated speech checks. The prompts, score files and master metadata are published in `soundtrack/`. Native recordings and lossless WAV masters are generated locally and excluded from Git.
 
-YuE inference code is Apache-2.0. The official model-weight license is preserved separately in `soundtrack/licenses/YuE2-MODEL_LICENSE`, including its additional permissions; the model weights are not distributed with the game. Demucs code is MIT licensed. Their runtime tools are used during asset production, not embedded in the browser bundle.
+YuE inference code is Apache-2.0. The official model-weight license is preserved separately in `soundtrack/licenses/YuE2-MODEL_LICENSE`, including its additional permissions; the model weights are not distributed with the game. Production tools are used during asset creation, not embedded in the browser bundle.
 
 ## Sound effects
 

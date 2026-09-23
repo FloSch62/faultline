@@ -1,0 +1,283 @@
+{
+  "description": "FAULTLINE individual card paintings. Local Krea 2 uses the painterly direction selected after the PoE comparison. Review candidates before installation.",
+  "builtInCards": [
+    "honeypot",
+    "cache-server"
+  ],
+  "local": {
+    "model": "Krea-2-Turbo",
+    "diffusionModel": "krea2_turbo_fp8_scaled.safetensors",
+    "textEncoder": "qwen3vl_4b_fp8_scaled.safetensors",
+    "vae": "qwen_image_vae.safetensors",
+    "width": 1536,
+    "height": 1024,
+    "steps": 8,
+    "cfg": 1,
+    "sampler": "euler",
+    "scheduler": "simple",
+    "modelSource": "https://huggingface.co/Comfy-Org/Krea-2",
+    "modelRevision": "eb1eddd3983a54678545a9b2c178c5853b30f7be",
+    "runtime": "ComfyUI",
+    "runtimeRevision": "b5cc8830279eae909a59de030af1e50761c36751",
+    "styleReference": {
+      "source": "public/art/card-atlas.png",
+      "cell": 1,
+      "grid": 3,
+      "inputName": "faultline-original-style.png",
+      "lora": "krea2_style_reference.safetensors",
+      "strength": 0.8
+    }
+  },
+  "cards": [
+    {
+      "id": "honeypot",
+      "name": "Honeypot",
+      "effect": "A decoy attracts hostile jams and cuts and damages the attacker.",
+      "engine": "openai-built-in",
+      "seed": 230926000,
+      "prompt": "Use case: stylized-concept.\nAsset type: one finished landscape 3:2 full-bleed collectible card illustration for FAULTLINE, a ruined orbital relay network tactics game.\nStyle/medium: premium detailed painterly oil concept art, tangible intricate engineering craftsmanship. Worn tarnished brass, chipped ivory ceramic, etched gunmetal, glass and fine optical cables; deep indigo-black mechanical cathedral shadows, restrained pale teal and warm amber glow, cinematic dust and rim lighting. Match a coherent set of antique science-fiction network machinery.\nComposition/framing: one clear focal subject and a readable action, close three-quarter view with strong silhouette at thumbnail size. Keep all essential storytelling within the central 80 percent width and central 65 percent height so the image works in a landscape card-art window. Paint the setting fully to every edge.\nConstraints: original physical machinery and meaningful packet-light metaphors, no card frame, no border, no UI, no diagram overlay, no lettering, no readable screens, no words, no numbers, no logos, no watermark. Opaque painted background. One illustration only, not a collage or atlas.\nCard: Honeypot. Gameplay meaning (context only, do not write it in the image): A decoy attracts hostile jams and cuts and damages the attacker.\nSubject and action: On a dark engineering bench a small alluring honey-amber glass decoy router in an open brass lure cage is cabled to the network. Several menacing thin red-black attack filaments converge on its bright false signal. The brass trap has snapped closed around the hostile filaments and small amber barbs send a bright retaliatory pulse back along them. The unmistakable decoy-and-trap device dominates; subtle real ivory router protected in the background. Warm amber focal glow. Avoid a literal honey jar or bees.",
+      "file": "public/art/cards/honeypot.png",
+      "sha256": "f3a23104cf0aa653332cba19ea9414c9439708e86de286897855d593a3b21106"
+    },
+    {
+      "id": "cache-server",
+      "name": "Cache Server",
+      "effect": "An online storage device supplies an extra card every turn.",
+      "engine": "openai-built-in",
+      "seed": 230926001,
+      "prompt": "Use case: stylized-concept.\nAsset type: one finished landscape 3:2 full-bleed collectible card illustration for FAULTLINE, a ruined orbital relay network tactics game.\nStyle/medium: premium detailed painterly oil concept art, tangible intricate engineering craftsmanship. Worn tarnished brass, chipped ivory ceramic, etched gunmetal, glass and fine optical cables; deep indigo-black mechanical cathedral shadows, restrained pale teal and warm amber glow, cinematic dust and rim lighting. Match a coherent set of antique science-fiction network machinery.\nComposition/framing: one clear focal subject and a readable action, close three-quarter view with strong silhouette at thumbnail size. Keep all essential storytelling within the central 80 percent width and central 65 percent height so the image works in a landscape card-art window. Paint the setting fully to every edge.\nConstraints: original physical machinery and meaningful packet-light metaphors, no card frame, no border, no UI, no diagram overlay, no lettering, no readable screens, no words, no numbers, no logos, no watermark. Opaque painted background. One illustration only, not a collage or atlas.\nCard: Cache Server. Gameplay meaning (context only, do not write it in the image): An online storage device supplies an extra card every turn.\nSubject and action: A squat compact ivory-and-brass network storage cabinet on a cathedral workbench, with three clearly separated stacked hot-swap cartridge drawers and blue-glowing memory wafers visible behind glass. One drawer is partly extended, presenting a fresh luminous rectangular data wafer; fine blue packet lights flow into the cabinet through a cabled input. Crisp stack-of-storage silhouette, useful working hardware with many small screws, restrained cool blue status lights.",
+      "file": "public/art/cards/cache-server.png",
+      "sha256": "3f8f2b899fcdf1f0761b43056b82b41a93a0173c5232c3f5ee36c3ae9e0e9e48"
+    },
+    {
+      "id": "poe-injector",
+      "name": "PoE Injector",
+      "effect": "An online power injector adds energy every turn.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928102,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A compact ancient brass power-over-Ethernet injector on a broken metal platform inside a ruined orbital cathedral. Two cables enter its battered angular housing: one amber power lead and one teal data lead. A central glass chamber combines their luminous energy, and a single output cable carries it onward to a small ivory router. Intricate but clearly painted mechanical forms, chipped and pitted brass, cracked ivory plates, dark cables, bright teal and gold sparks in the glass. Towering broken gothic machinery and drifting debris recede into deep blue-black space. Rich layered oil-paint brushwork, finely illustrated craftsmanship, softly broken painted edges, muted colors, dramatic shadow masses and warm light. The environment and device form one imaginative card-art composition. Center the main device with its cables readable. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/poe-injector.png",
+      "sha256": "0b87240f63bb4002ec9bb5dc9acddd05202b3f5dad6b0c97824517b237d81f0b"
+    },
+    {
+      "id": "load-balancer",
+      "name": "Load Balancer",
+      "effect": "A distribution device strengthens every live channel.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928103,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. An exquisite brass mechanical traffic distributor with a central three-way rotary valve and pale green glass chamber. One incoming teal packet stream enters from the left and splits evenly into three separate physical optical conduits fanning outward toward three small ivory network modules. Equal glowing packets in each output make the balancing action unmistakable. Compact sturdy hardware, broad forked silhouette, pale jade and teal signals, dark cathedral bench. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/load-balancer.png",
+      "sha256": "f6f96f61f2fd69c66e9247c083526497713c922e5671b74728ed340a40019246"
+    },
+    {
+      "id": "failover-policy",
+      "name": "Failover Policy",
+      "effect": "An armed safeguard prevents a cable cut and gains shielding.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928104,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A diagonal steel cutter blade hits a curved translucent teal shield and stops in a shower of tiny sparks. Immediately beneath the shield, a thin teal optical cable remains visibly whole, attached to a small rectangular brass protection module. A second bright amber cable forms a clear U-shaped bypass loop around the protected section. Close three-quarter view: stopped blade above, intact teal cable across the middle, glowing amber backup loop below. All three elements fit inside the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/failover-policy.png",
+      "sha256": "57ac3c21be8d136772495224f333ce6b9fd6591aa3eb0a587ad261308d9bac64"
+    },
+    {
+      "id": "port-security",
+      "name": "Port Security",
+      "effect": "An armed safeguard stops a jam and retaliates against the attacker.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928105,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A rectangular Ethernet network socket with eight gold contacts, built into the front of a chipped ivory router. A heavy brass sliding security shutter locks down over the inserted teal-lit cable plug. Sharp red hostile sparks strike the closed shutter from the right and bounce backwards in a brilliant blue-white defensive pulse. The square locked socket and the stopped red attack fill the center of the picture. Close three-quarter view on a dark engineering bench. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/port-security.png",
+      "sha256": "d759581f0dd1007c3caa19ff9b031bdff559fe53de7ac4efbbd1e3180710b991"
+    },
+    {
+      "id": "rate-limiter",
+      "name": "Rate Limiter",
+      "effect": "An armed safeguard absorbs an incoming enemy strike.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928106,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A thick torrent of bright red-orange packet cubes flows from the left into a brass pressure-regulating valve. Its narrow mechanical aperture stops most of the torrent; only three small orderly blue packets emerge from the slim nozzle on the right. The valve is a compact horizontal cylinder on a dark bench, with a small blank pressure dial. Strong contrast between the wide violent incoming red stream and the tiny controlled outgoing blue stream. The throttling action dominates the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/rate-limiter.png",
+      "sha256": "6cf0f68a87e4779d24c64e26596186219c93571f47bf95bab31e7f28f9463e08"
+    },
+    {
+      "id": "ips-signature",
+      "name": "IPS Signature",
+      "effect": "An intrusion-prevention signature shields against a breach.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928107,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A jagged crimson packet shard is caught halfway through a rectangular brass security scanner. Bright amber scanning beams trace the shard, revealing a matching thorn-shaped silhouette on the glass pattern plate behind it. The captured red shard cracks into sparks inside the scan chamber. A separate narrow conduit beneath carries harmless small teal packet cubes past the scanner. Close view of the device and the intercepted red threat, on an ivory engineering bench. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/ips-signature.png",
+      "sha256": "93f183825558308492fd6393a0c2650bffafa6eebf1a85318839c9252a5e4662"
+    },
+    {
+      "id": "quarantine-rule",
+      "name": "Quarantine Rule",
+      "effect": "An armed containment rule cancels a hostile field.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928108,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A tangled bright crimson mechanical virus with thorny red crystal tentacles is trapped inside a sealed clear glass containment jar. The red tentacles press against the glass but cannot pass its glowing pale teal containment seams. Three heavy brass clamps lock the jar shut onto a chipped ivory pedestal. The red threat is clearly visible inside; all the cables outside the jar remain calm and blue. One complete containment vessel fills the center of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/quarantine-rule.png",
+      "sha256": "ae9ffc78b5e299470df57baab25428038a61c81372b3e5288e78d92db06ee71d"
+    },
+    {
+      "id": "tarpit",
+      "name": "Tarpit",
+      "effect": "A trap punishes a charging or ultimate attack.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928109,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A circular recessed brass network trap filled with thick glossy violet-black signal tar. A menacing angular mechanical attack probe lunging downward is caught and sinking into its viscous center; taut violet filaments seize its claws while jagged violet energy returns up the probe. Distinct low basin silhouette, sticky engulfing material and restrained purple retaliation, antique network engineering, no biological gore or literal outdoor swamp. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/tarpit.png",
+      "sha256": "0f34195f9952594262cec09f8d5b91815e7a155ba74db6c4926858e1a88fce3f"
+    },
+    {
+      "id": "ecmp",
+      "name": "Equal-Cost Multipath",
+      "effect": "Every live parallel route adds transmission damage.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928110,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A physical miniature network on a dark brass routing table: two substantial ivory terminal pylons joined by exactly three separate graceful parallel optical paths of equal visible length, each carrying equally bright teal packet pulses toward the destination. The three luminous routes arch in a clean fan through small brass routing couplers, clearly distinct and unobstructed. Equal synchronized flow, wide readable composition, cyan-blue light, tangible machinery rather than a flat network diagram. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/ecmp.png",
+      "sha256": "ff1c6977cf25297db59e4b969f6d1d417685b59d52d5dde1dd738b25e5ee2c23"
+    },
+    {
+      "id": "spine-leaf",
+      "name": "Spine-Leaf",
+      "effect": "Deploys a switch connected to every router.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928111,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A broad central brass spine switch raised on a short ivory plinth with a bank of luminous blue ports. Multiple separate fine blue-gold cables fan down and outward to four clearly visible smaller ivory router towers arranged across a lower bench, every small router connected directly to the central switch. A striking crown-and-fan network silhouette, functional detailed hardware, dark orbital cathedral, blue rim light, no tree branches or botanical leaves. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/spine-leaf.png",
+      "sha256": "9d31a6f06453568cec686e0b77af7e827d68c3c85eabcc8417d7891b80aafbb3"
+    },
+    {
+      "id": "mesh-weave",
+      "name": "Mesh Weave",
+      "effect": "Connects a selected device to its two nearest unconnected devices.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928112,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. An intricate brass mechanical weaving shuttle circling a central ivory router on a dark bench, drawing exactly two fresh luminous teal optical strands outward to two nearby separate router modules. The strands settle into real brass connector sockets, completing a small triangular fabric among existing delicate cables. The central device and two new connections must read immediately, graceful cable weaving motion, jade-teal glow, tangible antique tool. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/mesh-weave.png",
+      "sha256": "95211d847e5e37d4ad2ca6a6c9995e2159d1bb16c7b8eff7a9199bdd86edaf3f"
+    },
+    {
+      "id": "deep-inspection",
+      "name": "Deep Packet Inspection",
+      "effect": "Online firewalls combine to provide block.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928113,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. An open faceted teal data packet suspended within a large horizontal brass microscope scanner above a fortified ivory-and-brass network gate. The packet's nested glass layers are peeled apart optically to reveal a small concealed red thorn fragment, which the scanner isolates behind an amber shield. Two small security modules feed amber light into the scanner base. Clear close-up cross-section inspection and defensive screening, warm amber lenses, no shark and no handheld magnifying glass. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/deep-inspection.png",
+      "sha256": "f3aee4b4536e69ad58de655440175b560ab5f41476f305c5c0216c5ce89aefbb"
+    },
+    {
+      "id": "stateful-firewall",
+      "name": "Stateful Firewall",
+      "effect": "A stronger firewall doubles protection against strikes and breaches.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928114,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A formidable pair of thick ivory-and-brass security gate towers connected by two overlapping amber force barriers. Between the towers a mechanical glass memory drum holds tiny orderly teal packet traces, remembering the safe connections; red hostile shards stop at the outer barrier while a fine teal data path passes through a controlled central opening. Two-layer defense and persistent memory, one broad sturdy bastion silhouette, warm orange-amber light, intricate painted machinery. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/stateful-firewall.png",
+      "sha256": "34f62877531a9341dc614a3c159e36f82cbf19f7d0dff5551d18718ab948fa1c"
+    },
+    {
+      "id": "reflect",
+      "name": "Reflect",
+      "effect": "Doubles stored defensive backpressure.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928115,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A concave polished brass-and-amber pressure reflector mounted against a sealed glass reservoir. A compact bright amber energy pulse rebounds between two opposed mirrored plates and returns into the same reservoir as two equally strong spiraling ribbons, visibly amplifying the captured energy. Dominant curved reflector and glowing stored-pressure chamber, warm gold light, tiny stress sparks, dark bench; stored defensive energy rather than a weapon shooting at an enemy. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/reflect.png",
+      "sha256": "63a9cea549bfddfa462b677e9a76efb317b12691eea0c811bc8d26b9b5d79b36"
+    },
+    {
+      "id": "store-forward",
+      "name": "Store and Forward",
+      "effect": "Adds damage to a buffer for a later transmission.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928116,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A squat elongated brass buffer vault with a transparent smoked-indigo chamber, violet-blue packet cubes neatly queued in several discrete slots behind a heavy closed output shutter. One input optical cable feeds a fresh luminous cube into the waiting queue; a fine dormant output conduit leads away. The physically stored queued packets and closed release gate are unmistakable, useful antique machine with a calm blue-lilac internal glow. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/store-forward.png",
+      "sha256": "6eb54d8fc3a8465bd690f24a282fc6777f793c01dc37722121d161524143b20d"
+    },
+    {
+      "id": "replay-attack",
+      "name": "Replay Attack",
+      "effect": "Doubles the stored packet buffer.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230929117,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. Two exposed brass recording spools stand upright side by side on a narrow open metal frame. A luminous violet optical ribbon loops around both spools in a figure eight. Between them, a glass playback prism splits a row of violet packet cubes into two identical glowing rows returning into a storage chamber. The ribbon, two reels and duplicated packets are the focal shapes. All surfaces are plain scratched metal or transparent glass. No paper, printed panel, keyboard, dial markings, inscription or controls with writing. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/replay-attack.png",
+      "sha256": "519664c45f559197cae624d457830a882e60268ffca39442105d1eeece77a47b"
+    },
+    {
+      "id": "dark-fiber",
+      "name": "Dark Fiber",
+      "effect": "An elusive protected cable resists cuts.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928118,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A sinuous thick matte-black optical cable with overlapping dark gunmetal armor, heavy tarnished brass end connectors and a very subtle deep blue-violet core visible at the ends. The intact cable arcs across a dark bench between two ivory network sockets. A broken precision cutter blade lies caught against its unmarked protective sheath, making its resistance to severing clear. Strong readable rim-lit cable silhouette despite the darkness; stealthy indigo, no bright teal coil or ghost creature. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/dark-fiber.png",
+      "sha256": "48728128ecdd17378d4f5310ce9daf0efdc5cfce318af6ae7d9c9926e70a6f07"
+    },
+    {
+      "id": "packet-loss",
+      "name": "Packet Loss",
+      "effect": "Useless traffic fragments vanish at the end of the turn.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928119,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. Two separated worn brass optical connectors face one another across a dark empty gap. A dotted procession of pale gray-blue luminous packet cubes leaves one connector but breaks apart into dust before reaching the other, several obvious missing spaces in the stream and the receiver dim. Focus on vanishing discrete packets and interrupted continuity, melancholy desaturated indigo and cold silver, tactile chipped hardware, no lettering or error icon. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/packet-loss.png",
+      "sha256": "6103091cca6f33981dee2047e19cefecd0f253b17e733990e366669bc3347170"
+    },
+    {
+      "id": "worm",
+      "name": "Worm",
+      "effect": "Malicious software in the hand increases incoming damage until deleted.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928120,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A small sinister segmented mechanical data worm made of articulated dark copper rings and jagged rose-red glass segments burrows into an opened ivory circuit module. Its curved body wraps around a fine optical cable; red corruption spreads visibly through the nearby circuit channels while the healthy teal lights dim. Clear worm silhouette with tiny gripping feet and a bright crimson head sensor, threatening but entirely mechanical, no biological gore. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/worm.png",
+      "sha256": "506da99cd152f6e340af69ebab8485b48a5c86021bd7fa1fbfa9acc048b56ca2"
+    },
+    {
+      "id": "cve",
+      "name": "CVE",
+      "effect": "A persistent vulnerability weakens the deck until removed.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928121,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. An ancient ivory-and-brass security module with a single unmistakable jagged crack through its protective faceplate and a broken locking seam. From the exposed dark inner circuitry a persistent thin crimson corruption thread leaks out and grips the surrounding cable. Focus on the unpatched weakness in otherwise solid protective armor, damaged screws and chipped ceramic, ominous dusty rose-red interior glow, no letters, no warning triangle, no document or clipboard. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/cve.png",
+      "sha256": "98cd3253ed68721da9db8387be7f937adbd7a7868003487380ce47db55c80a8e"
+    },
+    {
+      "id": "rebuild",
+      "name": "Emergency Rebuild",
+      "effect": "Deploys a new router already connected to both terminals.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928122,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. On a damaged dark cathedral workbench, an articulated brass repair arm lowers a fresh ivory core router into the empty socket between two surviving network terminal pylons. Two newly energized teal optical cables immediately connect this replacement router to both pylons, forming a complete bright working route above scattered broken components. One clear newly assembled router and two live connections, hopeful teal and warm amber, no mere bypass loop. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/rebuild.png",
+      "sha256": "91075dbeeb364cc8c02ac177acf297b36a4ac4f98fbd34a032bf7eb6c8204ff7"
+    },
+    {
+      "id": "emergency",
+      "name": "Emergency Repair",
+      "effect": "Restores integrity and provides immediate block.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928123,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. Close-up of an engineer's worn ivory-gloved hand using a delicate brass repair probe to fuse a jagged crack in a damaged ivory network core. The crack is visibly closing with a fine soft green-gold seam as status lights revive; a small translucent protective teal arc shelters the exposed core during repair. Intimate restorative action, repaired sturdy hardware rather than salvaged loose components, hopeful green-teal light, dark orbital cathedral bench. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/emergency.png",
+      "sha256": "51f70aa3589af0d1cc7a6347558944474d897ce52d982a22c6c9e91db30baab4"
+    },
+    {
+      "id": "protocol",
+      "name": "Link Recovery",
+      "effect": "Repairs jammed hardware and reconnects a severed cable.",
+      "engine": "local-krea-2-turbo",
+      "seed": 230928124,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A precise hinged brass cable-splicing instrument clamps two severed optical cable ends into one straight aligned glowing connection. Beside the splice, attached to the same compact ivory network port, tangled red interference filaments dissolve into harmless specks and the status lens returns to blue-teal. A subtle protective pale blue halo around the repaired joint. Strong close-up connector-and-repair silhouette, both clean signal and restored continuity, no cathedral force-wall scene. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/protocol.png",
+      "sha256": "b5d070f6dddf23e739c837d4bc94ad7c2bd5f8b160c7c2a250ecc64bf04faa30"
+    }
+  ]
+}

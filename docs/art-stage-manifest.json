@@ -1,0 +1,68 @@
+{
+  "description": "Stage II and III environments. Final cinematic digital painting direction matched to relay-cathedral.png; the initial sketch-like candidates were rejected.",
+  "local": {
+    "model": "Krea-2-Turbo",
+    "diffusionModel": "krea2_turbo_fp8_scaled.safetensors",
+    "textEncoder": "qwen3vl_4b_fp8_scaled.safetensors",
+    "vae": "qwen_image_vae.safetensors",
+    "width": 1920,
+    "height": 1088,
+    "steps": 8,
+    "cfg": 1,
+    "sampler": "euler",
+    "scheduler": "simple",
+    "modelSource": "https://huggingface.co/Comfy-Org/Krea-2",
+    "modelRevision": "eb1eddd3983a54678545a9b2c178c5853b30f7be",
+    "runtime": "ComfyUI",
+    "runtimeRevision": "b5cc8830279eae909a59de030af1e50761c36751",
+    "styleReference": {
+      "lora": "krea2_style_reference.safetensors",
+      "strength": 0.45
+    },
+    "shift": 1.15
+  },
+  "images": [
+    {
+      "id": "glass-cathedral",
+      "engine": "local-krea-2-turbo",
+      "reference": "public/art/relay-cathedral.png",
+      "seed": 230930401,
+      "prompt": "An extraordinarily detailed cinematic matte painting in the exact finished science-fiction environment art direction of the reference. Monumental weathered orbital infrastructure with richly rendered surfaces, precise mechanical engineering and dramatic naturalistic volumetric lighting. Dense layers of trusses, fine gantries, bundled conduits, riveted brass panels, worn ivory ceramic machinery and tiny service lights establish convincing colossal scale. Sophisticated chiaroscuro, deep desaturated midnight-blue shadows, small warm golden highlights, intricate sharp foreground detail gradually lost in immense misty distance. High-end game environment key art with subtle painterly edge control and exceptionally high visual fidelity. The Glass Cathedral, a breathtaking different district of this orbital civilization. From a high maintenance balcony, look across a vast gulf of blue cloud toward enormous translucent prismatic transmission towers and pointed mechanical spires reinforced with dense dark-bronze scaffolding. Hundreds of fine suspension cables, stacked relay cabinets, pipes and service bridges articulate their scale. A huge segmented circular optical aperture set into a gilded machine cathedral dominates the far upper right, its many layers of fractured violet-blue glass catching pale cold light and tiny amber reflections. Dense clouds swirl around the lower structures; several suspended rail bridges recede toward distant towers. Dark textured silhouettes and cloud on the left transition to the luminous aperture on the right. The glass forms architectural optical machinery. Immense layered depth and exquisite intricate hard-surface craftsmanship, a believable dark science-fiction world. The environment fills the entire widescreen image, without writing, characters, enemies, framing or interface.",
+      "file": "public/art/stages/glass-cathedral.png",
+      "sha256": "bb53a1d37b11bf066c17cfd4d6bcf89ecc3774c3f48a9601a85568a067f22701",
+      "referenceSha256": "03030df73f961c2eb70f89166693b886c3bd2d0de1241a208763684f50a7418a"
+    },
+    {
+      "id": "glass-interior",
+      "engine": "local-krea-2-turbo",
+      "reference": "public/art/relay-cathedral.png",
+      "seed": 230930402,
+      "prompt": "An extraordinarily detailed cinematic matte painting of a monumental abandoned orbital transmission cathedral, viewed from a maintenance platform inside its immense glass-and-brass nave. This is finished science-fiction environment key art, with richly rendered surfaces, precise mechanical engineering and dramatic realistic volumetric lighting. Vast dark-bronze pylons rise through several levels of densely stacked ivory relay cabinets, ribbed mechanical housings, tiny service ladders and intricate steel gantries. Heavy bundles of black conduits drape between the pillars. High segmented vaults contain enormous fractured violet optical glass panels held in finely engineered brass frames, with delicate prismatic reflections and cold blue light. Narrow elevated bridges cross the cavern at several depths, their tiny warm amber lamps receding far into blue-grey atmospheric mist. A complex recessed optical receiver fills the far end of the hall. Finely resolved surface detail includes worn rivets, flaking paint, pipe couplings, grated walkways, recessed panel lines, tarnished bronze filigree and chipped porcelain. A broad dark gunmetal platform fills the lower third, its empty central area bordered by intricate railings and illuminated cable channels. Sophisticated chiaroscuro, midnight-blue shadows, subtle pale violet light and very small warm amber highlights. Tangible materials and convincing colossal scale, architectural detail sharp in the foreground and gradually lost in the immense misty distance. A cohesive dark science-fiction game world, wide cinematic composition, exceptionally high fidelity and visual richness. The environment fills the entire widescreen image, without writing, framing or interface.",
+      "file": "public/art/stages/glass-interior.png",
+      "sha256": "2147812993a372d2dd228d1bbbc48dbd3484a25a14b583bae22ac665535c934f",
+      "referenceSha256": "03030df73f961c2eb70f89166693b886c3bd2d0de1241a208763684f50a7418a"
+    },
+    {
+      "id": "blackout-heart",
+      "engine": "local-krea-2-turbo",
+      "reference": "public/art/relay-cathedral.png",
+      "seed": 230930503,
+      "prompt": "An extraordinarily detailed cinematic matte painting of a colossal failing orbital transmission engine, seen across an immense gulf from a narrow maintenance balcony. This is finished science-fiction environment key art, with richly rendered surfaces, precise mechanical engineering and dramatic realistic volumetric lighting. A gigantic blackened copper reactor drum with intricate concentric armored rings occupies the far upper right, its central aperture burning with a deep restrained crimson-red glow. The surrounding megastructure contains hundreds of densely stacked worn ivory relay containers and warm brass machine housings, massive radiator fins, heavy cable bundles, ribbed buttresses, articulated braces and countless tiny amber maintenance lights. Several elevated steel causeways cross the foreground and middle distance toward the reactor; their handrails, panel seams and cable channels are meticulously resolved. Tall industrial spires loom from blue-black coolant mist in the left half of the image. Strong ember-red internal light from the machinery contrasts with cold blue ambient haze, softly illuminating nearby brass plating. Deep layered perspective, sophisticated chiaroscuro and convincingly colossal scale. Tangible materials with flaking paint, rust, worn rivets, small pipe couplings and ornate engineered details. An ominous dying network backbone, atmospheric but clearly legible, with exceptional high fidelity and visual richness. The entire frame is a widescreen environment illustration, without people, text, framing or interface.",
+      "file": "public/art/stages/blackout-heart.png",
+      "referenceStrength": 0.3,
+      "sha256": "3a8eb8192182b3b5d9ba891279c860cc2bc66e25b1068a063c2f3e889dd5d581",
+      "referenceSha256": "03030df73f961c2eb70f89166693b886c3bd2d0de1241a208763684f50a7418a"
+    },
+    {
+      "id": "blackout-interior",
+      "engine": "local-krea-2-turbo",
+      "reference": "public/art/relay-cathedral.png",
+      "seed": 230930504,
+      "prompt": "An extraordinarily detailed cinematic matte painting of the immense inner chamber of a dying orbital transmission engine, viewed from a maintenance platform inside its armored reactor hall. This is finished science-fiction environment key art, with richly rendered surfaces, precise mechanical engineering and dramatic realistic volumetric lighting. Massive blackened copper containment ribs sweep over several levels of densely stacked worn ivory relay cabinets, ribbed cylindrical machinery, huge bundled conduits, narrow service ladders and intricate steel gantries. Thick rust-red cables hang between the pillars. Deep crimson-red light escapes from long reactor vents high in the walls and a recessed quarantine aperture in the distant upper right; numerous tiny warm amber maintenance lamps illuminate the surrounding worn brass mechanisms. Cold blue-grey coolant vapor drifts between multiple layers of narrow catwalks and immense dark machine housings. Finely resolved detail includes heavy rivets, flaking ivory paint, pipe couplings, grated walkways, recessed panel lines, tarnished copper filigree and chipped ceramic insulators. A broad dark gunmetal platform fills the lower third, its empty central area bordered by intricate railings and illuminated cable channels. Strong controlled red and amber rim light defines the architectural surfaces against midnight-blue shadows. Tangible materials and convincing colossal scale, sharp detailed foreground and deep misty distance, a sophisticated dark science-fiction game world. Wide cinematic composition with exceptionally high fidelity and visual richness, without characters, writing, framing or interface.",
+      "file": "public/art/stages/blackout-interior.png",
+      "referenceStrength": 0.3,
+      "sha256": "b8b4de2cee811400dc464b7c5ec31083203b356dfc8ad8999f65d52f7f9a2e50",
+      "referenceSha256": "03030df73f961c2eb70f89166693b886c3bd2d0de1241a208763684f50a7418a"
+    }
+  ]
+}

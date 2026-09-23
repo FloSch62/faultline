@@ -1,0 +1,32 @@
+{
+  "source": "audio.flac",
+  "source_sha256": "5f97f8e1461b19a4d899d77458eac8c24e0971dce18c9948270ea64ddda1276b",
+  "mix": "complete native YuE2 recording",
+  "processing": "lossless FLAC decode to WAV; no source separation or denoising",
+  "sample_rate": 48000,
+  "channels": 2,
+  "subtype": "PCM_24",
+  "frames": 4010816,
+  "duration_seconds": 83.55866666666667,
+  "instrumental_sha256": "d7d0d2cc86c09c358299b4c414b6888920d124fd43bc6b60ba5b63b1078d8d11",
+  "verification": {
+    "decoded_pcm_equal_to_source": true,
+    "max_abs_pcm_error": 0
+  },
+  "delivery": {
+    "file": "public/audio/a-thousand-fractures-instrumental.ogg",
+    "sha256": "79b7260810dc076947d328f9e911985282c0ac7a3d04eedfb0f3ba21c57f470d",
+    "bytes": 1437936,
+    "codec": "Vorbis",
+    "quality": 5,
+    "fade_in_seconds": 1.5,
+    "fade_out_seconds": 3,
+    "constant_gain_db": -3.1799999999999997,
+    "target_lufs": -19,
+    "peak_ceiling_dbtp": -2,
+    "integrated_lufs": -19.04,
+    "true_peak_dbtp": -3.51,
+    "range_lu": 8.2
+  },
+  "generation_version": "v3"
+}

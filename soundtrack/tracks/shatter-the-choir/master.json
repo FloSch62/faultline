@@ -1,0 +1,32 @@
+{
+  "source": "audio.flac",
+  "source_sha256": "e175361fa625251eb379ee2315cf68eeaabfa3bb84d3bcc1ed5a15a077bf3249",
+  "mix": "complete native YuE2 recording",
+  "processing": "lossless FLAC decode to WAV; no source separation or denoising",
+  "sample_rate": 48000,
+  "channels": 2,
+  "subtype": "PCM_24",
+  "frames": 5354816,
+  "duration_seconds": 111.55866666666667,
+  "instrumental_sha256": "0e544515fa4bd8bb71b67df287b621a7624f6585795a04d86b1d77697e5ae5ba",
+  "verification": {
+    "decoded_pcm_equal_to_source": true,
+    "max_abs_pcm_error": 0
+  },
+  "delivery": {
+    "file": "public/audio/shatter-the-choir-instrumental.ogg",
+    "sha256": "9601198fcac431b17cfce79042121f5b31ba74d586f83d5793cb3d284af6e25e",
+    "bytes": 2068581,
+    "codec": "Vorbis",
+    "quality": 5,
+    "fade_in_seconds": 1.5,
+    "fade_out_seconds": 3,
+    "constant_gain_db": -4.5600000000000005,
+    "target_lufs": -19,
+    "peak_ceiling_dbtp": -2,
+    "integrated_lufs": -18.98,
+    "true_peak_dbtp": -6.89,
+    "range_lu": 8.3
+  },
+  "generation_version": "v5"
+}

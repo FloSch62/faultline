@@ -168,7 +168,7 @@ A signal travels from ALPHA to OMEGA through at least one router. Cables are und
 - **Channels**: the maximum number of routes that share no intermediate device (ALPHA and OMEGA are shared). Computed exactly over at most twelve deployed devices. The forecast lists one maximum disjoint set, primary route first when it belongs to one; when it cannot, the list is the primary route followed by that set (so it may list one more path than the channel count).
 - **Online device**: a non-terminal device that lies on at least one live route (any route, not only the channel set). Offline devices do nothing, with one exception: a cabled Honeypot decoys anywhere.
 
-Enumeration keeps one strongest representative per visited device set and endpoint (for one device set, the path with the best amplified-minus-frayed cable signal), so a better route behind a dense branch is never missed; the forecast stays under 5 ms on a full fourteen-socket table (tested).
+Enumeration keeps one strongest representative per visited device set and endpoint (for one device set, the path with the best amplified-minus-frayed cable signal), so a better route behind a dense branch is never missed; the forecast stays under 5 ms on a full fourteen-socket table (tested as the best of several batches; shared CI runners get a 15 ms budget).
 
 ### Why a transmission deals that much damage
 

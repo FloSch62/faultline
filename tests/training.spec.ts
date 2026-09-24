@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import { atRoom, expect, install, STORAGE, test } from "./helpers.ts";
+import { CARDS, RULES } from "../src/core/cards.ts";
 
 const TRAINING = "faultline-training-v1";
 
@@ -123,7 +124,8 @@ test("Field Training: lessons 1 and 3 complete through the real controls; exit r
   await expect(page.locator(".title-screen")).toBeVisible();
   await expect(page.locator(".lesson-end")).toHaveCount(0);
 
-  // Lesson 3: a second channel through its own router plus an armed Failover Policy survive the cut.
+  // Lesson 3: a second channel through its own router is the whole three-energy turn; it survives
+  // the cut, and next turn Hot Patch restores the cut line.
   await page.locator('[data-action="tutorial"]').first().click();
   await page.locator('dialog button[data-lesson="reroute"]').click();
   await lessonReady(page, "reroute");
@@ -136,10 +138,14 @@ test("Field Training: lessons 1 and 3 complete through the real controls; exit r
   const second = (await dockNodes(page)).find(id => !existing.includes(id))!;
   await cable(page, "alpha", second);
   await cable(page, second, "omega");
-  await expect(page.locator(".training-panel")).toContainText(/.+/);
-  await page.locator('[data-hand][data-card-id="failover-policy"]').first().click();
-  await expect(page.locator(".protocol-slot.armed")).toHaveCount(1);
+  // The route took every energy: the spotlight goes to Transmit, never to an unaffordable Failover Policy.
+  await expect(page.locator(".energy-orb strong")).toHaveText(String(RULES.baseEnergy - CARDS.router.cost - 2 * CARDS.fiber.cost));
+  await expect(page.locator(".transmit-button.lesson-focus")).toBeVisible();
+  await expect(page.locator('[data-hand][data-card-id="failover-policy"].lesson-focus')).toHaveCount(0);
   await transmitLesson(page);
+  await expect(page.locator(".training-meter")).toHaveAttribute("aria-valuenow", "2");
+  await expect(page.locator('[data-hand][data-card-id="patch"].lesson-focus')).toBeVisible();
+  await page.locator('[data-hand][data-card-id="patch"]').first().click();
   await lessonOver(page, "Online Devices");
   expect(JSON.parse((await page.evaluate(key => localStorage.getItem(key), TRAINING))!)).toEqual(expect.arrayContaining(["first-signal", "reroute"]));
 
@@ -206,7 +212,9 @@ test("Field Training: the danger lesson spotlights the Prepare slot and says whe
   await expandCoach(page);
   await expect(page.locator(".prepared-pile")).not.toHaveClass(/lesson-focus/);
 
-  await page.locator("[data-scrub]").first().click();
+  // The ledger chips are gone: the Tap's mark over the table opens its plate, and the plate scrubs.
+  await page.locator('#intent-layer [data-anchor-installation="tap1"]').click();
+  await page.locator('#target-dock .scrub-button[data-scrub="tap1"]').click();
   await expect(page.locator(".game-root")).not.toHaveClass(/\bbusy\b/);
   await page.locator('[data-hand][data-card-id="worm"]').first().click();
   const slot = page.locator(".prepared-pile");
@@ -360,41 +368,51 @@ for (const size of SIZES) {
       await openDrill(page, "clear-ground");
       await expect(page.locator(".training-kicker")).toContainText("Lesson 11 of 12");
       await step(page, 1);
-      const jammer = page.locator('.ledger-chip.is-installation[data-scrub="jammer1"]');
-      await spotlit(page, '.ledger-chip.is-installation[data-scrub="jammer1"]');
+      // The ledger chips are gone: an installation or a worn device carries a mark over the table (the
+      // spotlight rings it); the mark opens its plate in the target dock, and the plate's button acts.
+      const mark = '#intent-layer [data-anchor-installation="jammer1"]';
+      const scrub = '#target-dock .scrub-button[data-scrub="jammer1"]';
+      const worn = '#intent-layer [data-anchor-node="router1"]';
+      const repair = '#target-dock .repair-button[data-repair="router1"]';
+      await spotlit(page, mark);
       await shot(page, "11-1-scrub");
-      await refused(page, () => page.locator('.ledger-chip.is-installation[data-scrub="spike1"]').click(), /Leave the Spike/);
-      await refused(page, () => page.locator('.ledger-chip.is-wear [data-repair="router1"]').click(), /current step/);
+      // Off the step: the router's repair (R, the most worn device) and Transmit. (The compact plate
+      // of a lesson has no Devices journal; scrubbing the Spike is refused in tutorial.test.ts.)
+      await refused(page, () => press(page, "r"), /current step/);
       await refused(page, () => press(page, "Space"), /Scrub it first/);
-      await jammer.click();
+      await page.locator(mark).click();
+      await spotlit(page, scrub);
+      await page.locator(scrub).click();
       await step(page, 2);
-      await spotlit(page, '.ledger-chip.is-installation[data-scrub="jammer1"]');
+      await spotlit(page, scrub);
       await shot(page, "11-2-scrub-again");
-      await jammer.click();
-      await expect(jammer).toHaveCount(0);
+      await page.locator(scrub).click();
+      await expect(page.locator(mark)).toHaveCount(0);
       await step(page, 3);
-      await spotlit(page, '.ledger-chip.is-wear [data-repair="router1"]');
+      await spotlit(page, `${repair}, ${worn}`);
       await expect(page.locator(".enemy-plate")).toContainText(/Breaks ROUTER1/i);
       await shot(page, "11-3-repair");
       await refused(page, () => press(page, "Space"), /Repair it first/);
-      await page.locator('.ledger-chip.is-wear [data-repair="router1"]').click();
+      if (!(await page.locator(repair).count())) await page.locator(worn).click();
+      await spotlit(page, repair);
+      await page.locator(repair).click();
       await step(page, 4);
-      await expect(page.locator(".ledger-chip.is-wear")).toHaveCount(0);
+      await expect(page.locator("#intent-layer [data-anchor-node]")).toHaveCount(0);
       await spotlit(page, ".transmit-button");
       await shot(page, "11-4-transmit");
 
       await transmitLesson(page);
       await step(page, 5);
-      await expect(page.locator(".ledger-chip.is-installation.kind-jammer")).toHaveCount(1);
+      await expect(page.locator('#intent-layer [data-anchor-installation^="jammer"]')).toHaveCount(1);
       await spotlit(page, '#hand-zone [data-card-id="purge-field"]');
       await shot(page, "11-5-purge");
       await page.locator('#hand-zone [data-card-id="purge-field"]').click();
-      await spotlit(page, '[data-field-zone="north"]');
+      await spotlit(page, '#target-dock [data-field-zone="north"]');
       await shot(page, "11-6-purge-band");
-      await refused(page, () => page.locator('[data-field-zone="south"]').click(), /Purge NORTH/);
-      await page.locator('[data-field-zone="north"]').click();
+      await refused(page, () => page.locator('#target-dock [data-field-zone="south"]').click(), /Purge NORTH/);
+      await page.locator('#target-dock [data-field-zone="north"]').click();
       await lessonOver(page, "The Crown and Its Wardens");
-      await expect(page.locator(".ledger-chip.is-installation")).toHaveCount(0);
+      await expect(page.locator("#intent-layer [data-anchor-installation]")).toHaveCount(0);
       expect(await page.evaluate(key => localStorage.getItem(key), TRAINING)).toContain("clear-ground");
     });
 

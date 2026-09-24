@@ -64,6 +64,8 @@ import {
   isBlocked,
   cableFrays,
   laysArmoredCable,
+  playDaemon,
+  bufferMultiplierOf,
   type ActionResult,
   type CombatPreview,
   type TurnResult,
@@ -83,6 +85,10 @@ import * as alpha from "./alpha-ui.ts";
 import * as training from "./tutorial.ts";
 import { loadPreferences, storePreferences } from "./preferences.ts";
 import type { DevTools } from "./dev/panel.ts";
+// v5 · Three Energy: card marks, the daemon strip and the v5 screens, over every earlier sheet.
+import "./three-energy.css";
+// The card's one layout, the hand fan and the scale per view, last of all.
+import "./card-layout.css";
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) =>
   document.querySelector<T>(selector)!;
@@ -99,7 +105,7 @@ void loadAllModels();
 const faultKey = (state: RunState) => `${state.faultNodes.join(",")}|${state.faultLinks.join(",")}`;
 const installationPoints = (state: RunState) => state.installations.reduce((sum, item) => sum + item.integrity, 0);
 /** Controls whose hover deserves a whisper; icon buttons and toolbars stay silent. */
-const HOVER_CUES = ".game-card:not(.drag-ghost), .route-room:not([disabled]), .archetype, .relic-option, [data-forge], .transmit-button, .console-button, .title-menu button, .gold-button, .field-seal.targetable, .lesson-card, button.port-row, .hostile-plate[data-plate]";
+const HOVER_CUES = ".game-card:not(.drag-ghost), .route-room:not([disabled]), .archetype, .relic-option, [data-forge], .transmit-button, .console-button, .title-menu button, .gold-button, #target-dock [data-field-zone], .lesson-card, button.port-row, .hostile-plate[data-plate]";
 let expedition: Expedition | null = null;
 let records: RunRecord[] = [];
 try {
@@ -183,7 +189,7 @@ let lastScreen = "";
 
 
 $("#app").innerHTML =
-  `<main class="game-root"><div class="scene-backdrop"></div><div class="scene-shade"></div><div class="motes" aria-hidden="true">${Array.from({ length: 22 }, (_, i) => `<i style="--x:${(i * 47) % 100}%;--duration:${14 + (i % 8) * 3}s;--delay:-${i * 2.7}s;--size:${(i % 3) + 1}px"></i>`).join("")}</div><div class="world-stage"><canvas id="world" aria-label="Network battlefield. Use cards and the device targeting controls to build your route."></canvas></div><div id="intent-layer" aria-hidden="true"></div><div class="texture"></div><header id="header" class="game-header"></header><div id="screen"></div><div id="battle-hud"></div><div id="hand-zone"></div><div id="target-dock"></div><div id="battle-foot"></div><div id="lesson-spotlight" aria-hidden="true"><i></i></div><div id="lesson-layer"></div><div id="game-tooltip" role="tooltip"></div><div id="hover-card" role="tooltip" aria-hidden="true"></div><div id="impact-layer" aria-hidden="true"></div><div id="battle-flash"></div><div id="toast" role="status" aria-live="polite"></div><div class="now-playing" id="now-playing"></div></main><dialog id="dialog" aria-label="Field journal"><button class="dialog-close" data-action="close" aria-label="Close dialog">${ui.icon("close", 16)}</button><div class="dialog-surface"><div id="dialog-content"></div></div></dialog>`;
+  `<main class="game-root"><div class="scene-backdrop"></div><div class="scene-shade"></div><div class="motes" aria-hidden="true">${Array.from({ length: 22 }, (_, i) => `<i style="--x:${(i * 47) % 100}%;--duration:${14 + (i % 8) * 3}s;--delay:-${i * 2.7}s;--size:${(i % 3) + 1}px"></i>`).join("")}</div><div class="world-stage"><canvas id="world" aria-label="Network battlefield. Use cards and the device targeting controls to build your route."></canvas></div><div id="intent-layer" aria-hidden="true"></div><div class="texture"></div><header id="header" class="game-header"></header><div id="screen"></div><div id="battle-hud"></div><div id="hand-zone"></div><div id="target-dock"></div><div id="battle-foot"></div><div id="lesson-spotlight" aria-hidden="true"><i></i></div><div id="lesson-layer"></div><div id="game-tooltip" role="tooltip"></div><div id="hover-card" role="tooltip" aria-hidden="true"></div><div id="card-zoom" aria-hidden="true"></div><div id="impact-layer" aria-hidden="true"></div><div id="battle-flash"></div><div id="toast" role="status" aria-live="polite"></div><div class="now-playing" id="now-playing"></div></main><dialog id="dialog" aria-label="Field journal"><button class="dialog-close" data-action="close" aria-label="Close dialog">${ui.icon("close", 16)}</button><div class="dialog-surface"><div id="dialog-content"></div></div></dialog>`;
 const root = $(".game-root"),
   dialog = $<HTMLDialogElement>("#dialog");
 sound.update({});
@@ -275,12 +281,14 @@ const testHooks = import.meta.env.DEV || (globalThis as { __faultlineTestRender?
  * (hostile-cards.ts). The same target only moves the card; render() hides it. */
 function hoverTable(target: TableHover | null, x: number, y: number) {
   if (!target || view !== "run" || run.phase !== "battle" || dialog.open || pendingMove) { hideHoverCard(); return; }
-  const key = `${target.kind}:${target.id}`;
+  // A zone card choosing its band names itself on every band's card.
+  const aiming = selected !== null && CARDS[run.hand[selected]]?.target === "zone" ? CARDS[run.hand[selected]].name : null;
+  const key = `${target.kind}:${target.id}${aiming ? ":aim" : ""}`;
   if (hoverCardKey() === key) { moveHoverCard(x, y); return; }
   const preview = combatPreview(run);
   const html = target.kind === "port" || target.kind === "delivery"
     ? hostileCards.hoverMarkup(run, preview, target)
-    : tableCards.hoverMarkup(run, preview, target);
+    : tableCards.hoverMarkup(run, preview, target, aiming);
   if (html) showHoverCard(key, html, x, y);
   else hideHoverCard();
 }
@@ -391,9 +399,9 @@ function render(rebuild = true) {
   // The foot (piles, prepare, transmit) follows the hand in the DOM so Tab reaches the cards first.
   $("#battle-hud").innerHTML = hudMarkup?.hud ?? "";
   $("#battle-foot").innerHTML = hudMarkup?.foot ?? "";
-  if (battle) { fitEnemyPlate(); fitLedger(); }
+  if (battle) fitEnemyPlate();
   const signature = battle
-    ? `${run.currentRoom}|${run.turn}|${run.energy}|${run.firstFiberPlayed}|${run.hand.join(",")}`
+    ? `${run.currentRoom}|${run.turn}|${run.energy}|${run.firstFiberPlayed}|${run.hand.join(",")}|${run.cardsPlayed}|${run.hand.map((_, i) => costFor(run, i)).join(",")}`
     : "";
   // Leaving a battle must clear the DOM even when practice reset the cache key.
   $("#hand-zone").hidden = !battle;
@@ -409,6 +417,8 @@ function render(rebuild = true) {
         el.classList.toggle("selected", Number(el.dataset.hand) === selected),
       );
   if (selected !== null) document.querySelector(`[data-hand="${selected}"]`)?.scrollIntoView({block:"nearest",inline:"nearest"});
+  // The large copy follows the hand: rebuilt, chosen or played cards, a busy table.
+  syncCardZoom();
   if (practice && battle) fitLesson();
   renderTargetDock();
   // After the dock: a step may point at one of its controls (a relocation band, a scrub plate).
@@ -480,8 +490,9 @@ function fitEnemyPlate() {
   clearFrame(plate);
   const box = () => plate.getBoundingClientRect();
   const dial = document.querySelector<HTMLElement>(".transmit-button")?.getBoundingClientRect();
+  const gems = document.querySelector<HTMLElement>(".protocol-ring")?.getBoundingClientRect();
   const hand = document.querySelector<HTMLElement>(".card-fan")?.getBoundingClientRect();
-  const below = [dial, hand].filter((rect): rect is DOMRect => !!rect && rect.width > 0 && rect.left < box().right && rect.right > box().left && rect.top > box().top);
+  const below = [dial, gems, hand].filter((rect): rect is DOMRect => !!rect && rect.width > 0 && rect.left < box().right && rect.right > box().left && rect.top > box().top);
   if (!below.length) return;
   const limit = Math.min(...below.map(rect => rect.top)) - 2 * interfaceScale();
   let clear = true;
@@ -515,18 +526,6 @@ function clearFrame(plate: HTMLElement) {
     plate.style.paddingTop = `${Math.max(baseTop, Math.ceil(.138 * height - over + 3))}px`;
     plate.style.paddingBottom = `${Math.max(baseBottom, Math.ceil(.132 * height - under + 3))}px`;
   }
-}
-/** The network ledger stays one line above the field seals: tags fold (see battle.css) until it
- * fits between the rails; only a ledger that still overflows wraps to a second line. */
-function fitLedger() {
-  const ledger = document.querySelector<HTMLElement>(".is-battle .network-ledger");
-  if (!ledger || getComputedStyle(ledger).flexWrap === "wrap") return;
-  const overflows = () => ledger.scrollWidth > ledger.clientWidth + 1;
-  for (const level of ["tight-1", "tight-2", "tight-3"]) {
-    if (!overflows()) return;
-    ledger.classList.add(level);
-  }
-  if (overflows()) ledger.classList.add("is-wrapping");
 }
 /** Encounter-scoped HUD moments: a hidden designation re-engraves once, an announced arrival rings once. */
 function revealDesignation(): boolean {
@@ -602,7 +601,8 @@ function renderTargetDock() {
       if (c?.target === "ground")
         markup = `<div class="target-options"><span>Place on the table, or</span><button data-action="auto-place">${ui.icon("cache", 14)} Deploy in a free socket</button>${(["north", "center", "south"] as const).map(zone => `<button data-deploy-zone="${zone}">${bandName(zone)} band</button>`).join("")}</div>`;
       else if (c?.target === "zone")
-        markup = `<div class="target-options"><span>${ui.esc(c.name)} · choose a band or a field seal</span></div>`;
+        // The bands light on the table; these three answer the keyboard (and name what each band holds).
+        markup = `<div class="target-options zone-targets"><span>${ui.esc(c.name)} · choose a band</span>${(["north", "center", "south"] as const).map(zone => `<button data-field-zone="${zone}" aria-label="${ui.esc(`${c.name} on the ${bandName(zone)} band: ${zoneDescription(run, zone)}`)}" data-tooltip="${ui.esc(zoneDescription(run, zone))}">${bandName(zone)}</button>`).join("")}<button data-action="cancel" class="target-cancel">Cancel <kbd>Esc</kbd></button></div>`;
       else if (hud.demolition)
         markup = `<div class="target-options installation-targets"><span>${ui.esc(c.name)} · destroy an installation</span>${run.installations.map(item => `<button data-demolish="${item.id}" aria-label="${ui.esc(`Destroy the ${INSTALLATION_NAMES[item.kind]} in ${zoneForNode(item).toUpperCase()}`)}">${battleUi.glyph(item.kind, 14)} ${ui.esc(INSTALLATION_NAMES[item.kind])} <i class="plate-pips">${battleUi.integrityPips(item)}</i> · ${bandName(zoneForNode(item))}</button>`).join("")}<button data-action="cancel" class="target-cancel">Cancel <kbd>Esc</kbd></button></div>`;
       else if (c?.target === "link" || c?.target === "node")
@@ -845,6 +845,11 @@ function chooseCard(index: number) {
     playAction(() => playJunk(run, index), "scrub", id);
     return;
   }
+  // A daemon starts at once: it joins the daemon strip for the rest of the encounter.
+  if (c.target === "daemon") {
+    if (playAction(() => playDaemon(run, index), "protocol", id)) toast(`${c.name} is running for the rest of this encounter.`);
+    return;
+  }
   selected = selected === index ? null : index;
   source = null;
   selectedNode = null;
@@ -870,7 +875,7 @@ function activateConsole() {
   const wasBuffering = run.buffering;
   if (playAction(() => useConsole(run), "console")) {
     if (state.id === "harden") sound.effect("block", { delay: .12 });
-    if (state.id === "buffer") toast(wasBuffering ? "Buffer cancelled. This turn transmits normally." : `Buffering: this transmission is stored ×${RULES.bufferMultiplier}. Transmit to store it.`);
+    if (state.id === "buffer") toast(wasBuffering ? "Buffer cancelled. This turn transmits normally." : `Buffering: this transmission is stored ×${bufferMultiplierOf(run)}. Transmit to store it.`);
   }
 }
 function scrub(id: string) {
@@ -936,13 +941,19 @@ function renderIntents(forecast: ReturnType<typeof combatPreview> | null) {
   const layer = document.getElementById("intent-layer");
   if (!layer) return;
   // Without a table (WebGL unavailable) there are no portraits to hang plates under: the HUD reads.
-  const markup = world && forecast && view === "run" && run.phase === "battle" ? hostileCards.intentBadges(run, forecast) : "";
+  const markup = world && forecast && view === "run" && run.phase === "battle" ? hostileCards.intentBadges(run, forecast) + tableAnchors() : "";
   if (markup !== intentMarkup) {
     intentMarkup = markup;
     layer.innerHTML = markup;
   }
   measureRail();
   placeIntents();
+}
+/** Invisible marks over the table's installations and worn devices: they follow the camera like the
+ * plates, so Field Training's spotlight can ring a thing that lives only on the table. */
+function tableAnchors(): string {
+  return run.installations.map(item => `<i class="table-anchor" data-anchor-installation="${item.id}" data-x="${item.x}" data-z="${item.z}"></i>`).join("")
+    + run.topology.nodes.filter(node => !node.fixed && isWorn(node)).map(node => `<i class="table-anchor" data-anchor-node="${node.id}" data-x="${node.x}" data-z="${node.z}"></i>`).join("");
 }
 /** The rail's frame for the table (client pixels): the span between the side plates, the header's
  * items the portraits stay clear of, and the plates' size (the tallest plate is reserved under every
@@ -981,6 +992,12 @@ function placeIntents() {
   const scale = interfaceScale(), origin = root.getBoundingClientRect();
   let shown = false;
   for (const plate of Array.from(layer.children) as HTMLElement[]) {
+    if (plate.classList.contains("table-anchor")) {
+      const at = world.screenFromPoint(Number(plate.dataset.x), Number(plate.dataset.z), 0.45);
+      const place = `translate(${((at.x - origin.left) / scale).toFixed(1)}px, ${((at.y - origin.top) / scale).toFixed(1)}px)`;
+      if (plate.dataset.place !== place) { plate.dataset.place = place; plate.style.transform = `${place} translate(-50%, -50%)`; }
+      continue;
+    }
     const port = (plate.dataset.plate ?? plate.dataset.arrival) as Port;
     const at = world.portAnchor(port, !!plate.dataset.arrival);
     if (plate.hidden && at) shown = true;
@@ -1729,6 +1746,13 @@ document.addEventListener("click", (event) => {
   }
   // From the Devices journal, scrub and repair keep the journal open (keyboard-only play can
   // scrub twice or repair then scrub); it re-renders with the new pips.
+  // Field Training's lit mark over a thing on the table answers like the thing itself.
+  const mark = target.closest<HTMLElement>("#intent-layer .table-anchor");
+  if (mark) {
+    if (mark.dataset.anchorInstallation) selectInstallation(mark.dataset.anchorInstallation);
+    else if (mark.dataset.anchorNode) onNode(mark.dataset.anchorNode);
+    return;
+  }
   const scrubId = target.closest<HTMLElement>("[data-scrub]")?.dataset.scrub;
   const repairId = target.closest<HTMLElement>("[data-repair]")?.dataset.repair;
   if ((scrubId || repairId) && modal === "devices") {
@@ -1840,7 +1864,7 @@ document.addEventListener("input", (event) => {
     libraryQuery = input.value;
     const holder = document.createElement("div");
     holder.innerHTML = alpha.libraryMarkup(libraryRun ?? run, libraryMode, libraryRarity, libraryQuery);
-    $("#dialog-content .collection-grid").replaceWith(holder.querySelector(".collection-grid")!);
+    $("#dialog-content .collection-body").replaceWith(holder.querySelector(".collection-body")!);
     return;
   }
   if (input.dataset.preference) {
@@ -1924,17 +1948,15 @@ window.addEventListener("pointermove", (event) => {
     cardDrag.moved = true;
     const original = $<HTMLElement>(`[data-hand="${cardDrag.index}"]`);
     cardDrag.ghost = original.cloneNode(true) as HTMLElement;
-    cardDrag.ghost.className += " drag-ghost";
+    cardDrag.ghost.className = cardDrag.ghost.className.replace(/\b(is-zoomed|selected)\b/g, "") + " drag-ghost";
     cardDrag.ghost.removeAttribute("data-hand");
-    const style = getComputedStyle(original);
-    cardDrag.ghost.style.width = style.width;
-    cardDrag.ghost.style.height = style.height;
-    cardDrag.ghost.style.setProperty("--picture-height", style.getPropertyValue("--picture-height"));
     root.append(cardDrag.ghost);
+    hideCardZoom();
     world?.setPlacement(CARDS[run.hand[cardDrag.index]].role ?? null);
   }
   if (cardDrag.ghost) {
-    const origin = root.getBoundingClientRect(), scale = interfaceScale();
+    // The ghost is drawn at the hand's card scale (CSS zoom), which also scales its own offsets.
+    const origin = root.getBoundingClientRect(), scale = interfaceScale() * (Number.parseFloat(getComputedStyle(cardDrag.ghost).zoom) || 1);
     cardDrag.ghost.style.left = `${(event.clientX - origin.left) / scale}px`;
     cardDrag.ghost.style.top = `${(event.clientY - origin.top) / scale}px`;
     world?.previewAt(event.clientX, event.clientY);
@@ -1968,6 +1990,107 @@ window.addEventListener("pointerup", (event) => {
   else render(false);
   setTimeout(() => (ignoreClick = false), 0);
 });
+
+// ------------------------------------------------------------ the pointed card, large
+/* The pointed or keyboard-focused card in hand shows at about the reward size above the fan (Slay
+ * the Spire style), as a copy in #card-zoom that takes no pointer: the fan's hit areas never move, so
+ * the next card is always where it looks. The card rests unseen in its slot meanwhile. Its keyword,
+ * cost and play-limit notes stand beside the copy (the fan's own parts carry no tooltips). */
+let zoomCard: HTMLElement | null = null;
+let zoomPointer: { x: number; y: number } | null = null;
+/** The copy came from the keyboard (Tab onto a card): only then does a render bring it back for focus. */
+let zoomByKeys = false;
+const handCard = (target: EventTarget | null) => (target as HTMLElement | null)?.closest?.<HTMLElement>("#hand-zone [data-hand]") ?? null;
+function hideCardZoom() {
+  const layer = document.getElementById("card-zoom");
+  zoomCard?.classList.remove("is-zoomed");
+  zoomCard = null;
+  zoomByKeys = false;
+  if (layer?.classList.contains("is-shown")) { layer.classList.remove("is-shown"); layer.replaceChildren(); }
+}
+/** The card's own tooltips (keywords, a modified cost, Kernel Panic's limit) as plates. */
+function zoomNotes(card: HTMLElement): string {
+  return Array.from(card.querySelectorAll<HTMLElement>("[data-tooltip]")).filter(el => !el.closest(".card-footer")).map(el => {
+    const text = el.dataset.tooltip ?? "", named = /^([^:.]{2,24}): (.+)$/s.exec(text);
+    const keyword = Array.from(el.classList).find(name => name.startsWith("kw-")) ?? "";
+    const tone = el.classList.contains("card-cost") ? ` is-cost${el.classList.contains("is-up") ? " is-up" : ""}` : el.classList.contains("card-limit") ? " is-limit" : "";
+    const title = named?.[1] ?? (el.classList.contains("card-cost") ? "Cost this turn" : ""), body = named?.[2] ?? text;
+    return `<p class="zoom-tip ${keyword}${tone}">${title ? `<b>${ui.esc(title)}</b>` : ""}${ui.esc(body)}</p>`;
+  }).join("");
+}
+function showCardZoom(card: HTMLElement, keyboard = false) {
+  const layer = document.getElementById("card-zoom");
+  if (!layer || !card.isConnected || busy || cardDrag || deviceDragging || dialog.open || card.classList.contains("selected")) { hideCardZoom(); return; }
+  const fresh = !layer.classList.contains("is-shown");
+  if (card !== zoomCard || fresh) {
+    zoomCard?.classList.remove("is-zoomed");
+    // The same face as a silent plate: no hand index, no tooltips, not a button.
+    const copy = document.createElement("div");
+    copy.className = card.className.replace(/\b(is-zoomed|selected)\b/g, "").trim();
+    copy.setAttribute("style", card.getAttribute("style") ?? "");
+    copy.dataset.cardId = card.dataset.cardId;
+    copy.innerHTML = card.innerHTML;
+    copy.querySelectorAll("[data-tooltip]").forEach(el => el.removeAttribute("data-tooltip"));
+    const notes = zoomNotes(card);
+    layer.replaceChildren(copy);
+    if (notes) layer.insertAdjacentHTML("beforeend", `<div class="zoom-tips">${notes}</div>`);
+    layer.classList.add("is-shown");
+    zoomCard = card;
+  }
+  // Over its slot with its foot on the hand band, inside the visible part of the table (a short
+  // window scrolls the table), shrunk only if the window is shorter than the card.
+  const scale = interfaceScale(), origin = root.getBoundingClientRect(), app = $("#app").getBoundingClientRect();
+  const view = {
+    left: (Math.max(app.left, 0) - origin.left) / scale, right: (Math.min(app.right, innerWidth) - origin.left) / scale,
+    top: (Math.max(app.top, 0) - origin.top) / scale, bottom: (Math.min(app.bottom, innerHeight) - origin.top) / scale,
+  };
+  layer.style.removeProperty("--card-scale");
+  const edge = 8, wanted = Number.parseFloat(getComputedStyle(layer).getPropertyValue("--card-scale")) || 1;
+  const size = Math.min(wanted, (view.bottom - view.top - 2 * edge) / 355);
+  layer.style.setProperty("--card-scale", size.toFixed(3));
+  const w = 230 * size, h = 355 * size, box = card.getBoundingClientRect();
+  const band = $("#hand-zone").getBoundingClientRect();
+  const slot = { left: (box.left - origin.left) / scale, top: (box.top - origin.top) / scale, width: box.width / scale };
+  const left = Math.max(view.left + edge, Math.min(view.right - edge - w, slot.left + slot.width / 2 - w / 2));
+  const top = Math.max(view.top + edge, Math.min(view.bottom - edge, (band.bottom - origin.top) / scale) - h);
+  layer.style.left = `${left}px`;
+  layer.style.top = `${top}px`;
+  layer.classList.toggle("tips-left", left + w + 256 > view.right && left - 256 >= view.left);
+  layer.classList.toggle("via-keyboard", keyboard);
+  zoomByKeys = keyboard;
+  card.classList.add("is-zoomed");
+  if (fresh && sound.settings.motion && !matchMedia("(prefers-reduced-motion: reduce)").matches)
+    layer.animate([
+      { transform: `translate(${slot.left - left}px, ${slot.top - top}px) scale(${(slot.width / w).toFixed(3)})`, opacity: 0.5 },
+      { transform: "none", opacity: 1 },
+    ], { duration: 130, easing: "cubic-bezier(.2,.8,.3,1)" });
+}
+/** After a render (the hand may be rebuilt, a card chosen or played): show the card now under the
+ * pointer or holding the keyboard focus, or nothing. */
+function syncCardZoom() {
+  const pointed = zoomPointer ? handCard(document.elementFromPoint(zoomPointer.x, zoomPointer.y)) : null;
+  const focused = zoomByKeys ? handCard(document.activeElement) : null;
+  const card = pointed ?? (focused?.matches(":focus-visible") ? focused : null);
+  if (card) showCardZoom(card, !pointed);
+  else hideCardZoom();
+}
+document.addEventListener("pointerover", (event) => {
+  const card = event.pointerType === "touch" ? null : handCard(event.target);
+  zoomPointer = card ? { x: event.clientX, y: event.clientY } : null;
+  if (card) { if (card !== zoomCard) showCardZoom(card); }
+  else if (zoomCard) syncCardZoom();
+});
+document.addEventListener("pointermove", (event) => { if (zoomPointer) zoomPointer = { x: event.clientX, y: event.clientY }; }, { passive: true });
+document.addEventListener("mouseout", (event) => { if (!event.relatedTarget) { zoomPointer = null; syncCardZoom(); } });
+document.addEventListener("pointerdown", (event) => { if (handCard(event.target)) { zoomPointer = null; hideCardZoom(); } }, true);
+document.addEventListener("focusin", (event) => {
+  const card = handCard(event.target);
+  if (card?.matches(":focus-visible")) showCardZoom(card, true);
+  else if (zoomCard && !zoomPointer) hideCardZoom();
+});
+document.addEventListener("focusout", (event) => { if (handCard(event.target) === zoomCard && !zoomPointer) hideCardZoom(); });
+$("#app").addEventListener("scroll", () => { if (zoomCard) syncCardZoom(); }, { passive: true });
+window.addEventListener("resize", () => { if (zoomCard) syncCardZoom(); });
 document.addEventListener("keydown", (event) => {
   if (event.ctrlKey || event.altKey || event.metaKey || event.repeat) return;
   // A message waits for its answer: 1, 2, 3 choose.
@@ -2396,15 +2519,15 @@ function fitLesson() {
   const scale = interfaceScale(), top = (plate.getBoundingClientRect().top - root.getBoundingClientRect().top) / scale;
   root.style.setProperty("--training-room", `${Math.max(120, Math.round(top - 84 - 12))}px`);
 }
-/** The title card sits in the band between the header and the field seals, centred in it, and
- * tightens (smaller type, closer lines) when that band is short, so it never covers the seals. */
+/** The title card sits in the band between the header and the hand (its target hint), centred in
+ * it, and tightens (smaller type, closer lines) when that band is short, so it never covers them. */
 function placeTerrainTitle(el: HTMLElement) {
-  const seals = document.querySelector<HTMLElement>(".is-battle .field-strip")?.getBoundingClientRect();
+  const hand = document.querySelector<HTMLElement>(".is-battle .target-hint, .is-battle #hand-zone")?.getBoundingClientRect();
   const header = document.querySelector<HTMLElement>("#header")?.getBoundingClientRect();
-  if (!seals?.height) return;
+  if (!hand?.height) return;
   const scale = interfaceScale(), box = root.getBoundingClientRect();
   const ceiling = Math.max(0, ((header?.bottom ?? box.top) - box.top) / scale) + 6;
-  const floor = (seals.top - box.top) / scale - 10;
+  const floor = (hand.top - box.top) / scale - 10;
   el.classList.add("is-placed");
   if (el.offsetHeight > floor - ceiling) el.classList.add("is-compact");
   if (el.offsetHeight > floor - ceiling) el.classList.add("is-tight");

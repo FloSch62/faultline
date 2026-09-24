@@ -21,6 +21,8 @@ function manual(): RunState {
   r.enemies[0].id = "leech";
   r.enemies[0].hp = r.enemies[0].maxHp = 100;
   r.relics = [];
+  // One energy left after the classic route, as in every test below.
+  r.energy = 1 + CARDS.router.cost + 2 * CARDS.fiber.cost;
   r.hand = ["router", "fiber", "fiber"];
   playGround(r, 0, 0, 0);
   playLink(r, 0, "alpha", "router1");
@@ -32,12 +34,9 @@ test("new expeditions never start with Containerlab or legendary Clabernetes", (
   for (const archetype of ["architect", "warden", "ghost"] as const) {
     for (let seed = 1; seed <= 20; seed++) {
       const r = newExpedition(archetype, seed).run;
-      assert.equal(r.deck.length, 17);
+      assert.equal(r.deck.length, 12);
       assert.ok(!r.deck.includes("containerlab"));
       assert.ok(!r.deck.includes("clabernetes"));
-      assert.ok(
-        r.deck.includes("startup-config") && r.deck.includes("inspect"),
-      );
       chooseRoom(r, "0-1");
       assert.ok(r.hand.some((id) => ["router", "hardened-router"].includes(baseCard(id))));
       assert.ok(r.hand.filter((id) => CARDS[id].target === "link").length >= 2);
@@ -208,7 +207,7 @@ test("Startup Config is once per router, stacks once per route, and replication 
   assert.equal(playNode(r, 0, "alpha").ok, false);
   assert.equal(playNode(r, 0, "router1").ok, true);
   assert.equal(combatPreview(r).packetDamage, 6);
-  assert.equal(r.block, 1);
+  assert.equal(r.block, CARDS["startup-config"].values.block ?? 0);
   assert.ok(r.exhaustPile.includes("startup-config"));
   playNode(r, 0, "router1");
   assert.ok(
@@ -221,7 +220,7 @@ test("Startup Config is once per router, stacks once per route, and replication 
   assert.equal(playNode(r, 0, "router1").ok, false);
 });
 
-test("Linux Bridge placement auto-links only its nearest device", () => {
+test("Linux Bridge placement auto-links only its two nearest devices", () => {
   const r = manual();
   r.hand = ["linux-bridge"];
   assert.equal(playGround(r, 0, 3, 2).ok, true);
@@ -229,7 +228,7 @@ test("Linux Bridge placement auto-links only its nearest device", () => {
   const links = r.topology.links.filter(
     (link) => link.a === bridge.id || link.b === bridge.id,
   );
-  assert.equal(links.length, 1);
+  assert.equal(links.length, CARDS["linux-bridge"].values.links);
   assert.ok(links.some((link) => link.a === "omega" || link.b === "omega"));
 });
 
@@ -255,8 +254,8 @@ test("VXLAN creates an amplified protected cable and inspection rewards an onlin
   assert.deepEqual(r.drawPile, ["pulse"]);
 });
 
-test("legendary reward frequency is substantially below the specific Containerlab rare", () => {
-  let containerlab = 0,
+test("legendary rewards are the RULES.legendaryShare of rare rolls", () => {
+  let rare = 0,
     clabernetes = 0;
   const r = manual();
   for (let sample = 1; sample <= 5000; sample++) {
@@ -264,12 +263,10 @@ test("legendary reward frequency is substantially below the specific Containerla
     r.phase = "battle";
     r.enemies[0].hp = 1;
     endTurn(r);
-    containerlab += Number(r.cardRewards.includes("containerlab"));
+    rare += r.cardRewards.filter((id) => ["rare", "legendary"].includes(CARDS[id].rarity)).length;
     clabernetes += Number(r.cardRewards.includes("clabernetes"));
   }
   assert.ok(clabernetes > 0);
-  assert.ok(
-    containerlab > clabernetes * 3,
-    `${containerlab} Containerlab versus ${clabernetes} Clabernetes`,
-  );
+  const share = clabernetes / rare;
+  assert.ok(Math.abs(share - RULES.legendaryShare) < 0.03, `${clabernetes} Clabernetes of ${rare} rare offers`);
 });

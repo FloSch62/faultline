@@ -3,6 +3,7 @@
  * nothing here consumes the RNG, so the forecast can run every one of them. */
 import { CARDS, RULES, type CardDefinition } from "../cards.ts";
 import { ENEMIES } from "../enemies.ts";
+import { ascends } from "../ascension.ts";
 import { linkKey } from "../graph.ts";
 import { addWreck } from "../terrain.ts";
 import type {
@@ -107,7 +108,7 @@ export function installField(run: RunState, effect: ZoneEffect) {
   run.zoneEffects.push(effect);
 }
 export function hostileFieldTurns(run: RunState) {
-  return RULES.hostileFieldTurns + (run.ascension >= 9 ? 1 : 0);
+  return RULES.hostileFieldTurns + (ascends(run.ascension, "lingeringCorruption") ? RULES.ascensionFieldTurns : 0);
 }
 /** Fields of one kind per band. A cast field and a permanent terrain field stack. */
 export function fieldBands(run: RunState, kind: ZoneEffectKind): Map<Zone, number> {
@@ -141,6 +142,20 @@ export const AUTO_SOCKETS: readonly { x: number; z: number }[] = [0, -2.5, 2.5, 
 export function freeSocket(run: RunState): { x: number; z: number } | null {
   if (run.topology.nodes.length >= RULES.maxDevices) return null;
   return AUTO_SOCKETS.find(({ x, z }) => !isBlocked(run, x, z)) ?? null;
+}
+/** v5 · the legal socket nearest a point (Splice: the midpoint of a cable): the point itself, then
+ * rings of twelve compass points every 0.35 out to 3.5, nearest first (ties: ring order, then the
+ * point facing the far rail, clockwise). Deterministic; null when the table is full. */
+export function socketNear(run: RunState, point: { x: number; z: number }): { x: number; z: number } | null {
+  if (run.topology.nodes.length >= RULES.maxDevices) return null;
+  const round = (value: number) => Math.round(value * 100) / 100;
+  const candidates = [{ x: round(point.x), z: round(point.z) }];
+  for (let ring = 1; ring <= 10; ring++)
+    for (let k = 0; k < 12; k++) {
+      const angle = (k * Math.PI) / 6, radius = ring * 0.35;
+      candidates.push({ x: round(point.x + radius * Math.sin(angle)), z: round(point.z - radius * Math.cos(angle)) });
+    }
+  return candidates.find(({ x, z }) => !isBlocked(run, x, z)) ?? null;
 }
 /** Band sockets (Siphon Tap, Anchor; the v3 malware rule): the free socket nearest the
  * centre of the busiest band, Center then North then South on ties. `band` forces one band. */

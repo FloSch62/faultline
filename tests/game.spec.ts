@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 // Every test also fails on any page or console error (see helpers.ts).
 import { expect, test } from "./helpers.ts";
-import { RULES } from "../src/core/cards.ts";
+import { CARDS, RULES } from "../src/core/cards.ts";
 import { newExpedition } from "../src/core/expedition.ts";
 import { chooseRoom } from "../src/core/run.ts";
 import type { CardId } from "../src/core/types.ts";
@@ -15,6 +15,8 @@ async function startBattle(
     drawPile?: CardId[];
     enemyHp?: number;
     enemyId?: string;
+    /** First-turn energy (default: the expedition's own, RULES.baseEnergy plus energy relics). */
+    energy?: number;
   } = {},
 ) {
   const e = newExpedition(archetype, seed);
@@ -27,6 +29,7 @@ async function startBattle(
   if (options.drawPile) e.run.drawPile = options.drawPile;
   if (options.enemyHp) e.run.enemies[0].hp = e.run.enemies[0].maxHp = options.enemyHp;
   if (options.enemyId) e.run.enemies[0].id = options.enemyId;
+  if (options.energy !== undefined) e.run.energy = options.energy;
   await page.addInitScript(
     ({ key, value }) => localStorage.setItem(key, value),
     { key, value: JSON.stringify(e) },
@@ -91,9 +94,9 @@ test("build, undo, connect, transmit, recover a fault, and take a reward", { tag
   });
   await playCard(page, "router");
   await page.getByRole("button", { name: /Deploy in a free socket/ }).click();
-  await expect(page.locator(".energy-orb strong")).toHaveText("3");
+  await expect(page.locator(".energy-orb strong")).toHaveText(String(RULES.baseEnergy - CARDS.router.cost));
   await page.keyboard.press("z");
-  await expect(page.locator(".energy-orb strong")).toHaveText("5");
+  await expect(page.locator(".energy-orb strong")).toHaveText(String(RULES.baseEnergy));
   await playCard(page, "router");
   await page.getByRole("button", { name: /Deploy in a free socket/ }).click();
   await wire(page, "alpha", "router1");
@@ -152,7 +155,7 @@ test("dialogs trap gameplay shortcuts; browser reload restores a real in-progres
   const restored = await page.context().newPage();
   await restored.goto("./");
   await restored.getByRole("button", { name: /Continue expedition/ }).click();
-  await expect(restored.locator(".energy-orb strong")).toHaveText("3");
+  await expect(restored.locator(".energy-orb strong")).toHaveText(String(RULES.baseEnergy - CARDS.router.cost));
   expect(
     await restored.evaluate(
       (key) => JSON.parse(localStorage.getItem(key)!).run.topology.nodes.length,
@@ -166,21 +169,24 @@ test("Containerlab and Clabernetes deploy, replicate, undo, and transmit", async
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  // Both rares in one turn: a turn with the energy for them (the test reads the cards, not the economy).
+  const energy = CARDS.containerlab.cost + CARDS.clabernetes.cost;
   await startBattle(page, 8, "architect", {
     hand: ["router", "fiber", "fiber", "containerlab", "clabernetes", "guard"],
     enemyHp: 11,
+    energy,
   });
   await playCard(page, "containerlab");
-  await expect(page.locator(".energy-orb strong")).toHaveText("2");
+  await expect(page.locator(".energy-orb strong")).toHaveText(String(energy - CARDS.containerlab.cost));
   await expect(page.locator(".transmit-power strong")).toHaveText("7");
   await playCard(page, "clabernetes");
   await expect(page.locator('[data-node="alpha"]')).toHaveCount(0);
   await page.locator('[data-node="router1"]').click();
-  await expect(page.locator(".energy-orb strong")).toHaveText("0");
+  await expect(page.locator(".energy-orb strong")).toHaveText(String(energy - CARDS.containerlab.cost - CARDS.clabernetes.cost));
   // Overclocked replica: a second channel adds bandwidth.
   await expect(page.locator(".transmit-power strong")).toHaveText(String(7 + RULES.bandwidthPerChannel));
   await page.keyboard.press("z");
-  await expect(page.locator(".energy-orb strong")).toHaveText("2");
+  await expect(page.locator(".energy-orb strong")).toHaveText(String(energy - CARDS.containerlab.cost));
   const undone = await page.evaluate(
     (key) => JSON.parse(localStorage.getItem(key)!),
     key,
@@ -295,7 +301,7 @@ test("an expanded Ghost hand leaves the transmission control clickable", async (
   await playCard(page, "surge");
   await expect(page.locator("[data-hand]")).toHaveCount(8);
   await page.mouse.move(500, 60);
-  await expect(page.locator(".energy-orb strong")).toHaveText("7");
+  await expect(page.locator(".energy-orb strong")).toHaveText(String(RULES.baseEnergy - CARDS.surge.cost + (CARDS.surge.values.energy ?? 0)));
   const dial = page.getByRole("button", { name: /^Transmit/ });
   const a = await dial.boundingBox();
   const b = await page.locator("#hand-zone").boundingBox();

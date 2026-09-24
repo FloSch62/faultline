@@ -405,7 +405,7 @@ test("Broadcast Storm, Packet Storm and Flood Fill hit every port; Traffic Shapi
   playInstant(r, 0);
   playInstant(r, 0);
   playInstant(r, 0);
-  const every = 2 + 5 + 2 * 1;
+  const every = CARDS["broadcast-storm"].values.everyPort! + CARDS["packet-storm"].values.everyPort! + 2 * CARDS["flood-fill"].values.perChannelEveryPort!;
   let p = combatPreview(r);
   assert.equal(p.ports.left!.packet, every);
   assert.equal(p.ports.centre!.packet, RULES.baseRouteDamage + RULES.bandwidthPerChannel + every);
@@ -489,13 +489,13 @@ test("Redundant PSU, Field Repair, Sentry Firewall and Rapid Redeploy do what th
   const sentry = r.topology.nodes.at(-1)!;
   assert.ok(sentry.sentry && sentry.shielded);
   r.hand = ["rapid-redeploy"];
-  r.discardPile = ["router", "fiber", "switch", "guard"];
+  r.discardPile = ["switch", "fiber", "router", "guard"];
   assert.ok(playInstant(r, 0).ok);
-  assert.deepEqual(r.hand, ["switch"], "the most recently discarded hardware card");
-  assert.equal(costFor(r, 0), 0);
+  assert.deepEqual(r.hand, ["router"], "the most recently discarded hardware card");
+  assert.equal(costFor(r, 0), CARDS.router.cost - 1);
   playGround(r, 0, -2.5, -2.4);
-  r.hand = ["switch"];
-  assert.equal(costFor(r, 0), 1, "the discount is spent");
+  r.hand = ["router"];
+  assert.equal(costFor(r, 0), CARDS.router.cost, "the discount is spent");
 });
 
 // ------------------------------------------------------------------ relics

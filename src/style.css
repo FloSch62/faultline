@@ -615,8 +615,6 @@ strong {
   position: relative;
   display: block;
   flex-shrink: 0;
-  width: 164px;
-  height: 239px;
   background: linear-gradient(
     145deg,
     #413c31,
@@ -630,12 +628,10 @@ strong {
   box-shadow:
     0 7px 16px #0009,
     0 1px 0 #e5cf967a inset;
-  transform-origin: 50% 110%;
   transition:
     transform 0.22s,
     filter 0.22s,
     box-shadow 0.22s;
-  transform: translateY(var(--lift, 0px)) rotate(var(--angle, 0deg));
   text-align: left;
   color: #e9dbc0;
   overflow: visible;
@@ -754,23 +750,6 @@ strong {
 .game-card.unplayable {
   filter: saturate(0.5) brightness(0.62);
 }
-.game-card:hover,
-.game-card:focus-visible {
-  transform: translateY(-44px) rotate(0) scale(1.16);
-  box-shadow:
-    0 15px 30px #000b,
-    0 0 0 1px #ebd399;
-  z-index: 50 !important;
-  filter: brightness(1.08);
-}
-.game-card.selected {
-  transform: translateY(-35px) rotate(0);
-  box-shadow:
-    0 0 0 2px #e6c17a,
-    0 0 26px #d9ac4644;
-  filter: brightness(1.12);
-  z-index: 40 !important;
-}
 .game-card.unplayable:hover {
   filter: saturate(0.6) brightness(0.95);
 }
@@ -792,13 +771,6 @@ strong {
 }
 .card-fan .game-card {
   pointer-events: auto;
-  margin-left: -24px;
-  z-index: calc(var(--order) + 1);
-  animation: deal-in 0.5s both;
-  animation-delay: calc(var(--order) * 0.045s);
-}
-.card-fan .game-card:first-child {
-  margin-left: 0;
 }
 .busy #hand-zone {
   pointer-events: none;
@@ -872,43 +844,8 @@ strong {
   margin: 36px 0 25px;
 }
 .reward-cards .game-card {
-  width: 202px;
-  height: 299px;
-  transform: none;
   animation: reward-in 0.7s backwards;
   animation-delay: calc(var(--order) * 0.15s);
-}
-.reward-cards .card-image {
-  bottom: 121px;
-}
-.reward-cards .card-heading {
-  top: 156px;
-  height: 36px;
-  font-size: 24px;
-}
-.reward-cards .card-copy {
-  top: 195px;
-  bottom: 26px;
-  left: 17px;
-  right: 17px;
-}
-.reward-cards .card-type {
-  font-size: 8px;
-  margin: 4px 0 8px;
-}
-.reward-cards .card-rule {
-  font-size: 12px;
-  line-height: 1.45;
-}
-.reward-cards .card-cost {
-  width: 37px;
-  height: 37px;
-  left: 9px;
-  top: 9px;
-  font-size: 26px;
-}
-.reward-cards .game-card:hover {
-  transform: translateY(-13px) scale(1.035);
 }
 .outcome-screen > .text-button {
   margin-top: 10px;
@@ -1051,37 +988,6 @@ strong {
   }
 }
 @container game (min-width: 1700px) {
-  .game-card {
-    width: 183px;
-    height: 260px;
-  }
-  .card-image {
-    bottom: 107px;
-  }
-  .card-heading {
-    top: 134px;
-    font-size: 21px;
-    height: 33px;
-  }
-  .card-copy {
-    top: 171px;
-    bottom: 23px;
-    left: 15px;
-    right: 15px;
-  }
-  .card-rule {
-    font-size: 12px;
-  }
-  .card-type {
-    font-size: 8px;
-  }
-  .card-cost {
-    width: 34px;
-    height: 34px;
-  }
-  .card-fan .game-card {
-    margin-left: -15px;
-  }
   #hand-zone {
     height: 263px;
     bottom: 27px;
@@ -1157,22 +1063,6 @@ strong {
   .reward-cards {
     margin: 50px 0 35px;
   }
-  .reward-cards .game-card {
-    width: 230px;
-    height: 335px;
-  }
-  .reward-cards .card-heading {
-    top: 178px;
-  }
-  .reward-cards .card-copy {
-    top: 218px;
-  }
-  .reward-cards .card-image {
-    bottom: 135px;
-  }
-  .reward-cards .card-rule {
-    font-size: 14px;
-  }
   .relic-options,
   .forge-options {
     margin-top: 65px;
@@ -1194,44 +1084,11 @@ strong {
   .encounter-heading h2 {
     font-size: 23px;
   }
-  .game-card {
-    width: 146px;
-    height: 216px;
-  }
-  .card-image {
-    bottom: 91px;
-  }
-  .card-heading {
-    top: 105px;
-    font-size: 17px;
-    height: 28px;
-  }
-  .card-copy {
-    top: 135px;
-    bottom: 21px;
-    left: 10px;
-    right: 10px;
-  }
-  .card-type {
-    font-size: 6px;
-    margin-bottom: 5px;
-  }
-  .card-rule {
-    font-size: 10px;
-  }
-  .card-cost {
-    width: 28px;
-    height: 28px;
-    font-size: 20px;
-  }
   #hand-zone {
     left: 185px;
     right: 185px;
     bottom: 28px;
     height: 220px;
-  }
-  .card-fan .game-card {
-    margin-left: -29px;
   }
   .battle-bottom {
     height: 246px;
@@ -1317,9 +1174,6 @@ strong {
   .reward-cards {
     margin-top: 27px;
   }
-  .reward-cards .card-type {
-    font-size: 8px;
-  }
   .forge-screen,
   .relic-screen {
     padding-top: 40px;
@@ -1402,30 +1256,6 @@ strong {
   }
   .reward-cards {
     margin: 26px 0 20px;
-  }
-  .reward-cards .game-card {
-    width: 182px;
-    height: 261px;
-  }
-  .reward-cards .card-image {
-    bottom: 111px;
-  }
-  .reward-cards .card-heading {
-    top: 131px;
-    height: 31px;
-    font-size: 21px;
-  }
-  .reward-cards .card-copy {
-    top: 165px;
-    bottom: 24px;
-  }
-  .reward-cards .card-rule {
-    font-size: 11px;
-  }
-  .reward-cards .card-cost {
-    width: 33px;
-    height: 33px;
-    font-size: 23px;
   }
   .relic-screen,
   .forge-screen {
@@ -1572,38 +1402,6 @@ strong {
   .enemy-flavor {
     font-size: 10px;
   }
-  .game-card {
-    width: 131px;
-    height: 203px;
-  }
-  .card-image {
-    bottom: 87px;
-  }
-  .card-heading {
-    top: 97px;
-    font-size: 16px;
-    height: 27px;
-  }
-  .card-copy {
-    top: 126px;
-    left: 8px;
-    right: 8px;
-    bottom: 19px;
-  }
-  .card-rule {
-    font-size: 9px;
-  }
-  .card-type {
-    font-size: 6px;
-  }
-  .card-cost {
-    width: 26px;
-    height: 26px;
-    font-size: 18px;
-  }
-  .card-fan .game-card {
-    margin-left: -35px;
-  }
   #hand-zone {
     left: 130px;
     right: 140px;
@@ -1678,26 +1476,6 @@ strong {
   }
   .reward-cards {
     gap: 19px;
-  }
-  .reward-cards .game-card {
-    width: 177px;
-    height: 267px;
-  }
-  .reward-cards .card-image {
-    bottom: 117px;
-  }
-  .reward-cards .card-heading {
-    top: 132px;
-    font-size: 21px;
-    height: 32px;
-  }
-  .reward-cards .card-copy {
-    top: 168px;
-    left: 13px;
-    right: 13px;
-  }
-  .reward-cards .card-rule {
-    font-size: 11px;
   }
   .relic-options {
     gap: 14px;
@@ -1976,37 +1754,6 @@ strong {
     gap: 9px;
     padding-right: 15px;
   }
-  .card-fan .game-card {
-    transform: none;
-    margin: 0;
-    width: 126px;
-    height: 196px;
-    animation: none;
-  }
-  .card-fan .game-card:hover,
-  .card-fan .game-card:focus-visible {
-    transform: none;
-    filter: brightness(1.12);
-  }
-  .card-fan .game-card.selected {
-    transform: translateY(-6px);
-    box-shadow: 0 0 0 2px #e7c27b;
-  }
-  .card-fan .card-heading {
-    top: 92px;
-    height: 26px;
-    font-size: 16px;
-  }
-  .card-fan .card-copy {
-    top: 120px;
-    bottom: 18px;
-  }
-  .card-fan .card-image {
-    bottom: 86px;
-  }
-  .card-fan .card-rule {
-    font-size: 9px;
-  }
   .energy-orb {
     bottom: 273px;
     left: 22px;
@@ -2106,41 +1853,6 @@ strong {
     justify-content: center;
     flex-wrap: wrap;
     margin: 26px 0 20px;
-  }
-  .reward-cards .game-card {
-    width: 148px;
-    height: 231px;
-  }
-  .reward-cards .card-image {
-    bottom: 99px;
-  }
-  .reward-cards .card-heading {
-    top: 113px;
-    font-size: 18px;
-    height: 29px;
-  }
-  .reward-cards .card-copy {
-    top: 145px;
-    bottom: 22px;
-    left: 10px;
-    right: 10px;
-  }
-  .reward-cards .card-rule {
-    font-size: 10px;
-  }
-  .reward-cards .card-type {
-    font-size: 7px;
-    margin-bottom: 6px;
-  }
-  .reward-cards .card-cost {
-    width: 28px;
-    height: 28px;
-    font-size: 20px;
-    top: 7px;
-    left: 7px;
-  }
-  .reward-cards .game-card:hover {
-    transform: translateY(-4px);
   }
   .reward-footer {
     margin-top: 10px;
@@ -2812,31 +2524,6 @@ strong {
   animation: none;
 }
 
-/* Extra draws tighten the fan instead of covering the transmission dial. */
-@container game (min-width: 901px) {
-  .card-fan {
-    --fan-card-width: 164px;
-  }
-  .card-fan .game-card:not(:first-child) {
-    margin-left: min(
-      -24px,
-      calc(
-        (100% - var(--hand-size) * var(--fan-card-width) - 60px) /
-          max(1, var(--hand-size) - 1)
-      )
-    );
-  }
-}
-@container game (min-width: 1700px) {
-  .card-fan {
-    --fan-card-width: 183px;
-  }
-}
-@container game (min-width: 901px) and (max-width: 1250px) {
-  .card-fan {
-    --fan-card-width: 146px;
-  }
-}
 @container game (min-width: 901px) {
   .battle-left .tutorial-callout {
     top: calc(100% + 10px);

@@ -21,7 +21,7 @@ import "./tutorial.css";
 import { RULES } from "./core/cards.ts";
 import { EVENTS } from "./core/events.ts";
 import { CARD_PRICES, REMOVE_PRICE, SALVAGE_COST, UPGRADE_PRICE } from "./core/meta.ts";
-import { MAX_ASCENSION } from "./core/ascension.ts";
+import { ASCENSION_LEVELS, MAX_ASCENSION } from "./core/ascension.ts";
 import { LESSONS, lessonById, nextLesson, type LessonDefinition, type LessonId, type LessonProgress } from "./tutorial/lessons.ts";
 import { mapDiagram } from "./tutorial/diagrams.ts";
 import { esc, icon } from "./tutorial/icons.ts";
@@ -196,8 +196,8 @@ export const WALKTHROUGH_PAGES: readonly WalkthroughPage[] = [
   },
   {
     title: "Rewards", art: "art/relay-interior.png", body: () => `
-      <p>After a battle, choose one of three cards — or skip. A lean deck draws its best cards more often. Elites guarantee a rare option and a relic.</p>
-      <ul class="walk-list"><li><b>Rarity</b> Common, uncommon, rare, legendary — power, not obligation.</li><li><b>Upgrades (+)</b> Lower cost, bigger numbers or extra draw. Later rewards sometimes arrive upgraded.</li><li><b>Archetype cards</b> Some cards appear only for your keeper.</li></ul>`,
+      <p>After a battle, choose one of three cards — or skip. A lean deck draws its best cards more often. Elites offer an uncommon or better first and a relic; guardians offer ${RULES.rewardRarity.guardian[0] ? "their best" : RULES.rewardRarity.guardian[1] ? "uncommons and rares" : "rares"}.</p>
+      <ul class="walk-list"><li><b>Rarity</b> Common, uncommon, rare, legendary — power, not obligation.</li><li><b>Upgrades (+)</b> Lower cost, bigger numbers or extra draw. Later rewards sometimes arrive upgraded.</li><li><b>Keeper cards</b> ${Math.round(RULES.keeperShare * 100)}% of offered cards are your keeper's own; the rest come from the shared colorless pool.</li></ul>`,
   },
   {
     title: "Credits & the Market", art: "art/relay-bazaar.png", body: () => `
@@ -222,7 +222,7 @@ export const WALKTHROUGH_PAGES: readonly WalkthroughPage[] = [
   },
   {
     title: "Ascension", body: () => `
-      <p>Win an expedition to unlock the next ascension level for that keeper. Each level adds one rule — tougher elites, sharper strikes, leaner markets — and levels stack up to ${MAX_ASCENSION}.</p>
+      <p>Win an expedition to unlock the next ascension level for that keeper. There are ${MAX_ASCENSION}: ${ASCENSION_LEVELS.map(level => level.name).join(", ")}. Each adds its rules to every level before it.</p>
       <p class="walk-note">Ascension is optional: it exists for players who want the backbone to fight back harder.</p>`,
   },
   {

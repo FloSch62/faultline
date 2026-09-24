@@ -1,4 +1,4 @@
-import { CARDS, RELICS, RULES, STARTER_DECK } from "./cards.ts";
+import { CARDS, RELICS, RULES, STARTER_DECK, STARTER_SIGNATURES } from "./cards.ts";
 import { createRun } from "./run.ts";
 import { DESIGNATIONS, ENEMIES, MESSAGE_OPTIONS, SIGNALS } from "./enemies.ts";
 import { EVENTS } from "./events.ts";
@@ -55,9 +55,10 @@ export const ARCHETYPES: Record<
     color: "#99bcd4",
   },
 };
-export const EXPEDITION_VERSION = 4;
+/** v5 · Three Energy. Saves from any other version are not loaded (no players yet: no migration). */
+export const EXPEDITION_VERSION = 5;
 export interface Expedition {
-  version: 4;
+  version: 5;
   run: RunState;
   archetype: Archetype;
   daily: boolean;
@@ -74,22 +75,9 @@ export interface RunRecord {
   ascension?: number;
 }
 
-/** Archetype variations of the shared 17-card starter deck, applied in order. */
-const VARIATIONS: Record<Archetype, [from: CardId, to: CardId, count: number][]> = {
-  architect: [["fiber", "duplex", 1], ["switch", "relay", 1], ["guard", "load-balancer", 1]],
-  // The Bastion replaces the Trust Gate before the Burst becomes a second Trust Gate.
-  warden: [["router", "hardened-router", 1], ["firewall", "bastion", 1], ["pulse", "firewall", 1]],
-  ghost: [["fiber", "crosslink", 2], ["patch", "diagnostic", 1], ["guard", "store-forward", 1]],
-};
-
+/** v5 starter decks (contract section 3): the shared ten plus each keeper's two signature cards. */
 export function starterDeck(archetype: Archetype): CardId[] {
-  const deck = [...STARTER_DECK];
-  for (const [from, to, count] of VARIATIONS[archetype]) {
-    let replaced = 0;
-    for (let i = 0; i < deck.length && replaced < count; i++)
-      if (deck[i] === from) { deck[i] = to; replaced++; }
-  }
-  return deck;
+  return [...STARTER_DECK, ...STARTER_SIGNATURES[archetype]];
 }
 
 export function newExpedition(
@@ -104,11 +92,11 @@ export function newExpedition(
   run.ascension = clampAscension(ascension);
   // The chart reads the ascension (pack frequency, second designations).
   run.map = createMap(0, seed, run.ascension);
-  run.maxIntegrity = profile.integrity - (ascends(run.ascension, 8) ? 2 : 0);
+  run.maxIntegrity = profile.integrity - (ascends(run.ascension, "wornBackbone") ? RULES.ascensionIntegrityLoss : 0);
   run.integrity = run.maxIntegrity;
   run.relics = [profile.relic];
   run.deck = starterDeck(archetype);
-  if (ascends(run.ascension, 5)) run.deck.push("cve");
+  if (ascends(run.ascension, "knownVulnerability")) run.deck.push("cve");
   run.phase = "map";
   return {
     version: EXPEDITION_VERSION,
@@ -138,6 +126,8 @@ const INSTALLATION_KINDS = ["tap", "jammer", "spike", "anchor", "breaker"];
 const GRID = { x: 7.25, z: 4.7 };
 /** Design caps, independent of the balance flags that turn a layer off. */
 const MAX_INSTALLATIONS = 4;
+/** Save cap on armed protocols (RULES.maxProtocols plus protocolSlots daemons). */
+const MAX_PROTOCOLS = 8;
 const MAX_INTEGRITY = 3;
 const MAX_CONDITION = 4;
 
@@ -276,50 +266,21 @@ function validSignal(value: unknown, turn: number): boolean {
 function validTurnEffects(value: unknown): boolean {
   if (value === undefined) return true;
   if (!isObject(value)) return false;
-  return [value.everyPort, value.focusBonus, value.firewallBonus].every(v => v === undefined || finite(v, 0)) &&
-    [value.forceFocus, value.spearhead].every(optionalBoolean) &&
-    (value.discounted === undefined || (Array.isArray(value.discounted) && value.discounted.length <= 10 && value.discounted.every(isCard)));
-}
-
-/** v3 → v4, in memory and one way (section 15.5): the single hostile stands at the centre,
- * malware becomes Siphon Taps, faults become lists, deployed devices get their condition,
- * and every new encounter field takes its empty value. */
-function migrateV3(e: Record<string, unknown>): boolean {
-  const r = e.run as Record<string, unknown> | undefined;
-  if (!isObject(r)) return false;
-  // Fields a v4 state already carries are kept (a save merely labelled 3 must not lose them).
-  const enemy = isObject(r.enemy) ? r.enemy : null;
-  if (!Array.isArray(r.enemies)) r.enemies = enemy ? [{ ...enemy, uid: "h1", port: "centre", role: "single" }] : [];
-  const malware = Array.isArray(r.malware) ? r.malware : [];
-  if (!Array.isArray(r.installations)) r.installations = malware.map(item => ({
-    id: isObject(item) ? item.id : undefined, kind: "tap", x: isObject(item) ? item.x : undefined, z: isObject(item) ? item.z : undefined,
-    integrity: RULES.installationIntegrity.tap, activeFrom: 0, owner: "h1",
-  }));
-  if (!Array.isArray(r.faultNodes)) r.faultNodes = typeof r.faultNode === "string" ? [r.faultNode] : [];
-  if (!Array.isArray(r.faultLinks)) r.faultLinks = typeof r.faultLink === "string" ? [r.faultLink] : [];
-  for (const key of ["enemy", "malware", "faultNode", "faultLink"]) delete r[key];
-  const nodes = isObject(r.topology) && Array.isArray(r.topology.nodes) ? r.topology.nodes : [];
-  for (const node of nodes)
-    if (isObject(node) && !node.fixed && node.condition === undefined)
-      node.condition = node.salvage ? RULES.salvageCondition : RULES.deviceCondition;
-  const actions = enemy && integer(enemy.turn, 0) ? enemy.turn as number : 0;
-  r.focus ??= (r.enemies as unknown[]).length ? "centre" : null;
-  r.enemyPhase ??= actions;
-  r.hostileActions ??= actions;
-  r.reinforcement ??= null;
-  r.signal ??= null;
-  r.offers ??= [];
-  r.encounterCards ??= [];
-  e.version = EXPEDITION_VERSION;
-  return true;
+  const cards = (list: unknown, max = 10) => list === undefined || (Array.isArray(list) && list.length <= max && list.every(isCard));
+  const labels = (list: unknown) => list === undefined || (Array.isArray(list) && list.length <= 20 && list.every(label => typeof label === "string"));
+  return [
+    value.everyPort, value.focusBonus, value.firewallBonus,
+    value.freeLinks, value.hardwareDiscount, value.misses, value.dodges, value.mitm, value.payloads, value.payloadDamage,
+  ].every(v => v === undefined || finite(v, 0)) &&
+    optionalBoolean(value.spearhead) && cards(value.discounted) && cards(value.freeCards) && cards(value.cardsPlayed, 80) &&
+    labels(value.missSources) && labels(value.dodgeSources);
 }
 
 export function parseExpedition(value: string | null): Expedition | null {
   try {
     const raw = JSON.parse(value || "null") as Record<string, unknown> | null;
     if (!isObject(raw)) return null;
-    // v3 is a strict subset of v4 and migrates; versions before 3 predate the network redesign.
-    if (raw.version === 3 && !migrateV3(raw)) return null;
+    // Only the current version loads: an older save is simply not continued (a new expedition starts).
     const e = raw as unknown as Expedition;
     if (e.version !== EXPEDITION_VERSION || !Object.hasOwn(ARCHETYPES, e.archetype)) return null;
     if (typeof e.daily !== "boolean" || typeof e.recorded !== "boolean" || !finite(e.startedAt)) return null;
@@ -342,7 +303,11 @@ export function parseExpedition(value: string | null): Expedition | null {
     // Combat state.
     if (!integer(r.consoleUses, 0, 2) || !finite(r.buffer, 0) || typeof r.buffering !== "boolean" || !finite(r.backpressure, 0))
       return null;
-    if (!Array.isArray(r.protocols) || r.protocols.length > 2 || !r.protocols.every(isCard)) return null;
+    // Protocol slots grow with protocolSlots daemons (Policy Engine); MAX_PROTOCOLS is the save cap.
+    if (!Array.isArray(r.protocols) || r.protocols.length > MAX_PROTOCOLS || !r.protocols.every(isCard)) return null;
+    // v5: running daemons and next-turn gains.
+    if (!Array.isArray(r.daemons) || r.daemons.length > 40 || !r.daemons.every(id => isCard(id) && CARDS[id].target === "daemon")) return null;
+    if (r.nextTurn !== undefined && !(isObject(r.nextTurn) && [r.nextTurn.block, r.nextTurn.draw].every(v => v === undefined || finite(v, 0)))) return null;
     if (r.terrain !== null && !(r.terrain && typeof r.terrain.name === "string" &&
       typeof r.terrain.description === "string" && Array.isArray(r.terrain.debris) &&
       r.terrain.debris.length <= RULES.wreckCap && r.terrain.debris.every(wreck => inGrid(wreck) &&
@@ -390,9 +355,6 @@ export function parseExpedition(value: string | null): Expedition | null {
     if (!Array.isArray(r.faultNodes) || r.faultNodes.length > 14 || !r.faultNodes.every(id => typeof id === "string" && ids.has(id))) return null;
     if (!Array.isArray(r.faultLinks) || r.faultLinks.length > 20 || !r.faultLinks.every(key => typeof key === "string")) return null;
     if (!validInstallations(r.installations)) return null;
-    // Per-channel aims were removed (every delivery lands on the target): a save that still
-    // carries them loads, and they are dropped.
-    delete (r as { aims?: unknown }).aims;
     if (r.focus !== null && !isPort(r.focus)) return null;
     // Hostiles, surprises and offers.
     if (!validEnemies(r.enemies, r.phase === "battle")) return null;
@@ -410,8 +372,7 @@ export function parseExpedition(value: string | null): Expedition | null {
       r.frayedByCut.every(key => typeof key === "string"))) return null;
     if (r.repairsThisTurn !== undefined && !integer(r.repairsThisTurn, 0, 99)) return null;
     if (!validTurnEffects(r.turnEffects)) return null;
-    // Traffic Shaping's old redirect flag is gone with the aims.
-    if (r.turnEffects) delete (r.turnEffects as { forceFocus?: unknown }).forceFocus;
+
     if (r.creditLedger !== undefined && !(Array.isArray(r.creditLedger) && r.creditLedger.length <= 12 &&
       r.creditLedger.every(line => isObject(line) && typeof line.label === "string" && integer(line.amount, 0, 9999)))) return null;
     return e;

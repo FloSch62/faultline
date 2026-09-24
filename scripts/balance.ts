@@ -4,31 +4,48 @@
  *   [--packs[=on|off]] [--front[=on|off]] [--escalation[=on|off]] [--designations[=on|off]]
  *   [--surprises[=on|off]] [--adds[=on|off]] [--layers=on|off] (--no-packs etc. also turn one off)
  *   [--rule=key:value,…]  numbers, arrays as a/b/c, nested keys as packShares.trio:0.6/0.3/0.3
+ *   [--card=id.key:value,…]  v5 card experiments without editing the data: `cost`, `rarity` or any
+ *     `values` key of a card (`flush.burst:3`, `flush+.burst:5`, `persistent-state.cost:3`; the `+`
+ *     version is separate; faces are not regenerated) [--ban=id,…] the bots never take these cards
  *   [--kill-order=threat|leader] [--summary] (a compact table on stderr)
+ *   [--path=mesh|backbone|deployment|fortress|firewall|protocols|buffer|evasion|payloads|power]
+ *     (v5: reward priorities favour that build path's cards, bot-meta.ts PATHS; a keeper path runs
+ *     only its keeper unless --archetype is given; `power` favours PoE Injector, Cache Server and
+ *     Load Balancer for every keeper)
+ * v5 metrics per profile: deck size at a win, energy devices (PoE Injectors deployed per fight and
+ * fights with 2+ online; wins of runs averaging 2+ per fight), daemons started, and per card: runs
+ * holding it at the end and their win rate, plays.
  * Every layer defaults to on (every delivery phase has shipped); `--layers=off` is the v3
  * baseline (packs, the table front, escalation, designations, surprises and adds all off). */
 import { newExpedition } from "../src/core/expedition.ts";
 import { combatPreview, endTurn, leaderOf, RULES } from "../src/core/run.ts";
 import type { Archetype, RunState } from "../src/core/types.ts";
-import { playBotTurn, resolveOffers, setBotOptions, PRIORITIES, type BotAction, type Policy } from "./bot.ts";
-import { playMetaPhase } from "./bot-meta.ts";
-import { baseCard } from "../src/core/cards.ts";
+import { playBotTurn, resolveOffers, setBotOptions, type BotAction, type Policy } from "./bot.ts";
+import { playMetaPhase, cardPriorities, PATHS } from "./bot-meta.ts";
+import { CARDS, baseCard } from "../src/core/cards.ts";
 
 const args = process.argv.slice(2);
 const seeds = Math.max(1, Number(args.find(arg => /^\d+$/.test(arg))) || 100);
 const flag = (name: string) => args.find(arg => arg.startsWith(`--${name}=`))?.split("=").slice(1).join("=");
 const elite = args.includes("--elite");
 const noSignature = args.includes("--no-signature");
+/** Probe experiment: the bots never take these cards (base ids). */
+const ban = flag("ban")?.split(",");
+/** Probe experiment: these cards join every starting deck (e.g. two PoE Injectors for the
+ * energy-device measure). */
+const start = (flag("start")?.split(",") ?? []) as RunState["deck"];
 const summary = args.includes("--summary");
 const ascension = Number(flag("ascension") ?? 0);
-const archetypes = (flag("archetype")?.split(",") ?? ["architect", "warden", "ghost"]) as Archetype[];
+const path = flag("path");
+if (path && !PATHS[path]) throw new Error(`Unknown path ${path}`);
+const archetypes = (flag("archetype")?.split(",") ?? (path && PATHS[path].keeper ? [PATHS[path].keeper] : ["architect", "warden", "ghost"])) as Archetype[];
 /** Experiment: scale normal-battle health (rooms of type "battle") to probe fight length. */
 const hpScale = Number(flag("hp-scale") ?? 1);
 /** Experiment: scale guardian health. */
 const bossScale = Number(flag("boss-scale") ?? 1);
 const policies = (flag("policy")?.split(",") ?? ["careless", "aggressive", "adaptive", "tactical"]) as Policy[];
 const killOrder = (flag("kill-order") ?? "threat") as "threat" | "leader";
-setBotOptions({ killOrder });
+setBotOptions({ killOrder, path });
 
 // ---------------------------------------------------------------- layers and rules
 
@@ -66,6 +83,18 @@ for (const pair of flag("rule")?.split(",") ?? []) {
   const last = keys[keys.length - 1];
   if (!Object.hasOwn(target, last)) throw new Error(`Unknown rule ${path}`);
   target[last] = raw.includes("/") ? raw.split("/").map(Number) : Number(raw);
+}
+
+/** --card=id.key:value · cost, rarity or a values key, on the base or the `+` id. */
+for (const pair of flag("card")?.split(",") ?? []) {
+  const [path, raw] = pair.split(":");
+  const at = path.lastIndexOf(".");
+  const id = path.slice(0, at), key = path.slice(at + 1);
+  const card = CARDS[id as keyof typeof CARDS] as unknown as Record<string, unknown> & { values: Record<string, number> };
+  if (!card) throw new Error(`Unknown card ${id}`);
+  if (key === "cost") card.cost = Number(raw);
+  else if (key === "rarity") card.rarity = raw;
+  else card.values[key] = Number(raw);
 }
 
 // ---------------------------------------------------------------- per-fight records
@@ -149,9 +178,15 @@ for (const archetype of archetypes) {
     const messages: Record<string, number> = {};
     /** Tactical tools the policy used: targets, scrubs, repairs, moves out of reach, v4 cards. */
     const tools: Record<string, number> = {};
+    /** v5: per run (energy devices, deck at the end) and per card. */
+    const runs: { won: boolean; deck: number; poePerFight: number; poeOnline2: number; fights: number }[] = [];
+    const cardRuns: Record<string, { runs: number; wins: number; plays: number }> = {};
+    const relicRuns: Record<string, { runs: number; wins: number }> = {};
+    const daemons: Record<string, number> = {};
     const V4_TOOLS = new Set(["phantom-node", "server-rack", "redundant-psu", "field-repair", "demolition-charge", "broadcast-storm", "packet-storm", "flood-fill", "traffic-shaping", "quorum", "bulkhead", "spearhead", "sentry-firewall", "rapid-redeploy", "patch", "reroute", "protocol"]);
     for (let seed = 1; seed <= seeds; seed++) {
       const r = newExpedition(archetype, Math.imul(seed, 0x9e3779b1) >>> 0, false, ascension).run;
+      r.deck.push(...start);
       let moves = 0, battleTurns = 0, battleKind: Kind = "battle", battleLeader = "";
       let fight: Fight | null = null;
       let startIntegrity = 0;
@@ -159,6 +194,8 @@ for (const archetype of archetypes) {
       const seen = [false, false, false];
       let credits = r.credits;
       const dead = new Set<string>();
+      let runFights = 0, poeDeploys = 0, poeOnline2 = 0, poeOnlineFight = false;
+      const plays: Record<string, number> = {};
       const logOffer = (kind: string, id: string) => { messages[`${kind}:${id}`] = (messages[`${kind}:${id}`] ?? 0) + 1; };
       const note = () => {
         const gained = r.credits - credits;
@@ -178,6 +215,9 @@ for (const archetype of archetypes) {
       };
       const closeFight = () => {
         if (!fight) return;
+        runFights++;
+        if (poeOnlineFight) poeOnline2++;
+        poeOnlineFight = false;
         fight.turns = battleTurns;
         fight.integrityLost = startIntegrity - r.integrity;
         fights.push(fight);
@@ -223,6 +263,9 @@ for (const archetype of archetypes) {
             energy = r.energy;
             current.energy += spent;
             const card = action.card ? baseCard(action.card) : "";
+            if (card && action.kind !== "prepare") plays[card] = (plays[card] ?? 0) + 1;
+            if (card === "poe-injector" && action.kind === "ground") poeDeploys++;
+            if (action.kind === "daemon" && card) daemons[card] = (daemons[card] ?? 0) + 1;
             const tool = action.kind === "move" ? (action.purpose ? "move:maintenance" : "") : ["focus", "scrub", "repair"].includes(action.kind) ? action.kind : V4_TOOLS.has(card) && action.kind !== "prepare" ? card : "";
             if (tool) tools[tool] = (tools[tool] ?? 0) + 1;
             const maintenance = action.kind === "scrub" || action.kind === "repair" || action.purpose === "maintenance" || MAINTENANCE_CARDS.has(card);
@@ -240,6 +283,7 @@ for (const archetype of archetypes) {
             continue;
           }
           const preview = combatPreview(r), guardian = guardians[battleLeader];
+          if (preview.online.filter(id => r.topology.nodes.find(node => node.id === id)?.role === "power").length >= 2) poeOnlineFight = true;
           const result = endTurn(r);
           battleTurns++;
           current.planted += result.planted.length;
@@ -280,12 +324,24 @@ for (const archetype of archetypes) {
           }
         } else {
           if (r.phase === "reward") resolveOffers(r, logOffer);
-          playMetaPhase(r, policy, { elite, noSignature, priorities: PRIORITIES[archetype] });
+          playMetaPhase(r, policy, { elite, noSignature, ban, priorities: cardPriorities(archetype, path) });
         }
       }
       note();
       if (moves >= 2500) throw new Error(`Run did not terminate: ${archetype} ${policy} ${seed} ${r.phase}`);
       for (let stage = 0; stage < 3; stage++) if (r.phase === "won" || r.stage > stage) income[stage].push(stageIncome[stage]);
+      runs.push({ won: r.phase === "won", deck: r.deck.length, poePerFight: runFights ? poeDeploys / runFights : 0, poeOnline2: runFights ? poeOnline2 / runFights : 0, fights: runFights });
+      for (const id of new Set(r.deck.map(card => baseCard(card)))) {
+        const entry = cardRuns[id] ??= { runs: 0, wins: 0, plays: 0 };
+        entry.runs++;
+        if (r.phase === "won") entry.wins++;
+      }
+      for (const [id, count] of Object.entries(plays)) (cardRuns[id] ??= { runs: 0, wins: 0, plays: 0 }).plays += count;
+      for (const id of r.relics) {
+        const entry = relicRuns[id] ??= { runs: 0, wins: 0 };
+        entry.runs++;
+        if (r.phase === "won") entry.wins++;
+      }
       if (r.phase === "won") {
         wins++;
         if (sampleWinningSeeds.length < 3) sampleWinningSeeds.push(r.seed);
@@ -381,12 +437,30 @@ for (const archetype of archetypes) {
       messages,
       tools: Object.fromEntries(Object.entries(tools).sort(([a], [b]) => a.localeCompare(b))),
       credits: { perStage: stages.map(s => s.income), ledger },
+      deckAtWin: (() => {
+        const sizes = runs.filter(run => run.won).map(run => run.deck);
+        return { mean: mean(sizes), min: sizes.length ? Math.min(...sizes) : 0, max: sizes.length ? Math.max(...sizes) : 0, inBand: share(sizes.filter(size => size >= 20 && size <= 32).length, sizes.length) };
+      })(),
+      energyDevices: (() => {
+        const heavy = runs.filter(run => run.poePerFight >= 2), any = runs.filter(run => run.poePerFight >= 1), some = runs.filter(run => run.poePerFight > 0);
+        const rate = (group: typeof runs) => ({ runs: group.length, winRate: share(group.filter(run => run.won).length, group.length) });
+        return {
+          poePerFight: mean(runs.map(run => run.poePerFight)),
+          fightsWith2Online: mean(runs.map(run => run.poeOnline2)),
+          runsWith2PerFight: rate(heavy), runsWith1PerFight: rate(any), runsWithAny: rate(some),
+          runsWith2OnlineInHalf: rate(runs.filter(run => run.poeOnline2 >= 0.5)),
+        };
+      })(),
+      daemons: Object.fromEntries(Object.entries(daemons).sort(([a], [b]) => a.localeCompare(b))),
+      relics: Object.fromEntries(Object.entries(relicRuns).sort(([a], [b]) => a.localeCompare(b)).map(([id, entry]) => [id, { runs: entry.runs, winRate: share(entry.wins, entry.runs) }])),
+      cards: Object.fromEntries(Object.entries(cardRuns).filter(([id]) => CARDS[id as keyof typeof CARDS]).sort(([a], [b]) => a.localeCompare(b))
+        .map(([id, entry]) => [id, { runs: entry.runs, winRate: share(entry.wins, entry.runs), plays: entry.plays }])),
     });
   }
 }
 const layers = Object.entries(layerState).map(([layer, on]) => `${layer} ${on ? "on" : "off"}`).join(", ");
 const result = {
-  notes: `v4 deterministic bots (kill order: ${killOrder}), ${elite ? "elite-seeking" : "default"} routing${noSignature ? ", no signature cards" : ""}, ascension ${ascension}; layers: ${layers}${hpScale !== 1 ? `, normal health ×${hpScale}` : ""}${bossScale !== 1 ? `, guardian health ×${bossScale}` : ""}${flag("rule") ? `, rules ${flag("rule")}` : ""}. Regression probes, not a human difficulty estimate.`,
+  notes: `v5 deterministic bots (kill order: ${killOrder}), ${elite ? "elite-seeking" : "default"} routing${noSignature ? ", no signature cards" : ""}${path ? `, path ${path}` : ""}${ban ? `, never taking ${ban.join(", ")}` : ""}${start.length ? `, starting with ${start.join(", ")}` : ""}, ascension ${ascension}; layers: ${layers}${hpScale !== 1 ? `, normal health ×${hpScale}` : ""}${bossScale !== 1 ? `, guardian health ×${bossScale}` : ""}${flag("rule") ? `, rules ${flag("rule")}` : ""}${flag("card") ? `, cards ${flag("card")}` : ""}. Regression probes, not a human difficulty estimate.`,
   layers: layerState,
   profiles: output,
 };
@@ -401,6 +475,8 @@ function summarize(profiles: Record<string, unknown>[]): string {
     lines.push(`${p.archetype}/${p.policy} win ${p.winRate} · turns normal ${p.averageTurnsPerNormalBattle} elite ${p.averageTurnsPerElite} guardian ${p.averageTurnsPerGuardian} · ult ${Math.round(g.ultimateReached * 100)}%/${Math.round(g.ultimateTurnReached * 100)}% int ${Math.round(g.interruptShare * 100)}% (adds ${g.interruptsWithAdds}/${g.ultimatesWithAdds}) · kill esc ${Math.round(k.escortFirst * 100)}% lead ${Math.round(k.leaderFirst * 100)}% both ${Math.round(k.together * 100)}% (${k.packs})`);
     lines.push(`  stages ${p.stages.map((s: any) => `${s.stage}: surv ${Math.round(s.survival * 100)}% n${s.normal.turns} e${s.elite.turns} g${s.guardian.turns} maint ${Math.round(s.maintenanceShare * 100)}%/${Math.round(s.fightsWithMaintenance * 100)}% intLost ${s.integrityLost} inc ${s.income}`).join(" | ")}`);
     lines.push(`  shapes ${Object.entries(p.shapes).map(([key, v]: [string, any]) => `${key} ${v.turns}t ${v.fights}`).join(" · ")}`);
+    const e = p.energyDevices, d = p.deckAtWin;
+    lines.push(`  deck@win ${d.mean} (${d.min}–${d.max}, ${Math.round(d.inBand * 100)}% in 20–32) · PoE/fight ${e.poePerFight} · 2+ online ${Math.round(e.fightsWith2Online * 100)}% of fights · runs 2+/fight ${e.runsWith2PerFight.runs} win ${Math.round(e.runsWith2PerFight.winRate * 100)}% · 1+/fight ${e.runsWith1PerFight.runs} win ${Math.round(e.runsWith1PerFight.winRate * 100)}% · 2+ online in half ${e.runsWith2OnlineInHalf.runs} win ${Math.round(e.runsWith2OnlineInHalf.winRate * 100)}%`);
     lines.push(`  lostTo ${Object.entries(p.lostTo).sort((a: any, b: any) => b[1] - a[1]).map(([id, n]) => `${id} ${n}`).join(", ")}`);
   }
   return lines.join("\n");

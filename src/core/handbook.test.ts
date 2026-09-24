@@ -4,8 +4,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { HANDBOOK_CHAPTERS, handbookMarkup } from "../tutorial/handbook.ts";
 import { esc } from "../tutorial/icons.ts";
-import { RULES } from "./cards.ts";
+import { BASE_CARD_IDS, CARDS, ENERGY_RELICS, RELICS, RULES } from "./cards.ts";
 import { DESIGNATIONS, ENEMIES, ESCORT_IDS, MESSAGE_OPTIONS, REACH_TEXT, SIGNALS, hostileName } from "./enemies.ts";
+import { ASCENSION_LEVELS } from "./ascension.ts";
+import { KEYWORDS } from "../card-marks.ts";
+import { BUILD_PATHS } from "../tutorial/paths.ts";
+import type { Archetype, BaseCardId } from "./types.ts";
 
 const R = RULES;
 /** Reading text: tags stripped, entities kept (the markup escapes names and rules). */
@@ -101,4 +105,70 @@ test("the Danger Playbook gains the three Under Quarantine rows", () => {
   const body = text(chapter("danger"));
   for (const row of ["A Breaker Charge beside your router", "A Jammer you cannot reach", "A Spiteful hostile at lethal"])
     assert.ok(body.includes(row), row);
+});
+
+// ---------------------------------------------------------------------------- v5 · Three Energy
+
+test("Your First Turn teaches the three-energy turn: base, relic cap, temporary energy, draw and the route's cost", () => {
+  const body = text(chapter("start"));
+  assert.ok(body.includes(`Every turn you get ${R.baseEnergy} energy and draw ${R.handDraw} cards`));
+  const route = CARDS.router.cost + 2 * CARDS.fiber.cost;
+  assert.ok(body.includes(`costs ${route}`), "the first route's cost");
+  assert.ok(body.includes(`never above ${R.relicEnergyCap}`), "the relic cap");
+  for (const id of ENERGY_RELICS) assert.ok(body.includes(esc(RELICS[id].name)), `energy relic ${id}`);
+  assert.ok(body.includes("On top of the base, no cap"), "temporary energy is uncapped");
+  assert.ok(body.includes(`${esc(CARDS["poe-injector"].name)}`));
+});
+
+test("Keywords & Daemons prints the cards' own glossary and every daemon with its running effect", () => {
+  const html = chapter("keywords");
+  for (const keyword of Object.values(KEYWORDS)) {
+    assert.ok(html.includes(esc(keyword.name)), keyword.name);
+    assert.ok(html.includes(esc(keyword.rule)), `${keyword.name} rule`);
+  }
+  const daemons = BASE_CARD_IDS.filter(id => CARDS[id].target === "daemon");
+  assert.ok(daemons.length >= 10);
+  for (const id of daemons) {
+    assert.ok(html.includes(esc(CARDS[id].name)), id);
+    assert.ok(html.includes(esc(CARDS[id].rules.replace(/^(?:(?:Daemon|Innate)\.\s*)+/, ""))), `${id} effect`);
+  }
+  assert.ok(html.includes(esc(CARDS.payload.rules)), "the Payload token");
+});
+
+test("Cards & Curses lists every curse with its face and where it comes from, and the v5 reward odds", () => {
+  const html = chapter("cards"), body = text(html);
+  for (const id of BASE_CARD_IDS.filter(id => CARDS[id].curse)) {
+    assert.ok(html.includes(esc(CARDS[id].name)), id);
+    assert.ok(html.includes(esc(CARDS[id].rules)), `${id} face`);
+  }
+  for (const odds of [R.rewardRarity.normal, R.rewardRarity.elite])
+    assert.ok(body.includes(odds.map(share => `${Math.round(share * 100)}%`).join(" / ")), `odds ${odds}`);
+  assert.ok(body.includes(`deck floor of ${R.deckFloor} cards`));
+});
+
+test("every keeper card sits on exactly one build path, and The Three Keepers shows all nine paths", () => {
+  const html = chapter("archetypes");
+  for (const keeper of ["architect", "warden", "ghost"] as Archetype[]) {
+    const owned = BASE_CARD_IDS.filter(id => CARDS[id].archetype === keeper);
+    const placed = BUILD_PATHS[keeper].flatMap(path => path.cards);
+    assert.equal(BUILD_PATHS[keeper].length, 3, `${keeper}: three paths`);
+    assert.deepEqual([...placed].sort(), [...owned].sort(), `${keeper}: every card on one path, none twice`);
+    for (const path of BUILD_PATHS[keeper]) {
+      assert.ok(html.includes(esc(path.name)), path.name);
+      assert.ok(path.partners.length > 0, `${path.name}: a colorless partner`);
+      for (const id of path.partners as BaseCardId[]) {
+        assert.ok(CARDS[id] && !CARDS[id].archetype, `${path.name}: ${id} is colorless`);
+        assert.ok(html.includes(esc(CARDS[id].name)), `${path.name}: ${id} shown`);
+      }
+      for (const id of path.cards.filter(id => !CARDS[id].token)) assert.ok(html.includes(esc(CARDS[id].name)), `${path.name}: ${id} shown`);
+    }
+  }
+});
+
+test("The Expedition names the four ascension levels and the energy boss relics' cap", () => {
+  const body = text(chapter("expedition"));
+  assert.equal(ASCENSION_LEVELS.length, 4);
+  for (const level of ASCENSION_LEVELS) assert.ok(body.includes(level.name), level.name);
+  assert.ok(body.includes(`from ${R.baseEnergy} up to ${R.relicEnergyCap}`));
+  assert.doesNotMatch(body, /guaranteed rare/, "v5 elites offer uncommon or better first, not a guaranteed rare");
 });

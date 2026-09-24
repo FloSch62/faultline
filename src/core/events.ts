@@ -1,5 +1,9 @@
 /** Unknown signals: short encounters between fights. Every choice states its
- * trade-off; seeded results are rolled when the event opens and named up front. */
+ * trade-off; seeded results are rolled when the event opens and named up front.
+ * v5: some choices take a curse as their price (contract section 8), and every such
+ * choice names its curse: The Firmware Mirror (Bitrot), The Quiet Broker (Backdoor),
+ * Cold Storage (Memory Leak), The Echo Chamber (Kernel Panic), The Zombie Farm (Zombie
+ * Process; it can also remove one). */
 import { CARDS, RELICS, RULES, canUpgrade, upgraded, baseCard } from "./cards.ts";
 import { DESIGNATIONS, hostileName } from "./enemies.ts";
 import { STAGES } from "./stages.ts";
@@ -30,8 +34,10 @@ export interface EventDefinition {
   text: string;
   /** Painted backdrop under public/art (without extension). */
   art?: string;
-  /** Story beats appear only in their own stage. */
+  /** Appears only in this stage (story beats, and stage signals like The Zombie Farm). */
   stage?: number;
+  /** A story beat: three times as likely as any other signal in its stage. */
+  story?: boolean;
   prepare?: (run: RunState, state: EventState) => void;
   choices: EventChoiceDefinition[];
 }
@@ -51,6 +57,20 @@ const leave = (detail: string, outcome: string): EventChoiceDefinition => ({
   label: "Walk on", detail: () => detail, resolve: () => outcome,
 });
 const RARITY_STEP: Record<string, Rarity> = { basic: "common", common: "uncommon", uncommon: "rare", rare: "rare", legendary: "rare" };
+/** "A", "A and B", "A, B and C". */
+const list = (names: string[]) => names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0] ?? "nothing";
+/** Deck indices of curses. */
+const curseIndices = (run: RunState) => run.deck.map((_, i) => i).filter(i => CARDS[run.deck[i]]?.curse);
+/** v5 curse prices: what the curse-bearing choices give and cost. */
+const CURSE_DEALS = {
+  /** The Firmware Mirror: the unsigned build upgrades this many named cards (Flash everything: two). */
+  unsignedUpgrades: 3,
+  /** The Zombie Farm: credits for carrying a Zombie Process out; integrity to kill a curse. */
+  farmCredits: 60,
+  farmKillIntegrity: 3,
+} as const;
+/** The Firmware Mirror's named cards: the first `count` seeded picks, in deck order. */
+const mirrorPicks = (state: EventState, count: number) => (state.picks ?? []).slice(0, count).sort((a, b) => a - b);
 
 /** Replaces a deck card with a random offerable card one rarity higher. */
 export function transformCard(run: RunState, index: number): { from: CardId; to: CardId } {
@@ -131,16 +151,17 @@ export const EVENTS: Record<string, EventDefinition> = {
   "firmware-mirror": {
     id: "firmware-mirror", title: "The Firmware Mirror", kicker: "UNKNOWN SIGNAL · A FLASHING TERMINAL", art: "relay-interior",
     text: "A maintenance terminal mirrors firmware to anything that connects. Its progress bar never stopped moving; it has been flashing an empty room for years.",
-    prepare: (run, state) => { state.picks = shuffle(run, upgradableIndices(run)).slice(0, 2).sort((a, b) => a - b); },
+    // Seeded picks in shuffle order: Flash everything takes the first two, the unsigned build three.
+    prepare: (run, state) => { state.picks = shuffle(run, upgradableIndices(run)).slice(0, CURSE_DEALS.unsignedUpgrades); },
     choices: [
       {
         label: "Flash everything",
-        detail: (run, s) => s.picks?.length ? `Upgrade ${s.picks.map(i => name(run.deck[i])).join(" and ")}. Lose 3 integrity.` : "Nothing in your deck can be improved.",
+        detail: (run, s) => s.picks?.length ? `Upgrade ${list(mirrorPicks(s, 2).map(i => name(run.deck[i])))}. Lose 3 integrity.` : "Nothing in your deck can be improved.",
         disabled: (run, s) => !s.picks?.length ? "Nothing in your deck can be improved." : run.integrity <= 3 ? "The surge would overwhelm you." : undefined,
         resolve: (run, s) => {
           run.integrity -= 3;
-          const names = s.picks!.map(i => { const card = run.deck[i]; run.deck[i] = upgraded(card); return name(card); });
-          return `The surge burns through you and into your tools. ${names.join(" and ")} upgraded.`;
+          const names = mirrorPicks(s, 2).map(i => { const card = run.deck[i]; run.deck[i] = upgraded(card); return name(card); });
+          return `The surge burns through you and into your tools. ${list(names)} upgraded.`;
         },
       },
       {
@@ -149,6 +170,16 @@ export const EVENTS: Record<string, EventDefinition> = {
         disabled: run => run.credits < price(run, 25) ? `You need ${price(run, 25)} credits.` : upgradableIndices(run).length ? undefined : "Nothing in your deck can be improved.",
         needsCard: "upgrade",
         resolve: (run, _, i) => { run.credits -= price(run, 25); const card = run.deck[i!]; run.deck[i!] = upgraded(card); return `One clean write. ${name(card)} upgraded.`; },
+      },
+      {
+        label: "Install the unsigned build",
+        detail: (run, s) => s.picks?.length ? `Upgrade ${list(mirrorPicks(s, CURSE_DEALS.unsignedUpgrades).map(i => name(run.deck[i])))}. Add a Bitrot curse.` : "Nothing in your deck can be improved.",
+        disabled: (_, s) => s.picks?.length ? undefined : "Nothing in your deck can be improved.",
+        resolve: (run, s) => {
+          const names = mirrorPicks(s, CURSE_DEALS.unsignedUpgrades).map(i => { const card = run.deck[i]; run.deck[i] = upgraded(card); return name(card); });
+          run.deck.push("bitrot");
+          return `Nobody signed this build, and it shows. ${list(names)} upgraded. A Bitrot joins your deck.`;
+        },
       },
       leave("Disconnect and let it keep mirroring nothing.", "You pull the cable. The progress bar keeps moving anyway."),
     ],
@@ -203,6 +234,16 @@ export const EVENTS: Record<string, EventDefinition> = {
           return `The cold follows you out. ${relicName(s.relic)} installed.`;
         },
       },
+      {
+        label: "Cut the cooling first",
+        detail: (_, s) => `Gain ${relicName(s.relic)}. Add a Memory Leak curse.`,
+        disabled: (_, s) => s.relic ? undefined : "The vault is empty.",
+        resolve: (run, s) => {
+          run.relics.push(s.relic!);
+          run.deck.push("memory-leak");
+          return `The frost melts and the door gives without a fight. The module still works; it just never lets go of anything. ${relicName(s.relic)} installed. A Memory Leak joins your deck.`;
+        },
+      },
       leave("Leave it sealed and keep your warmth.", "Some things are better kept exactly as they were."),
     ],
   },
@@ -218,6 +259,16 @@ export const EVENTS: Record<string, EventDefinition> = {
         resolve: (run, _, i) => { run.credits -= price(run, 30); const card = run.deck[i!]; run.deck.push(card); return `The walls return ${name(card)}. Now there are two.`; },
       },
       {
+        label: "Echo for nothing, take a Kernel Panic",
+        detail: () => "Duplicate a card in your deck for nothing. Add a Kernel Panic curse.",
+        needsCard: "duplicate",
+        resolve: (run, _, i) => {
+          const card = run.deck[i!];
+          run.deck.push(card, "kernel-panic");
+          return `The walls return ${name(card)}, then keep returning everything, faster and faster, until something in you locks up. A Kernel Panic joins your deck.`;
+        },
+      },
+      {
         label: "Listen",
         detail: run => `Restore ${Math.min(2, run.maxIntegrity - run.integrity)} integrity.`,
         resolve: run => `For a while, the hall only repeats your breathing. +${heal(run, 2)} integrity.`,
@@ -230,7 +281,9 @@ export const EVENTS: Record<string, EventDefinition> = {
     prepare: (run, state) => {
       state.relic = [...run.relics].reverse().find(id => RELICS[id]?.tier !== "starter");
       const card = rollCard(run, "uncommon");
-      state.cards = card ? [card] : [];
+      // The rare the broker lends (after the uncommon, so the uncommon keeps its seed).
+      const rare = rollCard(run, "rare", card ? [card] : []);
+      state.cards = card ? [card, ...(rare ? [rare] : [])] : [];
     },
     choices: [
       {
@@ -250,6 +303,15 @@ export const EVENTS: Record<string, EventDefinition> = {
         disabled: (run, s) => !s.cards?.length ? "The broker has nothing to sell." : run.credits < price(run, 45) ? `You need ${price(run, 45)} credits.` : undefined,
         resolve: (run, s) => { run.credits -= price(run, 45); run.deck.push(s.cards![0]); return `No receipt. ${name(s.cards![0])} added to your deck.`; },
       },
+      {
+        label: (_, s) => s.cards?.[1] ? `Take ${name(s.cards[1])} for nothing` : "Take something for nothing",
+        detail: (_, s) => `Add ${name(s.cards?.[1])} to your deck. Add a Backdoor curse.`,
+        disabled: (_, s) => s.cards?.[1] ? undefined : "The broker has nothing to lend.",
+        resolve: (run, s) => {
+          run.deck.push(s.cards![1], "backdoor");
+          return `"Free," the broker says, "this once." ${name(s.cards![1])} joins your deck, and so does the Backdoor someone left inside it.`;
+        },
+      },
       leave("Nod, and keep walking.", "The broker is gone before you look back."),
     ],
   },
@@ -263,7 +325,7 @@ export const EVENTS: Record<string, EventDefinition> = {
     choices: [
       {
         label: "Answer it",
-        detail: (run, s) => `Fight ${staticFoes(run, s)} with ${Math.round((RULES.eventHealthScale - 1) * 100)}% more integrity. Victory: ${credits(run, 40)} credits and a rare card choice.`,
+        detail: (run, s) => `Fight ${staticFoes(run, s)} with ${Math.round((RULES.eventHealthScale - 1) * 100)}% more integrity. Victory: ${credits(run, 40)} credits and an elite card reward (uncommon or better first).`,
         resolve: (run, s) => {
           const fight = staticFight(run, s)!;
           const names = [fight.enemyId, ...(fight.pack ?? [])].filter((id): id is string => !!id).map(hostileName);
@@ -275,9 +337,39 @@ export const EVENTS: Record<string, EventDefinition> = {
       leave("Let it rage and go around.", "You leave it shouting at no one."),
     ],
   },
+  "zombie-farm": {
+    id: "zombie-farm", stage: 1, title: "The Zombie Farm", kicker: "UNKNOWN SIGNAL · A HALL OF DEAD PROCESSES", art: "relay-interior",
+    text: "Row after row of racks, every one of them busy. Nothing they run has had a parent in years: orphaned processes still holding their memory, still answering to their names. A broker's tag on the door pays for any you carry out.",
+    // A seeded curse in your deck, named by the kill choice (none: the choice is closed).
+    prepare: (run, state) => { state.picks = shuffle(run, curseIndices(run)).slice(0, 1); },
+    choices: [
+      {
+        label: "Carry one out",
+        detail: run => `Gain ${credits(run, CURSE_DEALS.farmCredits)} credits. Add a Zombie Process curse.`,
+        resolve: run => {
+          const gain = credits(run, CURSE_DEALS.farmCredits);
+          run.credits += gain;
+          run.deck.push("zombie-process");
+          return `It follows you without being asked. +${gain} credits. A Zombie Process joins your deck.`;
+        },
+      },
+      {
+        label: (run, s) => s.picks?.length ? `Kill ${name(run.deck[s.picks[0]])}` : "Kill a process",
+        detail: (run, s) => s.picks?.length ? `Lose ${CURSE_DEALS.farmKillIntegrity} integrity. Remove ${name(run.deck[s.picks[0]])} from your deck.` : "Lose integrity to remove a curse from your deck.",
+        disabled: (run, s) => !s.picks?.length || !CARDS[run.deck[s.picks[0]]]?.curse ? "You carry no curse."
+          : run.integrity <= CURSE_DEALS.farmKillIntegrity ? "You are too damaged to fight it." : undefined,
+        resolve: (run, s) => {
+          run.integrity -= CURSE_DEALS.farmKillIntegrity;
+          const [card] = run.deck.splice(s.picks![0], 1);
+          return `It takes more out of you than it should, but the signal stops mid-reply. ${name(card)} is gone from your deck.`;
+        },
+      },
+      leave("Leave the farm to its work.", "Behind you, every rack keeps answering."),
+    ],
+  },
   // ------------------------------------------------------------ story beats
   "copper-letters": {
-    id: "copper-letters", stage: 0, title: "The Copper Letters", kicker: "STAGE I · A SORTING ROOM", art: "relay-interior",
+    id: "copper-letters", stage: 0, story: true, title: "The Copper Letters", kicker: "STAGE I · A SORTING ROOM", art: "relay-interior",
     text: "The pneumatic tubes are still full: letters printed the night the backbone fell and never sent. Most are addressed to the same few streets. One is addressed to whoever finds it.",
     prepare: (run, state) => { state.picks = shuffle(run, upgradableIndices(run)).slice(0, 1); },
     choices: [
@@ -295,7 +387,7 @@ export const EVENTS: Record<string, EventDefinition> = {
     ],
   },
   "bell-ringer": {
-    id: "bell-ringer", stage: 1, title: "The Bell-Ringer's Rest", kicker: "STAGE II · THE FOOT OF THE TOWER", art: "relay-cathedral",
+    id: "bell-ringer", stage: 1, story: true, title: "The Bell-Ringer's Rest", kicker: "STAGE II · THE FOOT OF THE TOWER", art: "relay-cathedral",
     text: "Someone made a bed here from cable spools and a signal blanket. The bell-ringer is long gone. Their tuning fork still hums when you pick it up, tuned to a rule no attacker has heard.",
     prepare: (run, state) => {
       const card = rollCard(run, "uncommon", [], id => CARDS[id].target === "protocol");
@@ -316,7 +408,7 @@ export const EVENTS: Record<string, EventDefinition> = {
     ],
   },
   "last-acknowledgement": {
-    id: "last-acknowledgement", stage: 2, title: "The Last Acknowledgement", kicker: "STAGE III · THE EDGE OF THE QUARANTINE", art: "relay-sanctuary",
+    id: "last-acknowledgement", stage: 2, story: true, title: "The Last Acknowledgement", kicker: "STAGE III · THE EDGE OF THE QUARANTINE", art: "relay-sanctuary",
     text: "A single terminal at the edge of the quarantine has been waiting to send one word: ACK. It needs a little power to reach the other side. So do you.",
     choices: [
       {
@@ -337,13 +429,14 @@ export function eventDefinition(id: string): EventDefinition {
   return EVENTS[id];
 }
 
-/** Seeded selection of an unseen event for this stage. The stage's story beat is
- * three times as likely as any other signal. Installs `run.event`. */
+/** Seeded selection of an unseen event for this stage (stage signals only in their
+ * stage). The stage's story beat is three times as likely as any other signal.
+ * Installs `run.event`. */
 export function openEvent(run: RunState) {
   const seen = run.seenEvents ?? [];
   const eligible = Object.values(EVENTS).filter(event => (event.stage === undefined || event.stage === run.stage) && !seen.includes(event.id));
   const pool = eligible.length ? eligible : Object.values(EVENTS).filter(event => event.stage === undefined);
-  const weighted = pool.flatMap(event => event.stage === run.stage ? [event, event, event] : [event]);
+  const weighted = pool.flatMap(event => event.story && event.stage === run.stage ? [event, event, event] : [event]);
   const event = weighted[Math.floor(random(run) * weighted.length)];
   const state: EventState = { id: event.id, resolved: false };
   event.prepare?.(run, state);

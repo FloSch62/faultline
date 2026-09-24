@@ -1,7 +1,8 @@
-/** Floors stay local to a stage, so every route chart remains readable. */
+/** Floors stay local to a stage, so every route chart remains readable. Guardian health lives in
+ * RULES.guardianHealth (v5). */
 export const STAGES = [
   {
-    name: "The Copper Reach", numeral: "I", boss: "regent", bossHp: 67,
+    name: "The Copper Reach", numeral: "I", boss: "regent",
     art: { panorama: "relay-cathedral.png", battle: "relay-interior.png" },
     music: {
       explore: "paths-of-copper",
@@ -15,7 +16,7 @@ export const STAGES = [
     elites: ["sentinel", "colossus", "weaver"],
   },
   {
-    name: "The Glass Cathedral", numeral: "II", boss: "cantor", bossHp: 96,
+    name: "The Glass Cathedral", numeral: "II", boss: "cantor",
     art: { panorama: "stages/glass-cathedral.png", battle: "stages/glass-interior.png" },
     music: {
       explore: "prismatic-silence",
@@ -30,7 +31,7 @@ export const STAGES = [
     elites: ["marshal", "widow", "colossus", "foreman"],
   },
   {
-    name: "The Blackout Heart", numeral: "III", boss: "core", bossHp: 132,
+    name: "The Blackout Heart", numeral: "III", boss: "core",
     art: { panorama: "stages/blackout-heart.png", battle: "stages/blackout-interior.png" },
     music: {
       explore: "messages-in-the-dark",

@@ -11,7 +11,8 @@
     "test:e2e": "playwright test",
     "test:smoke": "playwright test --grep @smoke",
     "balance": "node --experimental-strip-types scripts/balance.ts",
-    "models": "node --experimental-strip-types scripts/models.ts"
+    "models": "node --experimental-strip-types scripts/models.ts",
+    "tables": "node --experimental-strip-types scripts/card-tables.ts"
   },
   "dependencies": {
     "three": "^0.180.0"

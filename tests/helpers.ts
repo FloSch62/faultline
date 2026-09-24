@@ -6,6 +6,7 @@ import { chooseRoom, endTurn } from "../src/core/run.ts";
 import { ENEMIES } from "../src/core/enemies.ts";
 import { EVENTS } from "../src/core/events.ts";
 import { makeEnemy } from "../src/core/encounter.ts";
+import { RULES } from "../src/core/cards.ts";
 import type { Archetype, CardId, Enemy, HostileRole, Installation, NetworkLink, NetworkNode, Port, RoomType, RunState } from "../src/core/types.ts";
 
 /** v3 malware in a fixture: a Siphon Tap at that socket. */
@@ -36,6 +37,9 @@ export interface BattleOptions {
   seed?: number;
 }
 
+/** Energy of a v5 turn with no energy relic: every fixture's default (tests read it, never a literal). */
+export const ENERGY = RULES.baseEnergy;
+
 /** A clean first-stage encounter: terminals only, no terrain, a chosen hostile and hand. */
 export function battle(options: BattleOptions = {}): Expedition {
   const e = newExpedition(options.archetype ?? "architect", options.seed ?? 0x5eed1234);
@@ -60,7 +64,7 @@ export function battle(options: BattleOptions = {}): Expedition {
   r.drawPile = options.draw ?? Array<CardId>(20).fill("guard");
   r.discardPile = options.discard ?? [];
   r.exhaustPile = [];
-  r.energy = options.energy ?? 5;
+  r.energy = options.energy ?? ENERGY;
   if (options.integrity !== undefined) r.integrity = r.maxIntegrity = Math.max(r.maxIntegrity, options.integrity);
   if (options.relics) r.relics = options.relics;
   r.log = ["Test encounter prepared."];

@@ -6,9 +6,10 @@ import "./shell.css";
 import { DESIGNATIONS, ENEMIES, designationRule, hostileName } from "./core/enemies.ts";
 import { STAGES } from "./core/stages.ts";
 import { TRACK_TITLES } from "./core/music.ts";
-import { CARDS, RELICS, RULES, canUpgrade, upgraded } from "./core/cards.ts";
+import { CARDS, RELICS, RULES, STARTER_SIGNATURES, canUpgrade, upgraded } from "./core/cards.ts";
 import {
   ARCHETYPES,
+  starterDeck,
   type Archetype,
   type Expedition,
 } from "./core/expedition.ts";
@@ -24,6 +25,7 @@ import {
   chooseForge,
   eventView,
   leaveEvent,
+  leaveForge,
   leaveShop,
   relicPool,
   removalBlocker,
@@ -43,6 +45,7 @@ import type { Preferences } from "./preferences.ts";
 import { chapterForFloor, ARCHETYPE_STORIES, sanctuaryStory, OUTCOMES, enemyStory, designationEntranceLine, reinforcementEntranceLine } from "./story.ts";
 import { encounterRoom, roomScout } from "./core/encounter.ts";
 import { asset, esc, icon, artStyle, cardMarkup } from "./ui.ts";
+import { HOUSE_COLORS, HOUSE_NAMES, houseSigil } from "./card-marks.ts";
 import { designationGlyph, designationMark } from "./tutorial/icons.ts";
 
 // ------------------------------------------------------------------ helpers
@@ -70,6 +73,10 @@ const EXTRA_ICONS: Record<string, string> = {
   wrench: '<path d="M13.4 10.6 4.3 19.7a1.6 1.6 0 0 0 2.3 2.3l9.1-9.1"/><path d="M13.4 10.6a4.8 4.8 0 0 1 6-6.5l-3 3 .4 2.6 2.6.4 3-3a4.8 4.8 0 0 1-6.7 6"/>',
   crate: '<rect x="3" y="5" width="18" height="15" rx="1"/><path d="M3 9.5h18M3 15.5h18M7 9.5l10 6M9.5 7.2h5"/>',
   storm: '<path d="M7.5 16.5H6.2a4.2 4.2 0 0 1-.5-8.4 6 6 0 0 1 11.6-.9 4.6 4.6 0 0 1 .9 9.1"/><path d="m13.2 11.5-3 5h3.6l-2.6 5"/>',
+  // v5 boss relics: two plugs held apart by a gap, a mainframe cabinet with tape reels, a bolt jumping a rail.
+  airgap: '<path d="M1.8 12h4.4M17.8 12h4.4"/><rect x="6.2" y="8" width="4" height="8" rx="1"/><rect x="13.8" y="8" width="4" height="8" rx="1"/><path d="M10.2 10h1M10.2 14h1M12.8 10h1M12.8 14h1"/><path d="M12 3.5v2.5M12 18v2.5" stroke-dasharray="1.2 1.6"/>',
+  mainframe: '<rect x="4" y="2.8" width="16" height="18.4" rx="1"/><circle cx="8.8" cy="8.2" r="2.6"/><circle cx="15.2" cy="8.2" r="2.6"/><path d="M8.8 8.2h.01M15.2 8.2h.01M7 14h10M7 17.2h6M16 17.2h1"/>',
+  overvolt: '<path d="M2.5 19.5h19"/><path d="m13.6 2.5-6.4 9.4h4.9l-2.4 7.6 7.6-11h-5Z"/><path d="M3.5 6.5 5.6 8M20.5 6.5 18.4 8M3.5 13.5l2.1-.9M20.5 13.5l-2.1-.9"/>',
 };
 /** ui.icon plus the expedition-only glyphs. */
 export function sicon(name: string, size = 18): string {
@@ -109,6 +116,8 @@ const RELIC_GLYPHS: Record<RelicId, string> = {
   // v4 · Under Quarantine
   "round-robin": "fanout", "ingress-filter": "lock", "priority-queue": "queue", "reinforced-frame": "frames",
   "field-engineer": "wrench", "bill-of-lading": "crate", "storm-control": "storm", "scorched-earth": "sword",
+  // v5 · Three Energy
+  "air-gap": "airgap", "legacy-mainframe": "mainframe", overvolt: "overvolt",
 };
 export function relicEmblem(id: RelicId, size = 30): string {
   return `<span class="relic-emblem tier-${RELICS[id].tier}" style="--relic-color:${RELICS[id].color}">${sicon(RELIC_GLYPHS[id] ?? "elite", size)}</span>`;
@@ -148,7 +157,8 @@ export function loadProgress(): Progress {
     const cleared: Progress["cleared"] = {};
     for (const id of Object.keys(ARCHETYPES) as Archetype[]) {
       const level = value?.cleared?.[id];
-      if (Number.isInteger(level) && level >= 0 && level <= MAX_ASCENSION) cleared[id] = level;
+      // v5: ascension has four levels; a record from the ten-level game is clamped, never migrated.
+      if (Number.isInteger(level) && level >= 0) cleared[id] = Math.min(MAX_ASCENSION, level);
     }
     const unlock = value?.lastUnlock;
     return {
@@ -240,6 +250,10 @@ export function screenAction(run: RunState, data: DOMStringMap): ScreenOutcome {
       const repair = data.screen === "forge-repair";
       const result = chooseForge(run, repair ? "repair" : "relic");
       return { result, cue: result.ok ? (repair ? "reward" : "navigate") : "error" };
+    }
+    case "forge-leave": {
+      const result = leaveForge(run);
+      return { result: result.ok ? undefined : result, cue: result.ok ? "navigate" : "error" };
     }
     case "forge-upgrade":
     case "forge-remove": {
@@ -403,23 +417,39 @@ export function titleMarkup(saved: Expedition | null) {
   </div><span class="version-mark">v${__APP_VERSION__}</span></section>`;
 }
 
+/** The ascension picker (v5, contract 6b): five rungs, 0 (the standard expedition) and the four named
+ * levels, read from ASCENSION_LEVELS. Every rung carries its rules in its tooltip; the chosen level's
+ * rules read in full below, with the earlier levels it includes named beside them. */
 function ascensionPanel(archetype: Archetype): string {
   const unlocked = unlockedAscension(archetype), level = chosenAscension(archetype);
-  const pips = Array.from({ length: MAX_ASCENSION + 1 }, (_, n) => {
-    const locked = n > unlocked;
-    const rule = n === 0 ? "The standard expedition." : ASCENSION_LEVELS[n - 1].rule;
-    return `<button class="asc-pip ${n === level ? "current" : ""} ${n < level ? "included" : ""} ${locked ? "locked" : ""}" data-screen="ascension" data-for="${archetype}" data-level="${n}" ${locked ? "disabled" : ""} aria-pressed="${n === level}" aria-label="Ascension ${n}${locked ? ", locked. Win at ascension " + (n - 1) + " to unlock" : ": " + rule}">${locked ? sicon("lock", 12) : `<span>${n}</span>`}</button>`;
-  }).join("");
-  const earlier = ASCENSION_LEVELS.slice(0, Math.max(0, level - 1));
+  const rungs = Array.from({ length: MAX_ASCENSION + 1 }, (_, n) => {
+    const locked = n > unlocked, info = n ? ASCENSION_LEVELS[n - 1] : null;
+    const name = info?.name ?? "Standard";
+    const rule = info?.rule ?? "The standard expedition: no ascension rules.";
+    const tip = `${n ? `Ascension ${n} · ${name}` : "Ascension 0 · Standard"}: ${rule}${locked ? ` Locked: win at ascension ${n - 1} with ${ARCHETYPES[archetype].name} to unlock it.` : n > 1 ? " Includes every earlier level." : ""}`;
+    return `<span class="asc-rung-slot" data-tooltip="${esc(tip)}"><button class="asc-rung ${n === level ? "current" : ""} ${n < level ? "included" : ""} ${locked ? "locked" : ""}" data-screen="ascension" data-for="${archetype}" data-level="${n}" ${locked ? "disabled" : ""} aria-pressed="${n === level}" aria-label="${esc(tip)}"><span class="asc-gem">${locked ? sicon("lock", 12) : `<span>${n}</span>`}</span><span class="asc-name">${esc(name)}</span></button></span>`;
+  }).join('<i class="asc-link" aria-hidden="true"></i>');
   const current = level ? ASCENSION_LEVELS[level - 1] : null;
+  const earlier = ASCENSION_LEVELS.slice(0, Math.max(0, level - 1));
+  const includes = earlier.length
+    ? `<span class="asc-includes">Includes ${earlier.map(item => `<span class="asc-earlier" tabindex="0" data-tooltip="${esc(`${item.level} · ${item.name}: ${item.rule}`)}">${esc(item.name)}</span>`).join(earlier.length > 1 ? ", " : "")}</span>` : "";
   const summary = current
-    ? `<strong>${esc(current.name)}</strong> ${esc(current.rule)}${earlier.length ? ` <span class="asc-more" tabindex="0" data-tooltip="${esc(earlier.map(a => `${a.level} · ${a.rule}`).join("  "))}" aria-label="${esc(`Also in effect: ${earlier.map(a => a.rule).join(" ")}`)}">+ ${earlier.length} earlier rule${earlier.length > 1 ? "s" : ""}</span>` : ""}`
-    : `<strong>Standard expedition</strong> ${unlocked ? `Ascension 1–${unlocked} unlocked for ${ARCHETYPES[archetype].name}.` : `Win with ${ARCHETYPES[archetype].name} to unlock ascension 1.`}`;
+    ? `<strong>${esc(current.name)}</strong><span class="asc-rule">${esc(current.rule)}</span>${includes}`
+    : `<strong>Standard expedition</strong><span class="asc-rule">${unlocked ? `Ascension 1–${unlocked} unlocked for ${ARCHETYPES[archetype].name}. Each level adds its rules to every level before it.` : `Win an expedition with ${ARCHETYPES[archetype].name} to unlock ascension 1. Each level adds its rules to every level before it.`}</span>`;
   return `<div class="ascension-panel inlay" role="group" aria-label="Ascension">
     <div class="asc-label">${sicon("ascend", 20)}<span><small>Ascension</small><strong>${level}</strong></span></div>
-    <div class="asc-body"><div class="asc-track" role="group" aria-label="Choose ascension level">${pips}</div>
+    <div class="asc-body"><div class="asc-track" role="group" aria-label="Choose ascension level">${rungs}</div>
     <p class="asc-summary">${summary}</p></div>
   </div>`;
+}
+
+/** The keeper's twelve starting cards: the two signature cards lit first, then the shared ten. */
+function starterRow(id: Archetype): string {
+  const deck = starterDeck(id), signature = STARTER_SIGNATURES[id];
+  const counts = new Map<CardId, number>();
+  for (const card of [...signature, ...deck.filter(card => !signature.includes(card))]) counts.set(card, (counts.get(card) ?? 0) + 1);
+  const names = [...counts].map(([card, n]) => `<span class="starter-card${signature.includes(card) ? " is-signature" : ""}" data-tooltip="${esc(`${CARDS[card].name}${n > 1 ? ` ×${n}` : ""}: ${CARDS[card].rules}${signature.includes(card) ? ` ${ARCHETYPES[id].name}'s signature card.` : ""}`)}">${esc(CARDS[card].name)}${n > 1 ? `<b>×${n}</b>` : ""}</span>`).join("");
+  return `<span class="kit-row kit-deck"><i>${icon("deck", 15)}</i><span><em>Starting deck · ${deck.length} cards</em><span class="starter-list">${names}</span></span></span>`;
 }
 
 const sentence = (text: string) => text.charAt(0) + text.slice(1).toLowerCase();
@@ -429,13 +459,15 @@ export function selectMarkup(selected: Archetype, daily: boolean) {
     const a = ARCHETYPES[id], consoleDef = CONSOLES[a.console], engine = ENGINES[id], relic = RELICS[a.relic];
     // Short console rules read in full; a long one keeps its first sentence (the engine row explains the rest).
     const consoleSummary = consoleDef.rules.length < 80 ? consoleDef.rules : consoleDef.rules.split(/(?<=\.)\s+/)[0];
-    return `<button class="archetype ${selected === id ? "chosen" : ""}" data-archetype="${id}" aria-pressed="${selected === id}" style="${artStyle(a.art)};--accent:${a.color}" aria-label="${esc(`${a.name}. ${a.title}. Console: ${consoleDef.name}, ${consoleDef.rules} Relic: ${relic.name}, ${relic.rules} Engine: ${engine.name}. ${a.integrity} integrity.`)}">
+    const deck = starterDeck(id);
+    return `<button class="archetype ${selected === id ? "chosen" : ""}" data-archetype="${id}" aria-pressed="${selected === id}" style="${artStyle(a.art)};--accent:${a.color}" aria-label="${esc(`${a.name}. ${a.title}. Console: ${consoleDef.name}, ${consoleDef.rules} Relic: ${relic.name}, ${relic.rules} Engine: ${engine.name}. Starting deck, ${deck.length} cards: ${STARTER_SIGNATURES[id].map(card => CARDS[card].name).join(" and ")} with the shared ten. ${a.integrity} integrity.`)}">
       <span class="archetype-art"></span>${selected === id ? '<span class="lit-stone"></span>' : ""}
       <span class="archetype-copy"><strong>${a.name}</strong><em class="archetype-epithet">${sentence(a.title)}</em>
         <span class="kit">
           <span class="kit-row"><i>${sicon("console", 16)}</i><span><em>Console · ${consoleDef.cost} energy</em><b>${consoleDef.name}</b><span>${esc(consoleSummary)}</span></span></span>
           <span class="kit-row"><i>${relicEmblem(a.relic, 15)}</i><span><em>Starting relic</em><b>${relic.name}</b><span>${esc(relic.rules)}</span></span></span>
           <span class="kit-row"><i>${sicon("engine", 16)}</i><span><em>Engine</em><b>${engine.name}</b><span>${esc(engine.rules)}</span></span></span>
+          ${starterRow(id)}
         </span>
         <span class="archetype-health">${icon("heart", 16)}<b>${a.integrity}</b><small>Integrity</small></span>
       </span></button>`;
@@ -598,7 +630,11 @@ export function rewardMarkup(r: RunState) {
   const kicker = cache ? "" : boss ? `STAGE ${STAGES[r.stage].numeral} · GUARDIAN DEFEATED` : esc(silencedLine(r, encounterRoom(r) ?? room));
   const cue = boss ? final ? "Choose your last card" : "Choose a card, then a guardian's relic"
     : elite ? "Choose a card, then a relic" : "Choose a card";
-  return `<section class="reward-screen full-screen v3"><div class="reward-emblem">${icon(cache ? "cache" : boss ? "crown" : "sword", 30)}</div>${screenHead(cache ? "Salvage Cache" : "Victory", "", kicker)}<p class="screen-cue">${cue}</p>${spoilsMarkup(r)}<div class="reward-cards">${r.cardRewards.map((id, i) => cardMarkup(id, i, "reward")).join("")}</div><button class="plate-button reward-skip" data-action="skip-reward">Skip</button></section>`;
+  // Air Gap takes one card from every reward: the plate says so where the missing card would be.
+  const gap = r.relics.includes("air-gap")
+    ? `<div class="reward-gap" tabindex="0" data-tooltip="${esc(`${RELICS["air-gap"].name}: ${RELICS["air-gap"].rules}`)}" aria-label="${esc(`${RELICS["air-gap"].name}: every card reward offers one card fewer.`)}">${relicEmblem("air-gap", 22)}<strong>${esc(RELICS["air-gap"].name)}</strong><span>One card fewer</span></div>` : "";
+  const cards = r.cardRewards.map((id, i) => cardMarkup(id, i, "reward")).join("");
+  return `<section class="reward-screen full-screen v3"><div class="reward-emblem">${icon(cache ? "cache" : boss ? "crown" : "sword", 30)}</div>${screenHead(cache ? "Salvage Cache" : "Victory", "", kicker)}<p class="screen-cue">${cue}</p>${spoilsMarkup(r)}<div class="reward-cards${gap ? " has-gap" : ""}" data-count="${r.cardRewards.length}">${cards}${gap}</div><button class="plate-button reward-skip" data-action="skip-reward">Skip</button></section>`;
 }
 
 export function relicMarkup(r: RunState) {
@@ -633,12 +669,18 @@ export function forgeMarkup(r: RunState) {
   const cards = (n: number) => `<b>${n}</b> card${n === 1 ? "" : "s"}`;
   // The first sentence of the sanctuary's story is what you find as you step in.
   const discovery = story.description.split(/(?<=\.)\s+/)[0];
-  return `<section class="forge-screen full-screen v3"><div class="reward-emblem">${icon("forge", 30)}</div>${screenHead("Sanctuary", esc(discovery))}<p class="screen-cue">Choose one service</p><div class="service-row">${[
-    service("forge-repair", "patch", "Repair", repair ? `Restore ${repair} integrity.` : "Your integrity is already full.", `${icon("heart", 14)} <b>${r.integrity} / ${r.maxIntegrity}</b>`, false, "heart"),
+  // Legacy Mainframe (boss relic): the sanctuary cannot repair; with nothing else to take, you move on.
+  const mainframe = r.relics.includes("legacy-mainframe");
+  const stuck = mainframe && !upgradable && !removable && !!salvageBlocked;
+  const leave = stuck ? `<button class="plate-button forge-leave" data-screen="forge-leave">${sicon("arrow", 15)} Move on</button>` : "";
+  return `<section class="forge-screen full-screen v3"><div class="reward-emblem">${icon("forge", 30)}</div>${screenHead("Sanctuary", esc(discovery))}<p class="screen-cue">${stuck ? "No service can help you here" : "Choose one service"}</p><div class="service-row">${[
+    mainframe
+      ? service("forge-repair", "patch", "Repair", `${esc(RELICS["legacy-mainframe"].name)}: sanctuaries cannot repair.`, `${relicEmblem("legacy-mainframe", 14)} <b>${r.integrity} / ${r.maxIntegrity}</b>`, true, "heart")
+      : service("forge-repair", "patch", "Repair", repair ? `Restore ${repair} integrity.` : "Your integrity is already full.", `${icon("heart", 14)} <b>${r.integrity} / ${r.maxIntegrity}</b>`, false, "heart"),
     service("forge-upgrade", "startup-config", "Upgrade", "One card becomes its upgraded version, for good.", `${cards(upgradable)} can improve`, !upgradable, "upgrade"),
     service("forge-remove", "crosslink", "Remove", "Leave one card behind. Curses too.", `${cards(removable)} can go`, !removable, "remove"),
     service("forge-salvage", "firmware", "Salvage", `Sacrifice ${SALVAGE_COST} maximum integrity for one of three relics.`, salvageBlocked || `Max integrity <b>${r.maxIntegrity} → ${r.maxIntegrity - SALVAGE_COST}</b>`, !!salvageBlocked, "elite"),
-  ].join("")}</div>${activePicker(r) ? deckPickerMarkup(r, activePicker(r)!) : ""}</section>`;
+  ].join("")}</div>${leave}${activePicker(r) ? deckPickerMarkup(r, activePicker(r)!) : ""}</section>`;
 }
 
 // ------------------------------------------------------------------ market
@@ -652,7 +694,11 @@ export function shopMarkup(r: RunState) {
   const cards = shop.cards.map((offer, i) => {
     const card = CARDS[offer.id], afford = r.credits >= offer.price;
     const bench = i === 0 && offer.id === "router";
-    return `<div class="market-offer ${offer.sold ? "sold" : ""} ${!offer.sold && !afford ? "short" : ""} ${bench ? "bench" : ""}" style="--order:${i}">${cardFace(offer.id)}${offer.sold ? '<span class="sold-stamp">Sold</span>' : ""}<button class="price-button" data-screen="buy-card" data-index="${i}" ${offer.sold ? "disabled" : ""} aria-label="${esc(offer.sold ? `${card.name}, sold` : `Buy ${card.name} for ${offer.price} credits${afford ? "" : ", not enough credits"}. ${card.rules}`)}">${offer.sold ? "Sold" : credits(offer.price, 15)}</button></div>`;
+    // Each slot names its shelf: the hardware bench, the keeper's own cards, or the shared colorless pool.
+    const house = card.archetype ?? "colorless";
+    const shelf = bench ? `<span class="market-house is-bench" data-tooltip="The hardware bench: a Core Router, always in stock.">${sicon("stall", 13)}<span>Bench</span></span>`
+      : `<span class="market-house house-${house}" style="--house:${HOUSE_COLORS[house]}" data-tooltip="${esc(card.archetype ? `${ARCHETYPES[card.archetype].name}'s shelf: cards only this keeper is offered.` : "Colorless shelf: cards every keeper can take.")}">${houseSigil(house, 13)}<span>${card.archetype ? HOUSE_NAMES[house] : "Colorless"}</span></span>`;
+    return `<div class="market-offer ${offer.sold ? "sold" : ""} ${!offer.sold && !afford ? "short" : ""} ${bench ? "bench" : ""} house-${bench ? "bench" : house}" style="--order:${i}">${shelf}${cardFace(offer.id)}${offer.sold ? '<span class="sold-stamp">Sold</span>' : ""}<button class="price-button" data-screen="buy-card" data-index="${i}" ${offer.sold ? "disabled" : ""} aria-label="${esc(offer.sold ? `${card.name}, sold` : `Buy ${card.name} for ${offer.price} credits${afford ? "" : ", not enough credits"}. ${card.rules}`)}">${offer.sold ? "Sold" : credits(offer.price, 15)}</button></div>`;
   }).join("");
   const relics = shop.relics.map((offer, i) => {
     const relic = RELICS[offer.id], afford = r.credits >= offer.price;
@@ -750,6 +796,19 @@ export function trackMarkup(title: string) {
   return `${NOTE}${sicon("warn", 16)}<span class="track-title">${esc(title)}</span>`;
 }
 
+/** The battle's keys (main.ts keydown): the table carries no legend, Options lists them. */
+const KEY_LEGEND: [string, string][] = [
+  ["<kbd>1</kbd>–<kbd>0</kbd>", "Play or choose a card in hand"],
+  ["<kbd>C</kbd>", "Console command"],
+  ["<kbd>Space</kbd> <kbd>Enter</kbd>", "Transmit and end the turn"],
+  ["<kbd>P</kbd>", "Prepare a card for next turn"],
+  ["<kbd>Z</kbd>", "Undo"],
+  ["<kbd>Esc</kbd>", "Put a card back · Options"],
+  ["<kbd>F</kbd>", "Target the next hostile"],
+  ["<kbd>S</kbd> · <kbd>R</kbd>", "Scrub an installation · repair a worn device"],
+  ["<kbd>I</kbd> · right-click", "Inspect a card"],
+  ["Point · <kbd>Tab</kbd>", "Read a card in hand, large"],
+];
 export function settingsMarkup(s: AudioSettings, inRun: boolean, preferences: Preferences, fullscreen: boolean) {
   const volume = (key: "music" | "effects", label: string) => {
     const value = Math.round(s[key] * 100);
@@ -761,6 +820,7 @@ export function settingsMarkup(s: AudioSettings, inRun: boolean, preferences: Pr
     <section class="settings-group"><h3>Audio</h3>${toggle("Sound", 'data-setting="sound"', !s.muted)}${volume("music", "Music")}${volume("effects", "Sound effects")}</section>
     <section class="settings-group"><h3>Gameplay</h3>${toggle("Motion & screen shake", 'data-setting="motion"', s.motion)}${toggle("Contextual field notes", 'data-preference="tips"', preferences.tips)}${toggle("Quick transmissions", 'data-preference="fast"', preferences.fast)}</section>
     <section class="settings-group"><h3>Display</h3>${toggle("Fullscreen", 'data-setting="fullscreen"', fullscreen)}</section>
+    <section class="settings-group controls-group"><h3>Controls</h3><dl class="key-legend">${KEY_LEGEND.map(([keys, what]) => `<div><dt>${keys}</dt><dd>${what}</dd></div>`).join("")}</dl></section>
     <div class="settings-actions button-row"><button class="gold-button" data-action="close">Return</button>${inRun ? '<button class="plate-button" data-action="save-exit">Save & return to title</button>' : ""}<button class="text-button" data-action="credits">Credits</button></div></div>`;
 }
 

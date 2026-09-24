@@ -1,14 +1,21 @@
 /** The Signal Keeper's Handbook: an illustrated rules reference.
  * Every number is read from the live rules (RULES, CARDS, RELICS, ENEMIES,
- * ascension and market constants), so the handbook cannot drift from balance. */
-import { CARDS, RELICS, RULES } from "../core/cards.ts";
+ * ascension and market constants), so the handbook cannot drift from balance.
+ * v5 · Three Energy: the energy economy, keywords and Daemons (the glossary is card-marks.ts's
+ * KEYWORDS, the same words the cards' tooltips use), curses and each keeper's three build paths. */
+import { BASE_CARD_IDS, CARDS, ENERGY_RELICS, RELICS, RULES, STARTER_DECK, STARTER_SIGNATURES } from "../core/cards.ts";
 import { DESIGNATIONS, ENEMIES, ESCORT_IDS, MESSAGE_OPTIONS, REACH_TEXT, SIGNALS, hostileName } from "../core/enemies.ts";
-import { ASCENSION_LEVELS, MAX_ASCENSION } from "../core/ascension.ts";
+import { ASCENSION_LEVELS, ASCENSION_RULES, MAX_ASCENSION } from "../core/ascension.ts";
 import { CARD_PRICES, RELIC_PRICE, REMOVE_PRICE, UPGRADE_PRICE, SALVAGE_COST } from "../core/meta.ts";
+import { MARKET_SLOTS } from "../core/rewards.ts";
+import { EVENTS } from "../core/events.ts";
+import { ARCHETYPES } from "../core/expedition.ts";
 import { CONSOLES } from "../core/run.ts";
-import type { BaseCardId, ConsoleId, DesignationId, InstallationKind, RelicId } from "../core/types.ts";
+import type { Archetype, BaseCardId, CardId, ConsoleId, DesignationId, InstallationKind, RelicId } from "../core/types.ts";
+import { KEYWORDS, type KeywordId } from "../card-marks.ts";
 import { bandsDiagram, bottleneckDiagram, bufferDiagram, designationDiagram, escalationDiagram, installationDiagram, loopDiagram, mapDiagram, onlineDiagram, portsDiagram, rerouteDiagram, routesDiagram } from "./diagrams.ts";
 import { designationMark, esc, icon } from "./icons.ts";
+import { BUILD_PATHS } from "./paths.ts";
 
 export interface HandbookChapter {
   id: string;
@@ -23,6 +30,7 @@ export const HANDBOOK_CHAPTERS: readonly HandbookChapter[] = [
   { id: "zones", title: "Bands & Fields", icon: "map" },
   { id: "rerouting", title: "Rerouting", icon: "undo" },
   { id: "tools", title: "Protocols & Console", icon: "eye" },
+  { id: "keywords", title: "Keywords & Daemons", icon: "bolt" },
   { id: "packs", title: "Packs & Ports", icon: "sword" },
   { id: "front", title: "The Table Front", icon: "map" },
   { id: "escalation", title: "Escalation & Designations", icon: "elite" },
@@ -30,7 +38,7 @@ export const HANDBOOK_CHAPTERS: readonly HandbookChapter[] = [
   { id: "archetypes", title: "The Three Keepers", icon: "crown" },
   { id: "danger", title: "Danger Playbook", icon: "heart" },
   { id: "guardians", title: "Guardians", icon: "boss" },
-  { id: "cards", title: "Cards & Keywords", icon: "deck" },
+  { id: "cards", title: "Cards & Curses", icon: "deck" },
   { id: "expedition", title: "The Expedition", icon: "coins" },
 ];
 const NUMERALS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII"];
@@ -44,6 +52,37 @@ const strong = (text: string | number) => `<strong>${text}</strong>`;
 const reach = REACH_TEXT;
 const pct = (share: number) => `${Math.round(share * 100)}%`;
 const title = (text: string) => text.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+const KEEPERS: readonly Archetype[] = ["architect", "warden", "ghost"];
+const keeperName = (keeper: Archetype) => ARCHETYPES[keeper].name.replace(/^The /, "");
+/** "Core Router ×2, Optic Fiber ×3". */
+function cardList(ids: readonly CardId[]) {
+  const counts = new Map<CardId, number>();
+  for (const id of ids) counts.set(id, (counts.get(id) ?? 0) + 1);
+  return [...counts].map(([id, n]) => `${esc(CARDS[id]?.name ?? id)}${n > 1 ? ` ×${n}` : ""}`).join(", ");
+}
+/** A card name with its cost, as the gem shows it: "Branch Line ·1". */
+const costed = (id: BaseCardId) => `${name(id)} <small>·${card(id)?.cost ?? ""}</small>`;
+/** The first route every opening hand guarantees: a Core Router and two Optic Fibers. */
+const ROUTE_COST = card("router").cost + 2 * card("fiber").cost;
+/** Base cards of a kind, in merge order (the Handbook lists what exists, never a typed copy). */
+const baseCards = (keep: (id: BaseCardId) => boolean) => BASE_CARD_IDS.filter(id => CARDS[id] && keep(id));
+const ownerOf = (id: BaseCardId) => {
+  const keeper = CARDS[id].archetype;
+  return keeper ? keeperName(keeper) : "Colorless";
+};
+/** Where each curse comes from: the ascension level, relic or event that names it as a price. */
+const CURSE_SOURCES: Partial<Record<BaseCardId, string>> = (() => {
+  const event = (id: string) => EVENTS[id]?.title ?? "";
+  const level = ASCENSION_LEVELS.find(item => item.level === ASCENSION_RULES.knownVulnerability);
+  return {
+    cve: [level ? `ascension ${level.level} (${level.name})` : "", event("unpatched-server")].filter(Boolean).join(" · "),
+    "zombie-process": event("zombie-farm"),
+    "kernel-panic": event("echo-chamber"),
+    backdoor: `${RELICS.overvolt.name} (on pickup and after every elite) · ${event("quiet-broker")}`,
+    bitrot: event("firmware-mirror"),
+    "memory-leak": event("cold-storage"),
+  };
+})();
 
 /** Integrity each installation arrives with (design 5.2). */
 const INSTALL_INTEGRITY: Record<InstallationKind, number> = R.installationIntegrity;
@@ -91,16 +130,30 @@ function lead(text: string) {
 }
 
 const CHAPTER_BODIES: Record<string, () => string> = {
-  start: () => `
+  start: () => {
+    const energyRelics = ENERGY_RELICS.map(id => esc(RELICS[id].name));
+    return `
     ${lead(`Every turn you get ${strong(R.baseEnergy)} energy and draw ${strong(R.handDraw)} cards (hand limit ${R.handLimit}). You build a network between the terminals ${strong("ALPHA")} and ${strong("OMEGA")}, then press ${strong("Transmit")}: your network deals damage, and every hostile answers with the move it announced.`)}
     ${figure(loopDiagram(), "One turn. Hardware and cables stay on the table for the whole encounter; block and burst last one turn.")}
     <div class="hb-columns">
-      <section><h4>${icon("bolt", 16)} Energy & cards</h4><p>Cards cost the number in their corner. Unspent energy is lost unless a relic says otherwise. Played cards go to discard; ${strong("Exhaust")} cards leave for the rest of the encounter. When your draw pile runs out, the discard pile is shuffled back in.</p></section>
+      <section><h4>${icon("bolt", 16)} Energy & cards</h4><p>Cards cost the number in their corner. Your first route, a ${name("router")} and two ${name("fiber")}s, costs ${strong(ROUTE_COST)}: ${ROUTE_COST >= R.baseEnergy ? "your whole first turn" : "most of your first turn"}. Unspent energy is lost unless a relic says otherwise. Played cards go to discard; ${strong("Exhaust")} cards leave for the rest of the encounter; a ${strong("Daemon")} keeps running (see ${strong("Keywords & Daemons")}). When your draw pile runs out, the discard pile is shuffled back in.</p></section>
       <section><h4>${icon("eye", 16)} Everything is forecast</h4><p>Before you transmit, both plates show the exact outcome: your damage with every term and where it lands, each hostile's action and its target, and the integrity you will lose. What you see is what resolves. Open ${strong("Details")} for the full calculation.</p></section>
-      <section><h4>${icon("deck", 16)} Prepare</h4><p>Press ${strong("P")}, or click the ${strong("+ PREPARE")} slot at the bottom left beside your Draw, Discard and Exhaust piles, to set one card aside for free. It becomes the first card of your next hand, replacing a draw. Use it to hold an answer for a turn you can already see coming.</p></section>
-      <section><h4>${icon("undo", 16)} Undo & inspect</h4><p>${strong("Z")} undoes the last action this turn. Right-click any card, or press ${strong("I")}, to inspect it. Relocating a placed device costs ${strong(R.relocateCost)} energy.</p></section>
+      <section><h4>${icon("deck", 16)} Prepare</h4><p>Press ${strong("P")}, or click the ${strong("+")} plate at the bottom left beside your Draw, Discard and Exhaust piles, to set one card aside for free. It becomes the first card of your next hand, replacing a draw. Use it to hold an answer for a turn you can already see coming.</p></section>
+      <section><h4>${icon("undo", 16)} Undo & inspect</h4><p>${strong("Z")} undoes the last action this turn. Right-click any card, or press ${strong("I")}, to inspect it: keywords and edge cases are explained there. Relocating a placed device costs ${strong(R.relocateCost)} energy.</p></section>
     </div>
-    ${tip("Integrity is your life", "Integrity carries over between rooms. At zero the expedition ends. Winning a battle never heals by itself — sanctuaries, events and a few relics do.", "rule")}`,
+    <h4 class="hb-subhead">${icon("bolt", 16)} Where energy comes from</h4>
+    ${table(["Source", "Energy", "Counts toward"], [
+      ["Every turn", String(R.baseEnergy), "The turn's base"],
+      [`Energy boss relics: ${energyRelics.join(", ")}`, "+1 each", `The base, never above ${R.relicEnergyCap}`],
+      [name("poe-injector"), "+1 each, online at the start of your turn", "On top of the base, no cap"],
+      [`${name("capacitor")}, ${name("surge")}`, "as printed (next turn, or now)", "On top of the base, no cap"],
+      [esc(RELICS["reserve-cell"].name), "unspent energy carried, up to 2", "On top of the base, no cap"],
+      [esc(RELICS["cold-start"].name), "+1 on the first turn of a battle", "On top of the base"],
+    ])}
+    <p>The energy orb reads what is left over the turn's base, such as ${strong(`2/${R.baseEnergy}`)}. Energy above the base glows and shows its rise; its tooltip names every source and next turn's energy, cards and block before you transmit.</p>
+    ${tip("Twelve cards to start", `Every keeper starts with ${STARTER_DECK.length + STARTER_SIGNATURES.architect.length} cards: the shared ${STARTER_DECK.length} (${cardList(STARTER_DECK)}) and two signature cards. Your opening hand always holds a router card and two link cards, so turn one can build a route.`)}
+    ${tip("Integrity is your life", "Integrity carries over between rooms. At zero the expedition ends. Winning a battle never heals by itself — sanctuaries, events and a few relics do.", "rule")}`;
+  },
 
   routes: () => `
     ${lead(`A ${strong("route")} is a path of live cables from ALPHA to OMEGA through at least one router, and every one counts. ${strong("Every device carries one channel")}: when two routes go through the same device, they are one channel, not two. Your ${strong("primary route")} — the strongest one — carries the damage; every extra channel adds bandwidth.`)}
@@ -120,7 +173,7 @@ const CHAPTER_BODIES: Record<string, () => string> = {
       ["Burst · Buffer · Backpressure", "as shown", "This transmission"],
       ["Exposed guardian", `+${R.exposedBonus}`, "After an interrupted ultimate"],
     ])}
-    ${figure(bottleneckDiagram(), "Two routes through one switch: the ledger reads 2 routes · 1 channel, and the switch wears a brass seal.")}
+    ${figure(bottleneckDiagram(), "Two routes through one switch: ALPHA and OMEGA read 2 routes · 1 channel on hover, and the switch wears a brass seal.")}
     ${tip("Reading the table", "Each channel glows in its own colour: gold for the primary, then cyan, green, blue, silver and rose, the same colours as its delivery. A cable wound with violet fibre is amplified, whichever channel it carries. A brass seal with a number marks a device that many routes pass through. Rest the pointer on any device, cable or installation for its card.")}
     ${tip("No hidden caps", "Every switch, every channel and every balancer counts. The limits are physical: 14 sockets on the table, your energy, and what the enemy can cut.", "rule")}`,
 
@@ -205,16 +258,42 @@ const CHAPTER_BODIES: Record<string, () => string> = {
 
   tools: () => {
     const c = CONSOLES;
-    const protocols: BaseCardId[] = ["failover-policy", "port-security", "rate-limiter", "ips-signature", "quarantine-rule", "tarpit"];
+    const protocols = baseCards(id => card(id).target === "protocol");
     return `
-    ${lead(`${strong("Protocols")} are armed face-down (up to ${R.maxProtocols}) and trigger by themselves during the enemy's action when their condition happens, then go to your discard. The forecast already counts them. Because intents are visible, you can arm tomorrow's answer today.`)}
-    ${table(["Protocol", "Cost", "Trigger → effect"], protocols.map(id => [name(id), String(card(id)?.cost ?? ""), rules(id).replace(/^Arm\.\s*/, "")]))}
+    ${lead(`${strong("Protocols")} are armed face-down (up to ${R.maxProtocols}; the Warden's ${name("policy-engine")} adds slots) and trigger by themselves during the enemy's action when their condition happens, then go to your discard. The forecast already counts them. Because intents are visible, you can arm tomorrow's answer today.`)}
+    ${table(["Protocol", "Cost", "Card", "Trigger → effect"], protocols.map(id => [name(id), String(card(id).cost), ownerOf(id), rules(id).replace(/^Arm(ed)?\.\s*/, "")]))}
     <h4 class="hb-subhead">${icon("play", 16)} Console commands</h4>
     <p>Every keeper has a command beside the hand: no card needed, once per turn.</p>
     <div class="hb-console-row">
       ${(["patch", "harden", "buffer"] as ConsoleId[]).map(id => `<div class="hb-console ${id}"><span class="hb-console-cost">${c[id].cost}</span><b>${esc(c[id].name)}</b><small>${id === "patch" ? "Architect" : id === "harden" ? "Warden" : "Ghost"}</small><p>${esc(c[id].rules)}</p></div>`).join("")}
     </div>
     ${tip("Honeypot", `A cabled honeypot pulls jams, cable cuts and overloads onto itself, at most one per hostile action; each one it absorbs deals ${R.honeypotDamage} to the attacker. It works even when offline, and an installation planted within ${reach} of it arrives with ${R.honeypotBite} less integrity. (The Cable Wraith is not fooled — it hunts long cables.)`)}`;
+  },
+
+  keywords: () => {
+    const order: KeywordId[] = ["exhaust", "retain", "innate", "volatile", "armed", "daemon", "token", "curse", "unplayable"];
+    const flagged = (flag: "retain" | "innate" | "volatile") => baseCards(id => !!card(id)[flag] || !!CARDS[`${id}+` as CardId]?.[flag]);
+    const examples: Partial<Record<KeywordId, string>> = {
+      retain: flagged("retain").map(name).join(", "),
+      innate: flagged("innate").map(id => card(id).innate ? name(id) : `${name(id)}+`).join(", "),
+      volatile: flagged("volatile").map(name).join(", "),
+      daemon: `${baseCards(id => card(id).target === "daemon").length} cards, below`,
+      token: baseCards(id => !!card(id).token).map(name).join(", "),
+      curse: `${baseCards(id => !!card(id).curse).length} curses, in ${strong("Cards & Curses")}`,
+    };
+    const daemons = baseCards(id => card(id).target === "daemon");
+    const payload = card("payload");
+    return `
+    ${lead(`Card faces stay short: a capitalised ${strong("keyword")} carries a whole rule. Rest the pointer on a keyword on any card for this glossary, or inspect the card (right-click, ${strong("I")}) for its edge cases.`)}
+    <div class="hb-glossary">
+      ${order.map(id => `<div class="hb-term"><dt>${esc(KEYWORDS[id].name)}</dt><dd>${esc(KEYWORDS[id].rule)}${examples[id] ? ` <small>(${examples[id]})</small>` : ""}</dd></div>`).join("")}
+    </div>
+    <h4 class="hb-subhead">${icon("play", 16)} Daemons</h4>
+    <p>A ${strong("Daemon")} is paid once and runs for the rest of the encounter: its card leaves your hand for a ${strong("seal")} on your player plate, where each running daemon shows its copies (×2) and, on hover, what it does. It never reaches your discard pile, and every daemon stops when the encounter ends. Copies stack: two copies do the work twice. What a daemon adds to your transmission or your shield appears in the forecast as its own labelled term.</p>
+    ${table(["Daemon", "Card", "Cost", "While it runs"], daemons.map(id => [name(id), ownerOf(id), String(card(id).cost), esc(card(id).rules.replace(/^(?:(?:Daemon|Innate)\.\s*)+/, ""))]))}
+    ${tip("When a daemon pays", `At ${R.baseEnergy} energy a turn, a daemon spends a turn's worth of tempo to pay every turn after it. Play it early in a long fight, an elite or a guardian; in a short fight a block card or a burst may be worth more.`, "rule")}
+    <h4 class="hb-subhead">${icon("deck", 16)} ${esc(payload.name)} tokens</h4>
+    <p>${esc(payload.name)} is the Ghost's token: ${strong(esc(payload.rules))} It costs ${payload.cost}, is made in your hand by cards such as ${name("fork-bomb")}, ${name("shell-access")} and ${name("botnet")}, exhausts when played and never enters your deck. A full hand (${R.handLimit}) sends new tokens to the discard pile, where they come back with the next shuffle; every token leaves when the encounter ends.</p>`;
   },
 
   packs: () => {
@@ -253,7 +332,7 @@ const CHAPTER_BODIES: Record<string, () => string> = {
     ${table(["Installation", "Integrity", "Effect", "Planted"], INSTALLATION_ROWS().map(row => [row.name, row.integrity, row.effect, row.placed]))}
     <h4 class="hb-subhead">${icon("cleanse", 16)} Taking it down</h4>
     ${table(["Answer", "Cost", "What it does"], [
-      ["Scrub", scrub, `Click the installation or its ledger tag, or press S: 1 integrity per point, destroyed at 0. ${R.quarantineScrubCost} per point while a Quarantine Drone lives.`],
+      ["Scrub", scrub, `Click the installation on the table, then Scrub, or press S: 1 integrity per point, destroyed at 0. ${R.quarantineScrubCost} per point while a Quarantine Drone lives.`],
       [name("purge-field"), String(card("purge-field").cost), "Destroys every installation in the band, whatever its integrity. An Anchor takes the purge instead of its fields."],
       ["Firewall quarantine", "Free", `In the trap phase every online firewall deals ${R.quarantineDamage} to the nearest installation within ${reach} (Sentry Firewall ${R.sentryQuarantine}). Place firewalls where installations land.`],
       ["Honeypot bite", "Free", `An installation planted within ${reach} of a cabled Honeypot arrives with ${R.honeypotBite} less integrity. Taps and Breaker Charges arrive destroyed.`],
@@ -329,23 +408,39 @@ const CHAPTER_BODIES: Record<string, () => string> = {
     ${tip("The worst case", "A hidden ribbon, one announced arrival and the escalation clock. Never three unannounced problems in one fight.", "rule")}`;
   },
 
-  archetypes: () => `
+  archetypes: () => {
+    const start = (keeper: Archetype) => {
+      const a = ARCHETYPES[keeper];
+      return `<p><b>Start:</b> ${a.integrity} integrity, ${esc(RELICS[a.relic].name)}, the ${esc(CONSOLES[a.console].name)} console (${CONSOLES[a.console].cost}) and the shared ${STARTER_DECK.length} plus ${cardList(STARTER_SIGNATURES[keeper])}.</p>`;
+    };
+    const paths = (keeper: Archetype) => `
+      <h4 class="hb-subhead">${icon("crown", 16)} ${keeperName(keeper)}: three build paths</h4>
+      ${table(["Path", "What it builds", "Keeper cards (cost)", "Colorless partners"], BUILD_PATHS[keeper].map(path => [
+        esc(path.name), `${esc(path.idea)} <small>${esc(path.play)}</small>`,
+        path.cards.filter(id => CARDS[id] && !card(id).token).map(costed).join(" · "),
+        path.partners.filter(id => CARDS[id]).map(costed).join(" · "),
+      ]), "hb-playbook")}`;
+    const keeperCards = (keeper: Archetype) => baseCards(id => card(id).archetype === keeper && !card(id).token).length;
+    return `
     <div class="hb-keepers">
       <article class="hb-keeper architect"><header><h4>Architect</h4><p class="hb-motto">Make a way through</p></header><div>
-        <p><b>Engine:</b> width. Hot Swap makes your first Fiber each turn free and Patch Cable runs a cable without a card, so every router quickly becomes another channel (+${R.bandwidthPerChannel} each). Load Balancers and clusters multiply it.</p>
-        <p><b>Play:</b> open with a route, then add a channel every turn you can. Spread routers North and South for separated-circuit shield.</p>
+        <p><b>Engine:</b> width. ${esc(RELICS["hot-swap"].name)} makes the first link card each turn cost 0 and Patch Cable runs a cable without a card, so every router quickly becomes another channel (+${R.bandwidthPerChannel} each). Load Balancers and clusters multiply it.</p>
+        ${start("architect")}
         <p><b>Risk:</b> many cables — Wire Weaver punishes ${R.weaverCables}+ cables, and long spans feed the Wraith.</p></div></article>
       <article class="hb-keeper warden"><header><h4>Warden</h4><p class="hb-motto">Hold what remains</p></header><div>
-        <p><b>Engine:</b> Backpressure. Every point of damage your shield prevents is stored and added to your next transmission. Harden and stacked firewalls turn every enemy attack into your next hit.</p>
-        <p><b>Play:</b> put firewalls online early, Harden on attack turns, then release the stored damage.</p>
+        <p><b>Engine:</b> Backpressure. ${Number(R.backpressureRatio) === 1 ? "All" : "Half"} the damage your shield prevents is stored and added to your next transmission. Harden and stacked firewalls turn every enemy attack into your next hit.</p>
+        ${start("warden")}
         <p><b>Risk:</b> it only charges when the enemy attacks — fields, cuts and charges give nothing to reflect.</p></div></article>
       <article class="hb-keeper ghost"><header><h4>Ghost</h4><p class="hb-motto">Find the hidden path</p></header><div>
-        <p><b>Engine:</b> Buffer. Store a transmission at ×${R.bufferMultiplier} and release everything at once. Store and Forward and Replay Attack grow it further. It counts toward interrupting ultimates.</p>
-        <p><b>Play:</b> buffer when the enemy isn't cutting you, flush when it matters — charge turns are perfect.</p>
+        <p><b>Engine:</b> Buffer. Store a transmission at ×${R.bufferMultiplier} and release everything at once. It counts toward interrupting ultimates.</p>
+        ${start("ghost")}
         <p><b>Risk:</b> packet loss. If a turn starts with no live route, the whole buffer is lost. Buffered turns deal nothing (Packet Leech heals).</p></div></article>
     </div>
     ${figure(bufferDiagram(R.bufferMultiplier), `Ghost: a buffered 8 becomes ${Math.floor(8 * R.bufferMultiplier)}, released on top of the next transmission.`)}
-    ${tip("Archetype cards", "Some rewards belong to one keeper only — ECMP and Spine-Leaf for the Architect, Deep Packet Inspection and Reflect for the Warden, Store and Forward and Replay Attack for the Ghost.")}`,
+    ${lead(`The ${KEEPERS.map(keeperName).join(", ").replace(/, ([^,]*)$/, " and $1")} have ${KEEPERS.map(keeperCards).join(", ").replace(/, ([^,]*)$/, " and $1")} cards of their own, offered only to their keeper, in ${strong("three build paths")} each. A path has enablers that set it up and payoffs that cash it in, and shared colorless cards that feed it. Stage I finds a first piece, stage II picks a path (a boss relic's energy often helps), stage III pays it off.`)}
+    ${KEEPERS.map(paths).join("")}
+    ${tip("Keeper cards", `A reward card comes from your keeper's cards ${pct(R.keeperShare)} of the time, else from the colorless pool; the market stocks both. Paths overlap: a Mesh deck still wants a Backbone rare, and every keeper can borrow the others' tools from the colorless pool.`)}`;
+  },
 
   danger: () => `
     ${lead("When the forecast turns red, work down the list. Several answers exist for every threat; the cheapest one that fully covers it is usually right.")}
@@ -353,13 +448,14 @@ const CHAPTER_BODIES: Record<string, () => string> = {
       ["Your only route will be cut", "The marked cable on the table", `Arm ${name("failover-policy")} · cable a ${name("honeypot")} · build a second channel · ${name("armored-fiber")} · patch next turn`],
       ["A breach is coming", "Right plate · shield forecast", `Bring a firewall online (${R.firewallBreachBlock} each) · ${name("ips-signature")} · block cards · Harden`],
       ["A device will be jammed", "The marked device", `${name("port-security")} · honeypot · ${name("shield")} · relocate out of a marked band · second channel`],
-      ["A band is corrupted", "Field seals under the table", `${name("purge-field")} · move hardware out · route through another band · ${name("quarantine-rule")} before it lands`],
+      ["A band is corrupted", "The band's field drawn on the table (hover the band)", `${name("purge-field")} · move hardware out · route through another band · ${name("quarantine-rule")} before it lands`],
       ["An installation lands", `The magenta tag and its ${pipRow(2, 2, "install")} pips`, `Scrub it (${R.scrubCost} energy per point) · ${name("purge-field")} on its band · a firewall within ${reach} quarantines it for free · move its target out of the ring (${R.relocateCost})`],
       ["A Breaker Charge beside your router", "The countdown numeral and its ring", `Scrub it (${R.scrubCost}: it has ${INSTALL_INTEGRITY.breaker} integrity) · relocate the router out of the ${reach} ring (${R.relocateCost}) · ${name("demolition-charge")} · a ${name("server-rack")} in reach takes the blast`],
       ["A Jammer you cannot reach", "Its magenta ring and the jammed device", `Move its target out of the ring (${R.relocateCost}) · jam protection: ${name("shield")}, ${name("hardened-router")}, ${name("bastion")} · a cabled honeypot in reach decoys it and bites · ${name("purge-field")} on its band · a firewall within ${reach} wears it down`],
       ["A Spiteful hostile at lethal", "LETHAL with the coral SPITEFUL ribbon", `Its last announced action resolves anyway: cover it as if it lived · ${name("failover-policy")} or ${name("port-security")} cancel it · ${name("quarantine-rule")} if it is a field · kill it on a turn its action is harmless`],
       ["A device is worn", `A hollow pip ${pipRow(1, 2)} and a rust-orange nameplate`, `Repair it (${R.repairCost} energy per point) · ${name("patch")} restores ${R.faultClearRepair} · move it out of a Spike's ring · a second channel so a breakdown never silences you`],
-      ["Junk in your hand", "Grey cards", `Delete a Worm (1) before transmitting (${R.wormDamage} damage otherwise) · Packet Loss vanishes at end of turn`],
+      ["Junk in your hand", "Grey cards", `Delete a Worm (${card("worm").cost}) before transmitting (${R.wormDamage} damage otherwise) · Packet Loss vanishes at end of turn`],
+      ["A curse in your hand", "A frost-rimmed card; Backdoor and Bitrot lines under the forecast", `${name("backdoor")} costs ${card("backdoor").values.amount ?? 1} integrity and ${name("bitrot")} wears a router at the end of every turn it is held; ${name("kernel-panic")} caps your plays · remove curses at a sanctuary or market (the deck floor never blocks it) · a message's Purge takes one`],
       ["An ultimate is charging", "The guardian banner and break meter", "Prepare your biggest burst (P) · arm Tarpit · plan shield for the hit · Ghost: buffer now, flush next turn"],
       ["You are low on integrity", "“integrity at risk” on your plate", "Cover the forecast fully first · check the lethal preview — CANCELLED means you kill first · take the sanctuary's repair"],
       ["Your hand is bad", "Energy vs. options", "Use your console command · strengthen the network for later turns · Prepare the one card you need next turn · cycle with draw cards"],
@@ -381,27 +477,35 @@ const CHAPTER_BODIES: Record<string, () => string> = {
     ${tip("Armor is a question", `Iron armor absorbs ${R.gradedArmorBase} minus ${R.gradedArmorPerChannel} per channel beyond the first — width answers it, and so does one very large hit. Plating is bypassed by any online firewall.`, "rule")}`;
   },
 
-  cards: () => `
+  cards: () => {
+    const curses = baseCards(id => !!card(id).curse);
+    const [normal, elite, guardian] = (["normal", "elite", "guardian"] as const).map(kind => R.rewardRarity[kind]);
+    const split = (odds: readonly number[]) => odds.map(pct).join(" / ");
+    return `
     <div class="hb-glossary">
       ${[
-        ["Exhaust", "Removed for the rest of the encounter after you play it. Returns next battle."],
-        ["Protocol · Armed", `Played face-down into your protocol slots (max ${R.maxProtocols}). Fires automatically on its trigger during the enemy's action, then discards.`],
-        ["Burst", "Extra damage for this transmission only."],
+        ["Hardware · link · node", "Hardware deploys a device on the table; a link card cables two devices; a node card upgrades one device. They stay for the encounter."],
+        ["Instant · field", "An instant resolves at once; a field card chooses a band for a few turns."],
+        ["Protocol · Daemon", "A protocol waits armed for its trigger; a daemon runs for the rest of the encounter (see Keywords & Daemons)."],
+        ["Burst", "Extra damage for this transmission only (“+3 damage this turn”)."],
         ["Block · Shield", "Protection against the coming enemy phase, shared by every attack in it. Expires afterwards."],
-        ["Jam protection", "Faraday Shell, Hardened Router, Signal Relay and Bastion hardware cannot be jammed. Not the same as shield."],
-        ["Armored cable", "Armored Fiber, VXLAN and Dark Fiber cannot be cut."],
+        ["Jam-proof", "Faraday Shell, Hardened Router, Signal Relay and Bastion hardware cannot be jammed. Not the same as shield."],
+        ["Cut-proof", "Armored Fiber, VXLAN and Dark Fiber cannot be cut and never fray."],
         ["Upgrade (+)", "An improved version: lower cost, bigger numbers or extra draw. Upgrade at sanctuaries, markets and some events; later rewards sometimes come upgraded."],
         ["Prepare", "Hold one card for next turn for free; it replaces a draw."],
-        ["Junk", "Injected by hostiles, removed after the encounter. Packet Loss is unplayable; a Worm costs 1 to delete and bites if kept."],
+        ["Junk", "Injected by hostiles, removed after the encounter. Packet Loss is unplayable and Volatile; a Worm costs 1 to delete and bites if kept."],
         ["Condition · Wear", `Every deployed device has ${R.deviceCondition} condition (salvage ${R.salvageCondition}). Overloads and Spikes wear it; at 0 it breaks. Repair costs ${R.repairCost} energy per point.`],
         ["Installation", `A hostile permanent on your table with 1–3 integrity. Scrub costs ${R.scrubCost} energy per point.`],
         ["Encounter card", "Offered by a crate or a message. It enters your hand for this encounter only and exhausts when played."],
-        ["Curse", "A permanent unplayable card (CVE). Remove it at a sanctuary or market."],
-        ["Archetype card", "Offered only to one keeper."],
-        ["Rarity", "Common, uncommon, rare, legendary. Elites guarantee a rare choice. Rarity is power, not obligation — skipping a reward keeps your deck sharp."],
+        ["Keeper card", `Offered only to one keeper. A reward card comes from your keeper's cards ${pct(R.keeperShare)} of the time, else from the colorless pool.`],
+        ["Rarity", `Common, uncommon, rare, legendary. Card rewards roll common / uncommon / rare at ${split(normal)} after a normal fight and ${split(elite)} after an elite or event fight (its first card uncommon or better)${guardian[0] + guardian[1] > 0 ? `, and ${split(guardian)} after a guardian` : "; guardians offer rares"}. ${pct(R.legendaryShare)} of rare rolls are legendary. Rarity is power, not obligation — skipping a reward keeps your deck sharp.`],
       ].map(([term, text]) => `<div class="hb-term"><dt>${term}</dt><dd>${text}</dd></div>`).join("")}
     </div>
-    ${tip("A lean deck", "Every card you add is a card you draw less often. Skip rewards that don't fit, and remove weak basics at sanctuaries and markets.")}`,
+    <h4 class="hb-subhead">${icon("warning", 16)} Curses</h4>
+    <p>A ${strong("curse")} is the price of a deal: an unplayable card that stays in your deck until you remove it. Removing it at a sanctuary or market ignores the deck floor of ${R.deckFloor} cards, and a message's Purge takes one. The frost-rimmed ones in hand show their cost under the forecast before you transmit.</p>
+    ${table(["Curse", "Face", "The fine print", "Comes from"], curses.map(id => [name(id), esc(card(id).rules), esc((card(id).detail ?? "").replace(/\s*Remove it at a Sanctuary or Market, whatever the size of your deck\./, "")), esc(CURSE_SOURCES[id] ?? "")]), "hb-playbook")}
+    ${tip("A lean deck", `Every card you add is a card you draw less often: at ${R.handDraw} cards a turn, a ${STARTER_DECK.length + STARTER_SIGNATURES.architect.length}-card deck cycles every few turns. Skip rewards that don't fit, and remove weak basics at sanctuaries and markets (down to ${R.deckFloor} cards).`)}`;
+  },
 
   expedition: () => {
     const boss = (Object.keys(RELICS) as RelicId[]).filter(id => RELICS[id].tier === "boss");
@@ -411,15 +515,16 @@ const CHAPTER_BODIES: Record<string, () => string> = {
     <p>A pack room shows ${strong("×2")} or ${strong("×3")} beside its symbol, its members listed leader first. A designated leader carries a small diamond under its name: ${designationMark("bad", 13)} coral for a bad ribbon, ${designationMark("good", 13)} teal for a good one, ${designationMark("unknown", 13)} static while it stays hidden until you enter. Reinforcements are never on the chart.</p>
     ${table(["Room", "What happens"], [
       ["Hostile signal", `A battle. Win credits and choose one of three cards (or skip). A pack pays +${R.packCredits}, a designated hostile +${R.designationCredits}, a reinforced fight +${R.reinforcementCredits}.`],
-      ["Elite threat", "A tougher battle with a guaranteed rare card option and a relic."],
+      ["Elite threat", "A tougher battle: its first card offer is uncommon or better, and you choose a relic."],
       ["Unknown signal", "An event: a choice with a visible trade-off."],
-      ["Market", `Spend credits: cards (${CARD_PRICES.common}–${CARD_PRICES.legendary}), relics (${RELIC_PRICE.min}–${RELIC_PRICE.max}), removal (${REMOVE_PRICE.base}, +${REMOVE_PRICE.step} each time), upgrade (${UPGRADE_PRICE}).`],
+      ["Market", `Spend credits: a bench router, ${MARKET_SLOTS.length} cards (${MARKET_SLOTS.map(slot => `${slot.pool === "keeper" ? "keeper" : "colorless"} ${slot.rarity}`).join(", ")}; ${CARD_PRICES.common}–${CARD_PRICES.legendary}), relics (${RELIC_PRICE.min}–${RELIC_PRICE.max}), removal (${REMOVE_PRICE.base}, +${REMOVE_PRICE.step} each time), upgrade (${UPGRADE_PRICE}).`],
       ["Salvage cache", "Choose one of three cards, plus a few credits."],
       ["Sanctuary", `One service: repair, upgrade a card, remove a card, or salvage a relic for ${SALVAGE_COST} maximum integrity.`],
-      ["Stage guardian", "The climax. Defeat it for a card, a boss relic and a partial repair before the next stage."],
+      ["Stage guardian", `The climax. Defeat it for a card (${R.rewardRarity.guardian[0] + R.rewardRarity.guardian[1] > 0 ? "uncommon or rare" : "rare"}), a boss relic and a partial repair before the next stage.`],
     ])}
+    <p>Every card offer rolls, slot by slot, your keeper's pool (${pct(R.keeperShare)}) or the colorless pool, then a rarity, then the card. In stage II ${pct(R.upgradedOfferRate[1])} of offered cards arrive upgraded, in stage III ${pct(R.upgradedOfferRate[2])}. A deck that wins usually ends between 20 and 30 cards after a few removals; removal keeps at least ${R.deckFloor} cards, one router card and two link cards.</p>
     <h4 class="hb-subhead">${icon("crown", 16)} Boss relics</h4>
-    <p>After the first two guardians you choose a boss relic: a powerful rule with a real drawback.</p>
+    <p>After the first two guardians you choose a boss relic: a powerful rule with a real drawback. ${ENERGY_RELICS.length} of them add ${strong("+1 energy every turn")}: energy relics raise your turn's base from ${R.baseEnergy} up to ${R.relicEnergyCap}, never beyond.</p>
     <div class="hb-relics">${boss.map(id => `<div class="hb-relic" style="--relic:${RELICS[id].color}"><b>${esc(RELICS[id].name)}</b><p>${esc(RELICS[id].rules)}</p></div>`).join("")}</div>
     <h4 class="hb-subhead">${icon("elite", 16)} Ascension</h4>
     <p>Win an expedition to unlock the next ascension level for that keeper (up to ${MAX_ASCENSION}). Levels stack.</p>

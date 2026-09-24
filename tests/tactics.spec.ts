@@ -5,6 +5,7 @@ import { newExpedition, type Expedition } from "../src/core/expedition.ts";
 import { makeEnemy } from "../src/core/encounter.ts";
 import { chooseRoom, combatPreview } from "../src/core/run.ts";
 import { ENEMIES } from "../src/core/enemies.ts";
+import { RULES } from "../src/core/cards.ts";
 
 const storage = "faultline-expedition-v2";
 function fixture(id = "core", turn = 4) {
@@ -58,7 +59,7 @@ test("prepare supports keyboard, return, undo and reload without duplicating car
   const r = await saved(page);
   expect(r.preparedCard).toBeNull();
   expect(r.hand[0]).toBe("pulse");
-  expect(r.hand).toHaveLength(6);
+  expect(r.hand).toHaveLength(RULES.handDraw);
 });
 
 test("charge telegraphs the next ultimate, a prepared burst breaks it, and exposure expires", async ({ page }) => {
@@ -102,10 +103,14 @@ for (const id of ["regent", "cantor", "core"]) {
       await page.locator('[data-action="prepare"]').click();
       await expect(page.locator('[data-prepare-card="0"]')).toBeVisible();
       await page.locator('.dialog-close').click();
+      // The band plates are gone (fields are drawn on the table); the enemy plate stays clear of the
+      // pile plates and the Transmit sigil.
       const overlap = await page.evaluate(() => {
         const a = document.querySelector(".enemy-plate")!.getBoundingClientRect();
-        const b = document.querySelector(".field-strip")!.getBoundingClientRect();
-        return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+        return [".pile-cluster", ".transmit-button"].some(selector => {
+          const b = document.querySelector(selector)?.getBoundingClientRect();
+          return !!b && b.width > 0 && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+        });
       });
       expect(overlap, `${id} at ${width}`).toBe(false);
     }

@@ -80,7 +80,9 @@ test("escorts and adds get no stage threat, pressure or enrage; ascension 4 stil
   assert.equal(leader.amount, 2 + 2 + 2 + 1);
   assert.equal(leader.escalation, 3);
   r.ascension = 4;
-  assert.equal(intentFor(r, r.enemies[0]).amount, 3);
+  // Sharper Teeth reaches escorts unless RULES.ascensionAttackRoles limits it to leaders and singles.
+  const sharper = r.stage >= RULES.ascensionAttackFromStage && !RULES.ascensionAttackRoles ? RULES.ascensionAttackBonus : 0;
+  assert.equal(intentFor(r, r.enemies[0]).amount, 2 + sharper);
 });
 
 // ------------------------------------------------------------------ deliveries, the target, merge, armor, overflow
@@ -459,7 +461,8 @@ test("Harden gains block per hostile beyond the first and per guardian add; one 
   const blockBefore = guardian.block;
   assert.ok(useConsole(guardian).ok);
   assert.equal(guardian.block - blockBefore, hardenBlock(guardian), "the console grants exactly the preview");
-  assert.match(CONSOLES.harden.rules, new RegExp(`\\+${RULES.hardenPerHostile} per hostile on the field beyond the first`));
+  if (RULES.hardenPerHostile) assert.match(CONSOLES.harden.rules, new RegExp(`\\+${RULES.hardenPerHostile} per hostile on the field beyond the first`));
+  else assert.doesNotMatch(CONSOLES.harden.rules, /per hostile/, "at 0 the console names no per-hostile bonus");
   // Off by its keys: the design's Harden everywhere.
   const saved = { perHostile: RULES.hardenPerHostile, perAdd: RULES.hardenPerAdd };
   const rules = RULES as unknown as Record<string, number>;

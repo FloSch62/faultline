@@ -112,11 +112,14 @@ export function connectsTo(from: MapRoom, to: MapRoom): boolean {
 
 /** Hostile integrity for a room: the single hostile's health, which a pack shares out
  * (planEncounter). Pass the expedition's ascension to include its health rules.
- * Signal in the Static ("event" rooms) fights at RULES.eventHealthScale of a normal room. */
+ * Signal in the Static ("event" rooms) fights at RULES.eventHealthScale of a normal room.
+ * v5: the formulas are RULES keys, read live (the balance probe's --rule reaches them):
+ * normalHealth / eliteHealth [base, per floor, per stage] and guardianHealth per stage. */
 export function encounterHealth(stage: number, room: MapRoom, ascension = 0): number {
-  const base = room.type === "boss" ? STAGES[stage].bossHp
-    : room.type === "elite" ? 30 + room.floor * 2 + stage * 10
-    : 16 + room.floor * 5 + stage * 13;
+  const formula = (key: readonly number[]) => key[0] + room.floor * key[1] + stage * key[2];
+  const base = room.type === "boss" ? RULES.guardianHealth[Math.max(0, Math.min(STAGES.length - 1, stage))]
+    : room.type === "elite" ? formula(RULES.eliteHealth)
+    : formula(RULES.normalHealth);
   const health = Math.round(base * healthMultiplier(room.type, ascension));
   return room.type === "event" ? Math.round(health * RULES.eventHealthScale) : health;
 }
@@ -133,7 +136,7 @@ export function reachableRooms(run: RunState): MapRoom[] {
 export function packChance(stage: number, floor: number, ascension = 0): number {
   const base = RULES.packRate[stage] ?? 0;
   if (base <= 0 || (stage === 0 && floor < RULES.packFromFloor)) return 0;
-  return Math.min(1, base + (ascends(ascension, 9) ? RULES.packRateAscensionBonus : 0));
+  return Math.min(1, base + (ascends(ascension, "lingeringCorruption") ? RULES.packRateAscensionBonus : 0));
 }
 
 /** Chance that a room's leader or single hostile carries a designation (rule 66). */
@@ -217,8 +220,8 @@ export function rollRoomContents(random: () => number, stage: number, room: MapR
   // repeat, never Stoked with Shedding, never a second good one, and ignores the A0 budget.
   // The rates are RULES.eliteSecondDesignation / normalSecondDesignation; a sure elite draws nothing.
   const eliteRate = RULES.eliteSecondDesignation;
-  const second = (elite && ascends(ascension, 7) && (eliteRate >= 1 || random() < eliteRate))
-    || (!elite && ascends(ascension, 10) && random() < chance * RULES.normalSecondDesignation);
+  const second = (elite && ascends(ascension, "eliteSecondDesignation") && (eliteRate >= 1 || random() < eliteRate))
+    || (!elite && ascends(ascension, "lastSignal") && random() < chance * RULES.normalSecondDesignation);
   if (second) {
     const pick = weightedDesignation(random, eligible.filter(id => designationsCompatible(first, id)));
     if (pick) designations.push(pick);

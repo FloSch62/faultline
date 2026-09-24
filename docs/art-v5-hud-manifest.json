@@ -1,0 +1,86 @@
+{
+  "description": "FAULTLINE v5 HUD art: the energy sigil behind the battle's energy reading. Local Krea 2 Turbo through ComfyUI with the card recipe, but square and anchored on the game's own painted brass dial (public/art/transmit-dial.png) instead of a card. Generated with scripts/generate_card_art.py --manifest docs/art-v5-hud-manifest.json; the chosen PNG is masked to its circle and exported as public/art/ui/<id>.webp (RGBA).",
+  "local": {
+    "model": "Krea-2-Turbo",
+    "diffusionModel": "krea2_turbo_fp8_scaled.safetensors",
+    "textEncoder": "qwen3vl_4b_fp8_scaled.safetensors",
+    "vae": "qwen_image_vae.safetensors",
+    "width": 1024,
+    "height": 1024,
+    "steps": 8,
+    "cfg": 1,
+    "sampler": "euler",
+    "scheduler": "simple",
+    "runtime": "ComfyUI",
+    "styleReference": {
+      "source": "public/art/transmit-dial.png",
+      "note": "composited on #080b10 and resized to 1024 x 1024",
+      "inputName": "faultline-hud-dial.png",
+      "lora": "krea2_style_reference.safetensors",
+      "strength": 0.6
+    }
+  },
+  "cards": [
+    {
+      "id": "energy-sigil",
+      "name": "Energy sigil",
+      "use": "The battle HUD's energy orb (three-energy.css --orb-art): current energy, /base and the rise tag read over its face.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924101,
+      "prompt": "A single circular energy sigil seen straight from above, perfectly centred and symmetrical, filling the whole square frame on a plain black background, matching the painted brass look of the reference dial. A thick ring of engraved tarnished brass with chipped ivory inlays, fine etched rune bands and rivets, and four small glowing amber gem studs at north, east, south and west, each with a short brass spike pointing outward. Inside the ring a wide round face of smoked dark glass over deep indigo-black, softly lit by a warm amber glow rising from the centre; the face is plain, empty and uncluttered and fills the inner sixty percent of the sigil so a number can be read over it. Rich layered oil-paint brushwork, worn engineered machinery, deep shadows and expressive warm gold light, crisp readable silhouette at small size. Flat top-down game interface emblem. No text, numbers, letters, labels, hands, people, scenery or border.",
+      "file": "public/art/ui/energy-sigil.webp",
+      "candidates": [
+        260924101,
+        260924102,
+        260924103,
+        260924104
+      ],
+      "rejected": [
+        {
+          "seed": 260924102,
+          "reason": "used for the Transmit sigil (recoloured teal), not for energy"
+        },
+        {
+          "seed": 260924103,
+          "reason": "mottled face fights the numbers"
+        },
+        {
+          "seed": 260924104,
+          "reason": "eight spikes read busy at 72-112 px"
+        }
+      ],
+      "export": {
+        "from": "energy-sigil@260924101.png (1024 x 1024)",
+        "mask": "filled circle to 0.425 of the width, plus everything brighter than the black ground out to 0.5 (ring, spikes, gems), feathered 1.2 px",
+        "size": [
+          320,
+          320
+        ],
+        "format": "webp (RGBA)",
+        "quality": 90,
+        "sha256": "88ff128960b00b1aeb8729a2b7da0eb47db21b0805f633c6cd18d82c981dea20"
+      }
+    },
+    {
+      "id": "transmit-sigil",
+      "name": "Transmit sigil",
+      "use": "The Transmit dial (battle.css .transmit-dial): the energy sigil's twin, same diameter; the armed protocols sit in its four studs.",
+      "engine": "local-krea-2-turbo",
+      "derivedFrom": "energy-sigil",
+      "seed": 260924102,
+      "prompt": "A single circular energy sigil seen straight from above, perfectly centred and symmetrical, filling the whole square frame on a plain black background, matching the painted brass look of the reference dial. A thick ring of engraved tarnished brass with chipped ivory inlays, fine etched rune bands and rivets, and four small glowing amber gem studs at north, east, south and west, each with a short brass spike pointing outward. Inside the ring a wide round face of smoked dark glass over deep indigo-black, softly lit by a warm amber glow rising from the centre; the face is plain, empty and uncluttered and fills the inner sixty percent of the sigil so a number can be read over it. Rich layered oil-paint brushwork, worn engineered machinery, deep shadows and expressive warm gold light, crisp readable silhouette at small size. Flat top-down game interface emblem. No text, numbers, letters, labels, hands, people, scenery or border.",
+      "file": "public/art/ui/transmit-sigil.webp",
+      "postprocess": "The orange gems (discs of 0.03 of the width at 0.386 from the centre) and the face's orange glow (inside 0.352) recoloured to hue 184 (the game's signal teal), saturation x0.9, feathered 1.5 px; then the energy sigil's mask and export.",
+      "export": {
+        "from": "energy-sigil@260924102.png (1024 x 1024)",
+        "size": [
+          320,
+          320
+        ],
+        "format": "webp (RGBA)",
+        "quality": 90,
+        "sha256": "0f4a5ea1777d9195732fe1e4bf5cdd65d2c60438d8b43fa36705b5d588469653"
+      }
+    }
+  ]
+}

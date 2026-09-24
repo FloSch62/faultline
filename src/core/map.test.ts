@@ -10,6 +10,7 @@ import { planEncounter, roomScout } from "./encounter.ts";
 import { DESIGNATIONS, ENEMIES, PACKS, designationsCompatible, eligibleDesignations } from "./enemies.ts";
 import { STAGES } from "./stages.ts";
 import { RULES } from "./cards.ts";
+import { ASCENSION_RULES } from "./ascension.ts";
 import type { MapRoom, RunState } from "./types.ts";
 
 /** Every path from the first floor to the guardian, as room lists. */
@@ -148,16 +149,17 @@ test("pack and designation rolls follow the stage rates, the hidden share and th
   assert.equal(three.eliteDesignated, three.elites, "every stage III elite carries a designation");
   assert.ok(two.good / two.ribbons > 0.25, "heavy packs fall back to cargo");
   assert.equal(one.second + one.eliteSecond + two.second + three.second, 0, "one designation at ascension 0");
-  // Ascension 9: +15 points of packs. Ascension 7: elites may carry two (RULES.eliteSecondDesignation).
-  // Ascension 10: normals may (RULES.normalSecondDesignation of the stage's chance).
-  const nine = count(1, 9, 300);
-  near(nine.packs / nine.normal, RULES.packRate[1] + RULES.packRateAscensionBonus, 0.05, "ascension 9 packs");
-  const seven = count(2, 7, 200);
-  near(seven.eliteSecond / seven.elites, RULES.eliteSecondDesignation, 0.06, "ascension 7: stage III elites carry two at the rate");
-  assert.equal(seven.second, 0, "ascension 7 leaves normals alone");
-  const ten = count(2, 10, 200);
-  assert.ok(ten.second > 0 && ten.second < ten.designated, "ascension 10: some normals carry two");
-  for (let seed = 1; seed <= 200; seed++) for (const room of createMap(2, seed, 10)) if (room.designations?.length === 2) {
+  // Sharper Teeth: +15 points of packs and elites may carry two (RULES.eliteSecondDesignation).
+  // The Last Signal: normals may too (RULES.normalSecondDesignation of the stage's chance).
+  const teeth = ASCENSION_RULES.lingeringCorruption;
+  const nine = count(1, teeth, 300);
+  near(nine.packs / nine.normal, RULES.packRate[1] + RULES.packRateAscensionBonus, 0.05, "Sharper Teeth packs");
+  const seven = count(2, ASCENSION_RULES.eliteSecondDesignation, 200);
+  near(seven.eliteSecond / seven.elites, RULES.eliteSecondDesignation, 0.06, "Sharper Teeth: stage III elites carry two at the rate");
+  assert.equal(seven.second, 0, "Sharper Teeth leaves normals alone");
+  const ten = count(2, ASCENSION_RULES.lastSignal, 200);
+  assert.ok(ten.second > 0 && ten.second < ten.designated, "The Last Signal: some normals carry two");
+  for (let seed = 1; seed <= 200; seed++) for (const room of createMap(2, seed, ASCENSION_RULES.lastSignal)) if (room.designations?.length === 2) {
     const [a, b] = room.designations;
     assert.ok(designationsCompatible(a, b), `${a} + ${b}`);
     assert.ok(DESIGNATIONS[a].kind === "bad" || DESIGNATIONS[b].kind === "bad", "never two good ones");
@@ -234,17 +236,31 @@ test("ascension raises hostile integrity by room type and is shown by the same h
   const elite = { ...battle, type: "elite" } as MapRoom;
   const boss = { ...battle, id: "6-1", floor: 6, type: "boss" } as MapRoom;
   const event = { ...battle, type: "event" } as MapRoom;
-  assert.equal(encounterHealth(0, battle, 0), 21);
-  assert.equal(encounterHealth(0, battle, 1), 21);
-  assert.equal(encounterHealth(0, battle, 2), Math.round(21 * 1.1));
-  assert.equal(encounterHealth(0, elite, 0), 32);
-  assert.equal(encounterHealth(0, elite, 1), Math.round(32 * 1.15));
-  assert.equal(encounterHealth(0, boss, 5), STAGES[0].bossHp);
-  assert.equal(encounterHealth(0, boss, 6), Math.round(STAGES[0].bossHp * 1.15));
-  assert.equal(encounterHealth(0, event, 2), Math.round(Math.round(21 * 1.1) * RULES.eventHealthScale), "Signal in the Static: normal health × 1.4");
-  const run = planner(0, 77, [], 6);
-  assert.equal(planEncounter(run, { ...boss, enemyId: "regent" }).enemies[0].maxHp, encounterHealth(0, boss, 6));
+  // v5: the formulas are RULES keys (base, per floor, per stage).
+  const normal = RULES.normalHealth[0] + RULES.normalHealth[1];
+  const hardened = RULES.eliteHealth[0] + RULES.eliteHealth[1];
+  const { stubbornSignals, hardenedElites, ancientGuardians } = ASCENSION_RULES;
+  assert.equal(encounterHealth(0, battle, 0), normal);
+  assert.equal(encounterHealth(0, battle, stubbornSignals - 1), normal);
+  assert.equal(encounterHealth(0, battle, stubbornSignals), Math.round(normal * RULES.ascensionNormalHealth));
+  assert.equal(encounterHealth(0, elite, hardenedElites - 1), hardened);
+  assert.equal(encounterHealth(0, elite, hardenedElites), Math.round(hardened * RULES.ascensionEliteHealth));
+  assert.equal(encounterHealth(0, boss, ancientGuardians - 1), RULES.guardianHealth[0]);
+  assert.equal(encounterHealth(0, boss, ancientGuardians), Math.round(RULES.guardianHealth[0] * RULES.ascensionGuardianHealth));
+  assert.equal(encounterHealth(1, boss, 0), RULES.guardianHealth[1]);
+  assert.equal(encounterHealth(0, event, stubbornSignals), Math.round(Math.round(normal * RULES.ascensionNormalHealth) * RULES.eventHealthScale), "Signal in the Static: normal health × the event scale");
+  const run = planner(0, 77, [], ancientGuardians);
+  assert.equal(planEncounter(run, { ...boss, enemyId: "regent" }).enemies[0].maxHp, encounterHealth(0, boss, ancientGuardians));
   assert.ok(ENEMIES.regent.boss);
+  // The balance probe's --rule reaches the formula live.
+  const rules = RULES as unknown as Record<string, number[]>;
+  const saved = rules.normalHealth;
+  try {
+    rules.normalHealth = [10, 0, 0];
+    assert.equal(encounterHealth(2, { ...battle, floor: 5 }, 0), 10);
+  } finally {
+    rules.normalHealth = saved;
+  }
 });
 
 test("route legality follows the drawn exits", () => {

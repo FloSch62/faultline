@@ -19,6 +19,7 @@ import {
 } from "./run.ts";
 import { canLink, paths } from "./graph.ts";
 import { combatPreview, RULES } from "./run.ts";
+import { CARDS } from "./cards.ts";
 import { topologyYaml } from "./export.ts";
 
 function firstBattle() {
@@ -115,10 +116,10 @@ test("relics are unique and affect battle resources", () => {
   assert.equal(run.relics.includes("cold-start"), true);
   assert.equal(run.phase, "map");
   assert.equal(chooseRoom(run, reachableRooms(run)[0].id).ok, true);
-  assert.equal(run.energy, 6);
+  assert.equal(run.energy, RULES.baseEnergy + 1);
 });
 
-test("Hot Swap discounts only the first fiber, and Hot Patch restores a severed route", () => {
+test("Hot Swap discounts only the first link card, and Hot Patch restores a severed route", () => {
   const run = firstBattle();
   run.relics.push("hot-swap");
   run.hand = ["fiber", "fiber", "patch"];
@@ -127,7 +128,7 @@ test("Hot Swap discounts only the first fiber, and Hot Patch restores a severed 
   run.topology.links.push({ a: "alpha", b: "router1" });
   assert.equal(costFor(run, 0), 0);
   assert.equal(playLink(run, 0, "router1", "omega").ok, true);
-  assert.equal(run.energy, 5);
+  assert.equal(run.energy, RULES.baseEnergy);
   assert.equal(costFor(run, 0), 1);
   run.faultLinks = ["alpha::router1"];
   assert.equal(playInstant(run, run.hand.indexOf("patch")).ok, true);
@@ -199,13 +200,13 @@ test("export assigns one interface per link endpoint and rejects duplicates", ()
   assert.match(yaml, /"router1:e1-2", "omega:eth1"/);
 });
 
-test("Containerlab deploys an overclocked live route for three energy", () => {
+test("Containerlab deploys an overclocked live route for its cost", () => {
   const run = firstBattle();
   assert.ok(!run.deck.includes("containerlab"));
   assert.ok(!run.deck.includes("clabernetes"));
   run.hand = ["containerlab"];
   assert.equal(playInstant(run, run.hand.indexOf("containerlab")).ok, true);
-  assert.equal(run.energy, 2);
+  assert.equal(run.energy, RULES.baseEnergy - CARDS.containerlab.cost);
   assert.equal(run.topology.nodes.length, 3);
   assert.equal(
     run.topology.nodes.find((n) => n.id === "router1")?.upgraded,
@@ -218,6 +219,7 @@ test("Containerlab deploys an overclocked live route for three energy", () => {
 test("Clabernetes preserves overclock and links, shields both routers, and survives a sever", () => {
   const run = firstBattle();
   run.hand = ["containerlab", "clabernetes"];
+  run.energy = CARDS.containerlab.cost + CARDS.clabernetes.cost;
   playInstant(run, 0);
   assert.equal(playNode(run, 0, "router1").ok, true);
   assert.equal(run.energy, 0);

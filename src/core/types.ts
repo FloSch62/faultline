@@ -17,88 +17,66 @@ export type Role =
   | "phantom";
 export type Archetype = "architect" | "warden" | "ghost";
 export type ConsoleId = "patch" | "harden" | "buffer";
-export type BaseCardId =
-  | "router"
-  | "switch"
-  | "firewall"
-  | "fiber"
-  | "crosslink"
-  | "shield"
-  | "patch"
-  | "surge"
-  | "firmware"
-  | "containerlab"
-  | "clabernetes"
-  | "guard"
-  | "pulse"
-  | "diagnostic"
-  | "reroute"
-  | "barrier"
-  | "capacitor"
-  | "relay"
-  | "hardened-router"
-  | "bastion"
-  | "duplex"
-  | "armored-fiber"
-  | "conduit"
-  | "salvage"
-  | "rebuild"
-  | "mirror"
-  | "zero-day"
-  | "compression"
-  | "emergency"
-  | "protocol"
-  | "startup-config"
-  | "linux-bridge"
-  | "vxlan"
-  | "inspect"
-  | "wireshark"
-  | "resonance-field"
-  | "aegis-field"
-  | "purge-field"
-  | "null-field"
-  // v3 devices
-  | "honeypot"
-  | "cache-server"
-  | "poe-injector"
-  | "load-balancer"
-  // v3 protocols (armed triggers)
-  | "failover-policy"
-  | "port-security"
-  | "rate-limiter"
-  | "ips-signature"
-  | "quarantine-rule"
-  | "tarpit"
-  // v3 archetype cards
-  | "ecmp"
-  | "spine-leaf"
-  | "mesh-weave"
-  | "deep-inspection"
-  | "stateful-firewall"
-  | "reflect"
-  | "store-forward"
-  | "replay-attack"
-  | "dark-fiber"
-  // v3 junk (encounter only) and curses (permanent)
-  | "packet-loss"
-  | "worm"
-  | "cve"
-  // v4 (Under Quarantine): packs and ports
-  | "broadcast-storm"
-  | "traffic-shaping"
-  | "flood-fill"
-  | "bulkhead"
-  | "spearhead"
-  | "packet-storm"
-  | "quorum"
-  // v4: the table front
-  | "server-rack"
-  | "redundant-psu"
-  | "sentry-firewall"
-  | "demolition-charge"
-  | "field-repair"
-  | "rapid-redeploy"
-  | "phantom-node";
+// ---------------------------------------------------------------- card ids (v5 · Three Energy)
+// Every card id of the v5 contract, per owner. The card data files (src/core/cards/*.ts) are typed
+// against these lists, so a phase C agent only adds definitions; nobody edits the unions again.
+
+/** Colorless: the shared pool every keeper can be offered (contract section 7). */
+export const COLORLESS_CARD_IDS = [
+  // fields
+  "resonance-field", "aegis-field", "purge-field", "null-field",
+  // hardware
+  "router", "switch", "firewall", "honeypot", "cache-server", "poe-injector", "load-balancer", "relay",
+  "hardened-router", "linux-bridge", "server-rack",
+  // cables
+  "fiber", "crosslink", "duplex", "armored-fiber", "conduit", "vxlan",
+  // node upgrades
+  "shield", "firmware", "compression", "startup-config", "clabernetes", "redundant-psu",
+  // instants
+  "patch", "surge", "containerlab", "guard", "pulse", "diagnostic", "reroute", "barrier", "capacitor", "salvage",
+  "rebuild", "zero-day", "emergency", "protocol", "inspect", "wireshark", "broadcast-storm", "traffic-shaping",
+  "packet-storm", "quorum", "demolition-charge", "field-repair",
+  // protocols
+  "failover-policy", "port-security", "rate-limiter", "ips-signature", "quarantine-rule", "tarpit",
+  // v5 new colorless (phase C: colorless agent; keepalive is the engine's worked example)
+  "ping", "hotfix", "keepalive", "rollback", "firmware-update",
+] as const;
+/** Curses (permanent, section 8) and junk (encounter clutter a hostile injects). */
+export const CURSE_CARD_IDS = [
+  "cve", "packet-loss", "worm",
+  // v5 new curses (phase C: colorless agent)
+  "zombie-process", "kernel-panic", "backdoor", "bitrot", "memory-leak",
+] as const;
+/** The Architect's cards (section 9.1). */
+export const ARCHITECT_CARD_IDS = [
+  "branch-line", "patch-panel", "redundant-paths", "standby-router", "ecmp", "flood-fill", "mirror", "mesh-weave",
+  "peering-session", "spine-leaf", "fabric-controller", "trunk-line", "splice", "traceroute", "deep-buffers",
+  "line-rate", "carrier-grade", "rack-and-stack", "blueprint", "rapid-redeploy", "provisioning-script", "zero-touch",
+  "datacenter",
+] as const;
+/** The Warden's cards (section 9.2). */
+export const WARDEN_CARD_IDS = [
+  "deep-inspection", "brace", "pushback", "stand-firm", "vent", "double-shift", "entrench", "persistent-state",
+  "flow-control", "reflect", "acl-gate", "stateful-firewall", "sentry-firewall", "bulkhead", "perimeter", "bastion",
+  "defense-in-depth", "tripwire", "policy-engine", "rearm", "incident-response", "null-route", "hardening-guide",
+] as const;
+/** The Ghost's cards (section 9.3), the Payload token included. */
+export const GHOST_CARD_IDS = [
+  "store-forward", "jitter-buffer", "hold-queue", "flush", "spearhead", "trickle", "replay-attack", "deep-queue",
+  "exfiltrate", "spoof", "phantom-node", "dark-fiber", "decoy-swarm", "ghost-protocol", "obfuscation", "fork-bomb",
+  "shell-access", "side-channel", "payload", "exploit-kit", "botnet", "cover-tracks", "man-in-the-middle",
+] as const;
+export type ColorlessCardId = (typeof COLORLESS_CARD_IDS)[number];
+export type CurseCardId = (typeof CURSE_CARD_IDS)[number];
+export type ArchitectCardId = (typeof ARCHITECT_CARD_IDS)[number];
+export type WardenCardId = (typeof WARDEN_CARD_IDS)[number];
+export type GhostCardId = (typeof GHOST_CARD_IDS)[number];
+export type BaseCardId = ColorlessCardId | CurseCardId | ArchitectCardId | WardenCardId | GhostCardId;
+/** Who owns a card's data and effects file. */
+export type CardOwner = "colorless" | "curses" | "architect" | "warden" | "ghost";
+export const CARD_IDS_BY_OWNER: Record<CardOwner, readonly BaseCardId[]> = {
+  colorless: COLORLESS_CARD_IDS, curses: CURSE_CARD_IDS, architect: ARCHITECT_CARD_IDS, warden: WARDEN_CARD_IDS, ghost: GHOST_CARD_IDS,
+};
 /** Upgraded cards carry a "+" suffix, e.g. "router+". CARDS has an entry for both. */
 export type CardId = BaseCardId | `${BaseCardId}+`;
 export type RelicId =
@@ -135,7 +113,11 @@ export type RelicId =
   | "bill-of-lading"
   // v4 boss relics
   | "storm-control"
-  | "scorched-earth";
+  | "scorched-earth"
+  // v5 boss relics (+1 energy each, capped by RULES.relicEnergyCap)
+  | "air-gap"
+  | "legacy-mainframe"
+  | "overvolt";
 export type Zone = "north" | "center" | "south";
 export type ZoneEffectKind = "resonance" | "aegis" | "stasis" | "corrosion" | "suppression";
 export interface ZoneEffect {
@@ -265,12 +247,6 @@ export interface SignalState {
   text?: string;
   /** COLD START with no salvage device on the table: the role that lands at `socket`. */
   role?: Role;
-}
-/** Kept for the v3 → v4 save migration only. */
-export interface LegacyMalware {
-  id: string;
-  x: number;
-  z: number;
 }
 /** Per-encounter battlefield layout, generated from seed + stage + room. */
 export interface Terrain {
@@ -422,6 +398,8 @@ export interface RunState {
   nextNodeId: number;
   cardRewards: CardId[];
   relicRewards: RelicId[];
+  /** v5: a link card was played this turn, so Hot Swap ("the first link card you play each turn
+   * costs 0") is spent. The name is kept from v4, when Hot Swap applied to Optic Fiber only. */
   firstFiberPlayed: boolean;
   shieldArrayUsed: boolean;
   log: string[];
@@ -484,6 +462,17 @@ export interface RunState {
   attackers?: string[];
   /** Entrance lines of this encounter (revealed designation, reinforcement warning). */
   entrance?: string[];
+  // ---- v5 · Three Energy ----
+  /** Daemon cards running this encounter, in play order (copies stack: each copy adds its effect).
+   * A played daemon never goes to discard; the list is cleared at encounter start and end. */
+  daemons: CardId[];
+  /** Gains waiting for the next player turn (Brace, …); cleared when that turn begins. Next-turn
+   * energy keeps using `reserveEnergy`. */
+  nextTurn?: NextTurnGains;
+}
+export interface NextTurnGains {
+  block?: number;
+  draw?: number;
 }
 
 /** One-turn modifiers from cards; reset when the turn ends. */
@@ -496,8 +485,31 @@ export interface TurnEffects {
   spearhead?: boolean;
   /** Bulkhead: every online firewall blocks this much more against each attack this enemy phase. */
   firewallBonus?: number;
-  /** Rapid Redeploy: hand cards (by id) that cost 1 less this turn. */
+  /** Rapid Redeploy, Blueprint: hand cards (by id) that cost 1 less this turn. */
   discounted?: CardId[];
+  /** Hand cards (by id) that cost 0 this turn (Rearm). */
+  freeCards?: CardId[];
+  // ---- v5 · Three Energy
+  /** Cards played this turn, in order (Rollback, Side Channel); RunState.cardsPlayed is their count. */
+  cardsPlayed?: CardId[];
+  /** The next N link cards played this turn cost 0 (Patch Panel). */
+  freeLinks?: number;
+  /** The next hardware (ground) card played this turn costs this much less (Rack and Stack). */
+  hardwareDiscount?: number;
+  /** The next N jams or cuts this enemy phase miss (Spoof): absorbed in the answer order after
+   * protocols, before Phantom Nodes, like a phantom without a device. */
+  misses?: number;
+  /** The first N strikes or breaches this enemy phase deal 0 (Ghost Protocol), in port order. */
+  dodges?: number;
+  /** Every card played this turn adds this much to the buffer (Man-in-the-Middle). */
+  mitm?: number;
+  /** Names of the cards that granted misses and dodges, in grant order (forecast labels). */
+  missSources?: string[];
+  dodgeSources?: string[];
+  /** Payload tokens played this turn and the damage they printed (the resolver adds the
+   * payloadBonus daemon hook per Payload, as labelled terms). */
+  payloads?: number;
+  payloadDamage?: number;
 }
 
 // ---------------------------------------------------------------- intents (v4)

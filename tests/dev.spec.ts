@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 import { expect, test, STORAGE, SETTINGS, PREFERENCES } from "./helpers.ts";
 import { newExpedition, type Expedition } from "../src/core/expedition.ts";
 import { DEV_STORAGE } from "../src/dev/sandbox.ts";
+import { MAX_ASCENSION } from "../src/core/ascension.ts";
 
 const normal = newExpedition("ghost", 7429);
 const records = '[{"seed":123,"archetype":"ghost","won":true,"score":4000,"floor":21,"at":1}]';
@@ -28,6 +29,8 @@ async function scenario(page: Page, id: string, channels: number) {
 }
 
 test("/dev boots directly and every channel scenario explains the engine's live count", async ({ page }) => {
+  // Ten scenarios, each loaded and checked through the real panel: long under a full parallel suite.
+  test.setTimeout(120_000);
   await openDev(page, false);
   const examples: [string, number][] = [["single", 1], ["parallel", 2], ["triple", 3], ["shared-router", 1], ["shared-firewall", 1], ["crosslink", 2], ["dead-end", 1], ["no-router", 0], ["cut", 1], ["empty", 0]];
   for (const [id, count] of examples) {
@@ -80,12 +83,12 @@ test("any stage, keeper and ascension are selectable; skipping a final guardian 
   await page.getByLabel("Sector", { exact: true }).selectOption("6");
   await page.getByLabel("Room", { exact: true }).selectOption("boss");
   await page.getByLabel("Keeper", { exact: true }).selectOption("warden");
-  await page.getByLabel("Ascension", { exact: true }).selectOption("10");
+  await page.getByLabel("Ascension", { exact: true }).selectOption(String(MAX_ASCENSION));
   await page.getByRole("button", { name: "Enter selected room", exact: true }).click();
   const e = await state(page);
   expect(e.run.stage).toBe(2);
   expect(e.run.enemies[0].id).toBe("core");
-  expect(e.run.ascension).toBe(10);
+  expect(e.run.ascension).toBe(MAX_ASCENSION);
   expect(e.archetype).toBe("warden");
   await expect(page.locator(".game-root")).toHaveAttribute("data-stage", "3");
   await tab(page, "Cheats");

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { newExpedition, parseExpedition } from "./expedition.ts";
+import { EXPEDITION_VERSION, newExpedition, parseExpedition } from "./expedition.ts";
 import { createMap } from "./map.ts";
 import { CARDS, RELICS, baseCard, isUpgraded } from "./cards.ts";
 import {
@@ -158,7 +158,7 @@ test("caches grant credits and a card choice; rewards respect the archetype and 
       const run = enter(fresh(archetype, seed), "elite");
       const offers = cardRewards(run);
       assert.equal(new Set(offers.map(baseCard)).size, 3, "no duplicate offers");
-      assert.equal(CARDS[offers[0]].rarity, "rare", "elite first slot is rare");
+      assert.notEqual(CARDS[offers[0]].rarity, "common", "an elite's first slot is uncommon or better");
       for (const id of offers) {
         const card = CARDS[id];
         assert.ok(!card.junk && !card.curse && card.rarity !== "basic", `${id} is offerable`);
@@ -279,7 +279,7 @@ test("the market sells priced cards and relics, and removes or upgrades once per
   assert.ok(shopUpgradeCard(r, router).ok);
   assert.equal(r.deck[router], "router+");
   assert.equal(shopUpgradeCard(r, r.deck.indexOf("pulse")).ok, false, "one upgrade per visit");
-  assert.ok(parseExpedition(JSON.stringify({ version: 4, run: r, archetype: "architect", daily: false, startedAt: 1, recorded: false })));
+  assert.ok(parseExpedition(JSON.stringify({ version: EXPEDITION_VERSION, run: r, archetype: "architect", daily: false, startedAt: 1, recorded: false })));
   assert.ok(leaveShop(r).ok);
   assert.equal(r.phase, "map");
   assert.equal(r.shop, null);

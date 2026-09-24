@@ -7,6 +7,7 @@ import { disjointPair, maximumChannels, mergePoints, routes as enumerateRoutes, 
 import { frayedLinks } from "../terrain.ts";
 import type { NetworkNode, RunState, Zone } from "../types.ts";
 import { ZONES, fieldBands, has, zoneForNode } from "./board.ts";
+import { daemonRouteTerms, daemonTotal, hasRouteTerms } from "../effects/index.ts";
 
 export interface ScoredRoute extends Route {
   score: number;
@@ -25,10 +26,11 @@ export interface Network {
   separated: boolean;
 }
 
-/** Route contribution of one device on the primary route (switches, configured and overclocked routers). */
-export function contributionOf(run: RunState, node: NetworkNode): number {
+/** Route contribution of one device on the primary route (switches, configured and overclocked
+ * routers; v5: switchBonus daemons such as Deep Buffers). */
+export function contributionOf(run: RunState, node: NetworkNode, switchBonus = daemonTotal(run, "switchBonus")): number {
   const lens = has(run, "packet-lens");
-  return (node.role === "switch" ? (lens ? RULES.packetLensSwitchDamage : RULES.switchDamage) + (node.amplified ? RULES.compressionDamage : 0) : 0) +
+  return (node.role === "switch" ? (lens ? RULES.packetLensSwitchDamage : RULES.switchDamage) + (node.amplified ? RULES.compressionDamage : 0) + switchBonus : 0) +
     (node.role === "router" ? (node.configured ? RULES.configuredDamage : 0) + (node.upgraded ? RULES.overclockDamage : 0) : 0);
 }
 
@@ -39,7 +41,11 @@ export function analyze(run: RunState, faultNodes: readonly string[], faultLinks
   for (const key of run.frayedByCut ?? []) frayed.add(key);
   const all = enumerateRoutes(run.topology, new Set(faultNodes), new Set(faultLinks), frayed);
   const zoneBit: Record<Zone, number> = { north: 1, center: 2, south: 4 };
-  const contribution = nodes.map(node => contributionOf(run, node));
+  const switchBonus = run.daemons?.length ? daemonTotal(run, "switchBonus") : 0;
+  const contribution = nodes.map(node => contributionOf(run, node, switchBonus));
+  // v5: routeTerms daemons (Carrier Grade) score every candidate route, so the primary route is
+  // still the one that deals the most.
+  const routeHooks = !!run.daemons?.length && hasRouteTerms(run);
   const band = nodes.map(node => node.fixed ? 0 : zoneBit[zoneForNode(node)]);
   let routerMask = 0, terminals = 0;
   nodes.forEach((node, i) => {
@@ -60,6 +66,10 @@ export function analyze(run: RunState, faultNodes: readonly string[], faultLinks
       if (!(bands & zoneBit[zone])) continue;
       score += (resonant.get(zone) ?? 0) * RULES.resonanceDamage;
       score -= (suppressed.get(zone) ?? 0) * RULES.suppressionPenalty;
+    }
+    if (routeHooks) {
+      const devices = nodes.filter((node, i) => !node.fixed && route.mask & (1 << i));
+      score += daemonRouteTerms(run, devices).reduce((sum, term) => sum + term.amount, 0);
     }
     (route as ScoredRoute).score = score;
     scored.push(route as ScoredRoute);

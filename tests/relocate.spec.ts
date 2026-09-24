@@ -2,7 +2,7 @@
 // device; only Relocate pays the energy. Every test also fails on any page or console error (helpers.ts).
 import type { Page } from "@playwright/test";
 import { RULES } from "../src/core/cards.ts";
-import { battle, expect, idle, install, route, saved, tablePoint, test, watchTable } from "./helpers.ts";
+import { ENERGY, battle, expect, idle, install, route, saved, tablePoint, test, watchTable } from "./helpers.ts";
 
 type Spot = { x: number; z: number };
 
@@ -57,15 +57,15 @@ test("a dropped device asks first: the plate names the move, Relocate pays 1 ene
   await expect(plate(page).locator("[data-relocate-confirm]")).toContainText("Enter");
   await expect(plate(page).locator("[data-relocate-cancel]")).toContainText("Esc");
   // Nothing is paid or moved yet; the table already shows the device at its new socket.
-  await expect(page.locator(".energy-orb strong")).toHaveText("5");
+  await expect(page.locator(".energy-orb strong")).toHaveText(String(ENERGY));
   expect(await saved(page)).toEqual(before);
   await expect.poll(() => devicePosition(page, "router1")).toEqual(SOUTH);
   await plate(page).locator("[data-relocate-confirm]").click();
   await expect(plate(page)).toHaveCount(0);
-  await expect(page.locator(".energy-orb strong")).toHaveText(String(5 - RULES.relocateCost));
+  await expect(page.locator(".energy-orb strong")).toHaveText(String(ENERGY - RULES.relocateCost));
   const moved = await saved(page);
   expect(node(moved, "router1")).toMatchObject(SOUTH);
-  expect(moved.energy).toBe(5 - RULES.relocateCost);
+  expect(moved.energy).toBe(ENERGY - RULES.relocateCost);
   await expect(page.locator("#toast")).toContainText("ROUTER1 · NORTH → SOUTH");
   await press(page, "z");
   expect(await saved(page)).toEqual(before);
@@ -73,6 +73,8 @@ test("a dropped device asks first: the plate names the move, Relocate pays 1 ene
 });
 
 test("Esc, a click on the table and a right-click each cancel: nothing spent, the device back where it stood", async ({ page }) => {
+  // Four drags and four cancels on the 3D table: long under a full parallel suite.
+  test.setTimeout(120_000);
   await watchTable(page);
   await install(page, battle({ ...route("router1", NORTH.x, NORTH.z) }));
   const before = await saved(page);
@@ -87,7 +89,7 @@ test("Esc, a click on the table and a right-click each cancel: nothing spent, th
     else await plate(page).locator("[data-relocate-cancel]").click();
     await expect(plate(page), cancel).toHaveCount(0);
     await expect.poll(() => devicePosition(page, "router1"), cancel).toEqual(NORTH);
-    await expect(page.locator(".energy-orb strong")).toHaveText("5");
+    await expect(page.locator(".energy-orb strong")).toHaveText(String(ENERGY));
     expect(await saved(page)).toEqual(before);
     // Esc only answered the plate (no Options dialog); the cancelling click started nothing else.
     await expect(page.locator("dialog")).not.toBeVisible();
@@ -119,7 +121,7 @@ test("a device-dock band asks on the same plate with the socket shown; Enter rel
   await expect(plate(page)).toHaveCount(0);
   const moved = await saved(page);
   expect(node(moved, "router1").z).toBeGreaterThan(1.3);
-  expect(moved.energy).toBe(5 - RULES.relocateCost);
+  expect(moved.energy).toBe(ENERGY - RULES.relocateCost);
   expect(moved.turn).toBe(before.turn);
   await expect(page.locator(".game-root")).not.toHaveClass(/\bbusy\b/);
   // The focused Relocate button answers Enter too.
@@ -128,7 +130,7 @@ test("a device-dock band asks on the same plate with the socket shown; Enter rel
   await expect(plate(page).locator("[data-relocate-confirm]")).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(plate(page)).toHaveCount(0);
-  expect((await saved(page)).energy).toBe(5 - 2 * RULES.relocateCost);
+  expect((await saved(page)).energy).toBe(ENERGY - 2 * RULES.relocateCost);
 });
 
 // A band's socket can stand off the drop grid (x 1.25, z 1.8): its own cell still counts as home.
@@ -140,7 +142,7 @@ for (const home of [NORTH, { x: 1.25, z: -1.8 }]) {
     await drag(page, home, home);
     await expect(page.locator("#movement-preview")).toHaveCount(0);
     await expect(plate(page)).toHaveCount(0);
-    await expect(page.locator(".energy-orb strong")).toHaveText("5");
+    await expect(page.locator(".energy-orb strong")).toHaveText(String(ENERGY));
     expect(await saved(page)).toEqual(before);
     await expect.poll(() => devicePosition(page, "router1")).toEqual(home);
   });
@@ -174,7 +176,7 @@ test("playing a card or transmitting withdraws the pending move first", async ({
   let run = await saved(page);
   expect(run.block).toBeGreaterThan(0);
   expect(node(run, "router1")).toMatchObject(NORTH);
-  expect(run.energy).toBe(5 - 1);
+  expect(run.energy).toBe(ENERGY - 1);
   await drag(page, NORTH, SOUTH);
   await expect(plate(page)).toBeVisible();
   await page.locator('[data-action="transmit"]').click();

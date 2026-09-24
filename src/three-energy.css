@@ -1,0 +1,395 @@
+/* FAULTLINE v5 · Three Energy: card marks (keywords, keepers, modified costs, daemons, curses,
+   tokens), the energy orb's base, the forecast's evasions and the v5 screens.
+   Loaded last (main.ts), in the gothic-brass voice of the battle HUD: engraved plates, lit
+   markers and glows, the bundled faces. */
+
+.is-battle, dialog, .game-root {
+  --daemon: #b9a3ee;
+  --daemon-hi: #dccbff;
+  --curse-frost: #b8d4e6;
+  --curse-rot: #9fc79a;
+  --token: #8fe3e0;
+}
+
+/* ------------------------------------------------------------ card pictures still being painted
+   The house's colour and sigil sit under the art layer: a missing painting reads as an engraved
+   plate, never as an empty hole. */
+.game-card > .card-image { background-image: var(--card-image, none), var(--card-fallback, linear-gradient(#0c1117, #0c1117)); }
+
+/* ------------------------------------------------------------ the type line and its keyword markers */
+.game-root .game-card .card-type, dialog .game-card .card-type {
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: center; column-gap: 6px; row-gap: 1px;
+}
+.game-card .card-type > span { position: relative; white-space: nowrap; }
+.game-card .card-type > span + span::before {
+  content: ""; display: inline-block; width: 3px; height: 3px; margin-right: 6px; vertical-align: 2px;
+  transform: rotate(45deg); background: currentColor; opacity: .5;
+}
+.game-card .type-word.is-sub { color: #aeb5bb; }
+.game-card .card-keyword { color: var(--kw, #e8d3a0); text-shadow: 0 0 9px color-mix(in srgb, var(--kw, #e8d3a0) 45%, transparent); }
+/* A lit bead before each keyword: the marker reads at a glance in a fanned hand. */
+.game-card .card-type > .card-keyword::before { opacity: 1; background: var(--kw); box-shadow: 0 0 5px var(--kw); }
+.kw-retain { --kw: #9fe6d4; }
+.kw-innate { --kw: #f6dfa0; }
+.kw-volatile { --kw: #f5a47e; }
+.kw-exhaust { --kw: #d8b089; }
+.kw-armed { --kw: #9fe3dd; }
+.kw-token { --kw: var(--token); }
+.kw-daemon { --kw: var(--daemon-hi); }
+.kw-curse { --kw: var(--curse-frost); }
+.kw-unplayable { --kw: #aeb5bb; }
+
+/* ------------------------------------------------------------ modified cost: a lit gem */
+.game-root .game-card > .card-cost.is-down, dialog .game-card > .card-cost.is-down {
+  color: #f0fff8;
+  text-shadow: 0 1px 0 #000, 0 0 12px #8ff0d0;
+  background: radial-gradient(circle at 50% 30%, #2f6a58, #0e1d19 70%);
+  border-color: #a8f3da;
+  box-shadow: 0 0 0 2px #0c0906, 0 0 0 3px #3f8f78, 0 0 16px #6fe8c0aa, 0 3px 9px #000c;
+  animation: cost-lit 2.2s ease-in-out infinite;
+}
+.game-root .game-card > .card-cost.is-up, dialog .game-card > .card-cost.is-up {
+  color: #ffe4dc;
+  text-shadow: 0 1px 0 #000, 0 0 10px #ef8f86;
+  background: radial-gradient(circle at 50% 30%, #6a2e28, #1c0e0c 70%);
+  border-color: #f0a090;
+  box-shadow: 0 0 0 2px #0c0906, 0 0 0 3px #8f4a3f, 0 0 14px #ef8f8699, 0 3px 9px #000c;
+}
+.card-cost .cost-printed {
+  position: absolute; right: -9px; top: -5px;
+  display: grid; place-items: center; width: 16px; height: 16px;
+  font: 600 11px/1 var(--title); color: #d9c9a4; text-decoration: line-through; text-decoration-color: #ef8f86;
+  text-shadow: none; background: #120f0b; border: 1px solid #8a6a3a; border-radius: 50%;
+  box-shadow: 0 0 0 1px #0b0906;
+}
+@keyframes cost-lit { 50% { box-shadow: 0 0 0 2px #0c0906, 0 0 0 3px #4fae92, 0 0 24px #8ff0d0cc, 0 3px 9px #000c; } }
+
+/* ------------------------------------------------------------ the owner: a lit frame per keeper
+   Three channels, never mixed: the FRAME carries the owner (rim, inner edge, etch, the corner wash
+   and a sigil stud under the cost), the FOOTER GEM carries the rarity, the NAMEPLATE carries the kind
+   (protocol, daemon). Colorless cards keep the neutral brass frame. */
+.game-root .game-card:is(.house-architect, .house-warden, .house-ghost), dialog .game-card:is(.house-architect, .house-warden, .house-ghost) {
+  border-color: var(--house);
+  background:
+    radial-gradient(ellipse at 8% 0, color-mix(in srgb, var(--house) 34%, #2a2a22), transparent 46%),
+    radial-gradient(ellipse at 10% 0, #3a3a2e, #232c2e 42%, #121d26 100%);
+  box-shadow: inset 0 0 0 3px #080f1b, inset 0 0 0 4px color-mix(in srgb, var(--house-edge) 55%, transparent), 0 0 12px color-mix(in srgb, var(--house) 24%, transparent), 0 5px 14px #000a;
+}
+.game-root .game-card:is(.house-architect, .house-warden, .house-ghost) .card-etch, dialog .game-card:is(.house-architect, .house-warden, .house-ghost) .card-etch {
+  border-color: color-mix(in srgb, var(--house-edge) 50%, transparent);
+}
+.game-root .game-card:is(.house-architect, .house-warden, .house-ghost):is(:hover, :focus-visible, .selected), dialog .game-card:is(.house-architect, .house-warden, .house-ghost):is(:hover, :focus-visible) {
+  border-color: color-mix(in srgb, var(--house) 55%, #fff4d6);
+  box-shadow: inset 0 0 0 3px #080f1b, inset 0 0 0 4px color-mix(in srgb, var(--house-edge) 70%, transparent), 0 0 24px color-mix(in srgb, var(--house) 45%, transparent), 0 10px 26px #000d;
+}
+.game-root .game-card:is(.house-architect, .house-warden, .house-ghost).selected {
+  box-shadow: inset 0 0 0 3px #080f1b, inset 0 0 22px #ffb04a26, 0 0 0 1px #0b0906, 0 0 30px 3px color-mix(in srgb, var(--house) 55%, #ffb04a), 0 12px 26px #000c;
+}
+/* Nameplate rivets take the owner's colour too: the plate still reads as brass. */
+.game-root .game-card:is(.house-architect, .house-warden, .house-ghost) > .card-heading::before,
+.game-root .game-card:is(.house-architect, .house-warden, .house-ghost) > .card-heading::after,
+dialog .game-card:is(.house-architect, .house-warden, .house-ghost) > .card-heading::before,
+dialog .game-card:is(.house-architect, .house-warden, .house-ghost) > .card-heading::after { background: linear-gradient(135deg, #fff4d6, var(--house)); }
+.game-card .keeper-word { color: var(--house); }
+
+/* ------------------------------------------------------------ the kind on the nameplate: protocols and daemons */
+/* Protocols keep their rarity gem and the owner's frame; their teal lives on the nameplate. */
+.game-root .game-card.kind-protocol:not(.house-architect):not(.house-warden):not(.house-ghost), dialog .game-card.kind-protocol:not(.house-architect):not(.house-warden):not(.house-ghost) { border-color: #baa06b; }
+.game-root .game-card.kind-protocol .card-gem, dialog .game-card.kind-protocol .card-gem { width: 7px; height: 7px; border-radius: 0; transform: rotate(45deg); }
+.game-root .game-card.kind-protocol.rarity-common .card-gem, dialog .game-card.kind-protocol.rarity-common .card-gem { background: linear-gradient(135deg, #e0f4ec, #6f9c8f); box-shadow: 0 0 0 1px #0b0906; }
+.game-root .game-card.kind-protocol.rarity-uncommon .card-gem, dialog .game-card.kind-protocol.rarity-uncommon .card-gem { background: linear-gradient(135deg, #e4ddff, #7f6cc8); box-shadow: 0 0 0 1px #0b0906, 0 0 7px #927dda; }
+.game-root .game-card.kind-protocol.rarity-rare .card-gem, dialog .game-card.kind-protocol.rarity-rare .card-gem { background: linear-gradient(135deg, #fff4d0, #d49a3a); box-shadow: 0 0 0 1px #0b0906, 0 0 8px #e0a64a; }
+.game-root .game-card.kind-protocol > .card-heading, dialog .game-card.kind-protocol > .card-heading {
+  background: linear-gradient(#1c2a2a, #0f1716 58%, #172221);
+  border-block-color: #8fd9d299;
+  box-shadow: inset 0 1px 0 #bff3f81c, inset 0 -1px 0 #000a, 0 3px 10px #74e0ec1f;
+}
+.game-root .game-card.kind-daemon > .card-heading, dialog .game-card.kind-daemon > .card-heading {
+  background: linear-gradient(#27203a, #130f1e 58%, #1d1830);
+  border-block-color: #b9a3eea6;
+  box-shadow: inset 0 1px 0 #dccbff22, inset 0 -1px 0 #000a, 0 3px 12px #9b7ff026;
+}
+.game-card.kind-daemon .type-word.is-daemon { color: var(--daemon-hi); text-shadow: 0 0 9px #9b7ff0bb; }
+
+/* ------------------------------------------------------------ curses: cold and sick */
+.game-root .game-card.curse-card, dialog .game-card.curse-card {
+  border-color: #8fa6b9 !important;
+  background: radial-gradient(ellipse at 20% 0, #2d3a45, #141c24 46%, #090d12 100%);
+  box-shadow: inset 0 0 0 3px #070b10, inset 0 0 28px #8fc7a01c, 0 0 14px #9fc0d61a, 0 5px 14px #000a;
+}
+.game-card.curse-card .card-image { filter: saturate(.3) hue-rotate(150deg) brightness(.78) contrast(1.12); }
+/* Frost at the rim, a sickly bloom from below. */
+.game-card.curse-card .card-image::before {
+  content: ""; position: absolute; inset: 0; z-index: 1; mix-blend-mode: normal;
+  background:
+    radial-gradient(ellipse at 50% 125%, #a6d69e33, transparent 62%),
+    radial-gradient(ellipse at 50% 45%, transparent 48%, #c3e1f440 100%),
+    repeating-linear-gradient(0deg, #ffffff08 0 1px, transparent 1px 3px);
+  box-shadow: inset 0 0 20px #cfe8ff38;
+}
+.game-root .game-card.curse-card > .card-heading, dialog .game-card.curse-card > .card-heading {
+  color: #d9e8ee; text-shadow: 0 1px 0 #000, 0 0 12px #9fd0e866;
+  background: linear-gradient(#1d262e, #0e1318 58%, #161d24); border-color: #8fa6b999;
+}
+.game-card.curse-card .card-heading::before, .game-card.curse-card .card-heading::after { background: linear-gradient(135deg, #e3f1f7, #5d7482); }
+.game-card.curse-card .card-type { color: #a9c6a2; }
+.game-card.curse-card .card-rule { color: #c9d6d8; }
+.game-card.curse-card .card-etch { border-color: #b8d4e62e; }
+.game-root .game-card.curse-card .card-gem, dialog .game-card.curse-card .card-gem { background: linear-gradient(135deg, #d6ecd0, #4f6e56); box-shadow: 0 0 0 1px #0b0906, 0 0 7px #9fc79a88; }
+.game-card.curse-card .card-footer { color: #9fb2b8; }
+
+/* ------------------------------------------------------------ tokens (Payload): plainly temporary */
+.game-root .game-card.token-card, dialog .game-card.token-card {
+  border-color: #8fe3e0aa;
+  background: radial-gradient(ellipse at 50% 0, #1f444acc, #0f1f26f0 52%, #09131af2);
+  box-shadow: inset 0 0 0 3px #071016, inset 0 0 24px #5fd6d026, 0 0 18px #5fd6d02a, 0 5px 14px #000a;
+}
+.game-card.token-card .card-etch { border-style: dashed; border-color: #8fe3e070; }
+.game-card.token-card .card-image { opacity: .84; filter: saturate(.85) brightness(1.08); }
+.game-card.token-card .card-image::before {
+  content: ""; position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(115deg, transparent 30%, #c9fffb24 46%, transparent 60%) -120% 0 / 240% 100% no-repeat;
+  animation: token-shimmer 3.6s ease-in-out infinite;
+}
+.game-root .game-card.token-card > .card-heading, dialog .game-card.token-card > .card-heading { color: #dbfcf7; border-color: #8fe3e066; }
+.game-root .game-card.token-card .card-gem, dialog .game-card.token-card .card-gem { background: transparent; box-shadow: 0 0 0 1px var(--token), 0 0 8px var(--token); }
+.game-card.token-card .card-footer { color: #9fdcd6; }
+@keyframes token-shimmer { 0%, 55% { background-position: -120% 0; } 100% { background-position: 140% 0; } }
+
+/* ------------------------------------------------------------ Kernel Panic: the limit stamped on the card */
+.game-card .card-limit {
+  position: absolute; z-index: 4; left: 50%;
+  top: calc(6px + var(--picture-height, 146px) / 2 - 22px);
+  transform: translateX(-50%) rotate(-5deg);
+  display: grid; justify-items: center; gap: 1px;
+  padding: 3px clamp(6px, 6cqi, 11px) 4px;
+  color: #ffd9cf;
+  background: linear-gradient(#3a1318f2, #1d0a0cf2);
+  border: 1px solid #e58576;
+  box-shadow: 0 0 0 2px #0b0906, 0 0 18px #e0786a88;
+}
+.game-card .card-limit b { font: 600 clamp(16px, 14cqi, 25px)/1 var(--title); font-variant-numeric: tabular-nums; text-shadow: 0 0 12px #ff8f7f; }
+.game-card .card-limit small { font: 700 clamp(9px, 7cqi, 11px)/1 var(--label); letter-spacing: .03em; white-space: nowrap; }
+.game-card .card-limit.is-spent { color: #c9b3ae; border-color: #8f5a52; box-shadow: 0 0 0 2px #0b0906; }
+
+/* ------------------------------------------------------------ the energy orb: a framed sigil
+   The whole reading sits inside the sigil's face: the current energy large, "/base" small beside it,
+   and energy above the base as a lit ember tag set into the rim's south point. The sigil art is
+   --orb-art (public/art/ui/energy-sigil.webp); its face is the inner 60 %. */
+.is-battle .energy-orb {
+  --orb-art: url("/art/ui/energy-sigil.webp");
+  display: block; padding: 0; border: 0; border-radius: 50%; background: none; box-shadow: none; filter: none; overflow: visible;
+}
+.is-battle .energy-orb::before {
+  content: ""; position: absolute; inset: 0; display: block; transform: none; border: 0; border-radius: 50%; opacity: 1;
+  background: var(--orb-art) center / contain no-repeat;
+  filter: drop-shadow(0 6px 10px #000c);
+}
+.is-battle .energy-orb .orb-reading {
+  /* Centred on the ink, not the line box: Grenze's numerals sit high in their em (measured). */
+  position: absolute; left: 50%; top: 50%; z-index: 1; transform: translate(-49%, -57%);
+  display: flex; align-items: baseline; justify-content: center; gap: 1px; margin: 0; white-space: nowrap;
+}
+.is-battle .energy-orb strong { margin: 0; font: 600 calc(var(--orb-size, 96px) * .38)/1 var(--title); font-variant-numeric: tabular-nums; color: #f6e3b6; text-shadow: 0 2px 0 #000, 0 0 16px #ffb04a55; }
+.is-battle .energy-orb .energy-base { position: static; margin: 0; font: 600 calc(var(--orb-size, 96px) * .16)/1 var(--title); font-style: normal; font-variant-numeric: tabular-nums; color: #cbb285; text-shadow: 0 1px 0 #000; }
+.is-battle .energy-orb .orb-word { position: absolute; left: 50%; top: calc(100% + 3px); bottom: auto; transform: translateX(-50%); margin: 0; font: 700 10.5px/1 var(--label); letter-spacing: .12em; color: #cdbb95; white-space: nowrap; text-shadow: 0 1px 2px #000; }
+.is-battle .energy-orb.is-risen::before { filter: drop-shadow(0 0 12px #ffb04a88) drop-shadow(0 6px 10px #000c); }
+.is-battle .energy-orb.is-risen strong { color: #fff3cf; text-shadow: 0 2px 0 #000, 0 0 20px #ffb04a; }
+.is-battle .energy-orb.is-spent strong { color: #b9ab8e; text-shadow: 0 2px 0 #000; }
+/* Above the base: an ember tag on the rim's south point. */
+.is-battle .energy-orb .energy-rise {
+  position: absolute; left: 50%; top: auto; right: auto; bottom: 7%; z-index: 2; transform: translateX(-50%);
+  display: grid; place-items: center; min-width: 22px; height: 17px; padding: 0 5px 1px;
+  font: 700 12px/1 var(--title); font-style: normal; font-variant-numeric: tabular-nums; color: #2a1a06;
+  background: radial-gradient(circle at 40% 30%, #fff1c4, #e2a347 75%); border-radius: 9px;
+  box-shadow: 0 0 0 2px #0b0906, 0 0 12px #ffb04acc;
+}
+/* The sigil stands on the pile row: its word lives in the tooltip. */
+.is-battle .energy-orb .orb-word { display: none; }
+@container game (max-width: 900px) {
+  .is-battle .energy-orb { --orb-size: 44px; }
+  .is-battle .energy-orb .orb-word { display: none; }
+  .is-battle .energy-orb .energy-rise { bottom: auto; top: -8px; left: auto; right: -12px; transform: none; min-width: 18px; height: 15px; font-size: 10px; }
+}
+
+/* ------------------------------------------------------------ daemon counts (the Details ledger; the
+   running seals on the player plate live in battle.css) */
+.daemon-count { flex: none; font: 600 15px/1 var(--title); font-variant-numeric: tabular-nums; color: #ffe6a6; text-shadow: 0 0 9px #ffb04a99; }
+
+/* ------------------------------------------------------------ curses in hand, under the survival forecast */
+.hand-omens { display: grid; gap: 3px; margin: -4px 0 9px; }
+.hand-omen {
+  display: flex; align-items: center; gap: 6px; min-width: 0;
+  padding: 2px 7px 3px 5px;
+  font: 12px/1.3 var(--text); color: #c4d6dc;
+  background: linear-gradient(90deg, #1a2630d9, #0f161cc4);
+  border: 1px solid #8fa6b955; border-radius: 2px 9px 2px 2px;
+  box-shadow: inset 0 0 12px #9fc79a14;
+}
+.hand-omen svg { flex: none; color: var(--curse-frost); filter: drop-shadow(0 0 4px #b8d4e6aa); }
+.hand-omen b { flex: none; font: 600 13px/1 var(--title); color: #e3eff3; }
+.hand-omen span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #a9c6a2; }
+
+/* ------------------------------------------------------------ evasions in the forecast */
+.hazard-caption.is-evasion { color: #cfe6ff; }
+.hazard-caption.is-evasion svg { filter: drop-shadow(0 0 5px #9fd0ffaa); }
+.is-battle .intent-medallion.is-evaded strong { color: #d6ecff; text-shadow: 0 0 14px #8fc8ffaa; }
+.is-battle .intent-medallion.is-evaded .intent-emblem { opacity: .55; }
+.row-intent.is-evaded b { color: #d6ecff; text-decoration: line-through; text-decoration-color: #8fc8ff; }
+.hostile-intent.is-evaded .hi-value { color: #d6ecff; text-shadow: 0 0 12px #8fc8ffaa; }
+.hostile-intent.is-evaded .hi-target { color: #cfe6ff; }
+
+/* ------------------------------------------------------------ forecast journal (Details) */
+.calculation-term.is-daemon > span::before {
+  content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px; vertical-align: 1px;
+  border-radius: 50%; background: radial-gradient(circle, #f4ecff 0 25%, #8a6ad8 35% 60%, #2a1f45 66%);
+  box-shadow: 0 0 6px #a58af0;
+}
+.calculation-term.is-daemon b { color: #e3d6ff; }
+.term-parts { margin: -3px 0 4px; font: italic 13px/1.4 var(--text); color: var(--text-dim); }
+.protocol-note.is-evasion svg { color: #9fd0ff; }
+.danger-note.is-omen svg { color: var(--curse-frost); }
+.daemon-ledger { margin-top: 16px; }
+.daemon-ledger .daemon-count { font-size: 15px; }
+.daemon-ledger .front-value { color: var(--daemon-hi); }
+
+/* ------------------------------------------------------------ card inspect: keywords and details */
+.inspect-keywords { display: grid; gap: 6px; margin: 16px 0 0; }
+.inspect-keywords > div { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 12px; }
+.inspect-keywords dt {
+  min-width: 86px; padding: 3px 9px 4px;
+  font: 600 15px/1 var(--title); color: var(--kw, #e8d3a0); text-align: center;
+  text-shadow: 0 0 10px color-mix(in srgb, var(--kw, #e8d3a0) 50%, transparent);
+  background: linear-gradient(#1c1812, #0e0c09);
+  border: 1px solid color-mix(in srgb, var(--kw, #e8d3a0) 45%, #5a4322);
+  box-shadow: inset 0 0 0 2px #0b0906;
+}
+.inspect-keywords dd { margin: 0; font: 15px/1.45 var(--text); color: var(--text-body); }
+.inspect-detail { margin: 14px 0 0; padding: 11px 15px 12px; }
+.inspect-detail p { margin: 6px 0 0; font: 15px/1.5 var(--text); color: var(--text-body); }
+
+/* ------------------------------------------------------------ the archive by keeper */
+.collection-body.is-sectioned {
+  display: grid; gap: 6px; padding: 8px 12px 22px;
+  background: radial-gradient(90% 40% at 50% 0, #18202b, transparent 70%), linear-gradient(#0a0e13, #080b10);
+  border: 1px solid #4a3920;
+  box-shadow: inset 0 0 0 1px #05070a, inset 0 4px 22px #000c, 0 1px 0 #f3dca012;
+}
+.collection-body.is-sectioned .collection-grid { padding: 16px 4px 24px; background: none; border: 0; box-shadow: none; }
+.archive-house-head {
+  position: relative; display: flex; align-items: center; gap: 12px;
+  margin: 14px 0 0; padding: 0 4px;
+  font: 600 22px/1.1 var(--title); letter-spacing: .01em; color: var(--text-hi);
+  text-shadow: 0 2px 8px #000;
+}
+.archive-house-head::after { content: ""; flex: 1; height: 1px; margin-left: 6px; background: linear-gradient(90deg, color-mix(in srgb, var(--house) 60%, transparent), transparent); }
+.archive-house-head b { order: 3; font: 600 19px/1 var(--title); font-variant-numeric: tabular-nums; color: var(--house); }
+.archive-house-head .house-seal {
+  display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%;
+  color: var(--house);
+  background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--house) 20%, #1a1f26), #0b1015 78%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--house) 70%, #5a4322), 0 0 0 3px #0b0906, 0 0 16px color-mix(in srgb, var(--house) 35%, transparent);
+}
+
+/* ------------------------------------------------------------ rewards: Air Gap's missing card */
+.reward-cards .reward-gap {
+  align-self: center;
+  display: grid; justify-items: center; align-content: center; gap: 8px;
+  width: 170px; min-height: 240px; padding: 18px 14px;
+  text-align: center; color: #b9c8d4;
+  border: 1px dashed #9fb4c866; border-radius: 9px 9px 7px 7px;
+  background: repeating-linear-gradient(135deg, #0e141acc 0 8px, #121a21cc 8px 16px);
+  box-shadow: inset 0 0 26px #000c;
+}
+.reward-gap strong { font: 600 21px/1.1 var(--title); color: #dfe8ef; }
+.reward-gap span { font: italic 15px/1.3 var(--text); color: #a9b8c4; }
+
+/* ------------------------------------------------------------ the market's shelves */
+.market-offer { position: relative; }
+.market-house {
+  position: absolute; z-index: 3; top: -12px; left: 50%; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px 4px 8px;
+  font: 600 13px/1 var(--title); white-space: nowrap;
+  color: var(--house, #d9bd85);
+  background: linear-gradient(#211b13, #0f0c08);
+  border: 1px solid color-mix(in srgb, var(--house, #c9a263) 55%, #5a4322);
+  box-shadow: inset 0 0 0 2px #0b0906, 0 0 12px color-mix(in srgb, var(--house, #c9a263) 25%, transparent), 0 3px 8px #000b;
+}
+.market-house.is-bench { --house: #c9a263; color: #d9c69c; }
+.market-offer .market-house { z-index: 6; transition: transform .22s; }
+.market-offer:not(.sold):hover .market-house { transform: translate(-50%, -8px); }
+.market-house svg { flex: none; filter: drop-shadow(0 0 4px color-mix(in srgb, currentColor 60%, transparent)); }
+.market-offer.sold .market-house { opacity: .45; }
+
+/* ------------------------------------------------------------ the sanctuary: nothing to take */
+.forge-screen .forge-leave { margin-top: 22px; }
+
+/* ------------------------------------------------------------ keeper select: the starting deck */
+.kit-deck .starter-list { display: flex; flex-wrap: wrap; gap: 1px 0; margin-top: 2px; font: 13.5px/1.4 var(--text); color: #b1b1a6; }
+.kit-deck .starter-card { white-space: nowrap; }
+.kit-deck .starter-card:not(:last-child)::after { content: "·"; margin: 0 6px; color: #8a6a3a; }
+.kit-deck .starter-card b { margin-left: 3px; font: 600 14px/1 var(--title); font-variant-numeric: tabular-nums; color: #d9c69c; }
+.kit-deck .starter-card.is-signature { color: color-mix(in srgb, var(--accent) 80%, #fff); text-shadow: 0 0 10px color-mix(in srgb, var(--accent) 45%, transparent); }
+/* The kit reads in full on the chosen keeper; the others keep two lines per rule (tooltips and the
+   aria label keep every word). */
+.archetype .kit-row b + span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ------------------------------------------------------------ keeper select: the ascension ladder */
+.ascension-panel .asc-track { display: flex; align-items: center; gap: 0; flex-wrap: nowrap; }
+.asc-rung-slot { display: inline-flex; min-width: 0; }
+.asc-link { flex: 0 0 7px; height: 1px; background: linear-gradient(90deg, #7b5a2c, #b99cf055); }
+.asc-rung {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0;
+  padding: 3px 9px 3px 3px;
+  font: 600 14px/1 var(--title); white-space: nowrap; color: #bba98a;
+  background: linear-gradient(#1e1911, #0e0b08);
+  border: 1px solid #5c4628;
+  border-radius: 14px 3px 3px 14px;
+  box-shadow: inset 0 0 0 2px #0b0906;
+  transition: border-color .18s, color .18s, box-shadow .18s;
+}
+.asc-rung .asc-gem {
+  display: grid; place-items: center; flex: none; width: 22px; height: 22px;
+  font: 600 14px/1 var(--title); font-variant-numeric: tabular-nums; color: #cbb993;
+  background: radial-gradient(circle at 50% 35%, #2b2217, #0f0c08 75%);
+  border: 1px solid #7b5a2c; border-radius: 50%;
+}
+.asc-rung:hover:not(:disabled) { border-color: var(--brass-hi); color: #fff0cc; }
+.asc-rung.included { color: #dccbf0; border-color: #7d62a0; }
+.asc-rung.included .asc-gem { color: #e2cff5; border-color: #9f7cc4; }
+.asc-rung.current { color: #fbf3ff; border-color: #e6d2ff; background: linear-gradient(#3a2a52, #17111f); box-shadow: inset 0 0 0 2px #0b0906, 0 0 0 1px #0b0906, 0 0 18px #b183e0aa; }
+.asc-rung.current .asc-gem { color: #fff; border-color: #f0dbff; background: radial-gradient(circle, #5d3f82, #17111f 75%); box-shadow: 0 0 10px #c9a8f0; }
+.asc-rung.locked { color: #6c6356; border-color: #3d3222; background: #0c0a07; cursor: var(--cursor-blocked); pointer-events: none; }
+.asc-rung.locked .asc-gem { color: #6c6356; border-color: #3d3222; }
+.asc-rung.locked .asc-gem svg { width: 11px; height: 11px; }
+.ascension-panel .asc-summary { display: block; -webkit-line-clamp: unset; overflow: visible; margin: 0; font: 14px/1.45 var(--text); color: #b7b2a4; }
+.ascension-panel .asc-summary strong { margin-right: 7px; font: 600 17px/1 var(--title); color: #ead9f7; }
+.asc-includes { display: block; margin-top: 3px; font: italic 13.5px/1.35 var(--text); color: #a99cbd; }
+.asc-earlier { font-style: normal; color: #d6c3ef; border-bottom: 1px dotted #c9a8ea88; }
+/* Room for the starting deck and the ladder: a shorter picture, one line of story, tighter kit rows. */
+.selection-screen .archetype-art { height: clamp(60px, 8.5cqh, 88px); }
+.selection-screen .chosen-story { max-width: 1000px; min-height: 0; }
+.selection-screen .archetypes { margin: clamp(10px, 1.6cqh, 20px) 0 clamp(10px, 1.6cqh, 18px); }
+.selection-screen .kit { gap: 5px; margin-bottom: 8px; }
+.selection-screen .kit-row { padding-top: 6px; }
+.selection-screen .kit-row b { font-size: 18px; }
+.selection-screen .archetype-epithet { margin-bottom: 8px; }
+.selection-screen .archetype .kit-row b + span { -webkit-line-clamp: 2; font-size: 13.5px; line-height: 1.35; }
+.selection-screen .kit-deck .starter-list { font-size: 13px; line-height: 1.3; }
+.selection-screen .selection-footer { align-items: stretch; gap: 18px; }
+.selection-screen .embark { min-width: 240px; padding-inline: 18px; }
+.selection-screen .ascension-panel { gap: 14px; padding-inline: 14px 16px; }
+.selection-screen .ascension-panel { padding-block: 8px 9px; }
+@container game (max-width: 1250px) {
+  .asc-rung .asc-name { display: none; }
+  .asc-rung.current .asc-name { display: inline; }
+  .asc-rung { padding-right: 3px; }
+  .asc-rung.current { padding-right: 11px; }
+}
+
+/* The orb reads its sources on hover and focus (the foot layer lets only buttons through). */
+.is-battle .energy-orb { pointer-events: auto; }
+
+/* ------------------------------------------------------------ list rows (prepare, upgrade compare): the owner's ring */
+.prepare-cost.is-owned { border-color: var(--house) !important; box-shadow: 0 0 0 2px #0b0906, 0 0 0 3px color-mix(in srgb, var(--house) 55%, transparent), 0 0 12px color-mix(in srgb, var(--house) 45%, transparent) !important; }

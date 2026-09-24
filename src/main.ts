@@ -408,6 +408,8 @@ function render(rebuild = true) {
     $("#hand-zone").innerHTML = battle ? battleUi.handMarkup(run, selected) : "";
     document.querySelector(".card-fan")?.scrollTo({left:scroll});
     handKey = signature;
+    // The rail measures the hand it stands over: the table may stand lower in a tall window.
+    if (battle) measureRail();
   } else if (battle)
     document
       .querySelectorAll<HTMLElement>("[data-hand]")
@@ -950,9 +952,11 @@ function tableAnchors(): string {
   return run.installations.map(item => `<i class="table-anchor" data-anchor-installation="${item.id}" data-x="${item.x}" data-z="${item.z}"></i>`).join("")
     + run.topology.nodes.filter(node => !node.fixed && isWorn(node)).map(node => `<i class="table-anchor" data-anchor-node="${node.id}" data-x="${node.x}" data-z="${node.z}"></i>`).join("");
 }
-/** The rail's frame for the table (client pixels): the span between the side plates, the header's
- * items the portraits stay clear of, and the plates' size (the tallest plate is reserved under every
- * portrait, so all feet stand on one line). */
+/** The rail's frame (client pixels): the span between the side plates, the band's top (the game's
+ * top edge: the portraits have their own layer), the header's items the portraits stay clear of, the
+ * plates' size (the tallest plate is reserved under every portrait, so all feet stand on one line)
+ * and the lowest the table may stand over the hand. */
+let handTop: { size: string; top: number } | null = null;
 function measureRail() {
   const layer = document.getElementById("intent-layer");
   if (!world || !layer || !root.classList.contains("is-battle")) return;
@@ -969,8 +973,12 @@ function measureRail() {
   layer.style.setProperty("--plate-side", `${(side / scale).toFixed(1)}px`);
   const plates = Array.from(layer.querySelectorAll<HTMLElement>(".hostile-plate"));
   const height = Math.max(58 * scale, ...plates.map(plate => plate.getBoundingClientRect().height));
+  // The table may stand lower in a tall window, its front edge 40 px over the resting hand (an empty
+  // hand is not drawn: the last measure at this size holds).
+  const [hand] = rect("#hand-zone"), size = `${box.width}x${box.height}`;
+  if (hand) handTop = { size, top: hand.top - box.top };
   world.setRailFrame({
-    left, right, top: Math.max(canvas.top, box.top) + 6 * scale,
+    left, right, top: box.top + 4 * scale, table: handTop?.size === size ? box.top + handTop.top - 40 * scale : undefined,
     obstacles: rect(".game-header .run-stats, .game-header .header-controls, .is-battle .encounter-heading")
       .map(item => ({ left: item.left, top: item.top, right: item.right, bottom: item.bottom })),
     plate: { width, side, height: Math.ceil(height), gap },
@@ -979,8 +987,8 @@ function measureRail() {
 addEventListener("resize", () => { measureRail(); placeIntents(); });
 // The plates' type may land after the first render: measure their height again once it has.
 void document.fonts?.ready.then(() => { measureRail(); placeIntents(); });
-/** Hangs each plate under its portrait (the table moves with the camera and the frame). Positions
- * are client pixels, the layer lives inside #app's interface zoom. */
+/** Hangs each plate under its portrait (the rail stands still when the table's camera moves; the
+ * table anchors follow it). Positions are client pixels, the layer lives inside #app's interface zoom. */
 function placeIntents() {
   const layer = document.getElementById("intent-layer");
   if (!layer?.firstElementChild || !world) return;

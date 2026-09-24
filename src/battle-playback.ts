@@ -20,9 +20,9 @@ import type { ActionKind, RailReadout, RailState, World, WorldPoint } from "./th
 
 /** The hud's view state the table mirrors (main.ts worldView()). */
 export interface WorldView {
-  /** The port whose details the right plate shows (a dimmer crest when it is not the focus). */
+  /** The port the player last targeted (the table marks only the target itself). */
   selectedPort: Port | null;
-  /** The delivery row selected with [ ] (its packet glyph and aim line brighten). */
+  /** The delivery picked up (its packet glyph lights in its channel colour and trails a tether). */
   selectedDelivery: string | null;
   /** The installation whose plate is open (its reach ring shows). */
   selectedInstallation: string | null;

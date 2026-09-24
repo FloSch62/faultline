@@ -842,8 +842,8 @@ dialog .game-card > .card-heading::before, dialog .game-card > .card-heading::af
 /* ============================================================ v4 · Under Quarantine: the far rail
    One hostile keeps today's plate. A pack turns the top of the plate into the port strip
    (phase order, one iron row per port) and the rest into the chosen port's detail; the
-   deliveries ledger closes the plate. Selection is light: the chosen row carries an ember
-   marker, the focus row a lit brass rim and the crest. Budget at 1280 × 720: strip 3 × 26 px,
+   deliveries ledger closes the plate. A row targets its hostile; the target's row carries a lit
+   brass rim and the crest (targeting.css). Budget at 1280 × 720: strip 3 × 26 px,
    detail ≈ 140 px, ledger ≈ 70 px inside the painted frame. */
 .is-battle { --channel-primary: #f2c46d; --channel-bandwidth: #6fe0f0; --fray: #d08a52; --coral: #ef8f86; --teal: #8fd9c0; --install: #e5a8f7; }
 
@@ -917,12 +917,6 @@ dialog .game-card > .card-heading::before, dialog .game-card > .card-heading::af
 }
 .port-row:hover, .port-row:focus-visible { border-color: #c9a263; box-shadow: inset 0 0 0 1px #07060a, inset 0 1px 0 #f3dca026, inset 0 0 16px #ffb04a14, 0 3px 8px #0008; outline: none; }
 .port-row.is-focus { border-color: var(--brass-hi); box-shadow: inset 0 0 0 1px #07060a, inset 0 1px 0 #f3dca033, inset 0 0 18px #ffb04a1f, 0 0 12px #ffb04a33; }
-/* The chosen row: an ember stone on its left edge. */
-.port-row-slot.is-selected::before {
-  content: ""; position: absolute; z-index: 2; left: -4px; top: 50%; width: 8px; height: 8px;
-  transform: translateY(-50%) rotate(45deg); background: linear-gradient(135deg, #fff4d0, var(--ember) 55%, #9b5a18);
-  box-shadow: 0 0 0 1px #0b0906, 0 0 10px var(--ember); pointer-events: none;
-}
 .port-letter {
   display: grid; flex: none; place-items: center; width: 14px; height: 14px; border-radius: 50%;
   font: 700 9px/1 var(--label); letter-spacing: 0; color: #d9c08a;
@@ -971,26 +965,8 @@ dialog .game-card > .card-heading::before, dialog .game-card > .card-heading::af
 .port-bar > i:first-child { display: block; height: 100%; background: linear-gradient(90deg, #9d534b, #ce9c7f); transition: width .35s; }
 .port-bar .health-risk { position: absolute; top: 0; height: 100%; background: repeating-linear-gradient(135deg, #ba755b 0 2px, #f7c4a7 2px 4px); }
 .port-row.is-lethal .port-bar .health-risk { background: repeating-linear-gradient(135deg, #d6a24a 0 2px, #ffe9a8 2px 4px); }
-/* The crest: the port's stud turned into a brass diamond engraved with its letter. Lit on the
-   focus row; dim on a selected row, where a click (or F) makes that port the focus. */
-.port-row.has-crest .port-letter { visibility: hidden; }
-.port-crest {
-  position: absolute; z-index: 2; left: 3px; top: calc(50% - 1.5px); transform: translateY(-50%); display: grid; place-items: center;
-  width: 18px; height: 18px; padding: 0; color: #d9c08a; background: none; border: 0;
-  transition: color .18s, filter .18s;
-}
-.port-crest::before {
-  content: ""; position: absolute; inset: 3px; transform: rotate(45deg);
-  background: radial-gradient(circle at 50% 35%, #2e2417, #0f0c08 72%); box-shadow: inset 0 0 0 1px #9b7a45, 0 1px 3px #000c;
-}
-.port-crest > b { position: relative; font: 700 9px/1 var(--label); letter-spacing: 0; }
-.port-crest:hover, .port-crest:focus-visible { color: #fff3d0; filter: drop-shadow(0 0 5px #ffb04a88); outline: none; }
-.port-crest:hover::before, .port-crest:focus-visible::before { box-shadow: inset 0 0 0 1px var(--brass-hi), 0 1px 3px #000c; }
-.port-crest.is-on { color: #2a1605; filter: drop-shadow(0 0 5px #ffb04a99); animation: crest-pulse 2.6s ease-in-out infinite; }
-.port-crest.is-on::before { background: linear-gradient(135deg, #fff2c9, #e8c47c 45%, #9b7424); box-shadow: 0 0 0 1px #0b0906, inset 0 0 0 1px #fff4d0aa; }
+/* The target's crest (targeting.css draws it) breathes an ember glow. */
 @keyframes crest-pulse { 50% { filter: drop-shadow(0 0 9px #ffb04acc); } }
-.reduced-motion .port-crest.is-on { animation: none; }
-@media (prefers-reduced-motion: reduce) { .port-crest.is-on { animation: none; } }
 
 /* ---- the chosen port's detail (packs) */
 .enemy-plate.is-pack .pack-identity { min-height: 0; margin-bottom: 6px; }

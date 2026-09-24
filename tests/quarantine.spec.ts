@@ -18,7 +18,7 @@ const table = { name: "Test bench", description: "A bare test table.", debris: [
 
 // ------------------------------------------------------------------ a pack fight
 
-test("pack fight: three plates, F focuses, T aims, per-port forecast, a dead escort's action is cancelled and its crate lands @smoke", async ({ page }) => {
+test("pack fight: three plates, a click targets, F cycles, T aims, per-port forecast, a dead escort's action is cancelled and its crate lands @smoke", async ({ page }) => {
   const e = pack([
     { id: "spark-mite", port: "left", hp: 4, maxHp: 12, extra: { crate: { kind: "salvage", role: "switch" } } },
     { id: "serpent", port: "centre", hp: 40 },
@@ -34,19 +34,18 @@ test("pack fight: three plates, F focuses, T aims, per-port forecast, a dead esc
   await expect.poll(async () => (await tableState(page)).plates.map(plate => plate.port).sort()).toEqual(["centre", "left", "right"]);
   await expect(page.locator('.port-row[data-port="centre"]')).toHaveClass(/is-focus/);
 
-  // A rail plate is a click target: it selects its port (reading only, the focus stays) …
+  // A rail plate is a click target: it makes that hostile the target (the focus); unaimed
+  // deliveries follow it and the right plate details it.
   const plate = (await tableState(page)).plates.find(item => item.port === "right")!;
   const spot = await tablePoint(page, plate.x, plate.y, plate.z);
   await page.mouse.click(spot.x, spot.y);
-  await expect(page.locator('.port-row[data-port="right"]')).toHaveClass(/is-selected/);
-  expect((await saved(page)).focus).toBe("centre");
-  // … and F makes the selected port the focus; unaimed deliveries follow it.
-  await page.keyboard.press("f");
   await expect.poll(async () => (await saved(page)).focus).toBe("right");
   await expect(page.locator('.port-row[data-port="right"]')).toHaveClass(/is-focus/);
+  await expect(page.locator('.port-row[data-port="right"]')).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".port-detail h2")).toContainText(/Splicer/i);
   await expect(page.locator("#world")).toHaveAttribute("data-focus", "right");
   expect(combatPreview(await saved(page)).deliveries.map(item => item.port)).toEqual(["right"]);
-  // With the focus on the selection, F cycles in port order: right → left → centre.
+  // F cycles the target in port order: right → left → centre.
   await page.keyboard.press("f");
   await expect.poll(async () => (await saved(page)).focus).toBe("left");
   await page.keyboard.press("f");
@@ -84,7 +83,8 @@ test("pack fight: three plates, F focuses, T aims, per-port forecast, a dead esc
   expect(forecast.hostiles.find(item => item.port === "left")!.state).toBe("cancelled");
   expect(forecast.incoming).toBeLessThan(unaimed.incoming);
   await expect(row).toHaveClass(/state-cancelled/);
-  await expect(row.locator(".row-state.is-cancelled")).toHaveText(/Cancelled/i);
+  await expect(row.locator(".row-state.is-cancelled")).toHaveText(/Falls/i);
+  await expect(page.locator('.hostile-intent[data-port="left"]')).toHaveClass(/state-falls/);
 
   // Transmit: the rules resolve exactly the forecast; the crate drops from the left port and lands
   // on the salvage socket, and its toast names the hardware.

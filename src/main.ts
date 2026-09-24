@@ -94,7 +94,7 @@ void loadAllModels();
 const faultKey = (state: RunState) => `${state.faultNodes.join(",")}|${state.faultLinks.join(",")}`;
 const installationPoints = (state: RunState) => state.installations.reduce((sum, item) => sum + item.integrity, 0);
 /** Controls whose hover deserves a whisper; icon buttons and toolbars stay silent. */
-const HOVER_CUES = ".game-card:not(.drag-ghost), .route-room:not([disabled]), .archetype, .relic-option, [data-forge], .transmit-button, .console-button, .title-menu button, .gold-button, .field-seal.targetable, .lesson-card, button.port-row, .port-stud";
+const HOVER_CUES = ".game-card:not(.drag-ghost), .route-room:not([disabled]), .archetype, .relic-option, [data-forge], .transmit-button, .console-button, .title-menu button, .gold-button, .field-seal.targetable, .lesson-card, button.port-row, .port-stud, .hostile-intent[data-port], .delivery-pick";
 let expedition: Expedition | null = null;
 let records: RunRecord[] = [];
 try {
@@ -178,7 +178,7 @@ let lastScreen = "";
 
 
 $("#app").innerHTML =
-  `<main class="game-root"><div class="scene-backdrop"></div><div class="scene-shade"></div><div class="motes" aria-hidden="true">${Array.from({ length: 22 }, (_, i) => `<i style="--x:${(i * 47) % 100}%;--duration:${14 + (i % 8) * 3}s;--delay:-${i * 2.7}s;--size:${(i % 3) + 1}px"></i>`).join("")}</div><div class="world-stage"><canvas id="world" aria-label="Network battlefield. Use cards and the device targeting controls to build your route."></canvas></div><div class="texture"></div><header id="header" class="game-header"></header><div id="screen"></div><div id="battle-hud"></div><div id="hand-zone"></div><div id="target-dock"></div><div id="battle-foot"></div><div id="lesson-spotlight" aria-hidden="true"><i></i></div><div id="lesson-layer"></div><div id="game-tooltip" role="tooltip"></div><div id="hover-card" role="tooltip" aria-hidden="true"></div><div id="impact-layer" aria-hidden="true"></div><div id="battle-flash"></div><div id="toast" role="status" aria-live="polite"></div><div class="now-playing" id="now-playing"></div></main><dialog id="dialog" aria-label="Field journal"><button class="dialog-close" data-action="close" aria-label="Close dialog">${ui.icon("close", 16)}</button><div class="dialog-surface"><div id="dialog-content"></div></div></dialog>`;
+  `<main class="game-root"><div class="scene-backdrop"></div><div class="scene-shade"></div><div class="motes" aria-hidden="true">${Array.from({ length: 22 }, (_, i) => `<i style="--x:${(i * 47) % 100}%;--duration:${14 + (i % 8) * 3}s;--delay:-${i * 2.7}s;--size:${(i % 3) + 1}px"></i>`).join("")}</div><div class="world-stage"><canvas id="world" aria-label="Network battlefield. Use cards and the device targeting controls to build your route."></canvas></div><div id="intent-layer" aria-hidden="true"></div><div class="texture"></div><header id="header" class="game-header"></header><div id="screen"></div><div id="battle-hud"></div><div id="hand-zone"></div><div id="target-dock"></div><div id="battle-foot"></div><div id="lesson-spotlight" aria-hidden="true"><i></i></div><div id="lesson-layer"></div><div id="game-tooltip" role="tooltip"></div><div id="hover-card" role="tooltip" aria-hidden="true"></div><div id="impact-layer" aria-hidden="true"></div><div id="battle-flash"></div><div id="toast" role="status" aria-live="polite"></div><div class="now-playing" id="now-playing"></div></main><dialog id="dialog" aria-label="Field journal"><button class="dialog-close" data-action="close" aria-label="Close dialog">${ui.icon("close", 16)}</button><div class="dialog-surface"><div id="dialog-content"></div></div></dialog>`;
 const root = $(".game-root"),
   dialog = $<HTMLDialogElement>("#dialog");
 sound.update({});
@@ -249,8 +249,10 @@ function ensureWorld() {
       onNode,
       onLink: () => {},
       onMove,
-      onPort: selectPort,
+      onPort: clickHostile,
       onAim: aimDelivery,
+      onDelivery: pickDelivery,
+      onFrame: placeIntents,
       onInstallation: selectInstallation,
       onHover: hoverTable,
     });
@@ -272,7 +274,7 @@ function hoverTable(target: TableHover | null, x: number, y: number) {
   if (hoverCardKey() === key) { moveHoverCard(x, y); return; }
   const preview = combatPreview(run);
   const html = target.kind === "port" || target.kind === "delivery"
-    ? hostileCards.hoverMarkup(run, preview, target)
+    ? hostileCards.hoverMarkup(run, preview, target, hud.delivery)
     : tableCards.hoverMarkup(run, preview, target);
   if (html) showHoverCard(key, html, x, y);
   else hideHoverCard();
@@ -322,17 +324,19 @@ function render(rebuild = true) {
     view === "title" || view === "select",
     sound.settings,
   );
+  settleHud();
   if (battle) {
     ensureWorld();
     const forecast = combatPreview(run);
     // The table and the rail mirror the run, its forecast and the HUD's selections (battle-playback.ts).
     syncWorld(world, run, forecast, worldView(), { rebuild, debrief });
+    renderIntents(debrief ? null : forecast);
     root.dataset.guardianWindow = forecast.lethal ? "" : forecast.interrupted ? "break" : forecast.intent?.ultimate ? "ultimate" : forecast.intent?.kind === "charge" ? "charge" : leaderOf(run)?.exposed ? "exposed" : "";
     root.classList.toggle("is-buffering", run.buffering);
     showTerrainTitle();
     announceArrival(forecast);
   }
-  if (!battle) delete root.dataset.guardianWindow;
+  if (!battle) { delete root.dataset.guardianWindow; renderIntents(null); }
   world?.setVisible(battle);
   let screen = "";
   if (debrief) screen = "";
@@ -365,7 +369,6 @@ function render(rebuild = true) {
       chart.scrollLeft = Math.max(0, nextRoom.offsetLeft - chart.clientWidth / 2);
     }
   }
-  settleHud();
   const revealing = battle && !debrief && revealDesignation();
   const hudMarkup = battle
     ? battleUi.battleMarkup(run, {
@@ -906,33 +909,102 @@ function journalAction(move: () => void) {
 function lessonMove(action: Extract<training.LessonAction, { kind: "aim" | "focus" | "repair" | "scrub" }>): boolean {
   return lessonBlocks(action);
 }
-/** Select a port (rail plate, sprite or strip row): the right plate shows its hostile.
- * Reading only: selection never changes a number. */
-function selectPort(port: Port) {
+/** A click on a hostile (its body, rail plate, intent badge or port-strip row). With a delivery
+ * picked up it aims that delivery there; otherwise the hostile becomes the target. */
+function clickHostile(port: Port) {
   if (!playable() || !livingEnemies(run).some(enemy => enemy.port === port)) return;
-  const changed = hud.port !== port;
-  hud.port = port;
-  render(false);
-  if (changed) sound.effect("select");
+  const armed = hud.delivery && livingEnemies(run).length > 1 && combatPreview(run).deliveries.some(item => item.channelKey === hud.delivery);
+  if (armed) aimDelivery(hud.delivery!, port);
+  else focusPort(port);
 }
-/** Make a port the focus: every unaimed delivery and all overflow go there (free, undoable). */
+/** Make a port the target (the rules' focus): every unaimed delivery and all overflow go there
+ * (free, undoable). The right plate details the target. Targeting the target changes nothing. */
 function focusPort(port: Port) {
   if (!playable() || !livingEnemies(run).some(enemy => enemy.port === port)) return;
-  hud.port = port;
-  if (effectiveFocus(run) === port && run.focus === port) { render(false); return; }
+  if (effectiveFocus(run) === port && run.focus === port) { hud.port = port; render(false); return; }
   if (lessonMove({ kind: "focus", port })) return;
+  hud.port = port;
   playAction(() => setFocus(run, port), "aim");
 }
-/** Re-aim one delivery at a port (null follows the focus): ledger studs, T, and the table's packet glyphs. */
-function aimDelivery(channelKey: string, port: Port | null) {
+/** Re-aim one delivery at a port (null follows the target): a click on a hostile with the delivery
+ * picked up, the ledger's studs, a dropped packet glyph, or T (`keep`: it stays picked up to cycle). */
+function aimDelivery(channelKey: string, port: Port | null, keep = false) {
   if (!playable()) return;
   const delivery = combatPreview(run).deliveries.find(item => item.channelKey === channelKey);
   if (!delivery) return;
-  hud.delivery = channelKey;
-  if (port !== null && delivery.port === port && (delivery.aimed || effectiveFocus(run) === port)) { render(false); return; }
+  if (port !== null && delivery.port === port && (delivery.aimed || effectiveFocus(run) === port)) {
+    hud.delivery = keep ? channelKey : null;
+    render(false);
+    return;
+  }
   if (lessonMove({ kind: "aim", key: channelKey, port })) return;
+  hud.delivery = keep ? channelKey : null;
   playAction(() => aimChannel(run, channelKey, port), "aim");
 }
+/** Pick a delivery up (a packet glyph or its ledger row) to aim it with the next hostile clicked;
+ * the same one again, or null (the empty table, Esc), puts it down. Reading only. */
+function pickDelivery(channelKey: string | null) {
+  if (!playable() || (channelKey && (selected !== null || consoleTargeting))) return;
+  const next = channelKey && channelKey !== hud.delivery && livingEnemies(run).length > 1
+    && combatPreview(run).deliveries.some(item => item.channelKey === channelKey) ? channelKey : null;
+  if (next === hud.delivery) return;
+  hud.delivery = next;
+  render(false);
+  sound.effect(next ? "select" : "undo");
+}
+let intentMarkup = "";
+/** The intent badges (hostile-cards.ts): content on render, position on every drawn frame. */
+function renderIntents(forecast: ReturnType<typeof combatPreview> | null) {
+  const layer = document.getElementById("intent-layer");
+  if (!layer) return;
+  // Without a table (WebGL unavailable) there is nothing to hang them on: the plates carry the intents.
+  const markup = world && forecast && view === "run" && run.phase === "battle" ? hostileCards.intentBadges(run, forecast, { armed: hud.delivery }) : "";
+  if (markup !== intentMarkup) {
+    intentMarkup = markup;
+    layer.innerHTML = markup;
+  }
+  placeIntents();
+}
+/** Hangs each badge over its rail plate (the table moves with the camera and the frame). Positions
+ * are client pixels, the layer lives inside #app's interface zoom. */
+function placeIntents() {
+  const layer = document.getElementById("intent-layer");
+  if (!layer?.firstElementChild || !world) return;
+  const scale = interfaceScale(), origin = root.getBoundingClientRect();
+  for (const badge of Array.from(layer.children) as HTMLElement[]) {
+    const port = (badge.dataset.port ?? badge.dataset.arrival) as Port;
+    const at = world.portAnchor(port, !!badge.dataset.arrival);
+    badge.hidden = !at;
+    if (!at) continue;
+    const place = `translate(${((at.x - origin.left) / scale).toFixed(1)}px, ${((at.y - origin.top) / scale).toFixed(1)}px)`;
+    if (badge.dataset.place !== place) { badge.dataset.place = place; badge.style.transform = `${place} translate(-50%, -100%)`; }
+    const width = `${Math.round(at.width / scale)}px`;
+    if (badge.style.getPropertyValue("--plate") !== width) badge.style.setProperty("--plate", width);
+  }
+}
+/** Hover cards off the canvas: an intent badge or a port-strip row shows its hostile's card, a
+ * delivery row's mark its delivery's card (the canvas raises its own through hoverTable). */
+document.addEventListener("pointermove", event => {
+  const el = event.target as HTMLElement;
+  if (el.id === "world") return;
+  const spot = el.closest?.<HTMLElement>("[data-hover-port], [data-hover-delivery]");
+  if (!spot || view !== "run" || run.phase !== "battle" || dialog.open) {
+    if (hoverCardKey().startsWith("dom:")) hideHoverCard();
+    return;
+  }
+  const target: TableHover = spot.dataset.hoverPort ? { kind: "port", id: spot.dataset.hoverPort } : { kind: "delivery", id: spot.dataset.hoverDelivery! };
+  const key = `dom:${target.kind}:${target.id}`;
+  // A row of the right plate keeps its card beside the plate, clear of the rows it reads.
+  const plate = spot.closest(".battle-right")?.getBoundingClientRect();
+  const x = plate ? plate.left : event.clientX;
+  if (hoverCardKey() === key) { moveHoverCard(x, event.clientY); return; }
+  const html = hostileCards.hoverMarkup(run, combatPreview(run), target, hud.delivery);
+  if (html) showHoverCard(key, html, x, event.clientY);
+  else hideHoverCard();
+});
+document.addEventListener("pointerout", event => {
+  if (!event.relatedTarget && hoverCardKey().startsWith("dom:")) hideHoverCard();
+});
 /** Select an installation (table click, ledger or journal): its scrub plate opens in the dock.
  * While Demolition Charge is choosing, the installation is its target instead. */
 function selectInstallation(id: string) {
@@ -970,11 +1042,15 @@ function worldView() {
   };
 }
 // Browser tests reach the table's click targets without the canvas (dev server only).
-if (import.meta.env.DEV) (globalThis as { __faultlineHud?: unknown }).__faultlineHud = { selectPort, selectInstallation, aimDelivery, focusPort, selectNode: onNode };
+if (import.meta.env.DEV) (globalThis as { __faultlineHud?: unknown }).__faultlineHud = { selectPort: clickHostile, clickHostile, pickDelivery, selectInstallation, aimDelivery, focusPort, selectNode: onNode };
 /** Forget selections that no longer point at anything (a fallen hostile, a scrubbed installation). */
 function settleHud() {
   if (view !== "run" || run.phase !== "battle") { hud.port = hud.delivery = hud.installation = null; hud.demolition = false; return; }
   if (hud.port && !livingEnemies(run).some(enemy => enemy.port === hud.port)) hud.port = null;
+  // A picked-up delivery is put down when its channel is gone, one hostile is left, or a card or
+  // the console starts choosing a target instead.
+  if (hud.delivery && (selected !== null || consoleTargeting || livingEnemies(run).length < 2
+    || !combatPreview(run).deliveries.some(item => item.channelKey === hud.delivery))) hud.delivery = null;
   if (hud.installation && !run.installations.some(item => item.id === hud.installation)) hud.installation = null;
   if (hud.demolition && (selected === null || baseCard(run.hand[selected] ?? "guard") !== "demolition-charge")) hud.demolition = false;
 }
@@ -1587,16 +1663,16 @@ document.addEventListener("click", (event) => {
     sound.effect("select");
     return;
   }
-  // The far rail: the crest sets the focus, a row selects its port, a stud aims a delivery.
+  // The far rail: a hostile's badge or strip row targets it (or receives the picked-up delivery),
+  // a delivery row picks its delivery up, a stud aims it at once.
   if (!dialog.open) {
-    const crest = target.closest<HTMLElement>("[data-focus-port]")?.dataset.focusPort as Port | undefined;
-    if (crest) { focusPort(crest); return; }
-    const row = target.closest<HTMLElement>(".port-row[data-port]")?.dataset.port as Port | undefined;
-    if (row) { selectPort(row); return; }
+    const hostile = target.closest<HTMLElement>(".hostile-intent[data-port], .port-row[data-port]")?.dataset.port as Port | undefined;
+    if (hostile) { clickHostile(hostile); return; }
     const stud = target.closest<HTMLElement>("[data-aim][data-aim-port]");
     if (stud) { aimDelivery(stud.dataset.aim!, stud.dataset.aimPort as Port); return; }
+    if (target.closest("[data-aim-cancel]")) { pickDelivery(null); return; }
     const delivery = target.closest<HTMLElement>(".delivery-row[data-delivery]")?.dataset.delivery;
-    if (delivery && playable()) { hud.delivery = delivery; render(false); sound.effect("select"); return; }
+    if (delivery) { pickDelivery(delivery); return; }
     const demolishId = target.closest<HTMLElement>("[data-demolish]")?.dataset.demolish;
     if (demolishId) { selectInstallation(demolishId); return; }
   }
@@ -1894,6 +1970,8 @@ document.addEventListener("keydown", (event) => {
   }
   if (event.key === "Escape") {
     event.preventDefault();
+    // A picked-up delivery is put down first (it waits for a click on a hostile).
+    if (hud.delivery && selected === null && !consoleTargeting && playable()) { pickDelivery(null); return; }
     if (selected !== null || selectedNode || deviceDragging || cardDrag || consoleTargeting || hud.installation || hud.demolition) {
       clearSelection();
       render(false);
@@ -1942,15 +2020,15 @@ window.addEventListener("pagehide", (event) => {
   save();
   if (!event.persisted) world?.dispose();
 });
-/** Targeting and table-front keys (13.8): F focus, [ ] choose a delivery, T aim it, R repair, S scrub. */
+/** Targeting and table-front keys (13.8): F cycles the target, [ ] pick a delivery up, T aims it at
+ * the next port, R repair, S scrub. */
 function tableKey(event: KeyboardEvent): boolean {
   const key = event.key.toLowerCase();
   if (!["f", "[", "]", "t", "r", "s"].includes(key)) return false;
   event.preventDefault();
   const living = livingEnemies(run).map(enemy => enemy.port);
   if (key === "f") {
-    if (hud.port && living.includes(hud.port) && hud.port !== effectiveFocus(run)) focusPort(hud.port);
-    else if (living.length > 1) {
+    if (living.length > 1) {
       const focus = effectiveFocus(run);
       focusPort(living[(living.indexOf(focus ?? living[0]) + 1) % living.length]);
     }
@@ -1971,7 +2049,7 @@ function tableKey(event: KeyboardEvent): boolean {
     const deliveries = combatPreview(run).deliveries;
     const delivery = deliveries.find(item => item.channelKey === hud.delivery) ?? deliveries[0];
     if (!delivery || living.length < 2) return true;
-    aimDelivery(delivery.channelKey, living[(living.indexOf(delivery.port) + 1) % living.length]);
+    aimDelivery(delivery.channelKey, living[(living.indexOf(delivery.port) + 1) % living.length], true);
     return true;
   }
   if (key === "r") {

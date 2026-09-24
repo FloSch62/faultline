@@ -3,7 +3,7 @@ import type { InstallationKind } from "../core/types.ts";
 
 /**
  * Canvas-drawn table furniture: device nameplates, installation tags, the rail plates under each
- * hostile, the focus crest, the countdown numeral, packet glyphs and kind glyphs. Everything is an
+ * hostile, the target reticle, the countdown numeral, packet glyphs and kind glyphs. Everything is an
  * engraved iron or brass object in the game's faces (Grenze numerals and names), never a web label.
  */
 
@@ -28,10 +28,6 @@ const GLYPHS: Record<string, string[]> = {
   jammer: ["M4 9a8 8 0 0 0 16 0Z", "M12 17v5M8 22h8M12 9 17 3"],
   spike: ["M12 2 15 16H9L12 2Z", "M5 21h14M8 18l-2 3m10-3 2 3"],
   breaker: ["M7 9h10v11H7Z", "M9 9V6h6v3M12 6c0-2 2-3 4-3", "M10 14h4"],
-};
-const INTENT_GLYPH: Record<string, string> = {
-  strike: "sword", breach: "sword", sever: "link", jam: "bolt", corrupt: "field", charge: "bolt", install: "malware",
-  overload: "warning", dormant: "next",
 };
 export const KIND_GLYPH: Record<InstallationKind, string> = { tap: "malware", jammer: "jammer", spike: "spike", anchor: "anchor", breaker: "breaker" };
 
@@ -165,9 +161,7 @@ export interface RailPlateData {
   damage: number;
   overflowIn: number;
   lethal: boolean;
-  /** The intent kind for this phase, its number, and whether it is cancelled / dormant. */
-  intent: string | null;
-  amount: number;
+  /** This phase's state (the intent itself is the DOM badge above the plate). */
   state: "acts" | "dormant" | "cancelled" | "spiteful" | "skipped" | "dead";
   /** Leaders: escalation level reached (0–3); null hides the pips. */
   escalation: number | null;
@@ -175,14 +169,9 @@ export interface RailPlateData {
   placeholder?: boolean;
 }
 
-const INTENT_COLORS: Record<string, string> = {
-  strike: "#f0ad76", breach: "#f57968", sever: "#f1d5a0", jam: "#b59cec", corrupt: "#c98fd3", charge: "#f6c486",
-  install: "#ff6fae", overload: FRAY, dormant: "#9a958a",
-};
-
-/** The rail plate under a hostile (1024 × 320): name, health bar in the hostile's colour with the
- * forecast loss as the HUD's striped risk band, this phase's intent glyph and number, the damage it
- * takes (or LETHAL in gold) and, for leaders, three escalation pips. */
+/** The rail plate under a hostile (1024 × 320): name (leaders: three escalation pips after it),
+ * health bar in the hostile's colour with the forecast loss as the HUD's striped risk band, and the
+ * damage it takes (or LETHAL in gold). Its intent hangs above it as a DOM badge (#intent-layer). */
 export function drawRailPlate(canvas: HTMLCanvasElement, data: RailPlateData) {
   const c = canvas.getContext("2d")!;
   const W = 1024, H = 320;
@@ -207,47 +196,22 @@ export function drawRailPlate(canvas: HTMLCanvasElement, data: RailPlateData) {
   c.lineJoin = "round";
   const shadow = () => { c.lineWidth = 9; c.strokeStyle = "rgba(0, 0, 0, .78)"; };
 
-  // Row 1: the name (leaders: three escalation pips after it), this phase's intent at the right.
-  const cancelled = data.state === "cancelled" || data.state === "dead" || data.lethal && data.state !== "spiteful";
-  const intentColor = cancelled ? "#8f8570" : data.state === "dormant" ? INTENT_COLORS.dormant : INTENT_COLORS[data.intent ?? ""] ?? "#f0ad76";
-  const intentLabel = !data.intent || data.state === "dormant" || data.intent === "charge" || !data.amount ? "" : String(data.amount);
-  c.font = `700 118px Grenze, serif`;
-  const numberWidth = intentLabel ? c.measureText(intentLabel).width : 0;
-  const intentWidth = data.intent ? numberWidth + (intentLabel ? 128 : 112) : 0;
+  // Row 1: the name, centred, with a leader's three escalation pips after it.
   const pipsWidth = data.escalation !== null ? 150 : 0;
-  let size = 122;
+  let size = 124;
   const name = data.name.toUpperCase();
   c.font = `600 ${size}px Grenze, serif`;
-  while (c.measureText(name).width > W - 124 - intentWidth - pipsWidth && size > 64) c.font = `600 ${(size -= 4)}px Grenze, serif`;
+  while (c.measureText(name).width > W - 116 - pipsWidth && size > 64) c.font = `600 ${(size -= 4)}px Grenze, serif`;
+  const nameWidth = c.measureText(name).width;
+  const left = Math.max(54, (W - nameWidth - pipsWidth) / 2);
   c.textAlign = "left";
   shadow();
-  c.strokeText(name, 54, 104);
+  c.strokeText(name, left, 104);
   c.fillStyle = dim ? "#a9a192" : IVORY;
-  c.fillText(name, 54, 104);
+  c.fillText(name, left, 104);
   if (data.escalation !== null) {
-    const start = 54 + c.measureText(name).width + 50;
+    const start = left + nameWidth + 50;
     for (let i = 0; i < 3; i++) pip(c, start + i * 44, 104, 16, i < data.escalation, "#e08a6b");
-  }
-  if (data.intent) {
-    const right = W - 54;
-    drawGlyph(c, INTENT_GLYPH[data.intent] ?? "bolt", right - numberWidth - (intentLabel ? 62 : 46), 104, 92, intentColor, 2.2);
-    if (intentLabel) {
-      c.font = `700 118px Grenze, serif`;
-      c.textAlign = "right";
-      shadow();
-      c.strokeText(intentLabel, right, 110);
-      c.fillStyle = intentColor;
-      c.fillText(intentLabel, right, 110);
-    }
-    if (cancelled && data.state !== "dead") {
-      // Struck through in gold: it will not act.
-      c.strokeStyle = "#e7c56f";
-      c.lineWidth = 8;
-      c.beginPath();
-      c.moveTo(right - intentWidth + 8, 132);
-      c.lineTo(right + 6, 76);
-      c.stroke();
-    }
   }
 
   // Row 2: the health bar (the number inside it) with the loss band; the damage, LETHAL or SILENCED.
@@ -344,54 +308,75 @@ export function railPlateSprite(): { sprite: THREE.Sprite; canvas: HTMLCanvasEle
   return { sprite: item, canvas };
 }
 
-let crest: THREE.CanvasTexture | null = null;
-/** The focus crest: the game's boss glyph engraved on a brass diamond, set in an iron mount with an
- * ember halo so it reads against any painted body. */
-export function crestTexture(): THREE.CanvasTexture {
-  if (crest) return crest;
+let reticle: THREE.CanvasTexture | null = null;
+/** The target marker (768 × 320): four brass corner brackets with an ember glow and a small lit
+ * diamond on each flank, drawn once and framed around the target's rail plate. */
+export function reticleTexture(): THREE.CanvasTexture {
+  if (reticle) return reticle;
   const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 256;
+  canvas.width = 768;
+  canvas.height = 320;
   const c = canvas.getContext("2d")!;
-  const glow = c.createRadialGradient(128, 128, 40, 128, 128, 128);
-  glow.addColorStop(0, "rgba(255, 150, 70, .7)");
-  glow.addColorStop(0.6, "rgba(255, 110, 40, .22)");
-  glow.addColorStop(1, "rgba(255, 100, 30, 0)");
-  c.fillStyle = glow;
-  c.fillRect(0, 0, 256, 256);
-  const diamond = (r: number) => {
+  const l = 26, t = 26, r = 742, b = 294, arm = 124, rise = 88;
+  const brackets = () => {
     c.beginPath();
-    c.moveTo(128, 128 - r);
-    c.lineTo(128 + r * 0.82, 128);
-    c.lineTo(128, 128 + r);
-    c.lineTo(128 - r * 0.82, 128);
-    c.closePath();
+    c.moveTo(l, t + rise); c.lineTo(l, t); c.lineTo(l + arm, t);
+    c.moveTo(r - arm, t); c.lineTo(r, t); c.lineTo(r, t + rise);
+    c.moveTo(r, b - rise); c.lineTo(r, b); c.lineTo(r - arm, b);
+    c.moveTo(l + arm, b); c.lineTo(l, b); c.lineTo(l, b - rise);
   };
-  // Iron mount, then the brass diamond.
-  diamond(112);
-  c.fillStyle = "#15120f";
-  c.fill();
+  c.lineCap = "square";
+  c.lineJoin = "miter";
+  // Ember halo, the brass bar, then a pale hairline on its inner edge.
+  c.shadowColor = "#ff9a3c";
+  c.shadowBlur = 22;
+  brackets();
+  c.lineWidth = 20;
+  c.strokeStyle = "#ffb04a";
+  c.stroke();
+  c.shadowBlur = 0;
+  brackets();
+  c.lineWidth = 13;
+  c.strokeStyle = "#e8c47c";
+  c.stroke();
+  brackets();
+  c.lineWidth = 3;
+  c.strokeStyle = "#fff2c9";
+  c.stroke();
+  for (const x of [l, r]) {
+    c.shadowColor = "#ff9a3c";
+    c.shadowBlur = 16;
+    pip(c, x, 160, 20, true, "#ffd98a");
+    c.shadowBlur = 0;
+  }
+  reticle = texture(canvas);
+  reticle.userData.shared = true;
+  return reticle;
+}
+
+let halo: THREE.CanvasTexture | null = null;
+/** A soft white ring (tinted by its sprite): the selected packet glyph's lit halo. */
+export function haloTexture(): THREE.CanvasTexture {
+  if (halo) return halo;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 128;
+  const c = canvas.getContext("2d")!;
+  c.shadowColor = "#ffffff";
+  c.shadowBlur = 14;
   c.lineWidth = 7;
-  c.strokeStyle = "#ffb86a";
+  c.strokeStyle = "rgba(255, 255, 255, .95)";
+  c.beginPath();
+  c.arc(64, 64, 44, 0, Math.PI * 2);
   c.stroke();
-  const brass = c.createLinearGradient(70, 40, 186, 216);
-  brass.addColorStop(0, "#ffe7ad");
-  brass.addColorStop(0.45, "#d09a4c");
-  brass.addColorStop(1, "#6b4820");
-  diamond(88);
-  c.fillStyle = brass;
-  c.fill();
-  c.lineWidth = 5;
-  c.strokeStyle = "#241508";
+  c.shadowBlur = 0;
+  c.lineWidth = 2;
+  c.strokeStyle = "rgba(255, 255, 255, .7)";
+  c.beginPath();
+  c.arc(64, 64, 54, 0, Math.PI * 2);
   c.stroke();
-  diamond(74);
-  c.lineWidth = 2.5;
-  c.strokeStyle = "rgba(255, 240, 200, .75)";
-  c.stroke();
-  drawGlyph(c, "boss", 128, 128, 88, "#20120a", 2.6);
-  drawGlyph(c, "boss", 127, 126, 88, "rgba(255, 226, 170, .4)", 1);
-  crest = texture(canvas);
-  crest.userData.shared = true;
-  return crest;
+  halo = texture(canvas);
+  halo.userData.shared = true;
+  return halo;
 }
 
 /** The Breaker Charge countdown: a Grenze numeral on a small obsidian disc, ember-lit. */

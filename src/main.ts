@@ -266,6 +266,8 @@ function ensureWorld() {
     );
   }
 }
+/** Test hooks: on the dev server, and on a production build under the browser suite's render flag. */
+const testHooks = import.meta.env.DEV || (globalThis as { __faultlineTestRender?: boolean }).__faultlineTestRender === true;
 /** Hover cards on the table: devices, cables and installations (table-cards.ts), hostiles and
  * packet glyphs (hostile-cards.ts). The same target only moves the card; render() hides it. */
 function hoverTable(target: TableHover | null, x: number, y: number) {
@@ -1047,7 +1049,7 @@ function worldView() {
   };
 }
 // Browser tests reach the table's click targets without the canvas (dev server only).
-if (import.meta.env.DEV) (globalThis as { __faultlineHud?: unknown }).__faultlineHud = { selectPort: clickHostile, clickHostile, pickDelivery, selectInstallation, aimDelivery, focusPort, selectNode: onNode };
+if (testHooks) (globalThis as { __faultlineHud?: unknown }).__faultlineHud = { selectPort: clickHostile, clickHostile, pickDelivery, selectInstallation, aimDelivery, focusPort, selectNode: onNode };
 /** Forget selections that no longer point at anything (a fallen hostile, a scrubbed installation). */
 function settleHud() {
   if (view !== "run" || run.phase !== "battle") { hud.port = hud.delivery = hud.installation = null; hud.demolition = false; return; }
@@ -2202,7 +2204,7 @@ function lessonMarkup(): string {
     + training.lessonEndMarkup(practice.progress, practice.plate);
 }
 // Browser tests read the drill's state (lesson runs are never saved). Dev server only.
-if (import.meta.env.DEV) (globalThis as { __faultlineLesson?: unknown }).__faultlineLesson = () => practice && {
+if (testHooks) (globalThis as { __faultlineLesson?: unknown }).__faultlineLesson = () => practice && {
   id: practice.id, turn: run.turn, focus: effectiveFocus(run), aims: { ...run.aims }, delivery: hud.delivery,
   deliveries: run.phase === "battle" && run.enemies.length ? combatPreview(run).deliveries.map(item => item.channelKey) : [],
   step: practice.progress?.current ?? 0, complete: !!practice.progress?.complete, plate: practice.plate,

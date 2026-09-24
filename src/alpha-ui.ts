@@ -97,12 +97,12 @@ function routeTrace(path: string[], label: string, primary: boolean, tail = "") 
 const hostileAt = (run: RunState, uid: string) => run.enemies.find(enemy => enemy.uid === uid);
 const nameOf = (run: RunState, uid: string) => named(hostileAt(run, uid)?.name ?? uid);
 
-/** Deliveries (13.7): one trace per channel with its port and amount, then each port's merged
- * packet and the overflow. Every number is a forecast field; nothing is added up here. */
+/** Deliveries (13.7): one trace per channel with its amount (every one lands on the target), then
+ * each port's merged packet and the overflow. Every number is a forecast field; nothing is added up here. */
 function deliveriesMarkup(run: RunState, p: CombatPreview) {
   if (!p.deliveries.length) return '<p class="route-trace is-offline"><b>Signal offline</b></p>';
   const traces = p.deliveries.map(delivery => routeTrace(delivery.path, delivery.primary ? "Primary" : `Channel ${delivery.index + 1}`, delivery.primary,
-    `<span class="route-port${delivery.aimed ? " is-aimed" : ""}" data-port="${delivery.port}"><small>${delivery.aimed ? "aimed" : "focus"}</small>${PORT_NAMES[delivery.port]}<b>${delivery.amount}</b></span>`)).join("");
+    `<span class="route-port" data-port="${delivery.port}"><small>target</small>${PORT_NAMES[delivery.port]}<b>${delivery.amount}</b></span>`)).join("");
   const lines = PORTS.map(port => {
     const forecast = p.ports[port];
     return forecast ? portLine(run, p, port, forecast) : "";
@@ -264,7 +264,7 @@ export function combatDetailsMarkup(run: RunState) {
     ? `${term("Incoming before shields", String(p.incomingRaw))}${packDefenses(run, p)}`
     : `${term("Incoming before shields", String(p.incomingRaw))}${p.incomingTerms.length ? `<div class="incoming-sources">${terms(p.incomingTerms)}</div>` : ""}${terms(p.shieldTerms)}`;
   return `${head("Forecast", sub)}
-    <div class="calculation-grid"><section class="ledger">${ledgerHead(icon("bolt", 17), "Signal Damage")}${terms(p.damageTerms)}${!p.signalPath.length ? '<p class="ledger-note">No live ALPHA → router → OMEGA route. Route bonuses cannot activate.</p>' : ""}<div class="calculation-total"><span>${p.buffering ? "Stored in the buffer" : pack ? "Damage to hostiles" : "Damage to hostile"}</span><strong>${p.buffering ? `+${p.bufferGain}` : p.packetDamage}</strong></div>${p.enemyDamage ? term("Traps during the enemy phase", p.enemyDamage, " trap-term") : ""}<h4 class="ledger-sub">Deliveries</h4>${deliveriesMarkup(run, p)}<p class="ledger-note">Your <b>primary route</b> is the strongest live route; only its devices add route damage. Every device carries one channel: routes through the same device are one <b>channel</b>. Every other channel delivers +${perChannel} bandwidth to the port it is aimed at. Deliveries on one port merge; armor is paid once per port.</p></section>
+    <div class="calculation-grid"><section class="ledger">${ledgerHead(icon("bolt", 17), "Signal Damage")}${terms(p.damageTerms)}${!p.signalPath.length ? '<p class="ledger-note">No live ALPHA → router → OMEGA route. Route bonuses cannot activate.</p>' : ""}<div class="calculation-total"><span>${p.buffering ? "Stored in the buffer" : pack ? "Damage to hostiles" : "Damage to hostile"}</span><strong>${p.buffering ? `+${p.bufferGain}` : p.packetDamage}</strong></div>${p.enemyDamage ? term("Traps during the enemy phase", p.enemyDamage, " trap-term") : ""}<h4 class="ledger-sub">Deliveries</h4>${deliveriesMarkup(run, p)}<p class="ledger-note">Your <b>primary route</b> is the strongest live route; only its devices add route damage. Every device carries one channel: routes through the same device are one <b>channel</b>. Every other channel delivers +${perChannel} bandwidth. Every channel lands on your <b>target</b> as one packet, so its armor is paid once; what a kill does not need <b>overflows</b> to the next hostile.</p></section>
     <section class="ledger">${ledgerHead(icon("shield", 17), "Defenses")}${defenses}${term("Total prevented", String(Math.min(p.incomingRaw, p.shield)))}<div class="calculation-total ${p.incoming ? "danger" : "safe"}"><span>Integrity lost</span><strong>${p.incoming}</strong></div>${p.protocolTriggers.map(t => `<p class="protocol-note">${icon("trigger", 15)} <span><b>${esc(t.name)}</b> fires: ${esc(t.effect)}</span></p>`).join("")}<p class="ledger-note">${outcome}</p></section></div>
     ${frontMarkup(run, p)}
     <div class="calculation-grid v3-grid"><section class="ledger">${ledgerHead(icon("console", 17), esc(c.name === engineName ? c.name : `${c.name} · ${engineName}`))}${engine}<p class="ledger-note">${esc(c.rules)}</p></section>

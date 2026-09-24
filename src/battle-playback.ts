@@ -22,8 +22,6 @@ import type { ActionKind, RailReadout, RailState, World, WorldPoint } from "./th
 export interface WorldView {
   /** The port the player last targeted (the table marks only the target itself). */
   selectedPort: Port | null;
-  /** The delivery picked up (its packet glyph lights in its channel colour and trails a tether). */
-  selectedDelivery: string | null;
   /** The installation whose plate is open (its reach ring shows). */
   selectedInstallation: string | null;
   /** An installation-target card is selected (Demolition Charge): installations light as targets. */
@@ -48,9 +46,6 @@ export function syncWorld(world: World | null, run: RunState, preview: CombatPre
   world.setForecastZone(preview.hazardZone);
   world.setZoneEffects(run.zoneEffects);
   world.setRail(options.debrief ? { focus: null, selected: null, readouts: {} } : railState(run, preview, view));
-  world.setDeliveries(preview.deliveries.map(delivery => ({
-    key: delivery.channelKey, primary: delivery.primary, path: delivery.path, port: delivery.port, aimed: delivery.aimed, amount: delivery.amount,
-  })), view.selectedDelivery);
 }
 
 /** Every forecast disruption target: each hostile's jams, cuts and overload, and each Jammer's jam. */

@@ -13,7 +13,7 @@ import type {
   CardId, DesignationId, Enemy, Installation, InstallationKind, Intent, NetworkNode, Port, RunState, Zone, ZoneEffect, EscalationLevel, HostileRole,
 } from "../types.ts";
 import {
-  BAND_TIES, FIELD_RULES, INSTALLATION_NAMES, PORTS, ZONES, anchoredBands, bandSocket, breakDevice, cabledHoneypots, card, conditionOf,
+  BAND_TIES, FIELD_RULES, INSTALLATION_NAMES, ZONES, anchoredBands, bandSocket, breakDevice, cabledHoneypots, card, conditionOf,
   damageEnemy, definitionOf, destroyInstallation, effectiveFocus, enemyAt, fieldBands, has, hostileFieldTurns, hostileLabel,
   installField, installationId, isHardware, leaderOf, livingEnemies, livingLeader, reachSocket, shelterOf, wearDevice, wearable,
   within, zoneForNode, type BreakRecord, type DestroyRecord, type TableLog, type WearRecord,
@@ -33,17 +33,16 @@ export interface Delivery {
   index: number;
   primary: boolean;
   path: string[];
+  /** Always the target's port: every delivery lands there and merges into one packet. */
   port: Port;
-  /** The player aimed it (false: it follows the focus). */
-  aimed: boolean;
   amount: number;
   terms: CombatTerm[];
 }
 export interface PortForecast {
   uid: string;
-  /** Sum of the deliveries aimed here (after Siphon Taps). */
+  /** Sum of the deliveries landing here (after Siphon Taps): the target's port, else 0. */
   merged: number;
-  /** Port bonuses: every-port and focus cards, backpressure release, exposed guardian. */
+  /** Port bonuses: every-port and target cards, backpressure release, exposed guardian. */
   bonus: number;
   /** Armor and plating subtracted once from everything the port receives. */
   armor: number;
@@ -249,7 +248,6 @@ export function simulationOf(run: RunState): RunState {
     faultLinks: [...run.faultLinks],
     protocols: [...run.protocols],
     terrain: run.terrain && { ...run.terrain, debris: run.terrain.debris.map(spot => ({ ...spot })) },
-    aims: { ...run.aims },
     reinforcement: run.reinforcement && { ...run.reinforcement },
     signal: run.signal && { ...run.signal, ...(run.signal.socket ? { socket: { ...run.signal.socket } } : {}) },
     ...(run.frayedByCut ? { frayedByCut: [...run.frayedByCut] } : {}),
@@ -331,7 +329,6 @@ function transmit(run: RunState, network: Network, focus: Port | null): Transmis
   const buffering = run.buffering && !!primary;
   const effects = run.turnEffects ?? {};
   const living = livingEnemies(run);
-  const livingPorts = new Set(living.map(enemy => enemy.port));
   const spanning = has(run, "spanning-tree");
   const taps = run.installations.filter(item => item.kind === "tap").length;
   const balancers = network.onlineNodes.filter(node => node.role === "balancer").length;
@@ -344,11 +341,8 @@ function transmit(run: RunState, network: Network, focus: Port | null): Transmis
   const release = !buffering && primary ? run.buffer : 0;
   const terms: CombatTerm[] = [];
   const deliveries: Delivery[] = [];
-  const portOf = (key: string): { port: Port; aimed: boolean } => {
-    const aimed = run.aims[key];
-    if (!effects.forceFocus && aimed && livingPorts.has(aimed)) return { port: aimed, aimed: true };
-    return { port: focus ?? "centre", aimed: false };
-  };
+  // Every delivery lands on the target (rule 15); overflow carries what it does not need (rule 13).
+  const port: Port = focus ?? "centre";
   if (primary) {
     // ---- aggregate terms, v3 labels (a single hostile sees exactly v3's list)
     const route = routeTerms(run, primary.path, primary.boosted, primary.frayed);
@@ -380,13 +374,12 @@ function transmit(run: RunState, network: Network, focus: Port | null): Transmis
     const routes = [network.channels[0], ...network.channels.slice(1, channels)];
     routes.forEach((route, index) => {
       const key = channelKey(route.path);
-      const { port, aimed } = portOf(key);
       const own: CombatTerm[] = index === 0 ? [...primaryTerms]
         : spanning ? [{ label: "Spanning Tree · bandwidth gives nothing", amount: 0 }]
           : [{ label: "Bandwidth", amount: bandwidth }, ...(balancers ? [{ label: `Load balancers ×${balancers}`, amount: balancers * RULES.balancerPerChannel }] : [])];
-      deliveries.push({ channelKey: key, index, primary: index === 0, path: route.path, port, aimed, amount: sumTerms(own), terms: own });
+      deliveries.push({ channelKey: key, index, primary: index === 0, path: route.path, port, amount: sumTerms(own), terms: own });
     });
-    // Priority Queue: the primary delivery deals +1 against the hostile with the least health.
+    // Priority Queue: +1 while the target is the hostile with the least health.
     if (has(run, "priority-queue") && living.length) {
       const least = Math.min(...living.map(enemy => enemy.hp));
       const target = enemyAt(run, deliveries[0].port);
@@ -398,10 +391,9 @@ function transmit(run: RunState, network: Network, focus: Port | null): Transmis
       }
     }
     // Siphon Taps (rule 11): −2 each, taken from the primary delivery first, then from
-    // bandwidth deliveries in port order.
+    // bandwidth deliveries in channel order.
     let siphon = taps * RULES.malwarePenalty;
-    const order = [deliveries[0], ...deliveries.slice(1).sort((a, b) => PORTS.indexOf(a.port) - PORTS.indexOf(b.port) || a.index - b.index)];
-    for (const delivery of order) {
+    for (const delivery of deliveries) {
       if (!siphon) break;
       const take = Math.min(siphon, Math.max(0, delivery.amount));
       if (!take) continue;
@@ -478,7 +470,7 @@ function transmit(run: RunState, network: Network, focus: Port | null): Transmis
     if (state.bonus) {
       const port = state.enemy.port.toUpperCase();
       if (everyPort) terms.push({ label: `${port} · every port +${everyPort}`, amount: everyPort });
-      if (focusBonus && state.enemy.port === focus) terms.push({ label: `${port} · focus packet`, amount: focusBonus });
+      if (focusBonus && state.enemy.port === focus) terms.push({ label: `${port} · target packet`, amount: focusBonus });
       if (primary && run.backpressure && backpressurePorts.includes(state.enemy.port)) terms.push({ label: `${port} · Backpressure`, amount: run.backpressure });
       if (primary && state.enemy.exposed && deliveries.some(delivery => delivery.port === state.enemy.port)) terms.push({ label: "Exposed guardian", amount: RULES.exposedBonus });
     }

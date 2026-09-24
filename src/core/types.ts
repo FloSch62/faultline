@@ -338,7 +338,7 @@ export interface MapRoom {
 export interface Enemy {
   /** Definition id in ENEMIES. Two escorts of one kind share it; `uid` tells them apart. */
   id: string;
-  /** Unique within the encounter ("h1", "h2", …); installations and aims refer to it. */
+  /** Unique within the encounter ("h1", "h2", …); installations and forecasts refer to it. */
   uid: string;
   name: string;
   title: string;
@@ -453,10 +453,8 @@ export interface RunState {
   /** Event ids already met this expedition; events do not repeat. */
   seenEvents?: string[];
   // ---- v4 · Under Quarantine ----
-  /** Port whose hostile receives every unaimed delivery and all overflow. */
+  /** The target (the rules' focus): the port every delivery lands on; overflow carries the surplus. */
   focus: Port | null;
-  /** channelKey → destination port. A channel that disappears loses its aim. */
-  aims: Record<string, Port>;
   /** Enemy phases resolved this encounter. Escort cadence reads phase parity (the next phase is enemyPhase + 1). */
   enemyPhase: number;
   /** Hostile actions resolved this encounter across every port; installations activate by it. */
@@ -492,10 +490,8 @@ export interface RunState {
 export interface TurnEffects {
   /** Added to every living port's packet (Broadcast Storm, Packet Storm, Flood Fill). */
   everyPort?: number;
-  /** Added to the focus port's packet (Traffic Shaping, Demolition Charge). */
+  /** Added to the target's packet (Traffic Shaping, Demolition Charge). */
   focusBonus?: number;
-  /** Traffic Shaping: every delivery goes to the focus this turn. */
-  forceFocus?: boolean;
   /** Spearhead: the buffer release ignores armor and plating. */
   spearhead?: boolean;
   /** Bulkhead: every online firewall blocks this much more against each attack this enemy phase. */

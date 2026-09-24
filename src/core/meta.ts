@@ -160,7 +160,6 @@ export function advanceRoom(run: RunState) {
   // Encounter-scoped combat state never survives a room.
   run.installations = [];
   run.focus = null;
-  run.aims = {};
   run.enemyPhase = 0;
   run.hostileActions = 0;
   run.reinforcement = null;

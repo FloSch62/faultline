@@ -319,7 +319,7 @@ export const ENEMY_STORIES: Record<StoryEnemyId, EnemyStory> = {
       strike: "A static jab crackles off its dish.",
       dormant: "Its dish tilts toward the leader, listening.",
     },
-    counterplay: `While it lives the leader's strikes deal +${RULES.uplinkBonus}. It carries the smallest share, so focus it first; an online firewall blocks ${RULES.firewallStrikeBlock} of every strike, which cancels the uplink exactly; the Ghost can aim a release at it.`,
+    counterplay: `While it lives the leader's strikes deal +${RULES.uplinkBonus}. It carries the smallest share, so target it first; an online firewall blocks ${RULES.firewallStrikeBlock} of every strike, which cancels the uplink exactly; a Ghost's buffer release lands on it in one blow.`,
     defeated: "The dish droops. The leader's orders suddenly sound very far away.",
   },
   "ward-node": {
@@ -330,7 +330,7 @@ export const ENEMY_STORIES: Record<StoryEnemyId, EnemyStory> = {
       jam: "Its lens seals a device it has decided is dangerous.",
       dormant: "The shield disc hums in front of the leader.",
     },
-    counterplay: `While it lives the leader has plating ${RULES.wardPlating} on top of its own armor. Any online firewall bypasses the plating; merge every delivery on the leader so it is paid once, or use Spearhead. Purge Field or Hot Patch answers the seal.`,
+    counterplay: `While it lives the leader has plating ${RULES.wardPlating} on top of its own armor. Any online firewall bypasses the plating, Spearhead's release ignores it, and targeting the Ward Node first breaks the link. Purge Field or Hot Patch answers the seal.`,
     defeated: "The shield disc flickers out. Behind it there was never anything to guard.",
   },
   "tap-spinner": {
@@ -375,7 +375,7 @@ export const ENEMY_STORIES: Record<StoryEnemyId, EnemyStory> = {
     motive: "Two portcullis engines that answer only the crown. When the Regent rises they step out of the gate itself, keyholes lit, to hold the threshold one more time.",
     pattern: ENEMIES["gate-warden"].pattern.map(p => p.kind),
     telegraphs: { strike: "The warden takes one iron step toward you." },
-    counterplay: `Each living Warden adds ${RULES.addBreakBonus} to the Regent's break threshold. They have no armor: spread your deliveries on the charge turn to drop one, or brace and break the Regent anyway.`,
+    counterplay: `Each living Warden adds ${RULES.addBreakBonus} to the Regent's break threshold. They have no armor: target one on the charge turn and its surplus overflows into the Regent, or brace and break the Regent anyway.`,
     defeated: "The warden folds back into a piece of the gate. Its keyhole goes dark.",
   },
   chorister: {

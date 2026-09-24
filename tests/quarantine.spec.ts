@@ -18,7 +18,7 @@ const table = { name: "Test bench", description: "A bare test table.", debris: [
 
 // ------------------------------------------------------------------ a pack fight
 
-test("pack fight: three plates, a click targets, F cycles, T aims, per-port forecast, a dead escort's action is cancelled and its crate lands @smoke", async ({ page }) => {
+test("pack fight: three plates, a click targets, F cycles, the packet and its overflow, a dead escort's action is cancelled and its crate lands @smoke", async ({ page }) => {
   const e = pack([
     { id: "spark-mite", port: "left", hp: 4, maxHp: 12, extra: { crate: { kind: "salvage", role: "switch" } } },
     { id: "serpent", port: "centre", hp: 40 },
@@ -34,8 +34,8 @@ test("pack fight: three plates, a click targets, F cycles, T aims, per-port fore
   await expect.poll(async () => (await tableState(page)).plates.map(plate => plate.port).sort()).toEqual(["centre", "left", "right"]);
   await expect(page.locator('.port-row[data-port="centre"]')).toHaveClass(/is-focus/);
 
-  // A rail plate is a click target: it makes that hostile the target (the focus); unaimed
-  // deliveries follow it and the right plate details it.
+  // A rail plate is a click target: it makes that hostile the target (the focus); every
+  // delivery follows it and the right plate details it.
   const plate = (await tableState(page)).plates.find(item => item.port === "right")!;
   const spot = await tablePoint(page, plate.x, plate.y, plate.z);
   await page.mouse.click(spot.x, spot.y);
@@ -45,43 +45,33 @@ test("pack fight: three plates, a click targets, F cycles, T aims, per-port fore
   await expect(page.locator(".port-detail h2")).toContainText(/Splicer/i);
   await expect(page.locator("#world")).toHaveAttribute("data-focus", "right");
   expect(combatPreview(await saved(page)).deliveries.map(item => item.port)).toEqual(["right"]);
-  // F cycles the target in port order: right → left → centre.
+  // F cycles the target in port order: right → left, and the whole packet follows.
   await page.keyboard.press("f");
   await expect.poll(async () => (await saved(page)).focus).toBe("left");
-  await page.keyboard.press("f");
-  await expect.poll(async () => (await saved(page)).focus).toBe("centre");
+  expect(combatPreview(await saved(page)).deliveries.map(item => item.port)).toEqual(["left"]);
 
-  // ] chooses the delivery, T aims it at the next living port: centre → right → left.
-  const key = combatPreview(await saved(page)).deliveries[0].channelKey;
-  await page.keyboard.press("]");
-  await expect(page.locator(`.delivery-row[data-delivery="${key}"]`)).toHaveClass(/is-selected/);
-  await page.keyboard.press("t");
-  await expect.poll(async () => (await saved(page)).aims[key]).toBe("right");
-  await page.keyboard.press("t");
-  await expect.poll(async () => (await saved(page)).aims[key]).toBe("left");
-  await expect(page.locator(`.port-stud[data-aim="${key}"][data-aim-port="left"]`)).toHaveAttribute("aria-pressed", "true");
-  expect((await saved(page)).focus).toBe("centre");
-
-  // Per-port forecast: the strip prints each port's numbers, the ledger foot totals each port.
+  // Per-port forecast: the strip prints each port's numbers; the plate adds up the packet on the
+  // target and names the overflow its kill does not need.
   const run = await saved(page), forecast = combatPreview(run);
   const left = forecast.ports.left!;
   expect(left.lethal).toBe(true);
   const row = page.locator('.port-row[data-port="left"]');
   await expect(row).toHaveClass(/is-lethal/);
   await expect(row).toHaveAttribute("aria-label", new RegExp(`4 of 12 integrity, takes ${Math.min(4, left.packet)}, lethal`));
-  const foot = page.locator(".deliveries-foot");
-  for (const port of ["left", "centre", "right"] as const) {
-    const landing = forecast.ports[port];
-    if (landing && (landing.packet || landing.merged)) await expect(foot).toContainText(`${port[0].toUpperCase()} ${landing.packet}`);
+  const landing = page.locator(".enemy-plate .landing");
+  await expect(landing.locator(".landing-total")).toHaveText(String(left.packet));
+  expect(left.overflowOut).toBe(left.packet - 4);
+  if (left.overflowOut) {
+    await expect(landing.locator(".landing-overflow")).toContainText(`overflow ${left.overflowOut} → ${left.overflowTo!.toUpperCase()}`);
+    expect(forecast.ports[left.overflowTo!]!.overflowIn).toBe(left.overflowOut);
   }
-  if (left.overflowOut) await expect(foot).toContainText(`overflow ${left.overflowOut} → ${left.overflowTo!.toUpperCase()}`);
   await expect(page.locator(".transmit-button")).toBeVisible();
 
   // The escort dies to this transmission, so its action is cancelled: it no longer adds damage.
-  const unaimed = combatPreview({ ...clone(run), aims: {} });
-  expect(unaimed.hostiles.find(item => item.port === "left")!.state).toBe("acts");
+  const onLeader = combatPreview({ ...clone(run), focus: "centre" });
+  expect(onLeader.hostiles.find(item => item.port === "left")!.state).toBe("acts");
   expect(forecast.hostiles.find(item => item.port === "left")!.state).toBe("cancelled");
-  expect(forecast.incoming).toBeLessThan(unaimed.incoming);
+  expect(forecast.incoming).toBeLessThan(onLeader.incoming);
   await expect(row).toHaveClass(/state-cancelled/);
   await expect(row.locator(".row-state.is-cancelled")).toHaveText(/Falls/i);
   await expect(page.locator('.hostile-intent[data-port="left"]')).toHaveClass(/state-falls/);
@@ -356,7 +346,7 @@ test("reduced motion: a crate appears where it lands, without a drop arc, and it
     { id: "spark-mite", port: "left", hp: 2, maxHp: 12, extra: { crate: { kind: "credits", amount: 12 } } },
     { id: "serpent", port: "centre", hp: 40 },
   ], { ...route("router1"), integrity: 60 });
-  e.run.aims = { router1: "left" };
+  e.run.focus = "left";
   await watchTable(page);
   await recordToasts(page);
   await install(page, e, { motion: false });

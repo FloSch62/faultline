@@ -46,7 +46,6 @@ export function battle(options: BattleOptions = {}): Expedition {
   const maxHp = options.maxHp ?? options.hp ?? 60;
   r.enemies = [{ ...makeEnemy(id, "h1", "centre", "single", maxHp, { turn: options.turn ?? 0 }), hp: options.hp ?? maxHp }];
   r.focus = "centre";
-  r.aims = {};
   void ENEMIES;
   r.bossIntroSeen = true;
   r.terrain = null;

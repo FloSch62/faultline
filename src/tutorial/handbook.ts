@@ -60,12 +60,12 @@ const INSTALLATION_ROWS = () => {
 /** How to answer each designation (design 12.1); the rule itself is content's. */
 const COUNTERPLAY: Record<DesignationId, string> = {
   nesting: `Scrub the first Tap (${R.scrubCost}) · ${name("purge-field")} · a cabled honeypot within ${reach} kills it on arrival`,
-  armored: `Any online firewall bypasses the plating · ${name("spearhead")} · merge deliveries so it is paid once`,
+  armored: `Any online firewall bypasses the plating · ${name("spearhead")} · plating is paid once per packet, so one big transmission beats many small ones`,
   stoked: `Kill faster: burst and width · ${name("patch")} clears every fault · ${name("failover-policy")} or ${name("port-security")}`,
   shedding: "Cross half health on a turn with block up · kill the new escort with overflow · a full rail makes it wait",
   hardened: `One more turn of damage · its strikes deal ${R.hardenedStrike} less`,
   rigged: `${name("failover-policy")} cancels the cut and its Spike · armored cables · keep cables away from your router`,
-  hungry: "Never transmit zero at it: aim at least one delivery its way · do not buffer twice in a row",
+  hungry: "Never transmit zero at it: target it, or let overflow reach it · do not buffer twice in a row",
   spiteful: `Cover its last announced action as if it lived · ${name("failover-policy")} or ${name("port-security")} cancel it · kill it on a harmless turn`,
   laden: "Defeat it for an undelivered message",
   salvaged: `Defeat it for salvage hardware on your table (condition ${R.salvageCondition})`,
@@ -222,17 +222,16 @@ const CHAPTER_BODIES: Record<string, () => string> = {
     const escorts = ESCORT_IDS.map(id => ENEMIES[id]);
     return `
     ${lead(`An encounter holds one to three hostiles at three ${strong("ports")}: ${strong("Left")}, ${strong("Centre")} and ${strong("Right")}. A leader or a single hostile stands at the centre; escorts take the left, then the right. Every phase they act in port order, left to right, and the fight ends when the last of them falls.`)}
-    ${figure(portsDiagram(), `Every live channel is a delivery. Here the primary delivery (${primary}) and one bandwidth delivery (+${R.bandwidthPerChannel}) go to the focus and merge into one packet; the third is aimed at the left escort.`)}
-    ${table(["Delivery", "Carries", "Goes to"], [
-      ["Primary", `The primary route's terms (base ${R.baseRouteDamage}, switches, routers, cables, bands, clusters), burst cards, the Ghost's buffer release, Backpressure, BGP Hijack, the exposed bonus, +${R.balancerPerChannel} per online Load Balancer`, "The focus, unless aimed"],
-      ["Bandwidth", `One for each further channel: +${R.bandwidthPerChannel} (${R.parallelCorePerChannel} with Parallel Core), +${R.balancerPerChannel} per online Load Balancer`, "The focus, unless aimed"],
-      ["Siphon Taps", `−${R.malwarePenalty} each, taken from the primary delivery first, then from bandwidth deliveries in port order`, "—"],
+    ${figure(portsDiagram(), `Every live channel is a delivery, and every delivery lands on your target. Here the primary delivery (${primary}) and two bandwidth deliveries (+${R.bandwidthPerChannel} each) hit the left escort as one packet; what its kill does not need overflows to the leader.`)}
+    ${table(["Delivery", "Carries", "Lands on"], [
+      ["Primary", `The primary route's terms (base ${R.baseRouteDamage}, switches, routers, cables, bands, clusters), burst cards, the Ghost's buffer release, Backpressure, BGP Hijack, the exposed bonus, +${R.balancerPerChannel} per online Load Balancer`, "Your target"],
+      ["Bandwidth", `One for each further channel: +${R.bandwidthPerChannel} (${R.parallelCorePerChannel} with Parallel Core), +${R.balancerPerChannel} per online Load Balancer`, "Your target"],
+      ["Siphon Taps", `−${R.malwarePenalty} each, taken from the primary delivery first, then from bandwidth deliveries in channel order`, "—"],
     ])}
     <div class="hb-columns">
-      <section><h4>${icon("elite", 16)} Focus</h4><p>One port is the ${strong("focus")}: every delivery you have not aimed goes there, and overflow lands there. It starts on the leader. Select a port by its plate or its row, then press ${strong("F")} or its crest to focus it. Selecting only reads; focusing decides.</p></section>
-      <section><h4>${icon("link", 16)} Aim</h4><p>Click a delivery's L · C · R stud, drag its packet on the table, or pick its row with ${strong("[ ]")} and press ${strong("T")}. Aiming is free and ${strong("Z")} undoes it. An aim holds between turns while its channel stands; a cut, jam or breakdown that removes the channel clears it.</p></section>
-      <section><h4>${icon("shield", 16)} One packet per port</h4><p>Deliveries at the same port merge into one packet. Armor and plating are paid once per port, then the packet is clamped at 0. Spread thin against an armored port and each delivery pays for nothing.</p></section>
-      <section><h4>${icon("arrow", 16)} Overflow</h4><p>Damage beyond a hostile's remaining health flows on: to the focus if that is another living hostile, otherwise to the next living port, left to right. It pays the receiving port's armor. The forecast prints it: “overflow 3 → CENTRE”.</p></section>
+      <section><h4>${icon("elite", 16)} Target</h4><p>One hostile is your ${strong("target")}: every delivery lands on it. It starts on the leader. Click a hostile (on the table, its badge or its row on the plate) to target it, or press ${strong("F")} to move the target along the rail. Targeting is free, and ${strong("Z")} undoes it. When the target falls, the next transmission goes to the leader, or else the weakest hostile.</p></section>
+      <section><h4>${icon("shield", 16)} One packet</h4><p>Every channel's delivery merges into one packet on the target. Armor and plating are paid once, then the packet is clamped at 0. The Transmission line on the right plate adds it up: each channel in its colour, the armor, what lands and the overflow.</p></section>
+      <section><h4>${icon("arrow", 16)} Overflow</h4><p>Damage beyond the target's remaining health flows on, to the first standing hostile from the left. It pays the receiving port's armor. The forecast prints it: “overflow 3 → CENTRE”. A kill wastes nothing, so choose the order: kill what matters first, and let the rest spill on.</p></section>
     </div>
     ${table(["Hostile", "Acts", "Escalates"], [
       ["Leader or single", "Every phase", "Yes: the leader is the clock (next chapter)"],
@@ -266,7 +265,7 @@ const CHAPTER_BODIES: Record<string, () => string> = {
     ${table(["State", "On the table", "Answer"], [
       [`Intact ${pipRow(2, 2)}`, "Two brass diamonds on its nameplate", "Nothing to do."],
       [`Worn ${pipRow(1, 2)}`, "A hollow diamond, the rim turns rust-orange, sparks", `Repair: ${R.repairCost} energy per point (R). ${name("patch")}, ${name("reroute")}, ${name("protocol")} and Harden also restore ${R.faultClearRepair} on the most worn device.`],
-      ["Broken", "Removed with its cables; its socket becomes wreckage", `Routes, channels and aims are recomputed at once. Wreckage never exceeds ${R.wreckCap} points.`],
+      ["Broken", "Removed with its cables; its socket becomes wreckage", `Routes and channels are recomputed at once. Wreckage never exceeds ${R.wreckCap} points.`],
     ])}
     ${tip("What a breakdown costs", `Your hardware card already went to the discard pile when you played it, so it comes back with the next shuffle. Its upgrades (Startup Config, Overclock, Packet Compression, Faraday Shell) are lost, and a device deployed by ${name("containerlab")}, ${name("rebuild")} or ${name("clabernetes")} is gone for the encounter. Condition resets when the encounter ends.`, "rule")}
     ${tip("Wear ignores jam protection", `Faraday Shell, Hardened Router, Signal Relay and Bastion stop jams, not wear. A ${name("server-rack")} takes the wear for every device within ${reach} (rack condition ${R.rackCondition}); ${name("redundant-psu")} raises a device to ${R.psuCondition}. A second channel means a breakdown never silences the transmission.`, "warn")}`;
@@ -374,7 +373,7 @@ const CHAPTER_BODIES: Record<string, () => string> = {
     ${lead("Each stage ends at a guardian. It charges on its fifth action, or on its first action after falling to half health, whichever comes first; then it unleashes its ultimate. The warning comes one full turn ahead.")}
     ${table(["Guardian", "Stage trait", "Interrupt threshold"], guardians.map(enemy => [esc(enemy.name.replace(/^THE /, "").toLowerCase().replace(/\b\w/g, c => c.toUpperCase())), esc(enemy.trait), `${strong(enemy.boss!.breakDamage)} damage on the ultimate turn, +${R.addBreakBonus} per living add`]))}
     <ol class="hb-steps">
-      <li><b>Charge turn.</b> No direct damage, but the guardian raises two adds at the outer ports. Each add alive when the ultimate resolves raises the threshold by ${R.addBreakBonus}. Spread deliveries onto the adds now, prepare your biggest burst (P), or arm Tarpit. Ghosts can buffer.</li>
+      <li><b>Charge turn.</b> No direct damage, but the guardian raises two adds at the outer ports. Each add alive when the ultimate resolves raises the threshold by ${R.addBreakBonus}. Target an add now (the surplus overflows into the guardian), prepare your biggest burst (P), or arm Tarpit. Ghosts can buffer.</li>
       <li><b>Ultimate turn — interrupt.</b> Deal the threshold in one transmission (after armor and suppression). The attack and its field are cancelled, and the guardian is ${strong("exposed")}: next transmission +${R.exposedBonus}, armor ignored.</li>
       <li><b>…or brace.</b> Shield, firewalls and protocols can absorb the whole ultimate, and the adds' attacks with it. Interrupting cancels only the guardian's action: the adds still act. The meter shows which line is closer.</li>
       <li><b>Half health.</b> Guardians enrage: stronger attacks, and extra damage alongside faults and fields. The next intent shows it.</li>

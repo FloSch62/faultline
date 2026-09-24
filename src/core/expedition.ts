@@ -304,7 +304,6 @@ function migrateV3(e: Record<string, unknown>): boolean {
       node.condition = node.salvage ? RULES.salvageCondition : RULES.deviceCondition;
   const actions = enemy && integer(enemy.turn, 0) ? enemy.turn as number : 0;
   r.focus ??= (r.enemies as unknown[]).length ? "centre" : null;
-  r.aims ??= {};
   r.enemyPhase ??= actions;
   r.hostileActions ??= actions;
   r.reinforcement ??= null;
@@ -373,7 +372,7 @@ export function parseExpedition(value: string | null): Expedition | null {
     if ((r.currentRoom !== null && !r.map.some(room => room.id === r.currentRoom)) ||
       (r.lastRoom !== null && !r.map.some(room => room.id === r.lastRoom))) return null;
     if (!Array.isArray(r.log) || !r.log.every(line => typeof line === "string")) return null;
-    // The table: devices with condition, installations, faults and aims.
+    // The table: devices with condition, installations and faults.
     if (!Array.isArray(r.topology?.nodes) || !Array.isArray(r.topology?.links)) return null;
     if (!r.topology.nodes.every(n =>
       typeof n.id === "string" && ROLES.includes(n.role) && finite(n.x) && finite(n.z) &&
@@ -391,8 +390,9 @@ export function parseExpedition(value: string | null): Expedition | null {
     if (!Array.isArray(r.faultNodes) || r.faultNodes.length > 14 || !r.faultNodes.every(id => typeof id === "string" && ids.has(id))) return null;
     if (!Array.isArray(r.faultLinks) || r.faultLinks.length > 20 || !r.faultLinks.every(key => typeof key === "string")) return null;
     if (!validInstallations(r.installations)) return null;
-    if (!isObject(r.aims) || Object.keys(r.aims).length > 32 || !Object.entries(r.aims).every(([key, port]) =>
-      key.length > 0 && key.split("|").every(id => ids.has(id)) && isPort(port))) return null;
+    // Per-channel aims were removed (every delivery lands on the target): a save that still
+    // carries them loads, and they are dropped.
+    delete (r as { aims?: unknown }).aims;
     if (r.focus !== null && !isPort(r.focus)) return null;
     // Hostiles, surprises and offers.
     if (!validEnemies(r.enemies, r.phase === "battle")) return null;
@@ -410,6 +410,8 @@ export function parseExpedition(value: string | null): Expedition | null {
       r.frayedByCut.every(key => typeof key === "string"))) return null;
     if (r.repairsThisTurn !== undefined && !integer(r.repairsThisTurn, 0, 99)) return null;
     if (!validTurnEffects(r.turnEffects)) return null;
+    // Traffic Shaping's old redirect flag is gone with the aims.
+    if (r.turnEffects) delete (r.turnEffects as { forceFocus?: unknown }).forceFocus;
     if (r.creditLedger !== undefined && !(Array.isArray(r.creditLedger) && r.creditLedger.length <= 12 &&
       r.creditLedger.every(line => isObject(line) && typeof line.label === "string" && integer(line.amount, 0, 9999)))) return null;
     return e;

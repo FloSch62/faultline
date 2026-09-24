@@ -1,5 +1,5 @@
 /** Packs and ports (design section 4): ports and port order, alternate-phase escorts,
- * deliveries and aims, merging and armor per port, overflow, focus, the enemy phase with
+ * deliveries on the target, merging and armor per port, overflow, focus, the enemy phase with
  * several hostiles, and the seven escort traits. */
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -7,7 +7,7 @@ import { RULES } from "./cards.ts";
 import { makeEnemy } from "./encounter.ts";
 import { newExpedition } from "./expedition.ts";
 import {
-  aimChannel, channelKey, chooseRoom, combatPreview, endTurn, hardenBlock, intentFor, leaderOf, livingEnemies, playInstant, playProtocol,
+  channelKey, chooseRoom, combatPreview, endTurn, hardenBlock, intentFor, leaderOf, livingEnemies, playInstant, playProtocol,
   setFocus, useConsole, CONSOLES,
 } from "./run.ts";
 import type { Archetype, HostileRole, NetworkNode, Port, RunState } from "./types.ts";
@@ -83,9 +83,9 @@ test("escorts and adds get no stage threat, pressure or enrage; ascension 4 stil
   assert.equal(intentFor(r, r.enemies[0]).amount, 3);
 });
 
-// ------------------------------------------------------------------ deliveries, aims, merge, armor, overflow
+// ------------------------------------------------------------------ deliveries, the target, merge, armor, overflow
 
-test("every live channel is a delivery; all go to the focus by default and a pack sees today's total", () => {
+test("every live channel is a delivery; all land on the target and a pack sees today's total", () => {
   const r = pack([["spark-mite", "left"], ["prophet", "centre"]]);
   route(r, "r1", 0);
   route(r, "r2", 2.5);
@@ -97,46 +97,35 @@ test("every live channel is a delivery; all go to the focus by default and a pac
   // Primary: route 5 + one balancer point; bandwidth: 3 + one balancer point.
   assert.equal(p.deliveries[0].amount, RULES.baseRouteDamage + 1);
   assert.equal(p.deliveries[1].amount, RULES.bandwidthPerChannel + 1);
-  assert.ok(p.deliveries.every(delivery => delivery.port === "centre" && !delivery.aimed));
+  assert.ok(p.deliveries.every(delivery => delivery.port === "centre"));
   assert.equal(p.ports.centre!.packet, p.packetDamage);
   assert.equal(p.packetDamage, sum(p.damageTerms));
   assert.equal(p.ports.left!.packet, 0);
 });
 
-test("aims send a channel to a port, persist while the channel exists and are lost when it disappears", () => {
+test("every delivery lands on the target: it follows the target, persists between turns, and a new channel joins it", () => {
   const r = pack([["relay-drone", "left", "escort", 40], ["prophet", "centre", "leader", 60]]);
   route(r, "r1", 0);
   route(r, "r2", 2.5);
-  const key = combatPreview(r).deliveries[1].channelKey;
-  assert.equal(key, channelKey(["alpha", "r2", "omega"]));
-  assert.ok(aimChannel(r, key, "left").ok);
-  assert.equal(aimChannel(r, key, "right").ok, false, "no hostile stands at the right port");
-  assert.equal(aimChannel(r, "nope", "left").ok, false);
+  const whole = RULES.baseRouteDamage + RULES.bandwidthPerChannel;
+  assert.equal(combatPreview(r).deliveries[1].channelKey, channelKey(["alpha", "r2", "omega"]));
+  assert.ok(setFocus(r, "left").ok);
+  assert.equal(setFocus(r, "right").ok, false, "no hostile stands at the right port");
   let p = combatPreview(r);
-  assert.equal(p.ports.left!.packet, RULES.bandwidthPerChannel);
-  assert.equal(p.ports.centre!.packet, RULES.baseRouteDamage);
-  assert.ok(p.deliveries[1].aimed);
+  assert.ok(p.deliveries.every(delivery => delivery.port === "left"), "no channel can be sent anywhere else");
+  assert.equal(p.ports.left!.merged, whole);
+  assert.equal(p.ports.left!.packet, whole);
+  assert.equal(p.ports.centre!.packet, 0);
   endTurn(r);
-  assert.equal(r.aims[key], "left", "the aim persists between turns");
-  assert.equal(hp(r, "left"), 40 - RULES.bandwidthPerChannel);
-  // Aiming null returns a delivery to the focus.
-  assert.ok(aimChannel(r, key, null).ok);
-  assert.equal(r.aims[key], undefined);
-  // A channel that disappears (here: its router breaks under OVERTENSION) loses its aim.
-  const w = pack([["relay-drone", "left", "escort", 40], ["weaver", "centre", "leader", 60, 1]]);
-  route(w, "r1", 0);
-  route(w, "r2", 2.5);
-  const r2 = w.topology.nodes.find(node => node.id === "r2")!;
-  r2.configured = true; // r2 carries the primary route
-  r2.condition = 1;
-  const primary = combatPreview(w).deliveries[0];
-  assert.deepEqual(primary.path, ["alpha", "r2", "omega"]);
-  assert.ok(aimChannel(w, primary.channelKey, "left").ok);
-  const q = combatPreview(w);
-  assert.deepEqual(q.breakdowns.map(item => item.nodeId), ["r2"]);
-  endTurn(w);
-  assert.equal(w.aims[primary.channelKey], undefined);
-  assert.ok(!w.topology.nodes.some(node => node.id === "r2"));
+  assert.equal(r.focus, "left", "the target persists between turns");
+  assert.equal(hp(r, "left"), 40 - whole);
+  assert.ok(!("aims" in r), "a run keeps no per-channel aims");
+  // A third channel is one more delivery on the same target.
+  route(r, "r3", -2.5);
+  p = combatPreview(r);
+  assert.equal(p.deliveries.length, 3);
+  assert.ok(p.deliveries.every(delivery => delivery.port === "left"));
+  assert.equal(p.ports.left!.merged, whole + RULES.bandwidthPerChannel);
 });
 
 test("deliveries to one port merge before armor; armor and plating are paid once per port", () => {
@@ -148,11 +137,11 @@ test("deliveries to one port merge before armor; armor and plating are paid once
   assert.equal(p.ports.centre!.merged, RULES.baseRouteDamage + RULES.bandwidthPerChannel);
   assert.equal(p.ports.centre!.armor, 2);
   assert.equal(p.ports.centre!.packet, RULES.baseRouteDamage + RULES.bandwidthPerChannel - 2);
-  // Split: the Sentinel still pays 2 on its share, the escort pays nothing.
-  aimChannel(r, p.deliveries[1].channelKey, "left");
+  // Target the escort: the whole packet moves with the target and the escort pays no plating.
+  setFocus(r, "left");
   p = combatPreview(r);
-  assert.equal(p.ports.centre!.packet, RULES.baseRouteDamage - 2);
-  assert.equal(p.ports.left!.packet, RULES.bandwidthPerChannel);
+  assert.equal(p.ports.left!.packet, RULES.baseRouteDamage + RULES.bandwidthPerChannel);
+  assert.equal(p.ports.centre!.packet, 0);
   assert.equal(p.packetDamage, sum(p.damageTerms));
 });
 
@@ -181,10 +170,13 @@ test("a lethal packet on every port ends the encounter; one lethal port cancels 
   r.enemies[1].turn = 1; // RUST STRIKE 2
   route(r, "r1", 0);
   route(r, "r2", 2.5);
-  aimChannel(r, combatPreview(r).deliveries[1].channelKey, "left");
+  setFocus(r, "left");
   const p = combatPreview(r);
   assert.equal(p.lethal, false);
   assert.ok(p.ports.left!.lethal);
+  // The Mite needs 3 of the packet: the surplus overflows into the leader.
+  assert.equal(p.ports.left!.overflowOut, RULES.baseRouteDamage + RULES.bandwidthPerChannel - 3);
+  assert.equal(p.ports.left!.overflowTo, "centre");
   assert.equal(p.hostiles[0].state, "cancelled");
   assert.equal(p.hostiles[0].incoming, 0);
   assert.equal(p.hostiles[1].state, "acts");
@@ -330,7 +322,6 @@ test("Siphon Taps come off the primary delivery first; Spanning Tree doubles the
   route(r, "r1", 0);
   route(r, "r2", 2.5);
   r.installations = [1, 2, 3].map(n => ({ id: `tap${n}`, kind: "tap" as const, x: -6 + n, z: 4.2, integrity: 1, activeFrom: 0, owner: "h2" }));
-  aimChannel(r, combatPreview(r).deliveries[1].channelKey, "left");
   let p = combatPreview(r);
   // 6 siphoned: all 5 of the primary, then 1 from the bandwidth delivery.
   assert.equal(p.deliveries[0].amount, 0);
@@ -427,14 +418,19 @@ test("guardian break thresholds count only the packet on the guardian's port, +3
   r.packetBoost = 20;
   let p = combatPreview(r);
   assert.equal(p.ports.centre!.breakThreshold, 12 + 2 * RULES.addBreakBonus);
-  // Spread two bandwidth deliveries onto the adds: both die, the threshold falls to 12.
-  aimChannel(r, p.deliveries[1].channelKey, "left");
-  aimChannel(r, p.deliveries[2].channelKey, "right");
-  r.enemies[0].hp = r.enemies[2].hp = 3;
+  // Target the left add: it falls, the threshold drops by 3, and the surplus overflows into the
+  // guardian's port, where it counts toward the break (after armor).
+  setFocus(r, "left");
+  r.enemies[0].hp = 3;
   p = combatPreview(r);
-  assert.equal(p.ports.centre!.breakThreshold, 12);
+  assert.ok(p.ports.left!.lethal);
+  assert.equal(p.ports.left!.overflowTo, "centre");
+  assert.equal(p.ports.centre!.overflowIn, p.ports.left!.overflowOut);
+  assert.equal(p.ports.centre!.breakThreshold, 12 + RULES.addBreakBonus);
+  assert.equal(p.ports.centre!.packet, p.ports.centre!.overflowIn - p.ports.centre!.armor);
   assert.ok(p.ports.centre!.breaks);
   assert.ok(p.interrupted);
+  assert.equal(p.ports.right!.packet, 0, "the right add takes nothing");
 });
 
 // ------------------------------------------------------------------ Warden: Harden scales with attackers (M4)

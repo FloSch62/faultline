@@ -23,7 +23,7 @@ test("every Handbook chapter renders without holes", () => {
 
 test("the four Under Quarantine chapters sit in the book with their seals and figures", () => {
   const expected: [string, string, string][] = [
-    ["packs", "sword", "Three channels deliver to the ports"],
+    ["packs", "sword", "Three channels deliver to your target"],
     ["front", "map", "The table front."],
     ["escalation", "elite", "Escalation levels over a leader's own actions"],
     ["surprises", "coins", ""],
@@ -52,7 +52,10 @@ test("Packs & Ports lists every escort with its trait, and the delivery numbers 
     assert.ok(html.includes(esc(ENEMIES[id].trait)), `trait ${id}`);
   }
   const primary = R.baseRouteDamage + R.switchDamage;
-  assert.ok(html.includes(`One packet of ${primary + R.bandwidthPerChannel}`));
+  const total = primary + 2 * R.bandwidthPerChannel;
+  assert.ok(html.includes(`land as one packet of ${total}`), "every channel lands on the target as one packet");
+  assert.ok(html.includes(`overflow ${total - Math.max(1, total - 4)} →`), "the figure shows the overflow");
+  assert.doesNotMatch(text(html), /\baim(ed|ing)?\b|\bfocus\b/i, "the chapter speaks of the target, not aims or focus");
   assert.ok(text(html).includes(`+${R.bandwidthPerChannel} (${R.parallelCorePerChannel} with Parallel Core)`));
   assert.ok(text(html).includes(`raises the break threshold by ${R.addBreakBonus}`));
 });

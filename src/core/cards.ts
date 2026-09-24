@@ -253,7 +253,7 @@ export interface CardValues {
   everyPort?: number;
   /** Flood Fill: added to every living port's packet per live channel this turn. */
   perChannelEveryPort?: number;
-  /** Traffic Shaping, Demolition Charge: added to the focus port's packet this turn. */
+  /** Traffic Shaping, Demolition Charge: added to the target's packet this turn. */
   focusBonus?: number;
   /** Quorum: extra block for every other living hostile on the field. */
   perHostile?: number;
@@ -625,8 +625,8 @@ const BASE: Record<BaseCardId, BaseDefinition> = {
   },
   "traffic-shaping": {
     name: "Traffic Shaping", subtitle: "QOS / SHAPING", cost: 0, rarity: "common", target: "instant", art: "program", color: "#8fd0b8", exhaust: true,
-    rules: "Every delivery goes to the focus this turn; the focus packet deals +1. Draw 1. Exhaust.", values: { focusBonus: 1, draw: 1 },
-    upgrade: { rules: "Every delivery goes to the focus this turn; the focus packet deals +3. Draw 1. Exhaust.", values: { focusBonus: 3, draw: 1 } },
+    rules: "Your target's packet deals +2 this turn. Draw 1. Exhaust.", values: { focusBonus: 2, draw: 1 },
+    upgrade: { rules: "Your target's packet deals +4 this turn. Draw 1. Exhaust.", values: { focusBonus: 4, draw: 1 } },
   },
   "flood-fill": {
     name: "Flood Fill", subtitle: "ARCHITECT / FLOOD", cost: 1, rarity: "uncommon", target: "instant", art: "program", color: "#e8b562", archetype: "architect",
@@ -671,8 +671,8 @@ const BASE: Record<BaseCardId, BaseDefinition> = {
   },
   "demolition-charge": {
     name: "Demolition Charge", subtitle: "COMMON / DEMOLITION", cost: 1, rarity: "common", target: "instant", art: "program", color: "#e98a6a", exhaust: true,
-    rules: "Your focus packet deals +2 this turn. If an installation stands, destroy one of your choice. Exhaust.", values: { focusBonus: 2 },
-    upgrade: { rules: "Your focus packet deals +4 this turn. If an installation stands, destroy one of your choice. Exhaust.", values: { focusBonus: 4 } },
+    rules: "Your target's packet deals +2 this turn. If an installation stands, destroy one of your choice. Exhaust.", values: { focusBonus: 2 },
+    upgrade: { rules: "Your target's packet deals +4 this turn. If an installation stands, destroy one of your choice. Exhaust.", values: { focusBonus: 4 } },
   },
   "field-repair": {
     name: "Field Repair", subtitle: "COMMON / MAINTENANCE", cost: 0, rarity: "common", target: "instant", art: "defense", color: "#9fd6a4", exhaust: true,
@@ -789,11 +789,11 @@ export const RELICS: Record<RelicId, RelicDefinition> = {
   // v4 common relics
   "round-robin": { name: "Round Robin", subtitle: "SCHEDULER", tier: "common", color: "#9fd4e8", rules: `At the start of each battle every hostile takes ${R.roundRobinDamage} damage (reinforcements on arrival).` },
   "ingress-filter": { name: "Ingress Filter", subtitle: "EDGE FILTER", tier: "common", color: "#c7b8e6", rules: `Every strike and breach against you deals ${R.ingressFilterReduce} less.` },
-  "priority-queue": { name: "Priority Queue", subtitle: "QOS MODULE", tier: "common", color: "#f2c77e", rules: `Your primary delivery deals +${R.priorityQueueBonus} against the hostile with the least remaining health.` },
+  "priority-queue": { name: "Priority Queue", subtitle: "QOS MODULE", tier: "common", color: "#f2c77e", rules: `Your transmission deals +${R.priorityQueueBonus} to its target while the target is the hostile with the least remaining health.` },
   "reinforced-frame": { name: "Reinforced Frame", subtitle: "CHASSIS KIT", tier: "common", color: "#c9b38c", rules: `Every device you deploy has ${R.reinforcedFrameCondition} more condition (${R.deviceCondition + R.reinforcedFrameCondition}; salvage and crate hardware ${R.salvageCondition + R.reinforcedFrameCondition}).` },
   "field-engineer": { name: "Field Engineer", subtitle: "FIELD KIT", tier: "common", color: "#a9d99a", rules: "The first repair each turn costs 0." },
   "bill-of-lading": { name: "Bill of Lading", subtitle: "CARGO MANIFEST", tier: "common", color: "#e0c48f", rules: "Crates are never empty (the empty share becomes credits) and undelivered messages offer three choices." },
   // v4 boss relics
   "storm-control": { name: "Storm Control", subtitle: "BOSS · RATE LIMITS", tier: "boss", color: "#8fc3ff", rules: `+1 energy every turn. Every hostile jam or cut that lands also deals ${R.stormControlDamage} damage to you.` },
-  "scorched-earth": { name: "Scorched Earth", subtitle: "BOSS · NO SURRENDER", tier: "boss", color: "#ff9b72", rules: `Whenever one of your actions or devices destroys an installation, its planter takes ${R.scorchedEarthDamage} (the focus if the planter is dead). Your devices deploy with ${R.scorchedEarthCondition} less condition.` },
+  "scorched-earth": { name: "Scorched Earth", subtitle: "BOSS · NO SURRENDER", tier: "boss", color: "#ff9b72", rules: `Whenever one of your actions or devices destroys an installation, its planter takes ${R.scorchedEarthDamage} (your target if the planter is dead). Your devices deploy with ${R.scorchedEarthCondition} less condition.` },
 };

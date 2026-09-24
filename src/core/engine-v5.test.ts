@@ -695,7 +695,7 @@ test("effect API: socketNear, strike with overflow and armor, Harden without the
 
 // ------------------------------------------------------------------ completeness (phase C)
 
-test("every v5 card id of the contract has a definition", { todo: "phase C fills the data files" }, () => {
+test("every v5 card id of the contract has a definition", () => {
   const missing = (Object.keys(CARD_IDS_BY_OWNER) as CardOwner[]).flatMap(owner => missingCards(owner).map(id => `${owner}:${id}`));
   assert.deepEqual(missing, []);
 });

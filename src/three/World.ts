@@ -244,8 +244,9 @@ const LABEL_FOOT = { y: 0.8, z: 1.12 } as const;
 const CAMERA_HOME = new THREE.Vector3(0, 15.88, 21.17);
 const CAMERA_TARGET = new THREE.Vector3(0, 0.15, 0);
 const CAMERA_SHIFT = -0.08;
-/** The table's front edge, which never sinks below RailFrame.table. */
-const TABLE_FRONT = new THREE.Vector3(0, -0.045, 5.83);
+/** The table's front edge: the board's fascia foot, where the containerlab medallion stands. It
+ * never sinks below RailFrame.table, and never under the hand (RailFrame.front). */
+const TABLE_FRONT = new THREE.Vector3(0, -0.12, 6.3);
 function frameCamera(camera: THREE.PerspectiveCamera, width: number, height: number, shift: number) {
   camera.setViewOffset(width, height, 0, shift * height, width, height);
 }
@@ -290,6 +291,8 @@ export interface RailFrame {
   top: number;
   /** The lowest the table's front edge may stand (over the resting hand), if the hand is shown. */
   table?: number;
+  /** The lowest the front edge may stand before the hand covers it: a short window raises the table. */
+  front?: number;
   obstacles: readonly { left: number; top: number; right: number; bottom: number }[];
   /** The leader's plate width, the side plates' width, the tallest plate and the gaps. */
   plate: { width: number; side: number; height: number; gap: number };
@@ -1201,9 +1204,12 @@ export class World {
       const at = point.clone().project(camera);
       return { x: rect.left + (at.x + 1) / 2 * rect.width, y: rect.top + (1 - at.y) / 2 * rect.height };
     };
-    // The table stands as low as the hand lets it (never higher than its home framing).
-    const slack = this.railFrame?.table ? this.railFrame.table - toScreen(TABLE_FRONT).y : 0;
-    const shift = CAMERA_SHIFT - Math.max(0, slack) / rect.height;
+    // The table stands as low as the hand lets it (never higher than its home framing), unless the
+    // hand would cover its front: then it rises just clear of it.
+    const front = toScreen(TABLE_FRONT).y;
+    const slack = this.railFrame?.table ? this.railFrame.table - front : 0;
+    const covered = this.railFrame?.front ? front - this.railFrame.front : 0;
+    const shift = CAMERA_SHIFT - Math.max(0, slack) / rect.height + Math.max(0, covered) / rect.height;
     if (Math.abs(shift - this.cameraShift) > 1e-4) {
       this.cameraShift = shift;
       this.resize();

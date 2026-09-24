@@ -990,7 +990,9 @@ function measureRail() {
   const [hand] = rect("#hand-zone"), size = `${box.width}x${box.height}`;
   if (hand) handTop = { size, top: hand.top - box.top };
   world.setRailFrame({
-    left, right, top: box.top + 4 * scale, table: handTop?.size === size ? box.top + handTop.top - 40 * scale : undefined,
+    left, right, top: box.top + 4 * scale,
+    table: handTop?.size === size ? box.top + handTop.top - 40 * scale : undefined,
+    front: handTop?.size === size ? box.top + handTop.top - 6 * scale : undefined,
     obstacles: rect(".game-header .run-stats, .game-header .header-controls, .is-battle .encounter-heading")
       .map(item => ({ left: item.left, top: item.top, right: item.right, bottom: item.bottom })),
     plate: { width, side, height: Math.ceil(height), gap },

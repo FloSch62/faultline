@@ -122,6 +122,7 @@ test("a damaged save cannot prevent starting a new expedition", async ({
   await page.goto("./");
   await expect(page.locator('[data-action="continue"]')).toHaveCount(0);
   await page.getByRole("button", { name: /New expedition/ }).click();
+  await page.locator('[data-action="skip-training"]').click();
   await page.getByRole("button", { name: "Enter the Faultline" }).click();
   await expect(page.locator(".game-root")).toHaveAttribute("data-view", "map");
   expect(JSON.parse((await saved(page))!).run.phase).toBe("map");

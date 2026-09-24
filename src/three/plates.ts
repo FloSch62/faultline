@@ -206,30 +206,4 @@ export function glyphTexture(name: string): THREE.CanvasTexture {
   return map;
 }
 
-let ringMap: THREE.CanvasTexture | null = null;
-/** A brass ring, drawn once: the port highlight while a packet glyph is dragged over it. */
-export function brassRingTexture(): THREE.CanvasTexture {
-  if (ringMap) return ringMap;
-  const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = 256;
-  const c = canvas.getContext("2d")!;
-  c.shadowColor = "#ffb45a";
-  c.shadowBlur = 18;
-  c.lineWidth = 9;
-  c.strokeStyle = "#e7c27a";
-  c.beginPath();
-  c.ellipse(256, 128, 236, 108, 0, 0, Math.PI * 2);
-  c.stroke();
-  c.shadowBlur = 0;
-  c.lineWidth = 2.5;
-  c.strokeStyle = "rgba(255, 240, 200, .8)";
-  c.beginPath();
-  c.ellipse(256, 128, 222, 96, 0, 0, Math.PI * 2);
-  c.stroke();
-  ringMap = texture(canvas);
-  ringMap.userData.shared = true;
-  return ringMap;
-}
-
 export { FRAY as FRAY_HEX, clipped };

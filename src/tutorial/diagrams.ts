@@ -50,18 +50,24 @@ export function routesDiagram(): string {
   ].join(""));
 }
 
-/** Two paths that share a device are one channel: a bottleneck. */
+/** Two routes through one device are one channel: the shared switch carries the table's brass
+ * junction seal (the merge glyph and the number of routes through it). */
 export function bottleneckDiagram(): string {
-  return svg("0 0 560 204", "Two paths share one switch, so they count as a single channel.", [
-    wire(70, 100, 190, 45, "primary"), wire(190, 45, 330, 100, "primary"),
-    wire(70, 100, 190, 155, "idle"), wire(190, 155, 330, 100, "idle"),
-    wire(330, 100, 490, 100, "primary"),
-    terminal(40, 100, "Alpha"), terminal(520, 100, "Omega"),
-    device(190, 45, "router", "primary"), device(190, 155, "router", "online"),
-    `<circle class="hb-warning-ring" cx="330" cy="100" r="24"/>`,
-    device(330, 100, "switch", "danger", "Shared"),
-    tag(280, 198, "One channel: cut the switch and both go dark", "danger"),
+  return svg("0 0 560 214", "Two routes pass through one switch: 2 routes, 1 channel. A brass seal on the switch shows the 2 routes that merge there.", [
+    wire(70, 104, 190, 48, "primary"), wire(190, 48, 330, 104, "primary"),
+    wire(70, 104, 190, 160, "idle"), wire(190, 160, 330, 104, "idle"),
+    wire(330, 104, 490, 104, "primary"),
+    terminal(40, 104, "Alpha"), terminal(520, 104, "Omega"),
+    device(190, 48, "router", "primary"), device(190, 160, "router", "online"),
+    device(330, 104, "switch", "primary", "Switch"),
+    junctionSeal(372, 72, 2),
+    tag(280, 18, "2 routes · 1 channel", "gold"),
+    tag(280, 206, "A device carries one channel: jam the switch and both routes go dark", "muted"),
   ].join(""));
+}
+/** The table's junction seal: a clipped brass tag with the merge glyph and a number. */
+function junctionSeal(x: number, y: number, routes: number) {
+  return `<g class="hb-junction" transform="translate(${x} ${y})"><path class="hb-junction-plate" d="M-21-13h42l5 5v16l-5 5h-42l-5-5v-16Z"/><path class="hb-junction-glyph" transform="translate(-23 -9) scale(0.75)" d="M3 6.5c4.5 0 6.5 5.5 10 5.5M3 17.5c4.5 0 6.5-5.5 10-5.5M13 12h8"/><text x="11" y="5.5">${routes}</text></g>`;
 }
 
 /** Online vs offline hardware. */

@@ -31,6 +31,7 @@ import {
 import type { CardId, DesignationId, Enemy, Installation, Port, RunState, Zone } from "./core/types.ts";
 import { enemyStory } from "./story.ts";
 import { cardMarkup, esc, icon } from "./ui.ts";
+import { channelCss } from "./channel-palette.ts";
 import { relicEmblem } from "./screens.ts";
 import { designationGlyph } from "./tutorial/icons.ts";
 import { levelRule } from "./core/combat/intent.ts";
@@ -565,7 +566,7 @@ function engineFor(r: RunState, p: CombatPreview): Engine {
   const bandwidth = r.relics.includes("spanning-tree") ? 0 : Math.max(0, p.channels - 1) * per;
   return {
     label: plural(p.channels, "channel"), value: `+${bandwidth}`, state: p.channels > 1 ? "is-active" : "",
-    tip: `Bandwidth: +${per} damage for every channel beyond the first (${p.channels} now). Channels are routes that share no device between ALPHA and OMEGA; a cut on one leaves the others transmitting.`,
+    tip: `Bandwidth: +${per} damage for every channel beyond the first (${p.channels} now). Every device carries one channel: routes through the same device are one channel. A cut on one channel leaves the others transmitting.`,
   };
 }
 
@@ -603,7 +604,14 @@ function ledgerMarkup(r: RunState, p: CombatPreview, v: BattleView): string {
   for (const fault of [...r.faultNodes, ...r.faultLinks])
     chips.push(`<span class="ledger-chip is-fault" data-tooltip="Faults last for this player turn. Hot Patch, Link Recovery or Fast Reroute clear every one; a second channel keeps transmitting.">${icon("link", 13)} Fault · <b>${esc(pretty(fault))}</b></span>`);
   if (!p.signalPath.length) chips.push(`<span class="ledger-chip is-offline" data-tooltip="A route runs ALPHA → router → OMEGA through live cables.">${icon("online", 13)} No live route</span>`);
-  else chips.push(`<span class="ledger-chip is-channels ${p.channels > 1 ? "is-strong" : ""}" data-tooltip="${esc(`${plural(p.channels, "channel")}: routes that share no device between the terminals. Each channel beyond the first adds bandwidth damage, and a cut on one channel leaves the others transmitting.`)}">${icon("channels", 13)} <b>${p.channels}</b> channel${p.channels === 1 ? "" : "s"}${p.channels > 1 ? `<i class="tag-extra"> · cut-proof</i>` : ""}</span>`);
+  else {
+    // "3 routes · 2 channels": every live route counts, and routes through one device are one channel.
+    // A diamond per channel in its table colour; the tooltip names the devices where routes merge.
+    const shared = p.sharedDevices.map(item => `${item.id.toUpperCase()} (${item.routes} routes)`).join(", ");
+    const tip = `${plural(p.routeCount, "route")} from ALPHA to OMEGA make ${plural(p.channels, "channel")}. Every device carries one channel: when two routes go through the same device, they are one channel, not two.${shared ? ` Shared here: ${shared}.` : ""} Each channel is a delivery, and every channel beyond the first adds bandwidth.`;
+    const swatches = Array.from({ length: p.channels }, (_, i) => `<i style="--channel:${channelCss(i)}"></i>`).join("");
+    chips.push(`<span class="ledger-chip is-channels ${p.channels > 1 ? "is-strong" : ""}" data-tooltip="${esc(tip)}" aria-label="${esc(tip)}">${icon("channels", 13)} <b>${p.routeCount}</b> route${p.routeCount === 1 ? "" : "s"} · <b>${p.channels}</b> channel${p.channels === 1 ? "" : "s"}<i class="channel-swatches" aria-hidden="true">${swatches}</i></span>`);
+  }
   if (devices.length) chips.push(`<span class="ledger-chip is-online ${p.online.length < devices.length ? "has-offline" : ""}" data-tooltip="${esc(`Online devices sit on at least one live route; offline devices do nothing. ${devices.filter(n => !p.online.includes(n.id)).map(n => n.id.toUpperCase()).join(", ") || "Everything is online."}`)}">${icon("online", 13)} <b>${p.online.length}/${devices.length}</b> online</span>`);
   for (const zone of p.clusters) chips.push(`<span class="ledger-chip is-cluster" data-tooltip="${esc(`${zone.toUpperCase()} holds ${RULES.clusterThreshold}+ online devices: +${RULES.clusterDamage} damage. Clustered bands are also easier for band attacks to hit.`)}">${icon("cluster", 13)} ${title(zone)} cluster <b>+${RULES.clusterDamage}</b></span>`);
   const scrub = scrubCost(r);

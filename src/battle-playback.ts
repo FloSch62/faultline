@@ -41,7 +41,9 @@ export function syncWorld(world: World | null, run: RunState, preview: CombatPre
   world.setInstallations(run.installations, { installs: preview.installTargets });
   world.setInstallationFocus(view.selectedInstallation, view.targetingInstallation);
   world.setOnline(preview.online);
-  world.setChannels(preview.channelPaths);
+  // One colour per delivering channel (a primary route outside the maximum set lists one path more).
+  world.setChannels(preview.channelPaths.slice(0, preview.channels));
+  world.setShared(preview.sharedDevices);
   world.setForecastTarget(tableTargets(preview));
   world.setForecastZone(preview.hazardZone);
   world.setZoneEffects(run.zoneEffects);

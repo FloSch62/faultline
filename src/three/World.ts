@@ -234,8 +234,8 @@ const RAIL_EDGE = new THREE.Vector3(0, 0.47, -5.8);
 const FAR_CROWN = new THREE.Vector3(0, 1.62, -3.5);
 /** Where a far-row nameplate hangs instead (in its device group): at its foot, before the plinth. */
 const LABEL_FOOT = { y: 0.8, z: 1.12 } as const;
-const CAMERA_HOME = new THREE.Vector3(0, 12.8, 18.8);
-const CAMERA_TARGET = new THREE.Vector3(0, 0.15, -0.3);
+const CAMERA_HOME = new THREE.Vector3(0.00, 16.09, 21.17);
+const CAMERA_TARGET = new THREE.Vector3(0.0, 0.15, -2.9);
 /** A cell's painted box, as fractions of the cell from its top-left corner. */
 interface ArtBounds { l: number; r: number; t: number; b: number }
 const FULL_CELL: ArtBounds = { l: 0.1, r: 0.9, t: 0.1, b: 0.9 };
@@ -477,7 +477,7 @@ export class World {
     this.controls.dampingFactor = 0.055;
     this.controls.enablePan = false;
     this.controls.minDistance = 13.5;
-    this.controls.maxDistance = 31;
+    this.controls.maxDistance = 36;
     this.controls.minPolarAngle = 0.45;
     this.controls.maxPolarAngle = 1.37;
     this.controls.target.copy(CAMERA_TARGET);

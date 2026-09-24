@@ -978,9 +978,9 @@ function frontCoach(id: LessonId, ctx: Context, done: Record<string, boolean>): 
         focus: hostileAt("left"),
       };
       if (!done.prepare) return {
-        coach: "Prepare **Packet Burst**: press **P**, or click **+ PREPARE** at the bottom left.",
+        coach: "Prepare **Packet Burst**: press **P**, or click the **+** plate at the bottom left.",
         detail: `A prepared card skips this turn and waits in next turn's hand. With the Warden gone the break is ${after}, and your channels deal ${total} to the Regent: the burst's +${burst} is the difference.`,
-        hint: "Press P, or click + PREPARE under your energy, then choose Packet Burst.",
+        hint: "Press P, or click the + plate beside your piles under your energy, then choose Packet Burst.",
         focus: ".prepared-pile",
       };
       if (!done.charge) return {
@@ -1272,9 +1272,9 @@ function coachFor(id: LessonId, ctx: Context, done: Record<string, boolean>): Co
         focus: card("worm"),
       };
       if (!done.prepare) return {
-        coach: "Prepare **Zero Day**: press **P**, or click **+ PREPARE** at the bottom left.",
+        coach: "Prepare **Zero Day**: press **P**, or click the **+** plate at the bottom left.",
         detail: "The Prepare slot — beside your Draw and Discard piles — holds one card for next turn, free; it replaces a draw. Next turn is the ultimate: hold your biggest burst.",
-        hint: "Press P, or click + PREPARE at the bottom left under your energy, then choose Zero Day.",
+        hint: "Press P, or click the + plate beside your piles at the bottom left, then choose Zero Day.",
         focus: ".prepared-pile",
       };
       if (!done.charge) return {

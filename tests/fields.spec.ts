@@ -25,32 +25,36 @@ async function start(page: Page, relics=false) {
 }
 async function saved(page:Page){return page.evaluate(storage=>JSON.parse(localStorage.getItem(storage)!).run,storage);}
 
+// The band plates are gone: fields are drawn on the table, and a selected field card lights the bands
+// on the table and offers one band button each in the target dock (their tooltips name what each
+// band holds). The bands' state is read from the save.
+const band=(page:Page,zone:string)=>page.locator(`#target-dock [data-field-zone="${zone}"]`);
 test("fields can be targeted, persist through corruption, cleansed, and undone",async({page})=>{
   await start(page);
   await expect(page.locator('.hazard-caption')).toContainText('CENTER');
   await page.locator('[data-card-id="resonance-field"][data-hand]').click();
-  await expect(page.locator('.field-seal.targetable')).toHaveCount(3);
+  await expect(page.locator('#target-dock [data-field-zone]')).toHaveCount(3);
+  await expect(band(page,'center')).toHaveAttribute('data-tooltip','Clear ground · no active fields');
   await page.keyboard.press('Escape');
-  await expect(page.locator('.field-seal.targetable')).toHaveCount(0);
+  await expect(page.locator('#target-dock [data-field-zone]')).toHaveCount(0);
   await expect(page.locator('dialog')).not.toBeVisible();
   await page.locator('[data-card-id="resonance-field"][data-hand]').click();
-  await page.locator('[data-field-zone="center"]').click();
+  await band(page,'center').click();
   await expect(page.locator('.signal-readout strong')).toContainText('8');
-  await expect(page.locator('[data-field-zone="center"]')).toContainText('Resonance 3t');
+  expect((await saved(page)).zoneEffects).toEqual([{zone:'center',kind:'resonance',turns:3}]);
   await page.locator('[data-action="transmit"]').click();
   await expect(page.locator('.game-root')).not.toHaveClass(/busy/,{timeout:15000});
   expect((await saved(page)).zoneEffects).toEqual([{zone:'center',kind:'resonance',turns:2},{zone:'center',kind:'corrosion',turns:2}]);
-  await expect(page.locator('[data-field-zone="center"]')).toHaveClass(/corrupted/);
   // Reload the actual autosave before playing the cleanse drawn for turn two.
   await page.reload();
   await page.locator('[data-action="continue"]').click();
   await page.locator('[data-card-id="purge-field"][data-hand]').click();
-  await page.locator('[data-field-zone="center"]').click();
-  await expect(page.locator('[data-field-zone="center"]')).not.toHaveClass(/corrupted/);
+  await expect(band(page,'center')).toHaveAttribute('data-tooltip',/Corrosion/);
+  await band(page,'center').click();
   expect((await saved(page)).zoneEffects).toEqual([{zone:'center',kind:'resonance',turns:2}]);
   expect((await saved(page)).exhaustPile).toContain('purge-field');
   await page.locator('[data-action="undo"]').click();
-  await expect(page.locator('[data-field-zone="center"]')).toHaveClass(/corrupted/);
+  await expect.poll(async()=>(await saved(page)).zoneEffects).toEqual([{zone:'center',kind:'resonance',turns:2},{zone:'center',kind:'corrosion',turns:2}]);
 });
 
 test("player vitals, every relic, fields and full card rules fit without collisions",async({page})=>{

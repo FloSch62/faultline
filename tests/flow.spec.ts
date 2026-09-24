@@ -111,7 +111,7 @@ for (const [width, height] of [[1280, 720], [1440, 900], [1920, 1080]] as const)
     expect(hp.y).toBeGreaterThan(plate.y);
     const player = await box(".player-plate");
     expect(overlap(player, plate)).toBe(false);
-    for (const selector of [".console-button", ".protocol-dock", ".transmit-button", ".energy-orb", ".field-strip"]) {
+    for (const selector of [".console-button", ".protocol-dock", ".transmit-button", ".energy-orb", ".pile-cluster"]) {
       const b = await box(selector);
       expect(b.x, selector).toBeGreaterThanOrEqual(0);
       expect(b.y, selector).toBeGreaterThanOrEqual(0);

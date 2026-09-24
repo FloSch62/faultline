@@ -54,9 +54,11 @@ test("Ghost: Buffer stores the transmission, releases it next turn, and warns be
   const e = battle({ archetype: "ghost", enemy: "prophet", turn: turnOf("prophet", "strike"), ...route("router1") });
   await install(page, e);
   const base = Number(await damageShown(page).textContent());
+  // Buffering stores ⌊damage × bufferMultiplier⌋ (×1.5 since the v5 balance pass).
+  const stored = Math.floor(base * RULES.bufferMultiplier);
   await page.locator('[data-action="console"]').click();
   await expect(page.locator(".transmit-button")).toHaveClass(/buffering/);
-  await expect(page.locator('[data-action="transmit"]')).toHaveAttribute("aria-label", new RegExp(`Store · ${base * RULES.bufferMultiplier}`));
+  await expect(page.locator('[data-action="transmit"]')).toHaveAttribute("aria-label", new RegExp(`Store · ${stored} into the buffer`));
   // Using it again before transmitting cancels, and a third press re-arms it.
   await page.locator('[data-action="console"]').click();
   await expect(page.locator(".transmit-button")).not.toHaveClass(/buffering/);
@@ -65,7 +67,7 @@ test("Ghost: Buffer stores the transmission, releases it next turn, and warns be
   let expected = resolved(run);
   await transmit(page);
   expect(await saved(page)).toEqual(expected);
-  expect(expected.buffer).toBe(base * RULES.bufferMultiplier);
+  expect(expected.buffer).toBe(stored);
   expect(expected.enemies[0].hp).toBe(run.enemies[0].hp);
   await idle(page);
   run = await saved(page);
@@ -148,15 +150,18 @@ async function malwareOnTable(page: Page) {
   throw new Error("No hoverable malware near the table centre");
 }
 
-test("malware is scrubbed from the network dock and by clicking it on the table", async ({ page }) => {
+test("malware is scrubbed with the S shortcut and by clicking it on the table", async ({ page }) => {
   const e = battle({ malware: [{ id: "malware1", x: -2.5, z: -2.4 }, { id: "malware2", x: 0, z: 0 }], hand: ["guard"] });
   await install(page, e);
-  await expect(page.locator(".ledger-chip.is-malware")).toHaveCount(2);
-  await page.locator('[data-scrub="malware1"]').click();
+  // The ledger chips are gone: each installation carries a mark over the table (Field Training rings it).
+  await expect(page.locator("#intent-layer [data-anchor-installation]")).toHaveCount(2);
+  // S scrubs the installation the forecast names most dangerous (ties: the first planted).
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("s");
+  await expect.poll(async () => (await saved(page)).installations.map(m => m.id)).toEqual(["malware2"]);
   let run = await saved(page);
-  expect(run.installations.map(m => m.id)).toEqual(["malware2"]);
   expect(run.energy).toBe(ENERGY - RULES.scrubCost);
-  await expect(page.locator(".ledger-chip.is-malware")).toHaveCount(1);
+  await expect(page.locator("#intent-layer [data-anchor-installation]")).toHaveCount(1);
   const spot = await malwareOnTable(page);
   // v4 (design 13.3): clicking an installation on the table opens its plate; the plate scrubs.
   await page.mouse.click(spot.x, spot.y);

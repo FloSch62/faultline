@@ -353,7 +353,7 @@ test("a full ten-card hand supports the final shortcut without covering transmit
   }
   await page.locator("body").press("0");
   await expect(page.locator("[data-hand]")).toHaveCount(9);
-  expect(JSON.parse((await saved(page))!).run.block).toBe(4);
+  expect(JSON.parse((await saved(page))!).run.block).toBe(CARDS.guard.values.block);
   await page.keyboard.press("z");
   await expect(page.locator("[data-hand]")).toHaveCount(10);
   expect(JSON.parse((await saved(page))!).run.block).toBe(0);
@@ -752,36 +752,30 @@ test("all card rules fit without clipping across narrow, short, zoomed and deskt
     await page.setViewportSize(viewport);
     for (let index = 0; index < cards.length; index += 10) {
       const batch = cards.slice(index, index + 10);
-      await page.locator(".card-fan").evaluate((fan, batch) => {
-        (fan as HTMLElement).style.setProperty(
-          "--hand-size",
-          String(batch.length),
-        );
+      // One round trip per batch (lay the ten cards into the fan, wait for the fonts, measure):
+      // under a full parallel suite, three round trips per batch outran the time limit.
+      const measurements = await page.locator(".card-fan").evaluate(async (fan, batch) => {
+        (fan as HTMLElement).style.setProperty("--hand-size", String(batch.length));
         fan.innerHTML = batch.map((card) => card.html).join("");
+        await document.fonts.ready;
+        return Array.from(fan.querySelectorAll<HTMLElement>(".game-card")).map((card) => {
+          const rule = card.querySelector<HTMLElement>(".card-rule")!;
+          const copy = card.querySelector<HTMLElement>(".card-copy")!;
+          const footer = card.querySelector<HTMLElement>(".card-footer")!;
+          const bounds = card.getBoundingClientRect();
+          return {
+            id: card.dataset.cardId!,
+            text: rule.textContent,
+            ruleBottom: rule.getBoundingClientRect().bottom - bounds.top,
+            footerTop: footer.getBoundingClientRect().top - bounds.top,
+            ruleScroll: rule.scrollHeight,
+            ruleHeight: rule.clientHeight,
+            copyScroll: copy.scrollHeight,
+            copyHeight: copy.clientHeight,
+            fontSize: parseFloat(getComputedStyle(rule).fontSize),
+          };
+        });
       }, batch);
-      await page.evaluate(() => document.fonts.ready);
-      const measurements = await page
-        .locator(".card-fan .game-card")
-        .evaluateAll((elements) =>
-          elements.map((element) => {
-            const card = element as HTMLElement;
-            const rule = card.querySelector<HTMLElement>(".card-rule")!;
-            const copy = card.querySelector<HTMLElement>(".card-copy")!;
-            const footer = card.querySelector<HTMLElement>(".card-footer")!;
-            const bounds = card.getBoundingClientRect();
-            return {
-              id: card.dataset.cardId!,
-              text: rule.textContent,
-              ruleBottom: rule.getBoundingClientRect().bottom - bounds.top,
-              footerTop: footer.getBoundingClientRect().top - bounds.top,
-              ruleScroll: rule.scrollHeight,
-              ruleHeight: rule.clientHeight,
-              copyScroll: copy.scrollHeight,
-              copyHeight: copy.clientHeight,
-              fontSize: parseFloat(getComputedStyle(rule).fontSize),
-            };
-          }),
-        );
       for (const card of measurements) {
         const label = `${card.id} at ${viewport.width}×${viewport.height}`;
         expect.soft(card.text, label).toBe(

@@ -73,6 +73,8 @@ test("a dropped device asks first: the plate names the move, Relocate pays 1 ene
 });
 
 test("Esc, a click on the table and a right-click each cancel: nothing spent, the device back where it stood", async ({ page }) => {
+  // Four drags and four cancels on the 3D table: long under a full parallel suite.
+  test.setTimeout(120_000);
   await watchTable(page);
   await install(page, battle({ ...route("router1", NORTH.x, NORTH.z) }));
   const before = await saved(page);

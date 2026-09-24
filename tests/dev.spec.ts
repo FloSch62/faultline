@@ -29,6 +29,8 @@ async function scenario(page: Page, id: string, channels: number) {
 }
 
 test("/dev boots directly and every channel scenario explains the engine's live count", async ({ page }) => {
+  // Ten scenarios, each loaded and checked through the real panel: long under a full parallel suite.
+  test.setTimeout(120_000);
   await openDev(page, false);
   const examples: [string, number][] = [["single", 1], ["parallel", 2], ["triple", 3], ["shared-router", 1], ["shared-firewall", 1], ["crosslink", 2], ["dead-end", 1], ["no-router", 0], ["cut", 1], ["empty", 0]];
   for (const [id, count] of examples) {

@@ -155,7 +155,8 @@ test("a click on a hostile always targets it, even right after hovering a channe
   await page.mouse.click(body.x, body.y);
   await expect.poll(async () => (await saved(page)).focus).toBe("right");
   expect("aims" in await saved(page)).toBe(false);
-  await expect(page.locator(".target-hint")).not.toContainText(/Aim/);
+  // The target hint shows only while a card is aiming; after a click on a hostile nothing aims.
+  await expect(page.locator(".target-hint")).toHaveCount(0);
 });
 
 test("the rail: one plate under each portrait with its name, next move and health from the forecast", async ({ page }) => {
@@ -312,7 +313,7 @@ for (const [width, height] of [[1280, 720], [1440, 900], [1920, 1080]] as const)
     const ports = e.run.enemies.map(enemy => enemy.port);
     await expect(page.locator("#intent-layer .hostile-plate:not([hidden])")).toHaveCount(ports.length);
     const plates = await boxOf(page, "#intent-layer .hostile-plate:not([hidden])");
-    const hud = await boxOf(page, ".battle-left, .battle-right, .game-header .run-stats, .game-header .header-controls, .encounter-heading, .field-strip");
+    const hud = await boxOf(page, ".battle-left, .battle-right, .game-header .run-stats, .game-header .header-controls, .encounter-heading, .pile-cluster");
     for (const port of ports) {
       await expect.poll(() => portrait(page, port), { message: `${port} portrait` }).not.toBeNull();
       const body = (await portrait(page, port))!;

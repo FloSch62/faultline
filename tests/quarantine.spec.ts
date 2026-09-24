@@ -145,7 +145,8 @@ test("a worn device opens its repair plate from the table and repairs for its co
   const e = battle({ enemy: "prophet", turn: turnOf("prophet", "strike"), ...worn });
   await watchTable(page);
   await install(page, e);
-  await expect(page.locator('.ledger-chip.is-wear [data-repair="router1"]')).toHaveCount(1);
+  // The ledger chips are gone: a worn device carries a mark over the table (Field Training rings it).
+  await expect(page.locator('#intent-layer [data-anchor-node="router1"]')).toHaveCount(1);
   const at = await tablePoint(page, 0, 1.35, 0);
   await page.mouse.click(at.x, at.y);
   const plate = page.locator("#target-dock .device-controls");
@@ -160,7 +161,7 @@ test("a worn device opens its repair plate from the table and repairs for its co
   expect((await saved(page)).energy).toBe(ENERGY - 1);
   await expect(plate.locator(".plate-pips")).toHaveText("◆◆");
   await expect(plate.locator(".repair-button")).toBeDisabled();
-  await expect(page.locator(".ledger-chip.is-wear")).toHaveCount(0);
+  await expect(page.locator("#intent-layer [data-anchor-node]")).toHaveCount(0);
 });
 
 /** A Breaker Charge beside a switch that is off the primary route (the route keeps working). */

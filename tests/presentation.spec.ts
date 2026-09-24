@@ -160,7 +160,9 @@ test("cards sound like what they do: lifting never shuffles; a reshuffle is hear
   const files = Object.values(EFFECTS).reduce((sum, cue) => sum + cue.variants, 0);
   await expect.poll(() => page.evaluate(() => (window as any).__decoded)).toBe(files);
   const cues = () => page.evaluate(() => (window as any).__effects.map((effect: { cue?: string }) => effect.cue ?? "?") as string[]);
-  const last = async () => (await cues()).at(-1);
+  // Hover cues are left out: after a play the fan closes up and the next card slides under the
+  // pointer, which rises its zoomed copy (and its hover cue) after the play's own cue.
+  const last = async () => (await cues()).filter(cue => !cue.startsWith("hover-")).at(-1);
   await page.locator('[data-hand="0"]').click();
   await expect.poll(last).toMatch(/^pickup-/);
   await page.locator('[data-hand="0"]').click();

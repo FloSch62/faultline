@@ -23,7 +23,7 @@ test("a Ghost turn: Power Surge rises over the base, a daemon runs, a Payload la
   await expect(page.locator(`${orb} strong`)).toHaveText(String(ENERGY));
   await expect(page.locator(`${orb} .energy-base`)).toHaveText(`/${ENERGY}`);
   await expect(page.locator(orb)).not.toHaveClass(/is-risen/);
-  await expect(page.locator(".daemon-strip")).toHaveCount(0);
+  await expect(page.locator(".daemon-seals")).toHaveCount(0);
 
   // Temporary energy sits on top of the base, uncapped: the orb rises and says by how much.
   const surge = CARDS.surge.values.energy ?? 0;
@@ -33,15 +33,15 @@ test("a Ghost turn: Power Surge rises over the base, a daemon runs, a Payload la
   await expect(page.locator(`${orb} .energy-rise`)).toContainText(`+${surge}`);
   let energy = ENERGY - CARDS.surge.cost + surge;
 
-  // A daemon: its card leaves the hand for the daemon strip, never the discard pile.
+  // A daemon: its card leaves the hand for a seal on the player plate, never the discard pile.
   const kit = page.locator('[data-hand][data-card-id="exploit-kit"]');
   await expect(kit.locator(".type-word.is-daemon")).toHaveText("Daemon");
   await playCard(page, "exploit-kit");
   energy -= CARDS["exploit-kit"].cost;
   await expect(page.locator(`${orb} strong`)).toHaveText(String(energy));
-  const plate = page.locator('.daemon-strip [data-daemon="exploit-kit"]');
-  await expect(plate).toBeVisible();
-  await expect(plate).toContainText(CARDS["exploit-kit"].name);
+  const seal = page.locator('.daemon-seals [data-daemon="exploit-kit"]');
+  await expect(seal).toBeVisible();
+  await expect(seal).toHaveAttribute("aria-label", new RegExp(`Daemon running: ${CARDS["exploit-kit"].name}`));
   let run = await saved(page);
   expect(run.daemons).toEqual(["exploit-kit"]);
   expect(run.discardPile).not.toContain("exploit-kit");
@@ -81,7 +81,7 @@ test("a Ghost turn: Power Surge rises over the base, a daemon runs, a Payload la
   expect(run.hand).not.toContain("guard");
   expect(run.discardPile).toContain("guard");
   expect(run.daemons).toEqual(["exploit-kit"]);
-  await expect(page.locator('.daemon-strip [data-daemon="exploit-kit"]')).toBeVisible();
+  await expect(page.locator('.daemon-seals [data-daemon="exploit-kit"]')).toBeVisible();
   await expect(page.locator(`${orb} strong`)).toHaveText(String(ENERGY));
   await expect(page.locator(orb)).not.toHaveClass(/is-risen/);
 });

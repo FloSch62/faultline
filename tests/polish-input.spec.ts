@@ -29,7 +29,8 @@ test("110% scaling keeps dragged cards under the pointer and tooltips in a scrol
   await page.evaluate(() => window.dispatchEvent(new Event("blur")));
   await page.mouse.up();
   await expect(page.locator(".drag-ghost")).toHaveCount(0);
-  await page.locator('[data-field-zone="center"]').hover();
+  // The band plates are gone; the energy orb carries the same engraved tooltip.
+  await page.locator(".energy-orb").hover();
   await expect(page.locator("#game-tooltip")).toHaveClass("visible");
   const tooltip = (await page.locator("#game-tooltip").boundingBox())!;
   expect(tooltip.x).toBeGreaterThanOrEqual(0);

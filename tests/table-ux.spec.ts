@@ -1,4 +1,4 @@
-/** Table readability in the browser: the "routes · channels" chip, one colour per channel on the
+/** Table readability in the browser: the "routes · channels" count on the terminals, one colour per channel on the
  * table, the junction seal where routes merge, the amplified fibre's own colour, and the hover
  * cards for devices and cables. The 3D table is read through helpers.watchTable. */
 import type { Page } from "@playwright/test";
@@ -44,6 +44,18 @@ async function hoverDevice(page: Page, id: string) {
   }
   throw new Error(`no hover card over ${id}`);
 }
+/** Rests the pointer on a terminal (ALPHA at x −5.3, OMEGA at x 5.3) until its hover card shows:
+ * it counts the routes and channels (the "routes · channels" ledger chip is gone). */
+async function hoverTerminal(page: Page, id: "alpha" | "omega") {
+  const x = id === "alpha" ? -5.3 : 5.3;
+  for (const y of [1.4, 1.1, 1.7, 0.8, 2.0]) {
+    const spot = await tablePoint(page, x, y, 0);
+    await page.mouse.move(spot.x - 2, spot.y);
+    await page.mouse.move(spot.x, spot.y);
+    if (await page.locator(`#hover-card.visible [data-card="terminal"][data-id="${id}"]`).count()) return page.locator(`#hover-card.visible [data-card="terminal"]`);
+  }
+  throw new Error(`no hover card over ${id}`);
+}
 /** Walks along a cable's arc (the same curve World draws) until its hover card shows. */
 async function hoverCable(page: Page, a: { x: number; z: number }, b: { x: number; z: number }) {
   const top = 0.62 + Math.min(0.38 + Math.hypot(a.x - b.x, a.z - b.z) * 0.07, 1.13);
@@ -56,7 +68,7 @@ async function hoverCable(page: Page, a: { x: number; z: number }, b: { x: numbe
   throw new Error("no hover card over the cable");
 }
 
-test("the chip counts routes and channels; each channel has its own colour and the amplified fibre keeps violet", async ({ page }) => {
+test("the terminals count routes and channels; each channel has its own colour and the amplified fibre keeps violet", async ({ page }) => {
   const e = meshed();
   const forecast = combatPreview(e.run);
   expect([forecast.routeCount, forecast.channels]).toEqual([4, 3]);
@@ -64,14 +76,10 @@ test("the chip counts routes and channels; each channel has its own colour and t
   await watchTable(page);
   await install(page, e);
 
-  const chip = page.locator(".ledger-chip.is-channels");
-  await expect(chip).toHaveText(/4 routes · 3 channels/);
-  await expect(chip).not.toContainText("cut-proof");
-  await expect(chip.locator(".channel-swatches i")).toHaveCount(3);
-  const tip = await chip.getAttribute("data-tooltip");
-  expect(tip).toContain("4 routes make 3 channels.");
-  expect(tip).toContain("two paths through the same device count as one.");
-  expect(tip).toContain("SWITCH6 (2 routes)");
+  const terminal = await hoverTerminal(page, "alpha");
+  await expect(terminal).toContainText("4 routes · 3 channels");
+  await expect(terminal).toContainText("Routes through the same device count as one channel.");
+  await page.mouse.move(5, 5);
 
   // One colour per delivering channel on the cables and skirts; a live route outside the set stays neutral.
   await expect.poll(async () => (await tableState(page)).cables.length).toBe(links.length);
@@ -107,7 +115,7 @@ test("the chip counts routes and channels; each channel has its own colour and t
 test("a single route reads in the singular and marks no junction", async ({ page }) => {
   await watchTable(page);
   await install(page, battle(route("router1")));
-  await expect(page.locator(".ledger-chip.is-channels")).toHaveText(/1 route · 1 channel/);
+  await expect(await hoverTerminal(page, "omega")).toContainText("1 route · 1 channel");
   expect((await tableState(page)).devices.every(item => item.junction === null)).toBe(true);
 });
 

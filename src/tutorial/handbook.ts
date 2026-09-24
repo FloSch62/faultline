@@ -138,7 +138,7 @@ const CHAPTER_BODIES: Record<string, () => string> = {
     <div class="hb-columns">
       <section><h4>${icon("bolt", 16)} Energy & cards</h4><p>Cards cost the number in their corner. Your first route, a ${name("router")} and two ${name("fiber")}s, costs ${strong(ROUTE_COST)}: ${ROUTE_COST >= R.baseEnergy ? "your whole first turn" : "most of your first turn"}. Unspent energy is lost unless a relic says otherwise. Played cards go to discard; ${strong("Exhaust")} cards leave for the rest of the encounter; a ${strong("Daemon")} keeps running (see ${strong("Keywords & Daemons")}). When your draw pile runs out, the discard pile is shuffled back in.</p></section>
       <section><h4>${icon("eye", 16)} Everything is forecast</h4><p>Before you transmit, both plates show the exact outcome: your damage with every term and where it lands, each hostile's action and its target, and the integrity you will lose. What you see is what resolves. Open ${strong("Details")} for the full calculation.</p></section>
-      <section><h4>${icon("deck", 16)} Prepare</h4><p>Press ${strong("P")}, or click the ${strong("+ PREPARE")} slot at the bottom left beside your Draw, Discard and Exhaust piles, to set one card aside for free. It becomes the first card of your next hand, replacing a draw. Use it to hold an answer for a turn you can already see coming.</p></section>
+      <section><h4>${icon("deck", 16)} Prepare</h4><p>Press ${strong("P")}, or click the ${strong("+")} plate at the bottom left beside your Draw, Discard and Exhaust piles, to set one card aside for free. It becomes the first card of your next hand, replacing a draw. Use it to hold an answer for a turn you can already see coming.</p></section>
       <section><h4>${icon("undo", 16)} Undo & inspect</h4><p>${strong("Z")} undoes the last action this turn. Right-click any card, or press ${strong("I")}, to inspect it: keywords and edge cases are explained there. Relocating a placed device costs ${strong(R.relocateCost)} energy.</p></section>
     </div>
     <h4 class="hb-subhead">${icon("bolt", 16)} Where energy comes from</h4>
@@ -150,7 +150,7 @@ const CHAPTER_BODIES: Record<string, () => string> = {
       [esc(RELICS["reserve-cell"].name), "unspent energy carried, up to 2", "On top of the base, no cap"],
       [esc(RELICS["cold-start"].name), "+1 on the first turn of a battle", "On top of the base"],
     ])}
-    <p>The energy orb reads what is left over the turn's base, such as ${strong(`2/${R.baseEnergy}`)}. Energy above the base glows and shows its rise; its tooltip names every source, and the ${strong("Next")} chip shows next turn's energy, cards and block before you transmit.</p>
+    <p>The energy orb reads what is left over the turn's base, such as ${strong(`2/${R.baseEnergy}`)}. Energy above the base glows and shows its rise; its tooltip names every source and next turn's energy, cards and block before you transmit.</p>
     ${tip("Twelve cards to start", `Every keeper starts with ${STARTER_DECK.length + STARTER_SIGNATURES.architect.length} cards: the shared ${STARTER_DECK.length} (${cardList(STARTER_DECK)}) and two signature cards. Your opening hand always holds a router card and two link cards, so turn one can build a route.`)}
     ${tip("Integrity is your life", "Integrity carries over between rooms. At zero the expedition ends. Winning a battle never heals by itself — sanctuaries, events and a few relics do.", "rule")}`;
   },
@@ -173,7 +173,7 @@ const CHAPTER_BODIES: Record<string, () => string> = {
       ["Burst · Buffer · Backpressure", "as shown", "This transmission"],
       ["Exposed guardian", `+${R.exposedBonus}`, "After an interrupted ultimate"],
     ])}
-    ${figure(bottleneckDiagram(), "Two routes through one switch: the ledger reads 2 routes · 1 channel, and the switch wears a brass seal.")}
+    ${figure(bottleneckDiagram(), "Two routes through one switch: ALPHA and OMEGA read 2 routes · 1 channel on hover, and the switch wears a brass seal.")}
     ${tip("Reading the table", "Each channel glows in its own colour: gold for the primary, then cyan, green, blue, silver and rose, the same colours as its delivery. A cable wound with violet fibre is amplified, whichever channel it carries. A brass seal with a number marks a device that many routes pass through. Rest the pointer on any device, cable or installation for its card.")}
     ${tip("No hidden caps", "Every switch, every channel and every balancer counts. The limits are physical: 14 sockets on the table, your energy, and what the enemy can cut.", "rule")}`,
 
@@ -289,7 +289,7 @@ const CHAPTER_BODIES: Record<string, () => string> = {
       ${order.map(id => `<div class="hb-term"><dt>${esc(KEYWORDS[id].name)}</dt><dd>${esc(KEYWORDS[id].rule)}${examples[id] ? ` <small>(${examples[id]})</small>` : ""}</dd></div>`).join("")}
     </div>
     <h4 class="hb-subhead">${icon("play", 16)} Daemons</h4>
-    <p>A ${strong("Daemon")} is paid once and runs for the rest of the encounter: its card leaves your hand for the ${strong("daemon strip")} above your protocol slots, where each running daemon shows its name, its copies (×2) and what it does. It never reaches your discard pile, and every daemon stops when the encounter ends. Copies stack: two copies do the work twice. What a daemon adds to your transmission or your shield appears in the forecast as its own labelled term.</p>
+    <p>A ${strong("Daemon")} is paid once and runs for the rest of the encounter: its card leaves your hand for a ${strong("seal")} on your player plate, where each running daemon shows its copies (×2) and, on hover, what it does. It never reaches your discard pile, and every daemon stops when the encounter ends. Copies stack: two copies do the work twice. What a daemon adds to your transmission or your shield appears in the forecast as its own labelled term.</p>
     ${table(["Daemon", "Card", "Cost", "While it runs"], daemons.map(id => [name(id), ownerOf(id), String(card(id).cost), esc(card(id).rules.replace(/^(?:(?:Daemon|Innate)\.\s*)+/, ""))]))}
     ${tip("When a daemon pays", `At ${R.baseEnergy} energy a turn, a daemon spends a turn's worth of tempo to pay every turn after it. Play it early in a long fight, an elite or a guardian; in a short fight a block card or a burst may be worth more.`, "rule")}
     <h4 class="hb-subhead">${icon("deck", 16)} ${esc(payload.name)} tokens</h4>
@@ -332,7 +332,7 @@ const CHAPTER_BODIES: Record<string, () => string> = {
     ${table(["Installation", "Integrity", "Effect", "Planted"], INSTALLATION_ROWS().map(row => [row.name, row.integrity, row.effect, row.placed]))}
     <h4 class="hb-subhead">${icon("cleanse", 16)} Taking it down</h4>
     ${table(["Answer", "Cost", "What it does"], [
-      ["Scrub", scrub, `Click the installation or its ledger tag, or press S: 1 integrity per point, destroyed at 0. ${R.quarantineScrubCost} per point while a Quarantine Drone lives.`],
+      ["Scrub", scrub, `Click the installation on the table, then Scrub, or press S: 1 integrity per point, destroyed at 0. ${R.quarantineScrubCost} per point while a Quarantine Drone lives.`],
       [name("purge-field"), String(card("purge-field").cost), "Destroys every installation in the band, whatever its integrity. An Anchor takes the purge instead of its fields."],
       ["Firewall quarantine", "Free", `In the trap phase every online firewall deals ${R.quarantineDamage} to the nearest installation within ${reach} (Sentry Firewall ${R.sentryQuarantine}). Place firewalls where installations land.`],
       ["Honeypot bite", "Free", `An installation planted within ${reach} of a cabled Honeypot arrives with ${R.honeypotBite} less integrity. Taps and Breaker Charges arrive destroyed.`],
@@ -448,7 +448,7 @@ const CHAPTER_BODIES: Record<string, () => string> = {
       ["Your only route will be cut", "The marked cable on the table", `Arm ${name("failover-policy")} · cable a ${name("honeypot")} · build a second channel · ${name("armored-fiber")} · patch next turn`],
       ["A breach is coming", "Right plate · shield forecast", `Bring a firewall online (${R.firewallBreachBlock} each) · ${name("ips-signature")} · block cards · Harden`],
       ["A device will be jammed", "The marked device", `${name("port-security")} · honeypot · ${name("shield")} · relocate out of a marked band · second channel`],
-      ["A band is corrupted", "Field seals under the table", `${name("purge-field")} · move hardware out · route through another band · ${name("quarantine-rule")} before it lands`],
+      ["A band is corrupted", "The band's field drawn on the table (hover the band)", `${name("purge-field")} · move hardware out · route through another band · ${name("quarantine-rule")} before it lands`],
       ["An installation lands", `The magenta tag and its ${pipRow(2, 2, "install")} pips`, `Scrub it (${R.scrubCost} energy per point) · ${name("purge-field")} on its band · a firewall within ${reach} quarantines it for free · move its target out of the ring (${R.relocateCost})`],
       ["A Breaker Charge beside your router", "The countdown numeral and its ring", `Scrub it (${R.scrubCost}: it has ${INSTALL_INTEGRITY.breaker} integrity) · relocate the router out of the ${reach} ring (${R.relocateCost}) · ${name("demolition-charge")} · a ${name("server-rack")} in reach takes the blast`],
       ["A Jammer you cannot reach", "Its magenta ring and the jammed device", `Move its target out of the ring (${R.relocateCost}) · jam protection: ${name("shield")}, ${name("hardened-router")}, ${name("bastion")} · a cabled honeypot in reach decoys it and bites · ${name("purge-field")} on its band · a firewall within ${reach} wears it down`],

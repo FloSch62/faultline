@@ -497,7 +497,7 @@ test("11 · clear the ground: scrub twice, repair ahead of the telegraphed break
   const start = combatPreview(s.run);
   assert.ok(start.wear.some(item => item.nodeId === "router1" && item.breaks), "the Spike would break the worn router");
   assert.ok(start.installationEffects.some(item => item.id === jammer.id && item.effect === "jam" && item.target === "router1"), "the Jammer jams the router");
-  assert.match(s.progress.focus, /\.ledger-chip\.is-installation\[data-scrub="jammer1"\]/, "the spotlight is the Jammer's ledger tag");
+  assert.match(s.progress.focus, /\[data-anchor-installation="jammer1"\]/, "the spotlight is the Jammer on the table");
 
   ok(scrubInstallation(s.run, jammer.id), "scrub 1");
   assert.ok(s.done("scrub1"));

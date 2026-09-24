@@ -902,25 +902,26 @@ function frontCoach(id: LessonId, ctx: Context, done: Record<string, boolean>): 
       const router = run.topology.nodes.find(node => node.id === "router1");
       const name = router?.id.toUpperCase() ?? "ROUTER1";
       const wear = preview?.wear.find(item => item.nodeId === "router1");
-      const scrubAt = (key: string) => `#target-dock .scrub-button[data-scrub="${key}"] || .ledger-chip.is-installation[data-scrub="${key}"]`;
+      // The Scrub plate once the installation is chosen, else the installation itself on the table.
+      const scrubAt = (key: string) => `#target-dock .scrub-button[data-scrub="${key}"] || #intent-layer [data-anchor-installation="${key}"]`;
       const cost = scrubCost(run);
       if (!done.scrub1) return {
-        coach: `Scrub the **Jammer**: click its tag in the ledger (${cost} energy).`,
+        coach: `Scrub the **Jammer**: click it on the table, then **Scrub** (${cost} energy).`,
         detail: `Installations have integrity: this one has ${jammer?.integrity ?? 0}. After your transmission it jams the nearest device within ${RULES.reach.toFixed(1)}, your router, and a jammed router carries no signal next turn. Each scrub removes one point for ${cost} energy.`,
-        hint: "Every installation has an iron tag in the ledger beside your hand. Click the Jammer's tag, or press S.",
+        hint: "Click the Jammer on the table and press Scrub on its plate, or press S.",
         focus: jammer ? scrubAt(jammer.id) : "",
       };
       if (!done.scrub2) return {
         coach: "Scrub it **again**: one point left.",
         detail: `At 0 it is destroyed, and Reclaim adds ${RULES.reclaimShield} shield to this enemy phase.`,
-        hint: "Click the Jammer's tag once more, or press S.",
+        hint: "Press Scrub once more, or S.",
         focus: jammer ? scrubAt(jammer.id) : "",
       };
       if (!done.repair) return {
-        coach: `**Repair** your router: click it in the **Worn** tag (${repairCost(run)} energy).`,
+        coach: `**Repair** your router: click it on the table, then **Repair** (${repairCost(run)} energy).`,
         detail: `${name} is worn: condition ${router ? conditionOf(router) : 0} of ${router ? maxConditionOf(router) : 0}. The Spike beside it wears the nearest device every enemy phase, and the forecast already says it: ${wear?.breaks ? `breaks ${name} · wreckage remains` : `wears ${name} to ${wear?.to ?? 0}`}. A breakdown takes the device and its cables. The warning comes a turn ahead; one repair answers it.`,
-        hint: `Click ${name} inside the Worn tag, or press R.`,
-        focus: `#target-dock .repair-button[data-repair="router1"] || .ledger-chip.is-wear [data-repair="router1"]`,
+        hint: `Click ${name} on the table and press Repair on its plate, or press R.`,
+        focus: `#target-dock .repair-button[data-repair="router1"] || #intent-layer [data-anchor-node="router1"]`,
       };
       if (!done.transmit) {
         const hatched = preview?.installTargets.find(item => item.kind === "jammer" && !item.boosts);
@@ -935,17 +936,17 @@ function frontCoach(id: LessonId, ctx: Context, done: Record<string, boolean>): 
         const band = jammer ? zoneForNode(jammer) : null;
         const there = band ? run.installations.filter(item => zoneForNode(item) === band).map(item => INSTALLATION_NAMES[item.kind]) : [];
         const purge = run.hand.findIndex(card => isCard(card, "purge-field"));
-        // Lifted, the card is choosing its band: the spotlight moves to the band's seal.
+        // Lifted, the card is choosing its band: the spotlight moves to the band's button.
         if (band && isCard(ctx.view.selected, "purge-field")) return {
-          coach: `Now click **${band.toUpperCase()}**: its field seal, or the band on the table.`,
+          coach: `Now click **${band.toUpperCase()}**: the band on the table, or its button above your hand.`,
           detail: `${there.map(kind => `the ${kind}`).join(" and ").replace(/^t/, "T")} stand${there.length === 1 ? "s" : ""} in ${band.toUpperCase()}. The purge destroys ${there.length === 1 ? "it" : "both"}; the other bands keep what they hold.`,
-          hint: `The seals under the table are the three bands. ${band.toUpperCase()} is lit. Esc puts the card back.`,
-          focus: `[data-field-zone="${band}"]`,
+          hint: `The three bands light on the table; the buttons above your hand name them too. ${band.toUpperCase()} is lit. Esc puts the card back.`,
+          focus: `#target-dock [data-field-zone="${band}"]`,
         };
         return {
           coach: `Play **Purge Field** on **${band?.toUpperCase() ?? "the Jammer's band"}**: ${there.length > 1 ? `the new Jammer and the ${there.filter(kind => kind !== "Jammer")[0] ?? "Spike"} both stand there` : "the new Jammer stands there"}.`,
           detail: `Purge Field costs ${purge >= 0 ? costFor(run, purge) : CARDS["purge-field"].cost}: it destroys every installation in one band (Reclaim ${RULES.reclaimShield} shield each) and clears the band's jams and hostile fields. Left standing, the Jammer jams your router next phase${wear?.breaks ? ` and the Spike breaks it` : ""}.`,
-          hint: `Select Purge Field, then click the ${band?.toUpperCase() ?? "marked"} band on the table or its field seal.`,
+          hint: `Select Purge Field, then click the ${band?.toUpperCase() ?? "marked"} band on the table.`,
           focus: card("purge-field"),
         };
       }
@@ -1146,7 +1147,7 @@ function coachFor(id: LessonId, ctx: Context, done: Record<string, boolean>): Co
       if (!done.resonance) return {
         coach: "Play **Resonance Field** on the band your route crosses.",
         detail: `+${RULES.resonanceDamage} damage for ${RULES.alliedFieldTurns} turns to routes crossing that band. Claim the ground you stand on.`,
-        hint: "Play Resonance Field, then click the field seal of your router's band.",
+        hint: "Play Resonance Field, then click your router's band on the table.",
         focus: card("resonance-field"),
       };
       if (!done.transmit) return {
@@ -1259,10 +1260,10 @@ function coachFor(id: LessonId, ctx: Context, done: Record<string, boolean>): Co
     case "danger": {
       const ultimateTurn = !!intent?.ultimate;
       if (!done.scrub) return {
-        coach: `Scrub the **Siphon Tap**: click its tag in the ledger (${scrubCost(run)} energy).`,
+        coach: `Scrub the **Siphon Tap**: click it on the table, then **Scrub** (${scrubCost(run)} energy).`,
         detail: `The Regent is charging its ultimate — you have one turn to prepare. A Siphon Tap on your table costs −${RULES.malwarePenalty} damage every transmission.`,
-        hint: "Click the Siphon Tap's iron tag in the ledger or press S — or click the Tap on the table and use Scrub.",
-        focus: `#target-dock .scrub-button[data-scrub="tap1"] || .ledger-chip.is-installation[data-scrub="tap1"]`,
+        hint: "Click the Siphon Tap on the table and press Scrub on its plate, or press S.",
+        focus: `#target-dock .scrub-button[data-scrub="tap1"] || #intent-layer [data-anchor-installation="tap1"]`,
       };
       if (!done.worm) return {
         coach: `Play the **Worm** to delete it (${cost("worm")} energy).`,

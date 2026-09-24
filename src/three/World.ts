@@ -38,7 +38,7 @@ export type WorldPoint = { x: number; z: number };
 export type BoardZone = Zone;
 /** What the pointer rests on over the table: a device, a cable (its linkKey), an installation or
  * a hostile (its port). "delivery" (a channelKey) is raised by the HUD's landing breakdown. */
-export type TableHover = { kind: "node" | "link" | "installation" | "port" | "delivery"; id: string };
+export type TableHover = { kind: "node" | "link" | "installation" | "port" | "delivery" | "band"; id: string };
 export interface WorldCallbacks {
   onGround: (point: WorldPoint) => void;
   onNode: (id: string) => void;
@@ -372,6 +372,10 @@ export class World {
     label: THREE.MeshBasicMaterial;
     warning: THREE.Mesh;
     color: number;
+    /** The band's fields on an iron plaque at its left end ("CORROSION · 2"), redrawn when they change. */
+    field: { mesh: THREE.Mesh; material: THREE.MeshBasicMaterial; canvas: HTMLCanvasElement; texture: THREE.CanvasTexture; text: string };
+    /** A thin lit rim around the band while a field holds it. */
+    rim: THREE.MeshBasicMaterial;
   }>();
   private forecastZone: BoardZone | null = null;
   private zoneEffects: ZoneEffect[] = [];
@@ -726,6 +730,70 @@ export class World {
     return mesh;
   }
 
+  /** A band's field plaque: an iron plate on the table, rimmed in the field's colour; hidden when clear. */
+  private fieldInscription() {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1024;
+    canvas.height = 176;
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = 4;
+    const material = new THREE.MeshBasicMaterial({ color: 0xffffff, map: texture, transparent: true, opacity: 0.96, depthWrite: false });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(3.3, 3.3 * 176 / 1024), material);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.renderOrder = 3;
+    mesh.visible = false;
+    return { mesh, material, canvas, texture, text: "" };
+  }
+  /** Draws the plaque: each field's name in its colour, then its time ("2", "TERRAIN", "ANCHORED"). */
+  private drawFieldInscription(field: { mesh: THREE.Mesh; canvas: HTMLCanvasElement; texture: THREE.CanvasTexture; text: string }, parts: { name: string; time: string; color: number }[]) {
+    const text = parts.map(part => `${part.name}:${part.time}:${part.color}`).join("|");
+    if (field.text === text) return;
+    field.text = text;
+    field.mesh.visible = parts.length > 0;
+    const c = field.canvas.getContext("2d")!, w = field.canvas.width, h = field.canvas.height;
+    c.clearRect(0, 0, w, h);
+    if (!parts.length) { field.texture.needsUpdate = true; return; }
+    const hex = (color: number) => `#${color.toString(16).padStart(6, "0")}`;
+    const rim = hex(parts[0].color);
+    // The plate: dark iron, a lit rim in the field's colour, a brass hairline inside.
+    c.beginPath();
+    c.roundRect(10, 16, w - 20, h - 32, 26);
+    c.fillStyle = "rgba(8, 11, 16, 0.84)";
+    c.fill();
+    c.lineWidth = 7;
+    c.strokeStyle = rim;
+    c.shadowColor = rim;
+    c.shadowBlur = 18;
+    c.stroke();
+    c.shadowBlur = 0;
+    c.beginPath();
+    c.roundRect(24, 30, w - 48, h - 60, 16);
+    c.lineWidth = 2;
+    c.strokeStyle = "rgba(201, 162, 99, 0.55)";
+    c.stroke();
+    // The words, centred as one line, each field's name in its own colour.
+    c.font = "700 70px Cinzel, serif";
+    c.textBaseline = "middle";
+    const segments = parts.flatMap((part, i) => [...(i ? [{ text: "   ", color: "#f3e6c8" }] : []), { text: part.name, color: hex(part.color) }, { text: ` · ${part.time}`, color: "#f3e6c8" }]);
+    const widths = segments.map(segment => c.measureText(segment.text).width);
+    const total = widths.reduce((sum, width) => sum + width, 0), room = w - 90;
+    const squeeze = Math.min(1, room / total);
+    c.save();
+    c.translate(w / 2 - total * squeeze / 2, h / 2 + 2);
+    c.scale(squeeze, 1);
+    let x = 0;
+    segments.forEach((segment, i) => {
+      c.fillStyle = segment.color;
+      c.shadowColor = segment.color;
+      c.shadowBlur = segment.color === "#f3e6c8" ? 0 : 10;
+      c.fillText(segment.text, x, 0);
+      x += widths[i];
+    });
+    c.restore();
+    field.texture.needsUpdate = true;
+  }
+
   private buildTableZones() {
     const zones: { id: BoardZone; name: string; z: number; depth: number; color: number }[] = [
       { id: "north", name: "NORTH", z: -3.25, depth: 3.9, color: 0x82aabf },
@@ -746,7 +814,21 @@ export class World {
       warning.position.set(7.12, 0.64, zone.z);
       warning.visible = false;
       this.board.add(warning);
-      this.zoneVisuals.set(zone.id, { fill, label: label.material, warning, color: zone.color });
+      const fieldLine = this.fieldInscription();
+      // At the band's front edge, left of centre: clear of ALPHA's pad, read before the devices behind it.
+      fieldLine.mesh.position.set(-3.7, 0.642, zone.z + zone.depth / 2 - 0.36);
+      this.board.add(fieldLine.mesh);
+      // The rim: four thin lit strips just inside the band's edges.
+      const rim = glow(zone.color, 0);
+      const half = zone.depth / 2 - 0.05;
+      for (const [w, d, x, z] of [[16.02, 0.035, 0, zone.z - half], [16.02, 0.035, 0, zone.z + half], [0.035, zone.depth - 0.1, -8.01, zone.z], [0.035, zone.depth - 0.1, 8.01, zone.z]] as const) {
+        const strip = new THREE.Mesh(new THREE.PlaneGeometry(w, d), rim);
+        strip.rotation.x = -Math.PI / 2;
+        strip.position.set(x, 0.641, z);
+        strip.renderOrder = 2;
+        this.board.add(strip);
+      }
+      this.zoneVisuals.set(zone.id, { fill, label: label.material, warning, color: zone.color, field: fieldLine, rim });
     }
     for (const z of [-1.3, 1.3]) {
       const divider = new THREE.Mesh(new THREE.BoxGeometry(16.12, 0.006, 0.014), glow(0xa7a48b, 0.4));
@@ -1830,6 +1912,8 @@ export class World {
   setInstallations(list: readonly Installation[], forecast: TableForecast | WorldPoint | null = null) {
     const previous = new Set(this.installations.keys());
     this.installationList = list.map(item => ({ ...item }));
+    // An anchor pins its band's hostile field: the band's engraving says so.
+    this.refreshZones();
     const live = new Set(list.map(item => item.id));
     for (const [id, group] of this.installations) {
       if (live.has(id)) continue;
@@ -2012,8 +2096,10 @@ export class World {
     this.refreshZones();
   }
   setZoneTargeting(enabled: boolean) {
+    if (this.targetingZone === enabled) return;
     this.targetingZone = enabled;
     if (!enabled) this.setZonePreview(null);
+    else this.refreshZones();
   }
   pulseZone(zone: BoardZone, kind: "field" | "cleanse" | "corrupt" | "move") {
     const color = { field: 0xe5c581, cleanse: 0xb9ffdf, corrupt: 0xd97780, move: 0x8bd5c5 }[kind];
@@ -2022,17 +2108,29 @@ export class World {
   }
   private refreshZones() {
     const colors = { resonance: 0xddb46b, aegis: 0x65c8b4, stasis: 0xab98df, corrosion: 0xd96755, suppression: 0xa77cdb };
+    const names = { resonance: "RESONANCE", aegis: "AEGIS", stasis: "NULL FIELD", corrosion: "CORROSION", suppression: "SUPPRESSION" };
     for (const [id, visual] of this.zoneVisuals) {
       const danger = id === this.forecastZone;
       const fields = this.zoneEffects.filter(effect=>effect.zone === id);
       const field = fields.find(effect=>effect.kind === "corrosion" || effect.kind === "suppression") ?? fields[0];
       const preview = id === this.previewZone;
-      const color = preview ? this.previewZoneBlocked ? 0xe66455 : 0x9edde0 : field ? colors[field.kind] : danger ? 0xc35e4d : visual.color;
+      // A zone card aiming: every band is a target (softly lit), the pointed one strongest.
+      const aimed = this.targetingZone && !preview;
+      const color = preview ? this.previewZoneBlocked ? 0xe66455 : 0x9edde0 : field ? colors[field.kind] : aimed ? 0x9edde0 : danger ? 0xc35e4d : visual.color;
       visual.fill.color.setHex(color);
-      visual.fill.opacity = preview ? 0.28 : field ? 0.18 : danger ? 0.14 : 0.045;
+      visual.fill.opacity = preview ? 0.28 : field ? 0.18 : aimed ? 0.1 : danger ? 0.14 : 0.045;
       visual.label.color.setHex(color);
-      visual.label.opacity = preview || danger || field ? 1 : 0.72;
+      visual.label.opacity = preview || danger || field || aimed ? 1 : 0.72;
       visual.warning.visible = danger;
+      // The band's fields on its plaque: what holds it and for how long (hostile fields first).
+      const anchored = this.installationList.some(item => item.kind === "anchor" && ZONE_OF(item.z) === id);
+      const hostile = (kind: string) => kind === "corrosion" || kind === "suppression";
+      this.drawFieldInscription(visual.field, [...fields].sort((a, b) => Number(hostile(b.kind)) - Number(hostile(a.kind))).map(effect => ({
+        name: names[effect.kind], color: colors[effect.kind],
+        time: effect.permanent ? "TERRAIN" : anchored && hostile(effect.kind) ? "ANCHORED" : `${effect.turns} TURN${effect.turns === 1 ? "" : "S"}`,
+      })));
+      visual.rim.color.setHex(preview || aimed ? color : field ? colors[field.kind] : visual.color);
+      visual.rim.opacity = preview ? 0.9 : aimed ? 0.45 : field ? 0.55 : 0;
     }
   }
 
@@ -2318,6 +2416,7 @@ export class World {
       const point = this.pointFromScreen(event.clientX,event.clientY);
       this.setZonePreview(point ? point.z < -1.3 ? "north" : point.z > 1.3 ? "south" : "center" : null);
       this.canvas.dataset.cursor = point ? "target" : "default";
+      this.callbacks.onHover?.(point ? { kind: "band", id: ZONE_OF(point.z) } : null, event.clientX, event.clientY);
       return;
     }
     if (
@@ -2353,10 +2452,13 @@ export class World {
       this.canvas.dataset.cursor = hit.installation && this.targetingInstallations ? "target"
         : hit.node || hit.installation || hit.port ? "pointer" : "grab";
       this.hover(hit.installation ? { kind: "installation", id: hit.installation } : hit.node ? { kind: "node", id: hit.node } : null);
+      // Nothing on the table under the pointer: the band itself (its fields, its devices).
+      const ground = hit.installation || hit.node || hit.port || hit.link ? null : this.pointFromScreen(event.clientX, event.clientY);
       const target: TableHover | null = hit.installation ? { kind: "installation", id: hit.installation }
         : hit.node ? { kind: "node", id: hit.node }
         : hit.port ? { kind: "port", id: hit.port }
-        : hit.link ? { kind: "link", id: hit.link } : null;
+        : hit.link ? { kind: "link", id: hit.link }
+        : ground ? { kind: "band", id: ZONE_OF(ground.z) } : null;
       this.callbacks.onHover?.(target, event.clientX, event.clientY);
     } else this.callbacks.onHover?.(null, event.clientX, event.clientY);
   };

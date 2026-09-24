@@ -16,9 +16,7 @@ button, input { -webkit-appearance: none; appearance: none; }
 .shield-value, .safe { color: #97c8c3; }
 .danger { color: #edaa96; }
 .forecast-net { padding-top: 5px; border-top: 1px solid #d4b17b25; }
-.network-status { position: absolute; bottom: 288px; left: 260px; right: 260px; display: flex; justify-content: center; flex-wrap: wrap; gap: 9px 18px; pointer-events: none; font: 11px var(--text); color: #b7c5bb; text-shadow: 0 2px 3px #000; }
-.network-status span { display: flex; align-items: center; gap: 5px; padding: 4px 8px; background: #10191dcc; border-top: 1px solid #89a79744; }
-.network-status .status-fault { color: #e5a69d; border-color: #a96963; }
+
 .combat-log { cursor: var(--cursor-pointer); bottom: 318px; max-width: min(650px,calc(100% - 520px)); padding: 4px 10px; background: #0c171bd9; border-bottom: 1px solid #a88b4b44; color: #b8c8c1; opacity: 1; font: 11px/1.4 var(--text); white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
 .combat-log:hover { color: #d8caad; }
 .draw-piles { flex-wrap: wrap; max-width: 190px; }
@@ -41,14 +39,6 @@ button, input { -webkit-appearance: none; appearance: none; }
 .device-controls { max-width: 800px; flex-wrap: wrap; }
 .device-controls > span:first-child { flex-basis: 100%; text-align: center; margin-bottom: 5px; }
 .card-footer { letter-spacing: .06em; }
-@container game (min-width: 901px) {
-  /* Reserve room for complete rules before the footer, even on dense cards. */
-  .card-fan .card-image { bottom: 143px; }
-  .card-fan .card-heading { top: auto; bottom: 126px; }
-  .card-fan .card-copy { top: auto; bottom: 22px; height: 102px; }
-  .card-fan .card-type { font-size: 7px; line-height: 1.2; letter-spacing: .08em; margin: 0 0 4px; }
-  .card-fan .card-rule { font-size: 11px; line-height: 1.3; }
-}
 .story-fragment { margin: 8px 0 22px; padding: 0 0 0 13px; border-left: 1px solid #b0986155; font: italic 12px/1.6 var(--text); color: #c0ad88; }
 .map-story > p { max-width: 330px; }
 .forge-screen > p { max-width: 660px; }
@@ -90,7 +80,7 @@ button, input { -webkit-appearance: none; appearance: none; }
   .damage-equation, .defense-equation { font-size: 11px; gap: 4px; }
   .formula-button { font-size: 10px; margin-top: 5px; }
   .battle-relics small { font-size: 9px; }
-  .network-status { bottom: 292px; font-size: 10px; }
+
   .draw-piles { bottom: 8px; row-gap: 7px; }
 }
 @container game (max-width: 900px) {
@@ -113,11 +103,9 @@ button, input { -webkit-appearance: none; appearance: none; }
   .intent-caption, .lethal-caption { display: none; }
   .battle-left .tutorial-callout { display: none; }
   .battle-relics { display: none; }
-  .network-status { bottom: 283px; left: 80px; right: 80px; gap: 4px; font-size: 9px; }
-  .network-status > span:last-child { display: none; }
-  .network-status span { padding: 3px 5px; }
+
   .transmit-button, .transmit-button.ready { right: 13px; bottom: 8px; width: 135px; height: 42px; display: grid; grid-template-columns: 35px 1fr; grid-template-rows: 1fr; align-items: center; gap: 5px; padding: 6px 10px; background: linear-gradient(135deg,#685638,#302c21); border: 1px solid #b19a65; box-shadow: inset 0 0 0 3px #1e241c55; border-radius: 0; }
-  .transmit-dial, .transmit-shortcut { display: none !important; }
+  .transmit-shortcut { display: none !important; }
   .transmit-power { display: flex; flex-direction: column; align-items: center; gap: 0; }
   .transmit-power strong { font: 19px/1 var(--display); }
   .transmit-power small { font: 7px/1.3 var(--text); }

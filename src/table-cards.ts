@@ -2,11 +2,11 @@
  * Owned by the table-readability work (channels, shared devices, amplified cables). Every number
  * is read from the forecast (`combatPreview`) or from RULES; nothing here computes a rule. */
 import { CARDS, RULES, baseCard } from "./core/cards.ts";
-import { INSTALLATION_NAMES, isWorn, scrubCost, zoneForNode, type CombatPreview } from "./core/run.ts";
+import { FIELD_RULES, INSTALLATION_NAMES, isWorn, scrubCost, zoneForNode, type CombatPreview } from "./core/run.ts";
 import { contributionOf } from "./core/combat/network.ts";
 import { linkKey } from "./core/graph.ts";
 import { frayedLinks } from "./core/terrain.ts";
-import type { Installation, NetworkLink, NetworkNode, Port, RunState } from "./core/types.ts";
+import type { Installation, NetworkLink, NetworkNode, Port, RunState, Zone } from "./core/types.ts";
 import type { TableHover } from "./three/World.ts";
 import { AMPLIFIED_CSS, channelCss } from "./channel-palette.ts";
 import { ROLE_COPY, glyph as roleGlyph } from "./alpha-ui.ts";
@@ -24,8 +24,10 @@ const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? on
 /** The merge glyph of the junction seal on the table: two strands that join and leave as one. */
 export const MERGE_GLYPH = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6.5c4.5 0 6.5 5.5 10 5.5M3 17.5c4.5 0 6.5-5.5 10-5.5M13 12h8"/></svg>';
 
-/** The card's inner markup for a device, cable or installation, or null for no card. */
-export function hoverMarkup(run: RunState, preview: CombatPreview, target: TableHover): string | null {
+/** The card's inner markup for a device, cable, installation or band, or null for no card. `aiming`:
+ * a zone card is choosing its band, so even clear ground gets a card. */
+export function hoverMarkup(run: RunState, preview: CombatPreview, target: TableHover, aiming: string | null = null): string | null {
+  if (target.kind === "band") return bandCard(run, preview, target.id as Zone, aiming);
   if (target.kind === "node") {
     const node = run.topology.nodes.find(item => item.id === target.id);
     return node ? deviceCard(run, preview, node) : null;
@@ -222,6 +224,32 @@ function cableCard(run: RunState, preview: CombatPreview, key: string, link: Net
 }
 
 // ------------------------------------------------------------------ installations
+
+// ------------------------------------------------------------------ bands
+
+/** A band of the table: its fields (what, how long), the threat on it, its devices and installations.
+ * Clear ground with nothing noteworthy has no card, unless a zone card is choosing its band. */
+function bandCard(run: RunState, preview: CombatPreview, zone: Zone, aiming: string | null): string | null {
+  const fields = run.zoneEffects.filter(effect => effect.zone === zone);
+  const installed = run.installations.filter(item => zoneForNode(item) === zone);
+  const anchored = installed.some(item => item.kind === "anchor");
+  const devices = run.topology.nodes.filter(node => !node.fixed && zoneForNode(node) === zone);
+  const online = devices.filter(node => preview.online.includes(node.id)).length;
+  const cluster = preview.clusters.includes(zone), threatened = preview.hazardZone === zone;
+  if (!fields.length && !installed.length && !cluster && !threatened && !aiming) return null;
+  const rows = fields.map(effect => {
+    const rule = FIELD_RULES[effect.kind];
+    const time = effect.permanent ? "terrain, all encounter" : anchored && rule.hostile ? "anchored: it does not tick down" : count(effect.turns, "turn");
+    return line(icon("field", 14), `<b>${esc(rule.name)}</b> · ${esc(rule.rules)} · ${time}`, rule.hostile ? "is-bad" : "is-good");
+  });
+  if (!fields.length) rows.push(line(icon("field", 14), "Clear ground · no active fields", "is-quiet"));
+  if (threatened) rows.push(line(icon("warning", 14), "The enemy targets this band next.", "is-threat"));
+  if (cluster) rows.push(line(icon("cluster", 14), `Cluster: ${RULES.clusterThreshold}+ online devices · <b>+${RULES.clusterDamage}</b> damage. Band attacks find it easier.`, "is-good"));
+  for (const item of installed) rows.push(line(glyph(item.kind, 14), `${esc(INSTALLATION_NAMES[item.kind])} <i class="tc-pips">${integrityPips(item)}</i>`, "is-bad"));
+  if (aiming) rows.push(line(icon("arrow", 14), `Click to play <b>${esc(aiming)}</b> on this band.`, "is-quiet"));
+  const sub = devices.length ? `${online}/${devices.length} device${devices.length === 1 ? "" : "s"} online` : "No devices";
+  return `<div class="tc-card kind-band band-${zone}" data-card="band" data-id="${zone}">${head(icon("field", 20), `${band(zone)} band`, "", sub)}${rows.join("")}</div>`;
+}
 
 function installationCard(run: RunState, preview: CombatPreview, item: Installation): string {
   const name = INSTALLATION_NAMES[item.kind], cost = scrubCost(run);

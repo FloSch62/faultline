@@ -34,7 +34,7 @@ export const WARDEN_CARDS: CardTable<WardenCardId> = {
   "acl-gate": {
     name: "ACL Gate", subtitle: "WARDEN / ACCESS LIST", cost: 1, rarity: "common", target: "ground", role: "firewall", art: "defense", color: "#f4b27a", archetype: "warden",
     text: v => `Deploy a firewall linked to its ${nearest(v.links)}.${block(v.block)}`,
-    detail: `Online, it blocks ${R.firewallBreachBlock} of each breach and ${R.firewallStrikeBlock} of each strike like any firewall. It links to the nearest device it is not already cabled to (distance ties: device ids).`,
+    detail: `Online, it blocks ${R.firewallBreachBlock} of each breach and ${R.firewallStrikeBlock} of each strike like any firewall. It links to the nearest devices it is not already cabled to (distance ties: device ids).`,
     values: { links: 2 },
     upgrade: { values: { links: 2, block: 3 } },
   },

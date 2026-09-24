@@ -64,6 +64,10 @@ export function readIntent(r: RunState, p: CombatPreview, h: HostileForecast): I
   // Attacks show their number after every term the forecast applied (uplinks, swarm, echoes…);
   // a cancelled attack keeps its printed amount, struck through.
   const value = attack ? String(state === "acts" || state === "spiteful" ? h.raw : intent.amount) : "";
+  // v5: a dodge (Ghost Protocol) or a cancelling protocol (Null Route) zeroes the attack; misses spare
+  // the jams and cuts (Spoof, Obfuscation). The badge names the card that did it.
+  const misses = p.evasions.filter(item => item.kind === "miss" && item.by === h.uid);
+  const evaded = h.dodged ? `dodged · ${h.dodged}` : h.nullified ? `cancelled · ${h.nullified}` : "";
   let kind: string = intent.kind, verb = "", target = "";
   const jams = h.jams.length ? h.jams : intent.targets ?? [];
   const cuts = h.cuts.length ? h.cuts : intent.cutTargets ?? [];
@@ -72,14 +76,14 @@ export function readIntent(r: RunState, p: CombatPreview, h: HostileForecast): I
     const pattern = enemy ? ENEMIES[enemy.id].pattern : [];
     verb = (enemy && pattern[(enemy.step ?? enemy.turn) % pattern.length]?.label) || intent.label;
   } else if (intent.kind === "dormant") verb = "RESTS";
-  else if (intent.kind === "strike") verb = "STRIKE";
-  else if (intent.kind === "breach") verb = "BREACH";
+  else if (intent.kind === "strike") { verb = "STRIKE"; target = evaded; }
+  else if (intent.kind === "breach") { verb = "BREACH"; target = evaded; }
   else if (intent.kind === "sever") {
     verb = cuts.length > 1 ? `CUT ×${cuts.length}` : "CUT";
-    target = cuts.length ? cuts.map(pretty).join(" · ") : h.cancelled ? "countered" : h.absorbed ? "absorbed" : "nothing exposed";
+    target = h.cuts.length ? h.cuts.map(pretty).join(" · ") : misses.length ? `${misses.length > 1 ? `${misses.length} miss` : "misses"} · ${[...new Set(misses.map(item => item.source))].join(" + ")}` : cuts.length ? cuts.map(pretty).join(" · ") : h.cancelled ? "countered" : h.absorbed ? "absorbed" : "nothing exposed";
   } else if (intent.kind === "jam") {
     verb = jams.length > 1 ? `JAM ×${jams.length}` : "JAM";
-    target = jams.length ? jams.map(pretty).join(" · ") : h.cancelled ? "countered" : h.absorbed ? "absorbed" : "nothing exposed";
+    target = h.jams.length ? h.jams.map(pretty).join(" · ") : misses.length ? `${misses.length > 1 ? `${misses.length} miss` : "misses"} · ${[...new Set(misses.map(item => item.source))].join(" + ")}` : jams.length ? jams.map(pretty).join(" · ") : h.cancelled ? "countered" : h.absorbed ? "absorbed" : "nothing exposed";
   } else if (intent.kind === "corrupt") {
     verb = h.field ? FIELD_VERB[h.field.kind] ?? "FIELD" : "FIELD";
     target = h.field ? h.field.zone.toUpperCase() : "";
@@ -101,6 +105,8 @@ export function readIntent(r: RunState, p: CombatPreview, h: HostileForecast): I
     if (!planted.absorbed) riders.push({ glyph: glyph(planted.kind, 13), text: `PLANTS ${INSTALLATION_NAMES[planted.kind].toUpperCase()}`, kind: `install-${planted.kind}` });
   if (h.junk) riders.push({ glyph: icon("deck", 13), text: `+${h.junk.count} ${CARDS[h.junk.card].name.toUpperCase()}`, kind: "junk" });
   if (h.heal) riders.push({ glyph: icon("heart", 13), text: `HEALS ${h.heal}`, kind: "heal" });
+  // Some jams or cuts land and some miss: the misses ride along.
+  if (misses.length && (h.jams.length || h.cuts.length)) riders.push({ glyph: glyph("veil", 13), text: `${misses.length} MISS${misses.length === 1 ? "ES" : ""} · ${misses[0].source.toUpperCase()}`, kind: "evasion" });
   return { ...base, kind, glyph: intentGlyph(intent, 26), value, verb: verb.toUpperCase(), target, state, riders };
 }
 
@@ -126,7 +132,7 @@ export function intentBadges(r: RunState, p: CombatPreview): string {
     const detail = note ? `<span class="hi-note">${esc(note)}</span>`
       : read.target || riders ? `<span class="hi-detail">${read.target ? `<span class="hi-target">${esc(read.target)}</span>` : ""}${riders}</span>` : "";
     const verdict = lethal ? "LETHAL" : after < enemy.hp ? `−${enemy.hp - after}` : "";
-    const move = ["hostile-intent", `kind-${read.kind}`, `state-${read.state}`, target ? "is-target" : "", read.enraged ? "is-enraged" : ""].filter(Boolean).join(" ");
+    const move = ["hostile-intent", `kind-${read.kind}`, `state-${read.state}`, target ? "is-target" : "", read.enraged ? "is-enraged" : "", h.dodged || h.nullified ? "is-evaded" : ""].filter(Boolean).join(" ");
     const plate = ["hostile-plate", `kind-${read.kind}`, `state-${read.state}`, target ? "is-target" : "", lethal ? "is-lethal" : ""].filter(Boolean).join(" ");
     return [`<div class="${plate}" data-plate="${enemy.port}" data-hover-port="${enemy.port}" style="--hostile:${hexOf(enemy.color)}">`
       + (target ? `<i class="hp-crest" aria-hidden="true">${glyph("crest", 14)}</i>` : "")

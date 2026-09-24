@@ -17,7 +17,7 @@ import type {
 } from "../core/types.ts";
 import { ENEMIES } from "../core/enemies.ts";
 import { STAGES } from "../core/stages.ts";
-import { EnemyActor } from "./EnemyActor.ts";
+import { EnemyActor, rigFloat } from "./EnemyActor.ts";
 import { cylinder, dashedRing, glow, mat, ring } from "./materials.ts";
 import { COLORS, addRoleBody, addSalvageScrap, animateDevice, newDeviceGroup, type DeviceGroup } from "./devices.ts";
 import {
@@ -30,7 +30,7 @@ import {
   type InstallationGroup,
 } from "./front.ts";
 import {
-  brassRingTexture, drawRailPlate, haloTexture, makeLabel, packetTexture, railPlateSprite, reticleTexture, TABLE_LABEL_ORDER, type RailPlateData,
+  brassRingTexture, haloTexture, makeLabel, packetTexture, TABLE_LABEL_ORDER,
 } from "./plates.ts";
 import { AMPLIFIED_COLOR, channelColor } from "../channel-palette.ts";
 import { amplifiedWinding, junctionSeal } from "./junction.ts";
@@ -62,24 +62,11 @@ export interface WorldCallbacks {
 /** Anything that may appear in an enemy intent, including the v3 name of an install. */
 export type ActionKind = IntentKind | "infect";
 
-/** What a rail plate reads for its port this phase, all from the forecast. */
-export interface RailReadout {
-  hpAfter: number;
-  damage: number;
-  overflowIn: number;
-  lethal: boolean;
-  intent: IntentKind | null;
-  amount: number;
-  state: RailPlateData["state"];
-  /** Leaders: escalation level (0–3); null for escorts, adds and singles. */
-  escalation: number | null;
-}
 export interface RailState {
-  /** The target: its rail plate wears the reticle. */
+  /** The target (canvas data-focus); its plate is lit in the DOM rail (#intent-layer). */
   focus: Port | null;
   /** The port the right plate details (the table marks only the target). */
   selected: Port | null;
-  readouts: Partial<Record<Port, RailReadout>>;
 }
 /** One delivery of this transmission, as the table shows it. */
 export interface DeliveryView {
@@ -190,7 +177,7 @@ interface EnemyAction {
   done: () => void;
   onImpact: () => void;
 }
-/** One stand on the far rail: its sprite rig, embers, light, rail plate and target reticle. */
+/** One stand on the far rail: its portrait (sprite rig, embers, light) and where its plate hangs. */
 interface PortVisual {
   port: Port;
   group: THREE.Group;
@@ -203,8 +190,19 @@ interface PortVisual {
   art: string;
   texture: THREE.Texture | null;
   placeholder: boolean;
+  /** The sprite's world size (layoutRail fits its painted box over the plate). */
   size: number;
-  drop: number;
+  /** The painted box of the bound cell. */
+  bounds: ArtBounds;
+  /** Where the portrait rests (layoutRail); animations move it from here. */
+  home: THREE.Vector3;
+  /** The plate's top centre: the portrait's painted foot never sinks below it. */
+  anchor: THREE.Vector3;
+  /** The table's far rail under this port (world x at the rail): pulses and fragments land there. */
+  railX: number;
+  /** Where layoutRail wants the portrait and its plate; home, anchor and size ease there (a
+   * newcomer or a resized table snaps). */
+  goal: { home: THREE.Vector3; anchor: THREE.Vector3; size: number; snap: boolean; at: number };
   boss: boolean;
   hitAt: number;
   /** Its death transition finished: hidden until a newcomer takes the port. */
@@ -216,15 +214,8 @@ interface PortVisual {
   dimUntil: number;
   action: EnemyAction | null;
   state: string;
-  plate: THREE.Sprite;
-  plateCanvas: HTMLCanvasElement;
-  plateKey: string;
-  reticle: THREE.Sprite;
   highlight: THREE.Sprite;
   hit: THREE.Sprite;
-  readout: RailReadout | null;
-  /** A mid-playback health (the packet landed; the rules advance at the end). */
-  shownHp: number | null;
 }
 interface DeliveryGlyph {
   view: DeliveryView;
@@ -256,26 +247,64 @@ function cableCurve(from: WorldPoint, to: WorldPoint) {
   center.y += Math.min(0.38 + start.distanceTo(end) * 0.07, 1.13);
   return new THREE.QuadraticBezierCurve3(start, center, end);
 }
-/** The hostile rises from behind the far rail: the table hides its lower body and its
- * crown reaches the header band. Sized so the head stays on screen from 1280×720 up. */
-const ENEMY_HOME = new THREE.Vector3(0, 0.7, -10.6);
-const enemyHome = (size: number) => ENEMY_HOME.clone().setY(ENEMY_HOME.y - (size - 10.5) * 0.3);
 export const PORT_ORDER: readonly Port[] = ["left", "centre", "right"];
-/** Escorts and adds stand at x ±6.6, one unit nearer the table so they read in front of the
- * leader's shoulders; their feet hide behind the same far rail. */
-const SIDE_X = 6.6;
-const SIDE_Z = -9.6;
-function portHome(port: Port, size: number) {
-  if (port === "centre") return enemyHome(size);
-  return new THREE.Vector3(port === "left" ? -SIDE_X : SIDE_X, -1.55 + size * 0.3, SIDE_Z);
-}
-/** Rail plates hang just behind the far rail, under their hostile as the default camera sees it. */
-const PLATE_Z = -6.1;
-const PLATE_SIZE = { leader: [5.4, 1.6875], side: [4.3, 1.34375] } as const;
-/** Plates hang with their foot on the far rail, in front of their hostile's lower body. */
-const PLATE_FOOT = 0.06;
+/** Portraits stand in the band above the table, each over its plate (a DOM plate in #intent-layer):
+ * the leader behind the table's centre, escorts and adds one unit nearer at the sides. The rail is
+ * laid out in screen space for the resting camera (layoutRail); these are only the depths. */
+const PORT_DEPTH: Record<Port, number> = { left: -9.6, centre: -10.6, right: -9.6 };
+/** The table's far rail: the rail's plates stand on it, so nothing on the table hides under them. */
+const RAIL_EDGE = new THREE.Vector3(0, 0.47, -5.8);
+/** A far-row device's crown (world): the rail's plates stand just above this line, never over it. */
+const FAR_CROWN = new THREE.Vector3(0, 1.62, -3.5);
+/** Where a far-row nameplate hangs instead (in its device group): at its foot, before the plinth. */
+const LABEL_FOOT = { y: 0.8, z: 1.12 } as const;
 const CAMERA_HOME = new THREE.Vector3(0, 12.8, 18.8);
-const plateX = (port: Port) => port === "centre" ? 0 : (port === "left" ? -SIDE_X : SIDE_X) * (CAMERA_HOME.z - PLATE_Z) / (CAMERA_HOME.z - SIDE_Z);
+const CAMERA_TARGET = new THREE.Vector3(0, 0.15, -0.3);
+/** A cell's painted box, as fractions of the cell from its top-left corner. */
+interface ArtBounds { l: number; r: number; t: number; b: number }
+const FULL_CELL: ArtBounds = { l: 0.1, r: 0.9, t: 0.1, b: 0.9 };
+const artBounds = new Map<string, ArtBounds>();
+/** Reads the painted box of one sheet cell from its alpha, once per cell. */
+function boundsOf(image: unknown, art: { file: string; columns: number; rows: number; index: number }): ArtBounds {
+  const key = `${art.file}:${art.index}`;
+  const known = artBounds.get(key);
+  if (known) return known;
+  const source = image as { width?: number; height?: number } | null;
+  if (!source?.width || !source.height || typeof document === "undefined") return FULL_CELL;
+  const size = 96, canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) return FULL_CELL;
+  const width = source.width / art.columns, height = source.height / art.rows;
+  let bounds = FULL_CELL;
+  try {
+    context.drawImage(image as CanvasImageSource, (art.index % art.columns) * width, Math.floor(art.index / art.columns) * height, width, height, 0, 0, size, size);
+    const data = context.getImageData(0, 0, size, size).data;
+    let l = size, r = -1, t = size, b = -1;
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      if (data[(y * size + x) * 4 + 3] < 48) continue;
+      if (x < l) l = x;
+      if (x > r) r = x;
+      if (y < t) t = y;
+      if (y > b) b = y;
+    }
+    if (r >= l && b >= t) bounds = { l: l / size, r: (r + 1) / size, t: t / size, b: (b + 1) / size };
+  } catch { /* A tainted or undecodable sheet keeps the default box. */ }
+  artBounds.set(key, bounds);
+  return bounds;
+}
+/** The rail's frame in client pixels, measured from the HUD (main.ts): the span between the side
+ * plates, the header's items the portraits stay clear of, and each hostile's plate (its height is
+ * reserved under every portrait). */
+export interface RailFrame {
+  left: number;
+  right: number;
+  /** The highest a portrait may reach. */
+  top: number;
+  obstacles: readonly { left: number; top: number; right: number; bottom: number }[];
+  /** The leader's plate width, the side plates' width, the tallest plate and the gaps. */
+  plate: { width: number; side: number; height: number; gap: number };
+}
 const snap = (n: number) => Math.round(n * 2) / 2;
 /** The v4 art sheets may still be in the paint shop: a stand-in cell of a kindred body is tinted
  * toward the hostile's colour until the painted cell lands. */
@@ -402,7 +431,13 @@ export class World {
   /** Every hostile on the rail (the dead included until a newcomer takes the port). */
   private enemies: Enemy[] = [];
   private pack = false;
-  private railState: RailState = { focus: null, selected: null, readouts: {} };
+  private railState: RailState = { focus: null, selected: null };
+  private railFrame: RailFrame | null = null;
+  /** The resting camera at this canvas's aspect: the rail is laid out for it (layoutRail). */
+  private readonly layoutCamera = new THREE.PerspectiveCamera(42, 1, 0.1, 140);
+  /** Client y of the table's far rail for the resting camera: far-row nameplates stay below it. */
+  private railFloor = 0;
+  private railShape = "";
   private deliveries: DeliveryView[] = [];
   private selectedDelivery: string | null = null;
   private readonly glyphs: DeliveryGlyph[] = [];
@@ -441,7 +476,7 @@ export class World {
     this.setStage(0);
     this.scene.backgroundIntensity = 0.62;
     this.camera.position.copy(CAMERA_HOME);
-    this.camera.lookAt(0, 0.2, -0.4);
+    this.camera.lookAt(CAMERA_TARGET);
     // Browser tests set __faultlineTestRender: the same scene and rules, drawn without bloom,
     // shadows or full resolution at 20 fps, so a software-rendered suite can run in parallel.
     const cheap = (globalThis as { __faultlineTestRender?: boolean }).__faultlineTestRender === true;
@@ -474,7 +509,7 @@ export class World {
     this.controls.maxDistance = 31;
     this.controls.minPolarAngle = 0.45;
     this.controls.maxPolarAngle = 1.37;
-    this.controls.target.set(0, 0.15, -0.3);
+    this.controls.target.copy(CAMERA_TARGET);
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     if (!cheap) this.composer.addPass(
@@ -915,7 +950,7 @@ export class World {
     const centre = port === "centre";
     const actor = new EnemyActor(centre ? 0 : 1);
     const group = new THREE.Group();
-    group.position.copy(centre ? ENEMY_HOME : portHome(port, 7.14));
+    group.position.set(0, 3, PORT_DEPTH[port]);
     group.add(actor.mesh);
     group.add(actor.embers);
     // A coloured spill across the far rail, and (the leader) a low glow that lifts the body from below.
@@ -930,36 +965,24 @@ export class World {
     }
     group.visible = false;
     this.scene.add(group);
-    const { sprite: plate, canvas: plateCanvas } = railPlateSprite();
-    const [width, height] = centre ? PLATE_SIZE.leader : PLATE_SIZE.side;
-    plate.scale.set(width, height, 1);
-    plate.position.set(plateX(port), PLATE_FOOT + height / 2, PLATE_Z);
-    plate.userData.port = port;
-    plate.visible = false;
-    // The target's reticle: brass corner brackets framing the plate, drawn over nearer hardware.
-    const reticle = new THREE.Sprite(new THREE.SpriteMaterial({ map: reticleTexture(), transparent: true, depthWrite: false, depthTest: false }));
-    reticle.renderOrder = 41;
-    reticle.scale.set(width * 1.13, height * 1.62, 1);
-    reticle.position.set(plate.position.x, plate.position.y, PLATE_Z + 0.05);
-    reticle.userData.base = reticle.scale.clone();
-    reticle.visible = false;
+    // The drag-aim ring (a packet glyph held over this port), round the portrait's foot.
     const highlight = new THREE.Sprite(new THREE.SpriteMaterial({ map: brassRingTexture(), transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending }));
     highlight.renderOrder = 39;
-    highlight.scale.set(width * 1.28, height * 2.1, 1);
-    highlight.position.copy(plate.position);
     highlight.visible = false;
+    // The body's click target: the painted box (portAt), never drawn.
     const hit = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, opacity: 0 }));
     hit.visible = false;
     hit.userData.port = port;
-    this.rail.add(plate, reticle, highlight, hit);
+    this.rail.add(highlight, hit);
     // Escort lights live on the always-visible rail: the light count never changes when a pack
     // arrives, so no material has to recompile mid-fight.
     if (!centre) this.rail.add(light);
     return {
       port, group, actor, light, under, enemy: null, uid: null, art: "", texture: null, placeholder: false,
-      size: centre ? 10.5 : 7.14, drop: 0, boss: false, hitAt: 0, dead: false, dying: false, ready: false,
-      dimFrom: 0, dimUntil: 0, action: null, state: "idle",
-      plate, plateCanvas, plateKey: "", reticle, highlight, hit, readout: null, shownHp: null,
+      size: centre ? 5 : 3.4, bounds: FULL_CELL, home: group.position.clone(), anchor: group.position.clone(), railX: 0,
+      goal: { home: group.position.clone(), anchor: group.position.clone(), size: centre ? 5 : 3.4, snap: true, at: 0 },
+      boss: false, hitAt: 0, dead: false, dying: false, ready: false, dimFrom: 0, dimUntil: 0, action: null, state: "idle",
+      highlight, hit,
     };
   }
 
@@ -999,15 +1022,16 @@ export class World {
         visual.actor.mesh.material.map = texture;
         visual.actor.mesh.material.needsUpdate = true;
       }
+      visual.bounds = boundsOf(entry.texture.image, art);
       visual.placeholder = stand;
       visual.actor.stand = stand ? 0.4 : 0;
       if (!visual.ready || entering) {
         visual.ready = true;
+        visual.goal.snap = true;
         visual.actor.enter(enemy.id, !!ENEMIES[enemy.id]?.boss);
       }
       visual.group.visible = this.showPort(visual);
-      visual.plateKey = "";
-      this.refreshRail();
+      this.layoutRail();
     };
     visual.ready = false;
     visual.group.visible = false;
@@ -1017,19 +1041,9 @@ export class World {
     return !!visual.enemy && visual.ready && !visual.dead;
   }
 
-  /** Hostile sizes: the leader keeps today's; escorts 0.68 ×, adds 0.6 × the leader's sprite. */
-  private sizeOf(enemy: Enemy, leaderSize: number) {
-    const definition = ENEMIES[enemy.id];
-    if (enemy.role === "escort") return leaderSize * 0.68;
-    if (enemy.role === "add") return leaderSize * 0.6;
-    return definition?.boss ? 11.6 : enemy.id === "storm" || enemy.id === "moth" ? 10.9 : 10.5;
-  }
-
   private syncRail(roster: readonly Enemy[], sameBattle: boolean) {
     this.enemies = roster.map(enemy => ({ ...enemy }));
     this.pack = roster.length > 1;
-    const centre = roster.find(enemy => enemy.port === "centre" && (enemy.role === "leader" || enemy.role === "single"));
-    const leaderSize = centre ? this.sizeOf(centre, 10.5) : 10.5;
     for (const visual of this.ports) {
       const here = roster.filter(enemy => enemy.port === visual.port);
       const enemy = here.find(item => item.hp > 0) ?? here[here.length - 1] ?? null;
@@ -1037,14 +1051,12 @@ export class World {
         visual.enemy = null;
         visual.uid = null;
         visual.group.visible = false;
-        visual.readout = null;
         visual.light.intensity = 0;
         continue;
       }
       const newcomer = visual.uid !== enemy.uid;
       visual.enemy = { ...enemy };
       visual.boss = !!ENEMIES[enemy.id]?.boss;
-      visual.size = this.sizeOf(enemy, leaderSize);
       visual.light.color.setHex(enemy.color);
       visual.under?.color.setHex(enemy.color);
       if (enemy.hp <= 0 && !visual.dying) {
@@ -1057,12 +1069,12 @@ export class World {
         visual.dead = enemy.hp <= 0;
         visual.dying = false;
         visual.action = null;
-        visual.shownHp = null;
+        visual.goal.snap = true;
         this.bindArt(visual, enemy, true);
         if (arriving) this.arrivalFlourish(visual);
       } else visual.group.visible = this.showPort(visual);
-      this.frameEnemy(visual);
     }
+    this.layoutRail();
     const leader = this.leaderPort();
     const lead = leader.enemy;
     if (lead) {
@@ -1071,63 +1083,208 @@ export class World {
       (this.scanMaterial.uniforms.uThreat.value as THREE.Color).setHex(lead.color).multiplyScalar(leader.boss ? 0.075 : 0.05);
     } else (this.scanMaterial.uniforms.uThreat.value as THREE.Color).setHex(0x000000);
     this.canvas.dataset.ports = this.ports.filter(visual => visual.enemy && visual.enemy.hp > 0).map(visual => visual.port).join(",");
-    this.refreshRail();
   }
 
   /** A reinforcement or an add takes its port: a pulse on the rail and embers (reduced motion: the pulse). */
   private arrivalFlourish(visual: PortVisual) {
     if (!this.visible || !visual.enemy) return;
-    const x = visual.port === "centre" ? 0 : plateX(visual.port);
-    this.pulseAt(x, -5.4, visual.enemy.color, 2.2);
-    this.burst(new THREE.Vector3(x, 1.2, -6), visual.enemy.color, 22, 3.2);
+    this.pulseAt(visual.railX, -5.4, visual.enemy.color, 2.2);
+    this.burst(new THREE.Vector3(visual.railX, 1.2, -6), visual.enemy.color, 22, 3.2);
   }
 
-  /** Rail plates and the target reticle (packs only: a single hostile is today's rail, untouched). */
+  /** The target and the forecast per port (the plates themselves are DOM, #intent-layer). */
   setRail(state: RailState) {
-    this.railState = { focus: state.focus, selected: state.selected, readouts: { ...state.readouts } };
-    for (const visual of this.ports) {
-      visual.readout = state.readouts[visual.port] ?? null;
-      visual.shownHp = null;
-    }
+    this.railState = { focus: state.focus, selected: state.selected };
     this.canvas.dataset.focus = state.focus ?? "";
-    this.refreshRail();
   }
-  /** A packet landed mid-playback: the plate shows the new health before the rules advance. */
-  setPortHealth(port: Port, hp: number) {
-    const visual = this.portOf(port);
-    if (!visual) return;
-    visual.shownHp = hp;
-    this.refreshRail();
+
+  /** A port's portrait and plate stand where the layout wants them, at once. */
+  private settle(visual: PortVisual) {
+    visual.home.copy(visual.goal.home);
+    visual.anchor.copy(visual.goal.anchor);
+    visual.size = visual.goal.size;
+    visual.goal.snap = false;
   }
-  private refreshRail() {
-    const standing = this.ports.filter(visual => visual.enemy && visual.enemy.hp > 0 && !visual.dead && !visual.dying).length;
-    for (const visual of this.ports) {
-      const enemy = visual.enemy;
-      const show = this.pack && !!enemy && this.visible && (!visual.dead || visual.dying) && visual.ready;
-      visual.plate.visible = show;
-      // The reticle marks the target while there is a choice (two or more standing).
-      visual.reticle.visible = show && standing > 1 && this.railState.focus === visual.port && enemy!.hp > 0 && !visual.dying;
-      if (!show || !enemy) continue;
-      const readout = visual.readout;
-      const hp = visual.shownHp ?? enemy.hp;
-      const midPlayback = visual.shownHp !== null;
-      const data: RailPlateData = {
-        name: enemy.name, color: enemy.color, hp, maxHp: enemy.maxHp,
-        hpAfter: midPlayback ? hp : readout?.hpAfter ?? hp,
-        damage: midPlayback ? 0 : readout?.damage ?? 0,
-        overflowIn: midPlayback ? 0 : readout?.overflowIn ?? 0,
-        lethal: !midPlayback && !!readout?.lethal,
-        state: enemy.hp <= 0 || visual.dying ? "dead" : readout?.state ?? "acts",
-        escalation: readout?.escalation ?? null,
-        placeholder: visual.placeholder,
-      };
-      const key = JSON.stringify(data);
-      if (key === visual.plateKey) continue;
-      visual.plateKey = key;
-      drawRailPlate(visual.plateCanvas, data);
-      (visual.plate.material.map as THREE.CanvasTexture).needsUpdate = true;
-      visual.plate.material.opacity = data.state === "dormant" ? 0.8 : data.state === "dead" ? 0.62 : 1;
+  /** Eases a portrait and its plate toward the layout's place (about a fifth of a second). */
+  private glide(visual: PortVisual, now: number) {
+    const goal = visual.goal, step = goal.at ? Math.min(1, 1 - Math.exp(-(now - goal.at) / 110)) : 1;
+    goal.at = now;
+    visual.home.lerp(goal.home, step);
+    visual.anchor.lerp(goal.anchor, step);
+    visual.size += (goal.size - visual.size) * step;
+  }
+  /** The HUD's measure of the rail (client pixels); the portraits are laid out again when it moves. */
+  setRailFrame(frame: RailFrame) {
+    const same = this.railFrame && JSON.stringify(this.railFrame) === JSON.stringify(frame);
+    this.railFrame = frame;
+    if (!same) this.layoutRail();
+  }
+
+  /**
+   * Lays the rail out in screen space for the resting camera: one slot per port on the table's far
+   * rail, its plate standing on the rail and its portrait fitted above the plate, clear of the
+   * header's items. The leader stands tallest (a guardian taller still); escorts and adds are
+   * smaller. Each sprite is sized so its painted box (not the cell's empty margin) fills the space,
+   * then placed at its port's depth so that box's foot rests on the plate. An orbiting camera
+   * carries the portraits with the table; the plates follow their anchors.
+   */
+  private layoutRail() {
+    const rect = this.canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const shape = `${rect.width.toFixed(0)}x${rect.height.toFixed(0)}@${rect.left.toFixed(0)},${rect.top.toFixed(0)}`;
+    const resized = shape !== this.railShape;
+    this.railShape = shape;
+    const camera = this.layoutCamera;
+    camera.aspect = rect.width / rect.height;
+    camera.position.copy(CAMERA_HOME);
+    camera.lookAt(CAMERA_TARGET);
+    camera.updateProjectionMatrix();
+    camera.updateMatrixWorld();
+    const toScreen = (point: THREE.Vector3) => {
+      const at = point.clone().project(camera);
+      return { x: rect.left + (at.x + 1) / 2 * rect.width, y: rect.top + (1 - at.y) / 2 * rect.height };
+    };
+    /** The world point at depth z under a client point. */
+    const onPlane = (x: number, y: number, z: number) => {
+      const direction = new THREE.Vector3((x - rect.left) / rect.width * 2 - 1, 1 - (y - rect.top) / rect.height * 2, 0.5)
+        .unproject(camera).sub(camera.position).normalize();
+      return camera.position.clone().addScaledVector(direction, (z - camera.position.z) / direction.z);
+    };
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    const frame = this.railFrame ?? {
+      left: rect.left + rect.width * 0.18, right: rect.right - rect.width * 0.18, top: Math.max(0, rect.top) + 84,
+      obstacles: [], plate: { width: 236, side: 200, height: 64, gap: 8 },
+    };
+    const floor = this.railFloor = Math.min(toScreen(RAIL_EDGE).y, toScreen(FAR_CROWN).y);
+    const plateTop = floor - frame.plate.height;
+    const foot = plateTop - frame.plate.gap;
+    const middle = rect.left + rect.width / 2;
+    const pitch = (frame.plate.width + frame.plate.side) / 2 + frame.plate.gap;
+    const leader = this.ports.find(visual => visual.port === "centre" && visual.enemy && (visual.enemy.role === "leader" || visual.enemy.role === "single"));
+    /** The tallest the painted box may stand at x without reaching a header item. */
+    const clear = (x: number, height: number, aspect: number) => {
+      for (let pass = 0; pass < 4; pass++) {
+        const half = height * aspect / 2, top = foot - height;
+        const item = frame.obstacles.find(box => box.left < x + half && box.right > x - half && box.bottom > top && box.top < foot);
+        if (!item) break;
+        height = Math.max(24, foot - item.bottom - 6);
+      }
+      return height;
+    };
+    const fitAll = (centre: number) => {
+      let crown = Infinity;
+      // The leader first: escorts stand at most 0.8 of its height and a guardian's adds 0.72, so
+      // the leader always reads as the leader.
+      const order = leader ? [leader, ...this.ports.filter(visual => visual !== leader)] : [...this.ports];
+      const fits = order.map(visual => {
+        const slot = centre + (visual.port === "left" ? -pitch : visual.port === "right" ? pitch : 0);
+        const role = visual.enemy?.role ?? "escort";
+        const lead = visual === leader;
+        const bounds = visual.bounds;
+        const aspect = (bounds.r - bounds.l) / Math.max(0.05, bounds.b - bounds.t);
+        // The leader stands tallest, a guardian taller still; with a leader beside them escorts
+        // and adds keep to a smaller figure, alone they may fill their space.
+        const share = lead ? visual.boss ? 0.36 : 0.32 : role === "add" ? 0.22 : leader ? 0.24 : 0.3;
+        const plateWidth = visual.port === "centre" ? frame.plate.width : frame.plate.side;
+        const most = Math.min(rect.height * share, foot - frame.top, plateWidth * (lead ? 1.3 : 1.08) / aspect, crown * (role === "add" ? 0.72 : 0.8));
+        // A portrait under a header item may lean in over its plate (up to a quarter of its width)
+        // where that lets it stand taller.
+        const inward = visual.port === "left" ? 1 : visual.port === "right" ? -1 : 0;
+        let best = { x: slot, height: clear(slot, most, aspect) };
+        for (let step = 1; inward && best.height < most && step <= 6; step++) {
+          const x = slot + inward * plateWidth * 0.25 * step / 6;
+          const height = clear(x, most, aspect);
+          if (height > best.height + 2) best = { x, height };
+        }
+        if (lead) crown = best.height;
+        return { visual, slot, aspect, most, ...best };
+      }).sort((a, b) => PORT_ORDER.indexOf(a.visual.port) - PORT_ORDER.indexOf(b.visual.port));
+      // Twins read as a pair: both stand as tall as the shorter.
+      const [left, , right] = fits;
+      if (left.visual.enemy && left.visual.enemy.id === right.visual.enemy?.id) {
+        const height = Math.min(left.height, right.height);
+        for (const fit of [left, right]) if (fit.height > height) {
+          fit.height = height;
+          if (clear(fit.slot, height, fit.aspect) >= height) fit.x = fit.slot;
+        }
+      }
+      return fits;
+    };
+    // The rail stands centred over the table, unless sliding it a little lets a portrait held down
+    // by a header item stand taller (the header's items are not symmetric).
+    const lowest = frame.left + pitch + frame.plate.side / 2, highest = frame.right - pitch - frame.plate.side / 2;
+    let fits = fitAll(Math.min(Math.max(middle, lowest), highest));
+    const score = (list: typeof fits) => list.reduce((sum, fit) => sum + (fit.visual.enemy ? Math.min(fit.height / fit.most, 1) : 0), 0);
+    let best = score(fits);
+    for (const shift of [-80, -60, -45, -30, -15, 15, 30, 45, 60, 80]) {
+      const centre = middle + shift * Math.min(1, rect.height / 784);
+      if (centre < lowest || centre > highest) continue;
+      const trial = fitAll(centre), value = score(trial) - Math.abs(shift) / 600;
+      if (value > best + 0.02) { best = value; fits = trial; }
     }
+    for (const { visual, slot, x, height } of fits) {
+      const bounds = visual.bounds;
+      const depth = PORT_DEPTH[visual.port];
+      const base = onPlane(x, foot, depth);
+      const perUnit = toScreen(base).y - toScreen(base.clone().add(up)).y;
+      const size = height / Math.max(1e-3, perUnit * (bounds.b - bounds.t));
+      // From the painted box's foot to the cell's centre, along the billboard's own axes.
+      const centreOf = base.clone()
+        .addScaledVector(right, -((bounds.l + bounds.r) / 2 - 0.5) * size)
+        .addScaledVector(up, (bounds.b - 0.5) * size);
+      // Idle float never dips the foot onto the plate.
+      const float = rigFloat(visual.enemy?.id ?? "") * 1.6 * size / 10.5;
+      const goal = visual.goal;
+      goal.size = size;
+      goal.home.copy(centreOf).addScaledVector(up, float + 0.02 * size);
+      goal.anchor.copy(onPlane(slot, plateTop, depth));
+      // A standing portrait glides to a new place (the roster changed); anything else snaps there.
+      if (goal.snap || resized || !visual.enemy || !visual.ready || this.reducedMotion()) this.settle(visual);
+      visual.railX = onPlane(slot, floor, RAIL_EDGE.z).x;
+      visual.under?.position.set(0, -size * 0.16, Math.min(1.4, size * 0.3));
+      const ring = visual.anchor.clone().addScaledVector(up, -0.5 * frame.plate.height / perUnit);
+      visual.highlight.position.copy(ring);
+      visual.highlight.scale.set((visual.port === "centre" ? frame.plate.width : frame.plate.side) * 1.25 / perUnit, frame.plate.height * 1.9 / perUnit, 1);
+    }
+    this.placeLabels();
+  }
+
+  /** A device's nameplate (and its junction seal) where it reads without rising over the rail's
+   * plates: over the device as usual, or (the far rows, whose plates would reach the rail) hung at
+   * the device's foot, in front of its plinth. `rest` is its usual height. */
+  private labelSpot(x: number, z: number, rest: number, scale = 0.57): { y: number; z: number } {
+    const rect = this.canvas.getBoundingClientRect();
+    if (!rect.height || !this.railFloor) return { y: rest, z: 0 };
+    const top = rect.top + (1 - new THREE.Vector3(x, -0.42 + rest + scale * 0.31, z).project(this.layoutCamera).y) / 2 * rect.height;
+    return top >= this.railFloor + 4 ? { y: rest, z: 0 } : LABEL_FOOT;
+  }
+  /** An installation's tag (and a Breaker Charge's countdown beside it) follows the same rule as
+   * a nameplate: on a far row it hangs at the installation's foot, clear of the rail's plates. */
+  private placeTags() {
+    for (const group of this.installations.values()) {
+      const data = group.userData.installation;
+      // Their usual heights (front.ts): the tag over the body, the countdown under the tag.
+      const rest = data.kind === "breaker" ? TABLE_Y + 1.78 : TABLE_Y + 2.02, home = TABLE_Y + 1.36;
+      const spot = this.labelSpot(group.position.x, group.position.z, rest, data.label.scale.y);
+      data.label.position.y = spot.y;
+      data.label.position.z = spot.z;
+      if (!data.numeral) continue;
+      const numeral = data.numeral;
+      const low = spot.z !== 0 || this.labelSpot(group.position.x, group.position.z, home, numeral.scale.y).z !== 0;
+      numeral.position.set(low ? -(data.label.scale.x * 0.5 + numeral.scale.x * 0.45) : 0, low ? spot.y : home, low ? spot.z : 0);
+    }
+  }
+  private placeLabels() {
+    for (const group of this.devices.values()) {
+      const label = group.userData.label as THREE.Sprite | undefined;
+      if (!label) continue;
+      const rest = (label.userData.rest as number | undefined) ?? label.position.y;
+      const spot = this.labelSpot(group.position.x, group.position.z, rest, label.scale.y);
+      label.position.set(0, spot.y, spot.z);
+      this.seals.get(group)?.position.copy(label.position);
+    }
+    this.declutterTags();
   }
 
   // ================================================================ devices and cables
@@ -1175,7 +1332,9 @@ export class World {
       : node.shielded ? " · GUARDED" : "";
     const color = jammed ? 0xff6880 : worn ? FRAYED_COLOR : !online ? node.salvage ? 0xc9874a : 0x7f898d : COLORS[node.role];
     const label = makeLabel(`${node.id.toUpperCase()}${status}`, color, { pips: this.pipsOf(node) });
-    label.position.y = node.role === "client" ? 3.0 : node.role === "power" ? 3.05 : 2.86;
+    label.userData.rest = node.role === "client" ? 3.0 : node.role === "power" ? 3.05 : 2.86;
+    const spot = this.labelSpot(node.x, node.z, label.userData.rest, label.scale.y);
+    label.position.set(0, spot.y, spot.z);
     if (!online) label.material.opacity = 0.78;
     return label;
   }
@@ -1374,7 +1533,9 @@ export class World {
     }
     if (routes && !this.seals.has(group)) {
       const next = junctionSeal(routes, TABLE_LABEL_ORDER + 1);
-      next.position.y = group.userData.label?.position.y ?? 2.86;
+      // It rides its nameplate, wherever that hangs (over the device, or at a far-row device's foot).
+      if (group.userData.label) next.position.copy(group.userData.label.position);
+      else next.position.y = 2.86;
       group.add(next);
       this.seals.set(group, next);
     }
@@ -1763,6 +1924,7 @@ export class World {
   /** A tag that lands on a device nameplate slides sideways, away from it, until both read (at most
    * 1.6 units, so it stays over its own body). Screen space from the resting camera. */
   private declutterTags() {
+    this.placeTags();
     if (!this.installations.size || !this.devices.size) return;
     this.camera.updateMatrixWorld();
     const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0);
@@ -2108,7 +2270,7 @@ export class World {
       const startsAtEnd = Math.hypot(end.x - curve.getPoint(0).x, end.z - curve.getPoint(0).z) < 0.01;
       const t = Math.max(0.3, 0.6 - shared * 0.18);
       const base = curve.getPoint(startsAtEnd ? 1 - t : t).add(new THREE.Vector3(0, 0.42, 0));
-      const plate = this.portOf(view.port)!.plate.position;
+      const plate = this.portOf(view.port)!.anchor;
       const toward = new THREE.Vector3(plate.x - base.x, 0, plate.z - base.z).normalize();
       // Channel i wears colour i of the shared palette, as its delivery row in the HUD does.
       const color = channelColor(index);
@@ -2229,30 +2391,33 @@ export class World {
       for (const material of this.placementMaterials) material.color.setHex(blocked ? 0xf07a64 : 0x80ffe6);
     }
   }
-  /** The standing port under the pointer: its intent badge (the DOM layer over the canvas, which a
-   * captured drag still passes over), its sprite or its rail plate. */
+  /** The standing port under the pointer: its plate (the DOM layer over the canvas, which a
+   * captured drag still passes over) or its portrait's painted box. */
   private portAt(event: { clientX: number; clientY: number }): Port | null {
-    const badge = (document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null)?.closest<HTMLElement>(".hostile-intent[data-port]");
-    const badgePort = badge?.dataset.port as Port | undefined;
-    if (badgePort && this.ports.some(visual => visual.port === badgePort && visual.enemy && visual.enemy.hp > 0 && !visual.dead)) return badgePort;
+    const plate = (document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null)?.closest<HTMLElement>(".hostile-plate[data-plate]");
+    const platePort = plate?.dataset.plate as Port | undefined;
+    if (platePort && this.ports.some(visual => visual.port === platePort && visual.enemy && visual.enemy.hp > 0 && !visual.dead)) return platePort;
     this.updateRay(event);
     const targets: THREE.Object3D[] = [];
     for (const visual of this.ports) {
       if (!visual.enemy || visual.enemy.hp <= 0 || visual.dead || !visual.ready) continue;
-      if (visual.plate.visible) targets.push(visual.plate);
-      // The body's hit area: the upper, painted part of the sprite (not its transparent margin).
-      const home = visual.group.position;
-      visual.hit.position.set(home.x, home.y + visual.size * 0.14 + visual.actor.mesh.position.y, home.z + 0.2);
-      visual.hit.scale.set(visual.size * 0.5, visual.size * 0.62, 1);
-      visual.hit.updateMatrixWorld();
+      this.fitHit(visual);
       targets.push(visual.hit);
     }
     const hit = this.raycaster.intersectObjects(targets, false)[0]?.object;
     return (hit?.userData.port as Port | undefined) ?? null;
   }
+  /** The body's click target follows its painted box, wherever the portrait stands this frame. */
+  private fitHit(visual: PortVisual) {
+    const box = visual.bounds, mesh = visual.actor.mesh;
+    mesh.updateWorldMatrix(true, false);
+    visual.hit.position.set((box.l + box.r) / 2 - 0.5, 0.5 - (box.t + box.b) / 2, 0).applyMatrix4(mesh.matrixWorld);
+    visual.hit.scale.set((box.r - box.l) * mesh.scale.x * 0.92, (box.b - box.t) * mesh.scale.y * 0.94, 1);
+    visual.hit.updateMatrixWorld();
+  }
   private highlightPort(port: Port | null) {
     if (this.aimDrag) this.aimDrag.over = port;
-    for (const visual of this.ports) visual.highlight.visible = visual.port === port && visual.plate.visible;
+    for (const visual of this.ports) visual.highlight.visible = visual.port === port && this.showPort(visual);
     if (this.aimDrag) this.canvas.dataset.cursor = port ? "target" : "grabbing";
   }
   /** Where the pointer is over the table for a glyph or a tether: a hand above the deck, and past
@@ -2280,7 +2445,7 @@ export class World {
     }
     const port = this.portAt(event);
     this.highlightPort(port);
-    const plate = port ? this.portOf(port)!.plate.position : null;
+    const plate = port ? this.portOf(port)!.anchor : null;
     const to = plate ? new THREE.Vector3(plate.x, plate.y + 0.2, plate.z + 0.05) : this.pointerPoint(event);
     const from = glyph.glyph.position;
     const middle = from.clone().lerp(to, 0.5);
@@ -2513,39 +2678,52 @@ export class World {
 
   // ================================================================ playback primitives
 
-  /** Where a port's intent badge hangs (client pixels): the top centre of its rail plate, which is
-   * also where a lone hostile's lower body meets the far rail. `width` is the plate's width on screen.
-   * null while the table is hidden, or for a port without a standing hostile (unless `empty`: an
-   * announced arrival's badge holds its empty port). */
+  /** Client pixels of a world point for the camera as it is now. */
+  private clientOf(point: THREE.Vector3) {
+    const rect = this.canvas.getBoundingClientRect();
+    const at = point.clone().project(this.camera);
+    return { x: rect.left + (at.x + 1) / 2 * rect.width, y: rect.top + (1 - at.y) / 2 * rect.height };
+  }
+  /** Where a port's plate hangs (client pixels): its top centre, just under the portrait's painted
+   * foot, and its width. null while the table is hidden, or for a port without a standing hostile
+   * (a falling one's plate leaves as it starts to fall), unless `empty`: an announced arrival's
+   * plate holds its empty port. */
   portAnchor(port: Port, empty = false): { x: number; y: number; width: number } | null {
     const visual = this.portOf(port);
-    if (!visual || !this.visible) return null;
-    if (!empty && (!visual.enemy || visual.enemy.hp <= 0 || visual.dead || !visual.ready)) return null;
-    const rect = this.canvas.getBoundingClientRect();
-    const [width, height] = port === "centre" ? PLATE_SIZE.leader : PLATE_SIZE.side;
-    const at = (point: THREE.Vector3) => {
-      point.project(this.camera);
-      return { x: rect.left + (point.x + 1) / 2 * rect.width, y: rect.top + (1 - point.y) / 2 * rect.height };
-    };
-    // A plate is a sprite: it faces the camera, so its crown lies along the camera's up axis (the
-    // drawn plate leaves a 1/32 margin inside the sprite).
-    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion);
-    const side = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
-    const crown = new THREE.Vector3(plateX(port), PLATE_FOOT + height / 2, PLATE_Z).addScaledVector(up, height / 2 * (30 / 32));
-    const centre = at(crown.clone()), left = at(crown.clone().addScaledVector(side, -width / 2)), right = at(crown.clone().addScaledVector(side, width / 2));
-    return { x: centre.x, y: centre.y, width: right.x - left.x };
+    if (!visual || !this.visible || !this.railFloor) return null;
+    if (!empty && (!visual.enemy || visual.enemy.hp <= 0 || visual.dead || visual.dying || !visual.ready)) return null;
+    const plate = this.railFrame?.plate;
+    return { ...this.clientOf(visual.anchor), width: (port === "centre" ? plate?.width : plate?.side) ?? 220 };
   }
-  /** Where a port's hostile is on screen (client pixels), for numbers that rise over it. */
+  /** The portrait's painted box on screen (client pixels) as drawn this frame. */
+  portraitRect(port: Port): { left: number; top: number; right: number; bottom: number } | null {
+    const visual = this.portOf(port);
+    if (!visual?.enemy || !visual.group.visible) return null;
+    const mesh = visual.actor.mesh, box = visual.bounds;
+    mesh.updateWorldMatrix(true, false);
+    const corners = [[box.l, box.t], [box.r, box.t], [box.l, box.b], [box.r, box.b]]
+      .map(([u, v]) => this.clientOf(new THREE.Vector3(u - 0.5, 0.5 - v, 0).applyMatrix4(mesh.matrixWorld)));
+    return {
+      left: Math.min(...corners.map(at => at.x)), right: Math.max(...corners.map(at => at.x)),
+      top: Math.min(...corners.map(at => at.y)), bottom: Math.max(...corners.map(at => at.y)),
+    };
+  }
+  /** The middle of a portrait's painted body (world), where packets and bolts strike it. */
+  private bodyOf(visual: PortVisual) {
+    const box = visual.bounds;
+    return visual.group.position.clone().add(new THREE.Vector3(
+      ((box.l + box.r) / 2 - 0.5) * visual.size, (0.5 - (box.t + box.b) / 2) * visual.size, 0));
+  }
+  /** Where a port's hostile is on screen (client pixels), for numbers that rise over it: the lower
+   * half of its body. */
   portScreen(port: Port): { x: number; y: number } | null {
     const visual = this.portOf(port);
     if (!visual?.enemy) return null;
-    const rect = this.canvas.getBoundingClientRect();
-    const point = (this.pack && visual.plate.visible ? visual.plate.position.clone().setY(visual.plate.position.y + 1.4)
-      : visual.group.position.clone().add(new THREE.Vector3(0, visual.size * 0.12, 0))).project(this.camera);
-    return { x: rect.left + (point.x + 1) / 2 * rect.width, y: rect.top + (1 - point.y) / 2 * rect.height };
+    const box = visual.bounds;
+    return this.clientOf(this.bodyOf(visual).add(new THREE.Vector3(0, -(box.b - box.t) * visual.size * 0.12, 0)));
   }
   private portTarget(visual: PortVisual) {
-    return visual.group.position.clone().add(new THREE.Vector3(0, visual.size * 0.08, 1.2));
+    return this.bodyOf(visual).add(new THREE.Vector3(0, 0, 1.2));
   }
 
   playPacket(path: string[], onDone?: () => void, color = 0x8affea, count?: number, air?: THREE.Vector3) {
@@ -2656,7 +2834,7 @@ export class World {
     const visual = this.portOf(port) ?? this.leaderPort();
     visual.hitAt = performance.now();
     if (this.reducedMotion()) {
-      this.pulseAt(visual.port === "centre" ? 0 : plateX(visual.port), -5.4, color, 1.7);
+      this.pulseAt(visual.railX, -5.4, color, 1.7);
       return;
     }
     const origin = this.portTarget(visual);
@@ -2741,7 +2919,7 @@ export class World {
         trail.position.z = i * .26; effect.add(trail);
       }
     }
-    const origin = visual.group.position.clone(); origin.y += visual.size * .06; origin.z += 1.4;
+    const origin = this.bodyOf(visual); origin.z += 1.4;
     if (kind === "charge") target.copy(origin);
     effect.position.copy(origin); effect.visible = false;
     effect.scale.setScalar(visual.size / 10.5);
@@ -2779,9 +2957,9 @@ export class World {
     const attack = action ? Math.min(1, (now - action.start) / action.duration) : null;
     const enraged = this.enraged(visual);
     const centre = visual.port === "centre";
-    visual.group.position.copy(portHome(visual.port, visual.size));
+    this.glide(visual, now);
+    visual.group.position.copy(visual.home);
     if (!centre) visual.light.position.copy(visual.group.position).add(new THREE.Vector3(0, 0.2, 3.2));
-    visual.group.position.y -= visual.drop;
     if (!reduced) visual.group.position.z -= hurt * .7;
     const dim = visual.dimUntil > now ? Math.sin(Math.min(1, (now - visual.dimFrom) / (visual.dimUntil - visual.dimFrom)) * Math.PI) : 0;
     visual.actor.dim = dim;
@@ -2792,7 +2970,7 @@ export class World {
     const strength = centre ? 1 : 0.5;
     visual.light.intensity = (visual.boss ? 34 : 24) * strength * (1 + heartbeat * .6 + (enraged ? .35 : 0)) * (1 - dim * .5);
     if (visual.under) visual.under.intensity = (visual.boss ? 26 : 18) * (1 + heartbeat * .4);
-    if (!action) return;
+    if (!action) { this.keepFoot(visual); return; }
     const t = Math.min(1, (now - action.start) / action.duration);
     const charge = Math.sin(Math.min(1, t / .5) * Math.PI / 2);
     // Anticipation: it rears back and rises before committing.
@@ -2815,6 +2993,7 @@ export class World {
       action.effect.rotation.set(t * 5, t * 7, action.kind === "sever" ? t * 2 : t * 6);
       action.effect.scale.setScalar((.6 + charge * .8) * Math.max(0.7, size));
     }
+    this.keepFoot(visual);
     visual.actor.mesh.material.color.lerp(new THREE.Color(enemy.color), Math.sin(t * Math.PI) * .3);
     if (t >= .78 && !action.impacted) {
       action.impacted = true;
@@ -2833,17 +3012,28 @@ export class World {
       action.done();
     }
   }
+  /** A portrait's painted foot never sinks onto its plate: a lunge, a rear or a swell lifts the
+   * whole body instead (a falling hostile's plate has already gone). */
+  private keepFoot(visual: PortVisual) {
+    if (visual.dying || !this.railFloor) return;
+    const box = visual.bounds, mesh = visual.actor.mesh;
+    visual.group.updateMatrixWorld(true);
+    const foot = new THREE.Vector3((box.l + box.r) / 2 - 0.5, 0.5 - box.b, 0).applyMatrix4(mesh.matrixWorld);
+    const at = this.clientOf(foot).y, limit = this.clientOf(visual.anchor).y - 2;
+    if (at <= limit) return;
+    const perUnit = at - this.clientOf(foot.clone().setY(foot.y + 1)).y;
+    if (perUnit > 0) visual.group.position.y += (at - limit) / perUnit;
+  }
   playEnemyTransition(kind: "enrage" | "death" | "break", done: () => void, quick = false, port?: Port) {
     const visual = this.portOf(port) ?? this.leaderPort();
     const enemy = visual.enemy;
     if (!enemy || !visual.ready) {
-      if (kind === "death") { visual.dead = true; visual.group.visible = false; this.refreshRail(); }
+      if (kind === "death") { visual.dead = true; visual.group.visible = false; }
       done();
       return;
     }
     this.canvas.dataset.enemyState = kind;
-    const x = visual.port === "centre" ? 0 : plateX(visual.port);
-    this.pulseAt(x, -5.3, enemy.color, (kind === "death" ? 3.4 : 2.4) * (visual.size / 10.5));
+    this.pulseAt(visual.railX, -5.3, enemy.color, (kind === "death" ? 3.4 : 2.4) * (visual.size / 10.5));
     if (kind === "enrage") this.shakeCamera(.14, 600);
     if (kind === "death") {
       visual.dying = true;
@@ -2855,12 +3045,10 @@ export class World {
         visual.dying = false;
         visual.dead = true;
         visual.group.visible = false;
-        this.refreshRail();
         this.refreshDeliveries(true);
       }
       done();
     }, quick || this.reducedMotion());
-    this.refreshRail();
   }
   /** A reinforcement or an add takes its port now (the playback's arrival beat). */
   arrive(enemy: Enemy) {
@@ -3022,7 +3210,7 @@ export class World {
   dropFragment(port: Port, done: () => void = () => {}) {
     const visual = this.portOf(port);
     const { group, body } = buildTableProp("fragment");
-    const x = visual ? (visual.port === "centre" ? 0 : plateX(visual.port)) : 0;
+    const x = visual ? visual.railX : 0;
     group.position.set(x, 1.6, -5.2);
     group.scale.setScalar(1.6);
     this.scene.add(group);
@@ -3039,7 +3227,6 @@ export class World {
       this.battleIdentity = null;
     }
     this.visible = visible;
-    this.refreshRail();
   }
 
   private clearTransientEffects() {
@@ -3079,22 +3266,8 @@ export class World {
   }
   resetCamera() {
     this.camera.position.copy(CAMERA_HOME);
-    this.controls.target.set(0, 0.15, -0.3);
+    this.controls.target.copy(CAMERA_TARGET);
     this.controls.update();
-  }
-
-  /** Short, wide tables crop the top of the canvas (it starts above the viewport and
-   * under the header). Lower a hostile just enough that its head stays visible. */
-  private frameEnemy(visual: PortVisual) {
-    const rect = this.canvas.getBoundingClientRect();
-    if (!rect.height) return;
-    const limit = Math.max(0, -rect.top) / rect.height + 0.06;
-    const home = portHome(visual.port, visual.size);
-    const crown = home.y + visual.size * 0.44;
-    this.camera.updateMatrixWorld();
-    const at = (y: number) => (1 - new THREE.Vector3(home.x, y, home.z).project(this.camera).y) / 2;
-    const top = at(crown), perUnit = at(crown - 1) - top;
-    visual.drop = top >= limit || perUnit <= 0 ? 0 : Math.min(2.6, (limit - top) / perUnit);
   }
 
   private resize() {
@@ -3106,7 +3279,7 @@ export class World {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height, false);
     this.composer.setSize(width, height);
-    for (const visual of this.ports) this.frameEnemy(visual);
+    this.layoutRail();
     this.declutterTags();
     const ratio = this.renderer.getPixelRatio();
     this.antialias.material.uniforms.resolution.value.set(
@@ -3147,14 +3320,6 @@ export class World {
         item.halo.material.opacity = reduced ? 0.9 : 0.7 + 0.3 * Math.sin(time * 4);
         item.halo.scale.setScalar(reduced ? 1.9 : 1.8 + 0.18 * Math.sin(time * 4));
       }
-    }
-    // The target's reticle breathes (still under reduced motion).
-    for (const visual of this.ports) {
-      if (!visual.reticle.visible) continue;
-      const base = visual.reticle.userData.base as THREE.Vector3;
-      const breath = reduced ? 1 : 1 + 0.035 * (0.5 + 0.5 * Math.sin(time * 2.4));
-      visual.reticle.scale.set(base.x * breath, base.y * breath, 1);
-      visual.reticle.material.opacity = reduced ? 1 : 0.82 + 0.18 * Math.sin(time * 2.4);
     }
     if (this.tether) this.tether.material.opacity = reduced ? 0.85 : 0.6 + 0.3 * Math.sin(time * 5);
   }

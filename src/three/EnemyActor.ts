@@ -37,6 +37,9 @@ const RIGS: Record<string, Rig> = {
   "quarantine-drone": { motion: "reactor", speed: 1.8, bend: .022, breath: .036, float: .09, roll: .025 },
 };
 
+/** How far a hostile's idle float lifts and dips it (world units at a 10.5 sprite). */
+export const rigFloat = (id: string) => (RIGS[id] ?? RIGS.leech).float;
+
 /** Up-lit rim of dilated alpha: a hard, readable silhouette against the busy relay backdrop. */
 const RIM_VERTEX = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`;
 const RIM_FRAGMENT = `
@@ -62,12 +65,12 @@ const RIM_FRAGMENT = `
     gl_FragColor = vec4(color * strength * under * flicker, rim * edge * fade);
   }`;
 const EMBER_VERTEX = `
-  uniform float time; uniform float size; uniform float height; uniform float width; uniform float rate;
+  uniform float time; uniform float size; uniform float height; uniform float width; uniform float rate; uniform float base;
   attribute float seed; varying float vAlpha; varying float vHeat;
   void main() {
     float t = fract(seed * 7.13 + time * rate * (.35 + .65 * fract(seed * 3.7)));
     vec3 p = vec3((fract(seed * 13.1) - .5) * width + sin(time * .7 + seed * 40.) * .45 * t,
-      mix(-2.2, height, t), (fract(seed * 5.3) - .5) * 2.4 + cos(time * .5 + seed * 20.) * .3);
+      mix(base, height, t), (fract(seed * 5.3) - .5) * 2.4 + cos(time * .5 + seed * 20.) * .3);
     vAlpha = smoothstep(0., .12, t) * (1. - smoothstep(.55, 1., t));
     vHeat = 1. - t;
     vec4 mv = modelViewMatrix * vec4(p, 1.);
@@ -224,7 +227,7 @@ export class EnemyActor {
       vertexShader: EMBER_VERTEX, fragmentShader: EMBER_FRAGMENT, transparent: true, depthWrite: false,
       blending: THREE.AdditiveBlending, toneMapped: false,
       uniforms: {
-        time: { value: 0 }, size: { value: .09 }, height: { value: 8 }, width: { value: 7 }, rate: { value: .085 },
+        time: { value: 0 }, size: { value: .09 }, height: { value: 8 }, width: { value: 7 }, rate: { value: .085 }, base: { value: -2.2 },
         color: { value: new THREE.Color(0xff8a5a) }, intensity: { value: .8 },
       },
     }));
@@ -295,7 +298,9 @@ export class EnemyActor {
     this.mesh.quaternion.copy(camera.quaternion);
     this.mesh.rotateZ(amplitude * (Math.sin(t * .6) * rig.roll + (kind === "sever" ? strike * .15 : 0) + hurt * -.07 - broken * .14));
     this.mesh.scale.setScalar(size * (1 + amplitude * (-.14 * (1 - enter) + windup * .035 + strike * .085 + power * .1 - death * .12)));
-    this.mesh.position.y = amplitude * (Math.sin(t) * rig.float * 1.6 - (1 - enter) * 1.6 - death * 1.1 - broken * .45);
+    // Travel scales with the body: a small portrait bobs, rises and sinks as far as a large one.
+    const unit = size / 10.5;
+    this.mesh.position.y = amplitude * unit * (Math.sin(t) * rig.float * 1.6 - (1 - enter) * 1.6 - death * 1.1 - broken * .45);
     this.mesh.material.opacity = enter * (reduced ? 1 - death : 1);
     this.mesh.material.color.setRGB(1, 1 - hurt * .35, 1 - hurt * .5);
     this.tint.setHex(enraged ? 0xff9c80 : color);
@@ -336,6 +341,7 @@ export class EnemyActor {
     ember.intensity.value = enter * (1 - death * .5) * (reduced ? .45 : .85) * (this.boss ? 1.2 : 1) * (1 - this.dim * .6);
     ember.width.value = size * .95;
     ember.height.value = size * 1.15;
+    ember.base.value = -size * .21;
     ember.size.value = this.boss ? .12 : .095;
 
     const state = transition?.kind ?? (hurt > .15 ? "hurt" : attack !== null ? kind === "charge" ? "charge" : attack < .36 ? "windup" : attack < .8 ? "attack" : "recover" : enter < 1 ? "enter" : "idle");

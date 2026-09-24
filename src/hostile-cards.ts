@@ -1,5 +1,5 @@
-/** The far rail in the DOM (targeting): one intent badge per living hostile, hung over the table
- * above its rail plate (#intent-layer; main.ts places the badges every frame), and the hover cards
+/** The far rail in the DOM (targeting): one plate per living hostile, hung under its portrait
+ * (#intent-layer; main.ts places the plates every frame from World.portAnchor), and the hover cards
  * for hostiles and packet glyphs. Every number is read from the forecast (combatPreview). */
 import { CARDS } from "./core/cards.ts";
 import { DESIGNATIONS, ENEMIES, designationRule } from "./core/enemies.ts";
@@ -70,7 +70,8 @@ export function readIntent(r: RunState, p: CombatPreview, h: HostileForecast): I
   if (intent.ultimate) {
     const pattern = enemy ? ENEMIES[enemy.id].pattern : [];
     verb = (enemy && pattern[(enemy.step ?? enemy.turn) % pattern.length]?.label) || intent.label;
-  } else if (intent.kind === "strike") verb = "STRIKE";
+  } else if (intent.kind === "dormant") verb = "RESTS";
+  else if (intent.kind === "strike") verb = "STRIKE";
   else if (intent.kind === "breach") verb = "BREACH";
   else if (intent.kind === "sever") {
     verb = cuts.length > 1 ? `CUT ×${cuts.length}` : "CUT";
@@ -102,30 +103,57 @@ export function readIntent(r: RunState, p: CombatPreview, h: HostileForecast): I
   return { ...base, kind, glyph: intentGlyph(intent, 26), value, verb: verb.toUpperCase(), target, state, riders };
 }
 
-/** The badges: one per living hostile (the target's with a lit crest while there is a choice), and
- * a dashed one holding an empty port for an announced arrival. `armed`: a picked-up delivery. */
+/** The rail's plates: one engraved plate under each living hostile's portrait with its name and
+ * escalation, its next move (the `.hostile-intent[data-port]` part, which lessons spotlight), and its
+ * health with the forecast loss; the target's plate is lit (with a choice of two or more). An
+ * announced arrival holds its empty port with a dashed plate. `armed`: a picked-up delivery. */
 export function intentBadges(r: RunState, p: CombatPreview, options: { armed: string | null }): string {
   const living = livingEnemies(r);
   const pack = living.length > 1;
   const armed = options.armed && pack ? p.deliveries.find(item => item.channelKey === options.armed) : undefined;
-  const badges = p.hostiles.flatMap(h => {
+  const plates = p.hostiles.flatMap(h => {
     const enemy = living.find(item => item.uid === h.uid);
     if (!enemy) return [];
     const read = readIntent(r, p, h);
     const target = pack && enemy.port === p.focus;
+    const landing = p.ports[enemy.port];
+    const lethal = !!landing?.lethal && !p.buffering;
+    const after = Math.max(0, Math.min(enemy.hp, p.buffering ? enemy.hp : landing?.hpAfter ?? enemy.hp));
+    const pct = (n: number) => `${(Math.max(0, n) / Math.max(1, enemy.maxHp) * 100).toFixed(1)}%`;
     const pips = read.level ? `<span class="hi-level" aria-hidden="true">${[1, 2, 3].map(n => `<i class="${n <= read.level!.now ? "on" : read.level!.next?.level === n ? "next" : ""}"></i>`).join("")}</span>` : "";
-    const note = read.state === "falls" ? "FALLS THIS TURN" : read.state === "spiteful" ? "FALLS · ACTS ANYWAY" : read.state === "broken" ? "BROKEN" : read.enraged ? "ENRAGED" : "";
+    const note = read.state === "falls" ? "FALLS THIS TURN" : read.state === "spiteful" ? "FALLS · ACTS ANYWAY" : read.state === "broken" ? "BROKEN" : read.enraged && !read.target ? "ENRAGED" : "";
     const riders = read.riders.slice(0, 2).map(rider => `<span class="hi-rider kind-${rider.kind}">${rider.glyph}${esc(rider.text)}</span>`).join("");
-    const classes = ["hostile-intent", `kind-${read.kind}`, `state-${read.state}`, target ? "is-target" : "", armed ? "is-aiming" : "", read.enraged ? "is-enraged" : ""].filter(Boolean).join(" ");
-    return [`<div class="${classes}" data-port="${enemy.port}" data-hover-port="${enemy.port}" style="--hostile:${hexOf(enemy.color)}${armed ? `;--channel:${channelCss(armed.index)}` : ""}">${target ? `<span class="hi-tag" aria-hidden="true"><i class="hi-crest">${glyph("crest", 14)}</i>TARGET</span>` : ""}<span class="hi-main"><span class="hi-glyph">${read.glyph}</span>${read.value ? `<b class="hi-value">${esc(read.value)}</b>` : ""}<span class="hi-words"><span class="hi-verb">${esc(read.verb)}</span>${read.target ? `<span class="hi-target">${esc(read.target)}</span>` : ""}</span>${pips}</span>${riders ? `<span class="hi-riders">${riders}</span>` : ""}${note ? `<span class="hi-note">${esc(note)}</span>` : ""}</div>`];
+    const detail = note ? `<span class="hi-note">${esc(note)}</span>`
+      : read.target || riders ? `<span class="hi-detail">${read.target ? `<span class="hi-target">${esc(read.target)}</span>` : ""}${riders}</span>` : "";
+    const verdict = lethal ? "LETHAL" : after < enemy.hp ? `−${enemy.hp - after}` : "";
+    const move = ["hostile-intent", `kind-${read.kind}`, `state-${read.state}`, target ? "is-target" : "", armed ? "is-aiming" : "", read.enraged ? "is-enraged" : ""].filter(Boolean).join(" ");
+    const plate = ["hostile-plate", `kind-${read.kind}`, `state-${read.state}`, target ? "is-target" : "", lethal ? "is-lethal" : "", armed ? "is-aiming" : ""].filter(Boolean).join(" ");
+    return [`<div class="${plate}" data-plate="${enemy.port}" data-hover-port="${enemy.port}" style="--hostile:${hexOf(enemy.color)}${armed ? `;--channel:${channelCss(armed.index)}` : ""}">`
+      + (target ? `<i class="hp-crest" aria-hidden="true">${glyph("crest", 14)}</i>` : "")
+      + `<div class="${move}" data-port="${enemy.port}"><span class="hi-main"><span class="hi-glyph">${read.glyph}</span>${read.value ? `<b class="hi-value">${esc(read.value)}</b>` : ""}<span class="hi-words"><span class="hi-verb">${esc(read.verb)}</span>${detail}</span>${pips}</span></div>`
+      + `<span class="hp-health"><span class="hp-bar"><i class="hp-fill" style="width:${pct(after)}"></i>${after < enemy.hp ? `<i class="hp-loss" style="left:${pct(after)};width:${pct(enemy.hp - after)}"></i>` : ""}<b class="hp-name">${esc(title(enemy.name))}</b><b class="hp-now">${enemy.hp}</b></span>${verdict ? `<em class="hp-verdict">${verdict}</em>` : ""}</span>`
+      + `</div>`];
   });
-  // An announced reinforcement holds its empty port with a dashed badge.
+  // An announced reinforcement holds its empty port with a dashed plate.
   const a = p.arrivals;
   if (a?.port && !living.some(enemy => enemy.port === a.port)) {
     const name = title(ENEMIES[a.enemyId]?.name ?? a.enemyId);
-    badges.push(`<div class="hostile-intent kind-arrival state-arriving" data-arrival="${a.port}"><span class="hi-main"><span class="hi-glyph">${icon("warning", 22)}</span><span class="hi-words"><span class="hi-verb">ARRIVES</span><span class="hi-target">${esc(name)} · ${a.inPhases <= 1 ? "after this action" : `in ${a.inPhases} actions`}</span></span></span></div>`);
+    plates.push(`<div class="hostile-plate kind-arrival is-arrival" data-arrival="${a.port}"><div class="hostile-intent kind-arrival state-arriving" data-arrival="${a.port}"><span class="hi-main"><span class="hi-glyph">${icon("warning", 22)}</span><span class="hi-words"><span class="hi-verb">ARRIVES</span><span class="hi-detail"><span class="hi-target">${a.inPhases <= 1 ? "after this action" : `in ${a.inPhases} actions`}</span></span></span></span></div><span class="hp-health"><span class="hp-bar is-empty"><b class="hp-name">${esc(name)}</b></span></span></div>`);
   }
-  return badges.join("");
+  return plates.join("");
+}
+
+/** A packet landed mid-playback: the plate's health drops in place (the forecast's loss is spent). */
+export function showPlateHit(port: Port, hp: number, maxHp: number) {
+  const plate = document.querySelector<HTMLElement>(`#intent-layer .hostile-plate[data-plate="${port}"]`);
+  if (!plate) return;
+  const fill = plate.querySelector<HTMLElement>(".hp-fill");
+  if (fill) fill.style.width = `${(Math.max(0, hp) / Math.max(1, maxHp) * 100).toFixed(1)}%`;
+  plate.querySelector(".hp-loss")?.remove();
+  plate.querySelector(".hp-verdict")?.remove();
+  const now = plate.querySelector(".hp-now");
+  if (now) now.textContent = String(Math.max(0, hp));
+  plate.classList.add("is-hit");
 }
 
 // ------------------------------------------------------------------ hover cards

@@ -28,17 +28,15 @@ test("pack fight: three plates, a click targets, F cycles, T aims, per-port fore
   await recordToasts(page);
   await install(page, e, { motion: true });
 
-  // Three plates: the port strip in the HUD and the rail plates on the table.
+  // Three plates: the port strip in the HUD and a plate under each portrait on the rail.
   await expect(page.locator(".port-strip .port-row")).toHaveCount(3);
   await expect(page.locator("#world")).toHaveAttribute("data-ports", "left,centre,right");
-  await expect.poll(async () => (await tableState(page)).plates.map(plate => plate.port).sort()).toEqual(["centre", "left", "right"]);
+  await expect.poll(() => page.locator("#intent-layer .hostile-plate:not([hidden])").evaluateAll(els => els.map(el => (el as HTMLElement).dataset.plate).sort())).toEqual(["centre", "left", "right"]);
   await expect(page.locator('.port-row[data-port="centre"]')).toHaveClass(/is-focus/);
 
   // A rail plate is a click target: it makes that hostile the target (the focus); unaimed
   // deliveries follow it and the right plate details it.
-  const plate = (await tableState(page)).plates.find(item => item.port === "right")!;
-  const spot = await tablePoint(page, plate.x, plate.y, plate.z);
-  await page.mouse.click(spot.x, spot.y);
+  await page.locator('#intent-layer .hostile-plate[data-plate="right"] .hp-health').click();
   await expect.poll(async () => (await saved(page)).focus).toBe("right");
   await expect(page.locator('.port-row[data-port="right"]')).toHaveClass(/is-focus/);
   await expect(page.locator('.port-row[data-port="right"]')).toHaveAttribute("aria-pressed", "true");
@@ -348,7 +346,7 @@ test("reduced motion: an announced reinforcement takes its port in place, with i
   await expect(page.locator(".port-strip .port-row")).toHaveCount(2);
   await expect(page.locator(`.port-row[data-port="${arrived.port}"]`)).toContainText(/Splicer/i);
   await expect(page.locator("#world")).toHaveAttribute("data-ports", ["left", "centre", "right"].filter(port => expected.enemies.some(enemy => enemy.port === port && enemy.hp > 0)).join(","));
-  await expect.poll(async () => (await tableState(page)).plates.map(plate => plate.port).sort()).toEqual(["centre", arrived.port].sort());
+  await expect.poll(() => page.locator("#intent-layer .hostile-plate:not([hidden])").evaluateAll(els => els.map(el => (el as HTMLElement).dataset.plate).sort())).toEqual(["centre", arrived.port].sort());
 });
 
 test("reduced motion: a crate appears where it lands, without a drop arc, and its toast names the contents", async ({ page }) => {

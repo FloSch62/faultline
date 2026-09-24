@@ -66,6 +66,7 @@ import {
   cableFrays,
   laysArmoredCable,
   type ActionResult,
+  type CombatPreview,
   type TurnResult,
 } from "./core/run.ts";
 import type { CardId, Port, RelicId, RunState, Zone } from "./core/types.ts";
@@ -162,6 +163,9 @@ let cardDrag: {
 } | null = null;
 let ignoreClick = false;
 let deviceDragging = false;
+/** A relocation waiting on its plate: the table shows the device at (x, z); nothing is paid until Relocate. */
+let pendingMove: { id: string; x: number; z: number; origin: Zone; destination: Zone } | null = null;
+let relocateFrame = 0;
 const undoStack: RunState[] = [];
 /** The screen last shown, so a new one can fade up instead of swapping like a page. */
 let lastScreen = "";
@@ -257,7 +261,7 @@ function ensureWorld() {
 /** Hover cards on the table: devices, cables and installations (table-cards.ts), hostiles and
  * packet glyphs (hostile-cards.ts). The same target only moves the card; render() hides it. */
 function hoverTable(target: TableHover | null, x: number, y: number) {
-  if (!target || view !== "run" || run.phase !== "battle" || dialog.open) { hideHoverCard(); return; }
+  if (!target || view !== "run" || run.phase !== "battle" || dialog.open || pendingMove) { hideHoverCard(); return; }
   const key = `${target.kind}:${target.id}`;
   if (hoverCardKey() === key) { moveHoverCard(x, y); return; }
   const preview = combatPreview(run);
@@ -268,6 +272,7 @@ function hoverTable(target: TableHover | null, x: number, y: number) {
   else hideHoverCard();
 }
 function clearSelection() {
+  dropRelocation();
   cancelDrag();
   selected = null;
   source = null;
@@ -399,6 +404,7 @@ function render(rebuild = true) {
   else world?.setPlacement(null);
   world?.setSelected(source ?? selectedNode);
   world?.setZoneTargeting(selected !== null && CARDS[run.hand[selected]]?.target === "zone");
+  showRelocation();
   const scene = audioScene();
   sound.setScene(scene, `${run.seed}:${run.stage}:${run.currentRoom}:${practice ? "practice" : "expedition"}`, view === "run" ? run.stage : null);
   renderTrack();
@@ -609,7 +615,9 @@ function renderTargetDock() {
         const repairButton = wearable ? `<button class="repair-button" data-repair="${node.id}" ${reason ? "disabled" : ""} data-tooltip="${ui.esc(reason || `Restore one condition point for ${cost} energy.`)}" aria-label="${ui.esc(`Repair ${node.id.toUpperCase()}, ${cost} energy, condition ${condition} of ${max}${reason ? `. ${reason}` : ""}`)}">${battleUi.glyph("wrench", 14)} Repair · ${cost}${ui.icon("bolt", 12)} · ${pip(condition)} → ${pip(Math.min(max, condition + 1))} <kbd>R</kbd></button>` : "";
         const source = (text: string) => text.replace(/^([^·]+?)(?= ·|$)/, name => name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase()));
         // One row where it fits (who, what threatens it, relocation, repair), wrapping to two.
-        markup = `<div class="target-options device-controls"><span><b>${ui.esc(node.id.toUpperCase())}</b>${wearable ? ` <i class="plate-pips${worn ? " is-worn" : ""}" aria-label="condition ${condition} of ${max}">${pip(condition)}</i>` : ""} · ${bandName(zoneForNode(node))}${node.fixed ? "" : online ? " · online" : " · offline"}${worn ? " · worn" : ""}${node.configured ? " · configured" : ""}${node.upgraded ? " · overclocked" : ""}${node.shielded ? " · jam protected" : ""}${node.salvage ? " · salvaged" : ""}${threat ? ` <em class="device-threat">${ui.esc(`${source(threat.source)} ${threat.breaks ? "breaks it" : `wears it ${threat.from} → ${threat.to}`}${threat.sheltered ? ` (${threat.nodeId.toUpperCase()} shelters it)` : ""}`)}</em>` : ""}</span><button data-action="cancel" class="target-cancel plate-close" aria-label="Close · Esc" data-tooltip="Close · Esc">${ui.icon("close", 11)}</button>${node.fixed && !repairButton ? "" : `<span class="dock-actions">${node.fixed ? "" : `<span class="dock-label">Relocate · ${RULES.relocateCost}${ui.icon("bolt", 12)}</span>${(["north", "center", "south"] as const).map(zone => `<button data-relocate-zone="${zone}" ${run.energy < RULES.relocateCost ? "disabled" : ""}>${bandName(zone)}</button>`).join("")}`}${repairButton}</span>`}</div>`;
+        // A band awaiting its answer on the relocation plate stays lit.
+        const asking = (zone: Zone) => pendingMove?.id === node.id && pendingMove.destination === zone;
+        markup = `<div class="target-options device-controls"><span><b>${ui.esc(node.id.toUpperCase())}</b>${wearable ? ` <i class="plate-pips${worn ? " is-worn" : ""}" aria-label="condition ${condition} of ${max}">${pip(condition)}</i>` : ""} · ${bandName(zoneForNode(node))}${node.fixed ? "" : online ? " · online" : " · offline"}${worn ? " · worn" : ""}${node.configured ? " · configured" : ""}${node.upgraded ? " · overclocked" : ""}${node.shielded ? " · jam protected" : ""}${node.salvage ? " · salvaged" : ""}${threat ? ` <em class="device-threat">${ui.esc(`${source(threat.source)} ${threat.breaks ? "breaks it" : `wears it ${threat.from} → ${threat.to}`}${threat.sheltered ? ` (${threat.nodeId.toUpperCase()} shelters it)` : ""}`)}</em>` : ""}</span><button data-action="cancel" class="target-cancel plate-close" aria-label="Close · Esc" data-tooltip="Close · Esc">${ui.icon("close", 11)}</button>${node.fixed && !repairButton ? "" : `<span class="dock-actions">${node.fixed ? "" : `<span class="dock-label">Relocate · ${RULES.relocateCost}${ui.icon("bolt", 12)}</span>${(["north", "center", "south"] as const).map(zone => `<button data-relocate-zone="${zone}"${asking(zone) ? ` class="active" aria-pressed="true"` : ""} ${run.energy < RULES.relocateCost ? "disabled" : ""}>${bandName(zone)}</button>`).join("")}`}${repairButton}</span>`}</div>`;
       }
     }
     if (selected === null && !selectedNode && hud.installation) {
@@ -1034,56 +1042,201 @@ function onMove(id: string, point: WorldPoint | null, finished: boolean) {
     if (finished) { deviceDragging = false; clearSelection(); render(); }
     else {
       const preview=document.getElementById("movement-preview");
-      if(preview) { preview.className="blocked"; preview.textContent="Outside the build grid · release to cancel"; }
+      if (preview) { preview.className = "relocate-plate blocked"; preview.innerHTML = `<p class="relocate-hint">Outside the build grid · release to cancel</p>`; }
       world?.setZonePreview(null);
     }
     return;
   }
   if (finished) {
     deviceDragging = false;
-    const destination = zoneForNode(point), origin = zoneForNode(node);
-    if (lessonBlocks({ kind: "move", node: id, zone: destination })) { clearSelection(); render(); return; }
-    // One cue per drop: a real relocation slides the device; dropping it back in place is a soft return.
-    const moved = Math.hypot(node.x - point.x, node.z - point.z) >= .01;
-    if (!playAction(() => relocateNode(run, id, point.x, point.z), moved ? "move" : "undo")) { clearSelection(); render(); }
-    else if (origin !== destination) { world?.pulseZone(destination,"move"); toast(`${id.toUpperCase()} · ${origin.toUpperCase()} → ${destination.toUpperCase()} · ${RULES.relocateCost} energy`); }
+    // Dropped back in its own socket: nothing moves, nothing to ask (a soft return).
+    if (atHome(node, point)) { clearSelection(); render(); sound.effect("undo"); return; }
+    if (lessonBlocks({ kind: "move", node: id, zone: zoneForNode(point) })) { clearSelection(); render(); return; }
+    // The drop only proposes: the plate beside the device asks before any energy is spent.
+    clearSelection();
+    proposeRelocation(id, point);
     return;
   }
-  const blocked = run.energy < RULES.relocateCost ? "Not enough energy" : isBlocked(run, point.x, point.z, id) ?? "";
-  const origin = zoneForNode(node), destination = zoneForNode(point);
-  const next = structuredClone(run);
-  const nextNode = next.topology.nodes.find(n=>n.id===id)!;
-  nextNode.x=point.x; nextNode.z=point.z;
-  const before = combatPreview(run), after = combatPreview(next);
+  const home = atHome(node, point);
+  const blocked = home ? "" : run.energy < RULES.relocateCost ? "Not enough energy" : isBlocked(run, point.x, point.z, id) ?? "";
+  const next = home ? run : movedRun(id, point.x, point.z), destination = zoneForNode(home ? node : point);
   let preview = document.getElementById("movement-preview");
   if (!preview) { preview = document.createElement("div"); preview.id="movement-preview"; preview.setAttribute("role","status"); root.append(preview); }
-  preview.className=blocked ? "blocked" : "";
-  preview.innerHTML=`<span class="move-caption">RELOCATE ${ui.esc(id.toUpperCase())}</span><strong>${origin.toUpperCase()} ${ui.icon("arrow",16)} ${destination.toUpperCase()}</strong><span>${ui.esc(blocked || `Release to move · ${RULES.relocateCost} energy`)}</span><div><span>Damage <b>${before.packetDamage} → ${after.packetDamage}</b></span><span>Shield <b>${before.shield} → ${after.shield}</b></span><span>Life lost <b>${before.incoming} → ${after.incoming}</b></span>${after.channels !== before.channels ? `<span>Channels <b>${before.channels} → ${after.channels}</b></span>` : ""}</div><small>${ui.esc(zoneDescription(run,destination))}</small>`;
+  preview.className = `relocate-plate${blocked ? " blocked" : ""}`;
+  preview.innerHTML = relocationMarkup(id, zoneForNode(node), destination, combatPreview(run), combatPreview(next), true)
+    + `<p class="relocate-hint">${ui.esc(blocked || (home ? "Release to leave it in place" : "Release to choose this socket"))}</p><small>${ui.esc(zoneDescription(run, destination))}</small>`;
+  placeRelocationPlate(preview, point.x, point.z);
   world?.setZonePreview(destination, !!blocked);
   deviceDragging = true;
-  if (blocked) return;
-  // A drag previews geometry; only the drop pays energy and mutates the run.
-  deviceDragging = true;
-  const topology = structuredClone(run.topology);
-  const moved = topology.nodes.find(n => n.id === id)!;
-  moved.x = point.x; moved.z = point.z;
-  world?.previewTopology(topology);
+  // A drag previews geometry; only a confirmed drop pays energy and mutates the run.
+  if (!blocked) world?.previewTopology(next.topology);
 }
+/** Device dock bands: the same plate asks, with the chosen socket shown on the table. Choosing the
+ * band the device stands in withdraws a pending move. */
 function relocateToZone(zone: "north" | "center" | "south") {
   if (!selectedNode || !playable()) return;
   const id = selectedNode;
   const node = run.topology.nodes.find(n => n.id === id)!;
-  if (zoneForNode(node) === zone) { toast(`${id.toUpperCase()} is already in ${zone.toUpperCase()}.`); return; }
+  if (zoneForNode(node) === zone) {
+    if (pendingMove?.id === id) cancelRelocation();
+    else toast(`${id.toUpperCase()} is already in ${zone.toUpperCase()}.`);
+    return;
+  }
+  if (pendingMove?.id === id && pendingMove.destination === zone) { document.querySelector<HTMLElement>("[data-relocate-confirm]")?.focus({ preventScroll: true }); return; }
   if (lessonBlocks({ kind: "move", node: id, zone })) return;
   let spot: WorldPoint | undefined;
   for (const z of { north: [-2.5, -3.6, -1.8], center: [0, 0.9, -0.9], south: [2.5, 3.6, 1.8] }[zone])
     for (const x of [node.x, 0, -1.25, 1.25, -2.5, 2.5, -3.75, 3.75, -4.5, 4.5])
       if (!spot && !isBlocked(run, x, z, id)) spot = { x, z };
   if (!spot) { toast("No free socket in that band.", "error"); return; }
-  const { x, z } = spot;
-  if (!playAction(() => relocateNode(run, id, x, z), "move")) return;
-  world?.pulseZone(zone,"move");
-  toast(`${id.toUpperCase()} → ${zone.toUpperCase()} · ${RULES.relocateCost} energy · ${zoneDescription(run,zone)}`);
+  proposeRelocation(id, spot);
+}
+/** A drop on its own snap cell leaves a device where it stands: drops snap to half units, and a device
+ * placed off that grid (a band's socket at x 1.25, z 1.8) is up to half a cell's diagonal from it. */
+const atHome = (node: WorldPoint, point: WorldPoint) => Math.hypot(node.x - point.x, node.z - point.z) < .36;
+/** The run with one device standing at (x, z): what the drag and the plate preview. */
+function movedRun(id: string, x: number, z: number) {
+  const next = structuredClone(run);
+  const node = next.topology.nodes.find(n => n.id === id);
+  if (node) { node.x = x; node.z = z; }
+  return next;
+}
+/** The relocation plate's reading: the move, its cost, and before → after from the forecast. The drag
+ * lists shield and life lost even when they hold (it explores); the confirm plate keeps what changes. */
+function relocationMarkup(id: string, origin: Zone, destination: Zone, before: CombatPreview, after: CombatPreview, every: boolean) {
+  const line = (label: string, from: number, to: number, better: number, always = every) => always || from !== to
+    ? `<span class="${from === to ? "" : (to - from) * better > 0 ? "is-better" : "is-worse"}">${label}<b>${from} → <i>${to}</i></b></span>` : "";
+  const bands = origin === destination ? `${bandName(origin)} · new socket` : `${bandName(origin)} ${ui.icon("arrow", 13)} ${bandName(destination)}`;
+  return `<div class="relocate-head"><b>${ui.esc(id.toUpperCase())}</b><span>${bands}</span><em aria-label="${RULES.relocateCost} energy">${RULES.relocateCost}${ui.icon("bolt", 13)}</em></div>`
+    + `<div class="relocate-lines">${line("Damage", before.packetDamage, after.packetDamage, 1, true)}${line("Shield", before.shield, after.shield, 1)}${line("Life lost", before.incoming, after.incoming, -1)}${line("Channels", before.channels, after.channels, 1, false)}</div>`;
+}
+/** The plate stands beside the device's socket, on the side with room, inside the table's column (clear
+ * of the side plates, the header, the device dock and the hand); its stud points at the device. */
+function placeRelocationPlate(plate: HTMLElement, x: number, z: number) {
+  if (!world) return;
+  const scale = interfaceScale(), box = root.getBoundingClientRect();
+  const edge = (selector: string) => { const rect = document.querySelector(selector)?.getBoundingClientRect(); return rect?.width ? rect : null; };
+  const left = edge(".battle-left"), right = edge(".battle-right"), header = edge("#header");
+  const floor = edge("#target-dock:not(:empty)") ?? edge("#hand-zone .card-fan");
+  const width = plate.offsetWidth, height = plate.offsetHeight, gap = 46;
+  let minX = left ? (left.right - box.left) / scale + 10 : 10, maxX = (right ? (right.left - box.left) / scale : box.width / scale) - 10;
+  let minY = header ? (header.bottom - box.top) / scale + 8 : 10, maxY = (floor ? (floor.top - box.top) / scale : box.height / scale) - 10;
+  // A narrow layout stacks its plates: then the whole window is the room.
+  if (maxX - minX < width) { minX = 10; maxX = box.width / scale - 10; }
+  if (maxY - minY < height) { minY = 10; maxY = box.height / scale - 10; }
+  // The stud points at the device's body, a little above the table.
+  const at = world.screenFromPoint(x, z, .8), px = (at.x - box.left) / scale, py = (at.y - box.top) / scale;
+  const east = px + gap + width <= maxX || px - gap - width < minX;
+  const leftAt = Math.max(minX, Math.min(maxX - width, east ? px + gap : px - gap - width));
+  const topAt = Math.max(minY, Math.min(maxY - height, py - height / 2));
+  plate.dataset.side = east ? "east" : "west";
+  plate.style.left = `${Math.round(leftAt)}px`;
+  plate.style.top = `${Math.round(topAt)}px`;
+  plate.style.setProperty("--stud", `${Math.round(Math.max(14, Math.min(height - 14, py - topAt)))}px`);
+}
+/** Ask before a relocation. The rules vet it on a copy (energy, grid, wreckage), so a refused move never
+ * asks; an accepted one shows on the table beside its plate until Relocate or Cancel. */
+function proposeRelocation(id: string, spot: WorldPoint) {
+  const node = run.topology.nodes.find(n => n.id === id);
+  if (!node || !playable()) return;
+  const trial = relocateNode(structuredClone(run), id, spot.x, spot.z);
+  if (!trial.ok) {
+    dropRelocation();
+    toast(trial.message, "error");
+    sound.effect("error");
+    render();
+    return;
+  }
+  pendingMove = { id, x: spot.x, z: spot.z, origin: zoneForNode(node), destination: zoneForNode(spot) };
+  render(false);
+  document.querySelector<HTMLElement>("[data-relocate-confirm]")?.focus({ preventScroll: true });
+  sound.effect("select");
+}
+let relocationHtml = "";
+/** While a relocation waits, the table shows the run with the device moved (routes, channels, forecast
+ * marks), its band lights, and the plate asks beside it. render() calls this; it never half-keeps a move. */
+function showRelocation() {
+  const move = pendingMove;
+  if (!move) return;
+  if (!playable() || !run.topology.nodes.some(n => n.id === move.id)) { dropRelocation(); return; }
+  const next = movedRun(move.id, move.x, move.z), after = combatPreview(next);
+  if (world) { syncWorld(world, next, after, worldView(), { rebuild: true }); world.setZonePreview(move.destination); }
+  let plate = document.getElementById("relocate-confirm");
+  if (!plate) {
+    plate = document.createElement("div");
+    plate.id = "relocate-confirm";
+    plate.className = "relocate-plate";
+    plate.setAttribute("role", "dialog");
+    root.append(plate);
+  }
+  plate.setAttribute("aria-label", `Relocate ${move.id.toUpperCase()} from ${bandName(move.origin)} to ${bandName(move.destination)} for ${RULES.relocateCost} energy`);
+  const html = relocationMarkup(move.id, move.origin, move.destination, combatPreview(run), after, false)
+    + `<div class="relocate-actions"><button data-relocate-confirm>Relocate <kbd>Enter</kbd></button><button data-relocate-cancel>Cancel <kbd>Esc</kbd></button></div>`;
+  // Rewritten only when the reading changes, so a focused button keeps its focus.
+  if (html !== relocationHtml) { plate.innerHTML = html; relocationHtml = html; }
+  // A faint ring keeps the socket it would leave: Cancel puts it back there.
+  let mark = document.getElementById("relocate-origin");
+  if (!mark) { mark = document.createElement("div"); mark.id = "relocate-origin"; mark.setAttribute("aria-hidden", "true"); root.append(mark); }
+  const place = () => {
+    const from = run.topology.nodes.find(n => n.id === pendingMove?.id);
+    if (from) placeOriginMark(mark, from.x, from.z);
+    if (pendingMove) placeRelocationPlate(plate, pendingMove.x, pendingMove.z);
+  };
+  place();
+  // The plate follows its device while the camera settles or zooms.
+  if (!relocateFrame) {
+    const follow = () => {
+      if (!pendingMove || !plate.isConnected) { relocateFrame = 0; return; }
+      place();
+      relocateFrame = requestAnimationFrame(follow);
+    };
+    relocateFrame = requestAnimationFrame(follow);
+  }
+}
+/** The origin ring: the socket's footprint projected onto the table (a perspective ellipse). */
+function placeOriginMark(mark: HTMLElement, x: number, z: number) {
+  if (!world) return;
+  const scale = interfaceScale(), box = root.getBoundingClientRect(), r = .72;
+  const [west, east, north, south] = [[x - r, z], [x + r, z], [x, z - r], [x, z + r]].map(([px, pz]) => world!.screenFromPoint(px, pz, 0));
+  const width = Math.hypot(east.x - west.x, east.y - west.y) / scale, height = Math.abs(south.y - north.y) / scale;
+  mark.style.left = `${Math.round(((west.x + east.x) / 2 - box.left) / scale - width / 2)}px`;
+  mark.style.top = `${Math.round(((north.y + south.y) / 2 - box.top) / scale - height / 2)}px`;
+  mark.style.width = `${Math.round(width)}px`;
+  mark.style.height = `${Math.round(height)}px`;
+}
+function closeRelocationPlate() {
+  document.getElementById("relocate-confirm")?.remove();
+  document.getElementById("relocate-origin")?.remove();
+  relocationHtml = "";
+  cancelAnimationFrame(relocateFrame);
+  relocateFrame = 0;
+}
+/** Forget the pending relocation: the plate goes and the table shows the run again. */
+function dropRelocation() {
+  if (!pendingMove) return;
+  pendingMove = null;
+  closeRelocationPlate();
+  world?.setZonePreview(null);
+  if (world && view === "run" && run.phase === "battle") syncWorld(world, run, combatPreview(run), worldView(), { rebuild: true });
+}
+/** Cancel (Esc, Z, right-click, a click elsewhere): the device stays where it stood. */
+function cancelRelocation(audible = true) {
+  if (!pendingMove) return;
+  dropRelocation();
+  render(false);
+  if (audible) sound.effect("undo");
+}
+/** Relocate: the rules check the move again (energy included); it lands like any action — undoable,
+ * with the move cue, the band's pulse and the toast. */
+function confirmRelocation() {
+  const move = pendingMove;
+  if (!move || !playable()) return;
+  pendingMove = null;
+  closeRelocationPlate();
+  if (!playAction(() => relocateNode(run, move.id, move.x, move.z), "move")) { clearSelection(); render(); return; }
+  if (move.origin === move.destination) return;
+  world?.pulseZone(move.destination, "move");
+  toast(`${move.id.toUpperCase()} · ${move.origin.toUpperCase()} → ${move.destination.toUpperCase()} · ${RULES.relocateCost} energy · ${zoneDescription(run, move.destination)}`);
 }
 
 function autoPlace(zone?: "north" | "center" | "south") {
@@ -1378,6 +1531,15 @@ document.addEventListener("click", (event) => {
   });
   const button = target.closest<HTMLButtonElement>("button");
   if (button?.disabled) return;
+  // The relocation plate answers its own buttons (and the dock's bands re-choose); any other click
+  // withdraws the pending move first, and a click on Undo only withdraws it, like Z. The table answers
+  // at pointerdown (below): the click that ends the drop itself must not cancel it.
+  if (target.closest("[data-relocate-confirm]")) { confirmRelocation(); return; }
+  if (target.closest("[data-relocate-cancel]")) { cancelRelocation(); return; }
+  if (pendingMove && !target.closest("#relocate-confirm, [data-relocate-zone], #world")) {
+    cancelRelocation(false);
+    if (target.closest('[data-action="undo"]')) return;
+  }
   const name = target.closest<HTMLElement>("[data-action]")?.dataset.action;
   if (name) {
     void action(name);
@@ -1592,6 +1754,14 @@ dialog.addEventListener("click", (event) => {
   const box = dialog.getBoundingClientRect();
   if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) closeModal();
 });
+// While the relocation plate asks, a press on the table (either button) answers "no" and starts nothing:
+// no second drag, click or orbit.
+document.addEventListener("pointerdown", (event) => {
+  if (!pendingMove || !(event.target as HTMLElement).closest?.("#world")) return;
+  event.stopPropagation();
+  event.preventDefault();
+  cancelRelocation();
+}, true);
 // Drag hardware cards directly onto the table; cables and upgrades use explicit targeting.
 document.addEventListener("pointerdown", (event) => {
   if (!playable() || event.button !== 0) return;
@@ -1640,7 +1810,7 @@ window.addEventListener("pointermove", (event) => {
 });
 function cancelDrag() {
   document.getElementById("movement-preview")?.remove();
-  world?.setZonePreview(null);
+  world?.setZonePreview(pendingMove?.destination ?? null);
   const restorePreview = deviceDragging;
   deviceDragging = false;
   cardDrag?.ghost?.remove();
@@ -1679,6 +1849,15 @@ document.addEventListener("keydown", (event) => {
     return;
   }
   if (event.target instanceof HTMLInputElement || dialog.open) return;
+  // The relocation plate asks first: Enter relocates, Esc or Z cancels. A focused button keeps Enter and
+  // Space (the plate's own answer it); any other command key withdraws the move and goes on.
+  if (pendingMove) {
+    const key = event.key.toLowerCase(), el = event.target as HTMLElement;
+    if (key === "escape" || key === "z") { event.preventDefault(); cancelRelocation(); return; }
+    if (key === "enter" && !(el instanceof HTMLButtonElement)) { event.preventDefault(); confirmRelocation(); return; }
+    if ((key === "enter" || key === " ") && el.closest?.("#relocate-confirm")) return;
+    if (key === "enter" || key.length === 1) cancelRelocation(false);
+  }
   if (event.key.toLowerCase() === "i") {
     const card = ((event.target as HTMLElement).closest<HTMLElement>("[data-card-id]")?.dataset.cardId ?? (selected !== null ? run.hand[selected] : undefined)) as CardId | undefined;
     if (card) { event.preventDefault(); inspectCard(card); return; }
@@ -2006,7 +2185,7 @@ function spotlightLesson() {
   const overlay = $("#lesson-spotlight"), hole = overlay.firstElementChild as HTMLElement;
   const target = targets.find((el): el is HTMLElement => el instanceof HTMLElement && el.offsetParent !== null);
   // A lifted card rests the dimmer, unless the step points past the hand at what the card targets.
-  const resting = (selected !== null && !!target?.closest("#hand-zone")) || consoleTargeting || !!cardDrag || deviceDragging || dialog.open;
+  const resting = (selected !== null && !!target?.closest("#hand-zone")) || consoleTargeting || !!cardDrag || deviceDragging || !!pendingMove || dialog.open;
   if (!target || resting) { overlay.classList.remove("active"); return; }
   const fresh = !overlay.classList.contains("active");
   if (fresh) hole.style.transition = "none";
@@ -2080,6 +2259,7 @@ document.addEventListener("contextmenu", event => {
   const target = event.target as HTMLElement;
   if (target.closest("input, textarea")) return;
   event.preventDefault();
+  cancelRelocation();
   const id = target.closest<HTMLElement>("[data-card-id]")?.dataset.cardId as CardId | undefined;
   if (id) inspectCard(id);
 });

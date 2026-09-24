@@ -2133,6 +2133,12 @@ export class World {
     if (Math.abs(position.x) > 7.35 || Math.abs(position.z) > 4.85) return null;
     return { x: snap(position.x), z: snap(position.z) };
   }
+  /** Where a table point stands on screen (client pixels): the relocation plate sits beside it. */
+  screenFromPoint(x: number, z: number, y = 0.5): { x: number; y: number } {
+    const rect = this.canvas.getBoundingClientRect();
+    const at = new THREE.Vector3(x, y, z).project(this.camera);
+    return { x: rect.left + (at.x + 1) / 2 * rect.width, y: rect.top + (1 - at.y) / 2 * rect.height };
+  }
   /** Mirrors the placement rules: device spacing 1.55, wreckage and installations 1.3. */
   private socketBlocked(point: WorldPoint) {
     return this.topology.nodes.some((node) => Math.hypot(node.x - point.x, node.z - point.z) < 1.55) ||

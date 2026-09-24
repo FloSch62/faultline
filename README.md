@@ -79,7 +79,7 @@ These are discoveries, **not starter cards**. Opening hands provide a router and
 | Place hardware | Click the table, drag its card, or use “Deploy in a free socket” |
 | Connect devices | Play a link, then choose two devices on the table or in the target strip |
 | Replicate / upgrade / shield | Play the card, then choose a valid device |
-| Relocate hardware | Drag a placed device, or use Devices & placement; costs 1 energy |
+| Relocate hardware | Drag a placed device to a new socket, or select it and pick a band; a plate beside it asks first: Relocate (Enter) pays 1 energy, Cancel (Esc, right-click or a click elsewhere) puts it back. A drop in its own socket is free |
 | Orbit the table | Drag empty table space |
 | Apply a field | Play a field card, then click a band on the table or its field seal |
 | Console command | Console control in the command dock, or C (Patch Cable then asks for two devices) |

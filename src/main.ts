@@ -680,6 +680,7 @@ function openModal(type: string) {
   }
   else if (type === "credits") content.innerHTML = screens.creditsMarkup();
   else if (type === "replace") content.innerHTML = screens.replaceMarkup(run);
+  else if (type === "training-offer") content.innerHTML = training.trainingOfferMarkup();
   dialog.className = [
     "deck",
     "collection",
@@ -708,6 +709,17 @@ function closeModal() {
   dialog.close();
   dialog.className = "";
   render(false);
+}
+/** A new player (no expedition, record or lesson yet, field notes on) is asked once whether to
+ * take Field Training before the first expedition. */
+function firstExpedition() {
+  return preferences.tips && !preferences.trainingOffered && !expedition && !records.length && !training.loadCompletedLessons().length;
+}
+function chooseKeeper() {
+  clearSelection();
+  archetype = "architect";
+  view = "select";
+  render();
 }
 function begin() {
   if (expedition && !["won", "lost"].includes(run.phase) && !discardArmed) {
@@ -1609,12 +1621,18 @@ async function action(name: string) {
     begin();
     return;
   }
+  if (name === "training-first" || name === "skip-training") {
+    preferences.trainingOffered = true;
+    storePreferences(preferences);
+    closeModal();
+    if (name === "training-first") openLesson(training.LESSONS[0].id);
+    else chooseKeeper();
+    return;
+  }
   if (dialog.open && name !== "save-exit" && name !== "export") return;
   if (name === "new") {
-    clearSelection();
-    archetype = "architect";
-    view = "select";
-    render();
+    if (firstExpedition()) openModal("training-offer");
+    else chooseKeeper();
     return;
   }
   if (name === "title" || name === "save-exit") {

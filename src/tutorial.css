@@ -1497,3 +1497,11 @@ button.lesson-card:hover .lesson-icon,
   .lesson-end { animation: none; }
   .lesson-end-scrim { transition: none; }
 }
+
+/* ---------------------------------------------------------------- first-expedition offer */
+
+/* Field Training's plate carries its recommendation under the words; the plain plate beside it
+ * goes straight to the keepers. */
+.training-offer .gold-button { flex-direction: column; gap: 4px; padding-block: 10px 9px; }
+.training-offer .gold-button > span { display: inline-flex; align-items: center; gap: 10px; }
+.training-offer .gold-button small { font: italic 400 14px/1 var(--text); letter-spacing: 0; color: #d9c393; text-shadow: 0 1px 0 #000; }

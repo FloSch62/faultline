@@ -325,7 +325,7 @@ export const EVENTS: Record<string, EventDefinition> = {
     choices: [
       {
         label: "Answer it",
-        detail: (run, s) => `Fight ${staticFoes(run, s)} with ${Math.round((RULES.eventHealthScale - 1) * 100)}% more integrity. Victory: ${credits(run, 40)} credits and a rare card choice.`,
+        detail: (run, s) => `Fight ${staticFoes(run, s)} with ${Math.round((RULES.eventHealthScale - 1) * 100)}% more integrity. Victory: ${credits(run, 40)} credits and an elite card reward (uncommon or better first).`,
         resolve: (run, s) => {
           const fight = staticFight(run, s)!;
           const names = [fight.enemyId, ...(fight.pack ?? [])].filter((id): id is string => !!id).map(hostileName);

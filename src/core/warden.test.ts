@@ -16,6 +16,7 @@ import {
   protocolLimit, runningDaemons, useConsole,
 } from "./run.ts";
 import { CARD_EFFECTS, DAEMON_HOOKS } from "./effects/index.ts";
+import { canLink } from "./graph.ts";
 
 // ------------------------------------------------------------------ helpers (the engine-v5 pattern)
 
@@ -85,6 +86,8 @@ function agree(run: RunState) {
   return { preview, result };
 }
 const values = (id: string) => CARDS[id as CardId].values;
+/** Tuned costs are read from the data (balance may change them). */
+const cost = (id: string) => CARDS[id as CardId].cost;
 const term = (terms: { label: string; amount: number }[], label: string) => terms.find(item => item.label === label)?.amount;
 
 // ------------------------------------------------------------------ the card list
@@ -95,13 +98,13 @@ test("the Warden's data is complete: every card of 9.2 at its cost, rarity and t
     "deep-inspection": [1, "basic", "instant", 1],
     brace: [1, "common", "instant", 1],
     pushback: [1, "common", "instant", 1],
-    "stand-firm": [2, "common", "instant", 2],
-    vent: [0, "common", "instant", 0],
+    "stand-firm": [cost("stand-firm"), "common", "instant", cost("stand-firm+")],
+    vent: [cost("vent"), "common", "instant", cost("vent+")],
     "double-shift": [1, "common", "instant", 0],
-    "hardening-guide": [1, "uncommon", "daemon", 0],
-    entrench: [2, "uncommon", "instant", 1],
-    "persistent-state": [2, "rare", "daemon", 1],
-    "flow-control": [2, "rare", "daemon", 1],
+    "hardening-guide": [cost("hardening-guide"), "uncommon", "daemon", cost("hardening-guide+")],
+    entrench: [cost("entrench"), "uncommon", "instant", cost("entrench+")],
+    "persistent-state": [cost("persistent-state"), "rare", "daemon", cost("persistent-state+")],
+    "flow-control": [cost("flow-control"), "rare", "daemon", cost("flow-control+")],
     reflect: [1, "rare", "instant", 0],
     "acl-gate": [1, "common", "ground", 1],
     "stateful-firewall": [2, "uncommon", "ground", 2],
@@ -109,12 +112,12 @@ test("the Warden's data is complete: every card of 9.2 at its cost, rarity and t
     bulkhead: [1, "uncommon", "instant", 1],
     perimeter: [1, "uncommon", "instant", 1],
     bastion: [2, "rare", "ground", 2],
-    "defense-in-depth": [2, "rare", "daemon", 1],
+    "defense-in-depth": [cost("defense-in-depth"), "rare", "daemon", cost("defense-in-depth+")],
     tripwire: [1, "common", "protocol", 1],
     "policy-engine": [1, "uncommon", "daemon", 0],
     rearm: [0, "uncommon", "instant", 0],
     "incident-response": [1, "rare", "daemon", 1],
-    "null-route": [2, "rare", "protocol", 1],
+    "null-route": [cost("null-route"), "rare", "protocol", cost("null-route+")],
   };
   assert.deepEqual(Object.keys(spec).sort(), [...CARD_IDS_BY_OWNER.warden].sort());
   for (const [id, [cost, rarity, target, plusCost]] of Object.entries(spec)) {
@@ -157,10 +160,10 @@ test("Deep Packet Inspection: 3 block, +2 per online firewall (+: 5, +3); offlin
   r.hand = ["deep-inspection", "deep-inspection+"];
   assert.ok(playInstant(r, 0).ok);
   assert.equal(r.block, values("deep-inspection").block! + 2 * values("deep-inspection").perFirewall!);
-  assert.equal(r.block, 3 + 2 * 2);
+  const dpi = values("deep-inspection"), dpiPlus = values("deep-inspection+");
   assert.ok(playInstant(r, 0).ok);
-  assert.equal(r.block, 7 + 5 + 2 * 3);
-  assert.equal(r.energy, 20 - 2);
+  assert.equal(r.block, dpi.block! + 2 * dpi.perFirewall! + dpiPlus.block! + 2 * dpiPlus.perFirewall!);
+  assert.equal(r.energy, 20 - cost("deep-inspection") - cost("deep-inspection+"));
   agree(r);
 });
 
@@ -174,13 +177,15 @@ test("ACL Gate: a firewall cabled to its nearest device; online it blocks; ACL G
   assert.equal(gate.role, "firewall");
   assert.ok(r.topology.links.some(link => link.a === gate.id && link.b === "r1"), "linked to r1, its nearest device");
   assert.equal(r.block, 0);
-  assert.ok(playLink(r, 0, gate.id, "omega").ok);
+  // With one auto-link the gate still needs a cable to OMEGA; with two it may already have it.
+  if (canLink(r.topology, gate.id, "omega")) assert.ok(playLink(r, r.hand.indexOf("fiber"), gate.id, "omega").ok);
   assert.ok(combatPreview(r).online.includes(gate.id));
-  assert.ok(playGround(r, 0, -2.5, 2.4).ok);
+  assert.ok(playGround(r, r.hand.indexOf("acl-gate+"), -2.5, 2.4).ok);
   assert.equal(r.block, values("acl-gate+").block);
   assert.equal(r.topology.links.filter(link => link.a === r.topology.nodes.at(-1)!.id).length, values("acl-gate+").links);
   const { preview } = agree(r);
-  assert.equal(term(preview.shieldTerms, "Online firewalls ×1 vs breach"), RULES.firewallBreachBlock);
+  const online = preview.online.filter(id => node(r, id)?.role === "firewall").length;
+  assert.equal(term(preview.shieldTerms, `Online firewalls ×${online} vs breach`), online * RULES.firewallBreachBlock);
 });
 
 test("Stateful Firewall blocks double (+: jam-proof); Sentry Firewall's quarantine deals 2 and adds shield (+: jam-proof)", () => {
@@ -221,9 +226,9 @@ test("Bulkhead: 3 block and each online firewall blocks 1 more per attack this e
   assert.equal(r.block, values("bulkhead").block);
   assert.equal(firewalls(combatPreview(r))! - before!, 2 * values("bulkhead").firewallBonus!);
   assert.ok(playInstant(r, 0).ok);
-  assert.equal(r.block, 3 + 5);
+  assert.equal(r.block, values("bulkhead").block! + values("bulkhead+").block!);
   const { preview } = agree(r);
-  assert.equal(firewalls(preview), 2 * (RULES.firewallBreachBlock + 2));
+  assert.equal(firewalls(preview), 2 * (RULES.firewallBreachBlock + values("bulkhead").firewallBonus! + values("bulkhead+").firewallBonus!));
 });
 
 test("Perimeter: +2 damage this turn per online firewall (+: +3), counted when played", () => {
@@ -231,15 +236,16 @@ test("Perimeter: +2 damage this turn per online firewall (+: +3), counted when p
   wall(r);
   const base = combatPreview(r).packetDamage;
   r.hand = ["perimeter", "perimeter+"];
-  assert.deepEqual(playInstant(r, 0), { ok: true, message: "Perimeter activated · +4 damage (2 online firewalls)." });
-  assert.equal(r.packetBoost, 2 * values("perimeter").perFirewall!);
+  const one = 2 * values("perimeter").perFirewall!, total = one + 2 * values("perimeter+").perFirewall!;
+  assert.deepEqual(playInstant(r, 0), { ok: true, message: `Perimeter activated · +${one} damage (2 online firewalls).` });
+  assert.equal(r.packetBoost, one);
   assert.ok(playInstant(r, 0).ok);
-  assert.equal(r.packetBoost, 4 + 2 * 3);
+  assert.equal(r.packetBoost, total);
   const hp = r.enemies[0].hp;
   const { preview } = agree(r);
-  assert.equal(term(preview.damageTerms, "Packet boost this turn"), 10);
-  assert.equal(preview.packetDamage, base + 10);
-  assert.equal(r.enemies[0].hp, hp - base - 10);
+  assert.equal(term(preview.damageTerms, "Packet boost this turn"), total);
+  assert.equal(preview.packetDamage, base + total);
+  assert.equal(r.enemies[0].hp, hp - base - total);
   const none = table();
   route(none, "r1", 0);
   none.hand = ["perimeter"];
@@ -253,9 +259,9 @@ test("Bastion Firewall: a jam-proof firewall and 6 block (+: 9)", () => {
   r.hand = ["bastion", "bastion+"];
   assert.ok(playGround(r, 0, 2.5, 0).ok);
   assert.ok(r.topology.nodes.at(-1)!.shielded && r.topology.nodes.at(-1)!.role === "firewall");
-  assert.equal(r.block, 6);
+  assert.equal(r.block, values("bastion").block);
   assert.ok(playGround(r, 0, 2.5, 2.4).ok);
-  assert.equal(r.block, 6 + 9);
+  assert.equal(r.block, values("bastion").block! + values("bastion+").block!);
   agree(r);
 });
 
@@ -264,16 +270,16 @@ test("Defense in Depth: each online firewall blocks 1 more per attack; copies st
   wall(r);
   r.hand = ["defense-in-depth", "defense-in-depth", "defense-in-depth+"];
   assert.ok(playDaemon(r, 0).ok);
-  assert.equal(r.energy, 20 - 2);
+  assert.equal(r.energy, 20 - cost("defense-in-depth"));
   assert.deepEqual(r.daemons, ["defense-in-depth"]);
-  assert.equal(term(combatPreview(r).shieldTerms, "Defense in Depth · firewalls ×2"), 2);
+  assert.equal(term(combatPreview(r).shieldTerms, "Defense in Depth · firewalls ×2"), 2 * values("defense-in-depth").firewallBonus!);
   assert.ok(playDaemon(r, 0).ok);
   assert.ok(playDaemon(r, 0).ok);
-  assert.equal(r.energy, 20 - 2 - 2 - 1);
+  assert.equal(r.energy, 20 - 2 * cost("defense-in-depth") - cost("defense-in-depth+"));
   assert.deepEqual(runningDaemons(r).map(daemon => [daemon.id, daemon.count]), [["defense-in-depth", 2], ["defense-in-depth+", 1]]);
   const { preview } = agree(r);
   assert.equal(term(preview.shieldTerms, "Defense in Depth ×2 · firewalls ×2"), 2 * 2 * values("defense-in-depth").firewallBonus!);
-  assert.equal(term(preview.shieldTerms, "Defense in Depth+ · firewalls ×2"), 2);
+  assert.equal(term(preview.shieldTerms, "Defense in Depth+ · firewalls ×2"), 2 * values("defense-in-depth+").firewallBonus!);
   assert.equal(preview.incoming, 0);
   // No online firewall, no term.
   const bare = table("reaver", 0);
@@ -288,15 +294,17 @@ test("Brace: 5 block now, 3 more next turn (+: 7 / 4); two Braces stack their ne
   const r = table("wraith", 1);
   route(r, "r1", 0);
   r.hand = ["brace", "brace+"];
-  assert.deepEqual(playInstant(r, 0), { ok: true, message: "Brace activated · +3 block next turn." });
-  assert.equal(r.block, 5);
-  assert.deepEqual(r.nextTurn, { block: 3 });
+  const brace = values("brace"), bracePlus = values("brace+");
+  assert.deepEqual(playInstant(r, 0), { ok: true, message: `Brace activated · +${brace.nextBlock} block next turn.` });
+  assert.equal(r.block, brace.block);
+  assert.deepEqual(r.nextTurn, { block: brace.nextBlock });
   assert.ok(playInstant(r, 0).ok);
-  assert.equal(r.block, 5 + 7);
-  assert.deepEqual(r.nextTurn, { block: 3 + 4 });
+  assert.equal(r.block, brace.block! + bracePlus.block!);
+  const next = brace.nextBlock! + bracePlus.nextBlock!;
+  assert.deepEqual(r.nextTurn, { block: next });
   const { preview } = agree(r);
-  assert.equal(preview.nextTurn.block, 7);
-  assert.equal(r.block, 7, "this turn's block expired; next turn's arrived");
+  assert.equal(preview.nextTurn.block, next);
+  assert.equal(r.block, next, "this turn's block expired; next turn's arrived");
   assert.equal(r.nextTurn, undefined);
 });
 
@@ -304,13 +312,15 @@ test("Pushback: 4 block and +2 backpressure, released by the next transmission (
   const r = table("wraith", 1);
   route(r, "r1", 0);
   r.hand = ["pushback", "pushback+"];
+  const push = values("pushback"), pushPlus = values("pushback+");
   assert.ok(playInstant(r, 0).ok);
-  assert.deepEqual([r.block, r.backpressure], [4, 2]);
+  assert.deepEqual([r.block, r.backpressure], [push.block, push.backpressure]);
   assert.ok(playInstant(r, 0).ok);
-  assert.deepEqual([r.block, r.backpressure], [4 + 6, 2 + 3]);
+  const stored = push.backpressure! + pushPlus.backpressure!;
+  assert.deepEqual([r.block, r.backpressure], [push.block! + pushPlus.block!, stored]);
   const { preview } = agree(r);
-  assert.equal(term(preview.damageTerms, "Backpressure"), 5);
-  assert.equal(preview.packetDamage, RULES.baseRouteDamage + 5);
+  assert.equal(term(preview.damageTerms, "Backpressure"), stored);
+  assert.equal(preview.packetDamage, RULES.baseRouteDamage + stored);
   assert.equal(r.backpressure, 0, "the transmission consumed it");
 });
 
@@ -320,7 +330,7 @@ test("Stand Firm: 11 block for 2 energy (+: 15)", () => {
   r.hand = ["stand-firm", "stand-firm+"];
   assert.ok(playInstant(r, 0).ok);
   assert.ok(playInstant(r, 0).ok);
-  assert.deepEqual([r.block, r.energy], [11 + 15, 20 - 4]);
+  assert.deepEqual([r.block, r.energy], [values("stand-firm").block! + values("stand-firm+").block!, 20 - cost("stand-firm") - cost("stand-firm+")]);
   const { preview } = agree(r);
   assert.equal(preview.incoming, 0);
 });
@@ -371,11 +381,11 @@ test("Hardening Guide: Harden gains 3 more block, on the console and on Double S
   const plain = hardenBlock(r);
   r.hand = ["hardening-guide", "hardening-guide", "hardening-guide+"];
   assert.ok(playDaemon(r, 0).ok);
-  assert.equal(r.energy, 20 - 1);
+  assert.equal(r.energy, 20 - cost("hardening-guide"));
   assert.equal(hardenBlock(r), plain + values("hardening-guide").block!);
   assert.ok(playDaemon(r, 0).ok);
   assert.ok(playDaemon(r, 0).ok);
-  assert.equal(r.energy, 20 - 2, "Hardening Guide+ costs 0");
+  assert.equal(r.energy, 20 - 2 * cost("hardening-guide") - cost("hardening-guide+"), "Hardening Guide+ costs less");
   assert.deepEqual(runningDaemons(r).map(daemon => [daemon.id, daemon.count]), [["hardening-guide", 2], ["hardening-guide+", 1]]);
   const guided = plain + 3 * values("hardening-guide").block!;
   assert.equal(hardenBlock(r), guided);
@@ -391,9 +401,10 @@ test("Hardening Guide: Harden gains 3 more block, on the console and on Double S
   wall(d);
   d.daemons = ["hardening-guide"];
   d.hand = ["double-shift"];
-  assert.deepEqual(playInstant(d, 0), { ok: true, message: `Double Shift activated · hardened +${plain + 3} block.` });
-  assert.deepEqual([d.block, d.consoleUses], [plain + 3, 0]);
-  assert.equal(term(agree(d).preview.shieldTerms, "Block this turn"), plain + 3);
+  const guide = plain + values("hardening-guide").block!;
+  assert.deepEqual(playInstant(d, 0), { ok: true, message: `Double Shift activated · hardened +${guide} block.` });
+  assert.deepEqual([d.block, d.consoleUses], [guide, 0]);
+  assert.equal(term(agree(d).preview.shieldTerms, "Block this turn"), guide);
   // Without a Harden, the daemon gives nothing.
   const idle = table("wraith", 1);
   route(idle, "r1", 0);
@@ -410,9 +421,9 @@ test("Entrench: double your block (+: cost 1); refused without block, nothing sp
   assert.deepEqual(r, before);
   r.block = 7;
   assert.deepEqual(playInstant(r, 0), { ok: true, message: "Entrench activated · +7 block." });
-  assert.deepEqual([r.block, r.energy], [14, 18]);
+  assert.deepEqual([r.block, r.energy], [14, 20 - cost("entrench")]);
   assert.ok(playInstant(r, 0).ok);
-  assert.deepEqual([r.block, r.energy], [28, 17]);
+  assert.deepEqual([r.block, r.energy], [28, 20 - cost("entrench") - cost("entrench+")]);
   agree(r);
 });
 
@@ -422,14 +433,15 @@ test("Persistent State: the block the attacks leave carries into the next turn; 
   r.hand = ["persistent-state", "persistent-state+", "stand-firm"];
   assert.ok(playDaemon(r, 0).ok);
   assert.ok(playDaemon(r, 0).ok);
-  assert.equal(r.energy, 20 - 2 - 1);
+  assert.equal(r.energy, 20 - cost("persistent-state") - cost("persistent-state+"));
   assert.ok(playInstant(r, 0).ok);
+  const wall = values("stand-firm").block!;
   const strike = combatPreview(r).incomingRaw;
   assert.ok(strike > 0);
   const { preview } = agree(r);
-  assert.deepEqual(preview.blockCarried, { amount: 11 - strike, by: "Persistent State" }, "the first running daemon names it; two copies carry once");
-  assert.equal(preview.nextTurn.block, 11 - strike);
-  assert.equal(r.block, 11 - strike);
+  assert.deepEqual(preview.blockCarried, { amount: wall - strike, by: "Persistent State" }, "the first running daemon names it; two copies carry once");
+  assert.equal(preview.nextTurn.block, wall - strike);
+  assert.equal(r.block, wall - strike);
   // Without the daemon, block expires.
   const plain = table("wraith", 1);
   route(plain, "r1", 0);
@@ -453,8 +465,9 @@ test("Flow Control: the Backpressure relic stores all the prevented damage, not 
   assert.ok(playDaemon(r, 0).ok);
   assert.ok(playInstant(r, 0).ok);
   const { preview } = agree(r);
-  assert.equal(preview.backpressureGain, strike * values("flow-control").amount!);
-  assert.equal(r.backpressure, strike);
+  assert.equal(preview.backpressureGain, Math.ceil(strike * Math.max(RULES.backpressureRatio, values("flow-control").amount!)));
+  assert.ok(preview.backpressureGain > Math.ceil(strike * RULES.backpressureRatio), "it stores more than the relic alone");
+  assert.equal(r.backpressure, preview.backpressureGain);
   // It changes the relic's share: without the relic nothing is stored.
   const bare = table("wraith", 1);
   route(bare, "r1", 0);
@@ -486,10 +499,10 @@ test("Tripwire: armed, the striker takes 5 in the trap step (+: 8); a striker it
   assert.deepEqual(playProtocol(r, 0), { ok: true, message: "Tripwire armed. It fires on the matching enemy action." });
   const hp = r.enemies[0].hp;
   const { preview } = agree(r);
-  assert.deepEqual(preview.protocolTriggers.map(item => [item.card, item.effect]), [["tripwire", "The attacker takes 5."]]);
+  assert.deepEqual(preview.protocolTriggers.map(item => [item.card, item.effect]), [["tripwire", `The attacker takes ${values("tripwire").damage}.`]]);
   assert.equal(preview.hostiles[0].trapDamage, values("tripwire").damage);
   assert.ok(preview.incoming > 0, "the strike still lands");
-  assert.equal(r.enemies[0].hp, hp - preview.packetDamage - 5);
+  assert.equal(r.enemies[0].hp, hp - preview.packetDamage - values("tripwire").damage!);
   assert.ok(r.discardPile.includes("tripwire"));
   const k = table("wraith", 1);
   k.enemies[0].hp = values("tripwire+").damage!;
@@ -556,15 +569,16 @@ test("Incident Response: whoever sets a protocol off takes 3 (+: 5); copies stac
   route(r, "r1", 0);
   r.hand = ["incident-response", "incident-response", "incident-response+", "rate-limiter"];
   for (let i = 0; i < 3; i++) assert.ok(playDaemon(r, 0).ok);
-  assert.equal(r.energy, 20 - 3);
+  assert.equal(r.energy, 20 - 2 * cost("incident-response") - cost("incident-response+"));
   assert.ok(playProtocol(r, 0).ok);
   const hp = r.enemies[0].hp;
   const { preview } = agree(r);
   const [fired] = preview.protocolTriggers;
-  assert.deepEqual(fired.retaliation, [{ label: "Incident Response ×2", amount: 6 }, { label: "Incident Response+", amount: 5 }]);
-  assert.equal(fired.effect, `Reduces the strike by ${values("rate-limiter").reduce}. Incident Response ×2: it takes 6. Incident Response+: it takes 5.`);
-  assert.equal(preview.hostiles[0].trapDamage, 11);
-  assert.equal(r.enemies[0].hp, hp - preview.packetDamage - 11);
+  const two = 2 * values("incident-response").damage!, upgradedHit = values("incident-response+").damage!;
+  assert.deepEqual(fired.retaliation, [{ label: "Incident Response ×2", amount: two }, { label: "Incident Response+", amount: upgradedHit }]);
+  assert.equal(fired.effect, `Reduces the strike by ${values("rate-limiter").reduce}. Incident Response ×2: it takes ${two}. Incident Response+: it takes ${upgradedHit}.`);
+  assert.equal(preview.hostiles[0].trapDamage, two + upgradedHit);
+  assert.equal(r.enemies[0].hp, hp - preview.packetDamage - two - upgradedHit);
   // No protocol fires, no damage.
   const quiet = table("wraith", 1);
   route(quiet, "r1", 0);
@@ -577,7 +591,7 @@ test("Null Route: the breach deals 0, its riders still resolve (+: cost 1); a st
   route(r, "r1", 0);
   r.hand = ["null-route", "null-route+"];
   assert.ok(playProtocol(r, 0).ok);
-  assert.equal(r.energy, 18);
+  assert.equal(r.energy, 20 - cost("null-route"));
   const { preview } = agree(r);
   assert.equal(preview.incoming, 0);
   assert.equal(preview.hostiles[0].nullified, "Null Route");
@@ -607,20 +621,21 @@ test("Fortress path: Persistent State, Flow Control and Hardening Guide turn two
   const harden = RULES.hardenShield + values("hardening-guide").block!;
   assert.equal(hardenBlock(r), harden);
   assert.ok(useConsole(r).ok);
-  const wall1 = 11 + 5 + harden;
+  const wall1 = values("stand-firm").block! + values("brace").block! + harden;
   assert.equal(r.block, wall1);
   const first = agree(r).preview;
   const strike = first.incomingRaw;
   assert.ok(strike > 0);
   assert.equal(first.incoming, 0);
-  assert.equal(first.backpressureGain, strike, "Flow Control: all of it");
+  const gain = Math.ceil(strike * Math.max(RULES.backpressureRatio, values("flow-control").amount!));
+  assert.equal(first.backpressureGain, gain, "Flow Control's share of it");
   assert.deepEqual(first.blockCarried, { amount: wall1 - strike, by: "Persistent State" });
-  assert.deepEqual([r.block, r.backpressure], [wall1 - strike + 3, strike]);
+  assert.deepEqual([r.block, r.backpressure], [wall1 - strike + values("brace").nextBlock!, gain]);
   // Turn 2: Pushback, Vent and Entrench stack the kept block; the backpressure rides the route.
   r.energy = 20;
   r.hand = ["pushback", "vent", "entrench"];
   for (let i = 0; i < 3; i++) assert.ok(playInstant(r, 0).ok);
-  const kept = wall1 - strike + 3, pushed = strike + values("pushback").backpressure!;
+  const kept = wall1 - strike + values("brace").nextBlock!, pushed = gain + values("pushback").backpressure!;
   assert.equal(r.block, 2 * (kept + values("pushback").block! + pushed));
   const hp = r.enemies[0].hp;
   const second = agree(r).preview;
@@ -637,14 +652,13 @@ test("Firewall wall path: ACL Gate and Trust Gate online, Defense in Depth and B
   r.hand = ["acl-gate", "fiber", "firewall", "fiber", "fiber", "defense-in-depth", "bulkhead", "deep-inspection", "perimeter"];
   assert.ok(playGround(r, 0, 2.5, 0).ok, "ACL Gate cables itself to r1");
   const gate = r.topology.nodes.at(-1)!.id;
-  assert.ok(playLink(r, 0, gate, "omega").ok);
-  assert.ok(playGround(r, 0, -2.5, 2.4).ok, "Trust Gate");
+  if (canLink(r.topology, gate, "omega")) assert.ok(playLink(r, r.hand.indexOf("fiber"), gate, "omega").ok);
+  assert.ok(playGround(r, r.hand.indexOf("firewall"), -2.5, 2.4).ok, "Trust Gate");
   const trust = r.topology.nodes.at(-1)!.id;
-  assert.ok(playLink(r, 0, "alpha", trust).ok);
-  assert.ok(playLink(r, 0, trust, "r1").ok);
+  for (const [a, b] of [["alpha", trust], [trust, "r1"]]) if (canLink(r.topology, a, b)) assert.ok(playLink(r, r.hand.indexOf("fiber"), a, b).ok);
   assert.deepEqual(combatPreview(r).online.filter(id => node(r, id)!.role === "firewall").sort(), [gate, trust].sort());
-  assert.ok(playDaemon(r, 0).ok);
-  for (let i = 0; i < 3; i++) assert.ok(playInstant(r, 0).ok);
+  assert.ok(playDaemon(r, r.hand.indexOf("defense-in-depth")).ok);
+  for (const id of ["bulkhead", "deep-inspection", "perimeter"] as CardId[]) assert.ok(playInstant(r, r.hand.indexOf(id)).ok);
   const dpi = values("deep-inspection"), firewalls = 2;
   assert.equal(r.block, values("bulkhead").block! + dpi.block! + firewalls * dpi.perFirewall!);
   assert.equal(r.packetBoost, firewalls * values("perimeter").perFirewall!);
@@ -653,7 +667,7 @@ test("Firewall wall path: ACL Gate and Trust Gate online, Defense in Depth and B
   assert.equal(term(preview.shieldTerms, "Online firewalls ×2 vs breach"), firewalls * (RULES.firewallBreachBlock + values("bulkhead").firewallBonus!));
   assert.equal(term(preview.shieldTerms, "Defense in Depth · firewalls ×2"), firewalls * values("defense-in-depth").firewallBonus!);
   assert.equal(preview.incoming, 0);
-  assert.equal(preview.packetDamage, RULES.baseRouteDamage + 4);
+  assert.equal(preview.packetDamage, RULES.baseRouteDamage + firewalls * values("perimeter").perFirewall!);
   assert.equal(r.enemies[0].hp, hp - preview.packetDamage);
 });
 

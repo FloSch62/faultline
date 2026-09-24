@@ -62,20 +62,22 @@ const node = (run: RunState, id: string) => run.topology.nodes.find(item => item
 
 /** Contract section 7: rarity, cost, target and the upgraded cost of every colorless card. The
  * balance phase updates this table with any cost it tunes. */
+/** Costs the balance pass tuned (docs/balance-v5.json): read from the data. */
+const tuned = (id: string) => CARDS[id as CardId].cost;
 const SPEC: Record<ColorlessCardId, [CardRarity, number, CardTarget, number]> = {
   "resonance-field": ["common", 1, "zone", 0], "aegis-field": ["uncommon", 1, "zone", 0], "null-field": ["uncommon", 1, "zone", 0],
   "purge-field": ["common", 0, "zone", 0],
   router: ["basic", 1, "ground", 1], switch: ["basic", 0, "ground", 0], firewall: ["common", 1, "ground", 1], honeypot: ["common", 1, "ground", 0],
-  "cache-server": ["uncommon", 2, "ground", 1], "poe-injector": ["rare", 2, "ground", 1], "load-balancer": ["uncommon", 2, "ground", 1],
+  "cache-server": ["uncommon", 2, "ground", 1], "poe-injector": ["rare", tuned("poe-injector"), "ground", tuned("poe-injector+")], "load-balancer": ["uncommon", 2, "ground", 1],
   relay: ["common", 1, "ground", 0], "hardened-router": ["uncommon", 1, "ground", 1], "linux-bridge": ["common", 1, "ground", 0],
   "server-rack": ["uncommon", 1, "ground", 0],
   fiber: ["basic", 1, "link", 1], crosslink: ["uncommon", 0, "link", 0], duplex: ["common", 1, "link", 1], "armored-fiber": ["common", 1, "link", 0],
   conduit: ["common", 1, "link", 0], vxlan: ["uncommon", 1, "link", 0],
   shield: ["uncommon", 1, "node", 0], firmware: ["rare", 1, "node", 0], compression: ["uncommon", 1, "node", 0], "startup-config": ["common", 0, "node", 0],
   clabernetes: ["legendary", 2, "node", 1], "redundant-psu": ["common", 1, "node", 0],
-  patch: ["basic", 1, "instant", 1], surge: ["rare", 0, "instant", 0], containerlab: ["rare", 2, "instant", 1], guard: ["basic", 1, "instant", 1],
+  patch: ["basic", 1, "instant", 1], surge: ["rare", 0, "instant", 0], containerlab: ["rare", tuned("containerlab"), "instant", tuned("containerlab+")], guard: ["basic", 1, "instant", 1],
   pulse: ["basic", 1, "instant", 1], diagnostic: ["common", 1, "instant", 1], reroute: ["uncommon", 0, "instant", 0], barrier: ["uncommon", 2, "instant", 2],
-  capacitor: ["common", 0, "instant", 0], salvage: ["common", 0, "instant", 0], rebuild: ["uncommon", 1, "instant", 0], "zero-day": ["rare", 2, "instant", 2],
+  capacitor: ["common", 0, "instant", 0], salvage: ["common", 0, "instant", 0], rebuild: ["uncommon", tuned("rebuild"), "instant", tuned("rebuild+")], "zero-day": ["rare", 2, "instant", 2],
   emergency: ["rare", 2, "instant", 2], protocol: ["common", 1, "instant", 1], inspect: ["common", 0, "instant", 0], wireshark: ["uncommon", 1, "instant", 1],
   "broadcast-storm": ["uncommon", 1, "instant", 1], "traffic-shaping": ["common", 0, "instant", 0], "packet-storm": ["rare", 2, "instant", 2],
   quorum: ["common", 1, "instant", 1], "demolition-charge": ["common", 1, "instant", 1], "field-repair": ["common", 0, "instant", 0],

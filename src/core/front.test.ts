@@ -405,7 +405,7 @@ test("Broadcast Storm, Packet Storm and Flood Fill hit every port; Traffic Shapi
   playInstant(r, 0);
   playInstant(r, 0);
   playInstant(r, 0);
-  const every = 2 + 5 + 2 * 1;
+  const every = CARDS["broadcast-storm"].values.everyPort! + CARDS["packet-storm"].values.everyPort! + 2 * CARDS["flood-fill"].values.perChannelEveryPort!;
   let p = combatPreview(r);
   assert.equal(p.ports.left!.packet, every);
   assert.equal(p.ports.centre!.packet, RULES.baseRouteDamage + RULES.bandwidthPerChannel + every);

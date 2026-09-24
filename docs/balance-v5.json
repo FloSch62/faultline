@@ -1,0 +1,1040 @@
+{
+  "date": "2026-09-24",
+  "notes": "v5 'Three Energy' balance pass. Deterministic bots (scripts/bot.ts tactical line with a generic plan evaluator; scripts/bot-meta.ts rewards/relics/removals/upgrades/events), full three-stage expeditions. Regression probes, not a human difficulty estimate. A 300-seed win rate moves about +/-2.8 points (1 sigma), a 150-seed one about +/-4. Time-boxed by the user: final numbers at 300 seeds (A0) and 150 seeds (A2, A4, paths, energy devices) instead of the 600/300/600 protocol.",
+  "policy": [
+    "Tactical line (v5): after the opener (route), fault repair, maintenance (scrubs, repairs, racks, phantoms) and the guardian windows (prepare an answer on the charge turn; break the ultimate when any instant sequence reaches it, else brace), every affordable card, console use and relocation becomes a plan played on a copy of the run and scored from combatPreview: the outlook change this turn (damage weighted by threat per health, kills, interrupt, minus 3 per incoming point, faults, installs; -400 for a lethal phase), damage stored for the next transmission (buffer while buffering, backpressure gained), what lasts (a next-turn forecast with this turn's effects stripped: route damage, persistent shield, energy and draw from devices, times the expected remaining turns with a 0.85 decay), one-shot next-turn gains (Brace, Capacitor, carried block), cards gained (draws, Payload tokens, returned cards, upgrades, new discounts), daemons (hook-driven effects by a per-turn estimate) and protocols armed for a later intent. Devices whose cables cannot all be paid this turn are valued as completed next turn. The best affordable set (knapsack on energy and the Kernel Panic play limit, one plan per card) is chosen and its most urgent member played (set-up, build, play, cash-in order). Retain cards wait unless they pay 6 + 2 per remaining turn or the fight ends. The card left unpaid with the highest value is prepared.",
+    "Meta (v5): per-keeper generalist reward priorities (the build-arounds first, colorless Emergency Rebuild/Containerlab/PoE/Zero Day/Surge/Aegis high), path-focused mode --path=<path> (the path's cards and contract partners first), energy boss relics ranked by drawback (Air Gap, Storm Control, Legacy Mainframe, Jumbo Frames (not the Architect), Overvolt; Anycast only without firewalls), curses removed first, Packet Bursts and Guards trimmed at sanctuaries/markets while the deck is 15+, upgrades that lower a cost first, events answered by choice label and never taking a curse unless named.",
+    "Probe flags added: --path=, --ban=, --start= (e.g. two PoE Injectors), --card=id.key:value (experiments without editing data). Metrics added: deck size at a win, PoE Injectors per fight and fights with 2+ online, runs averaging 1+/2+ PoE per fight and their win rate, daemons started, per-card runs/win rate/plays, per-relic runs/win rate."
+  ],
+  "targets": [
+    {
+      "metric": "Win rate, ascension 0",
+      "target": "32-42 % per keeper, spread <= 8"
+    },
+    {
+      "metric": "Win rate, ascension 2",
+      "target": "16-26 % per keeper"
+    },
+    {
+      "metric": "Win rate, ascension 4",
+      "target": "5-12 % per keeper"
+    },
+    {
+      "metric": "Turns per normal / elite / guardian fight",
+      "target": "3.5-5 / 5-7 / 7-10"
+    },
+    {
+      "metric": "Build paths",
+      "target": "path bot within 60-140 % of its keeper's rate, all 9"
+    },
+    {
+      "metric": "Energy devices",
+      "target": "runs with 2+ PoE Injectors per fight win <= 1.3 x keeper"
+    },
+    {
+      "metric": "Guardian ultimates",
+      "target": "ultimate turn reached >= 70 %; pooled interrupts 35-70 %"
+    },
+    {
+      "metric": "Deck size at a win",
+      "target": "20-32"
+    }
+  ],
+  "wardenRule": "Backpressure stores all the damage your shield prevents (RULES.backpressureRatio 0.5 -> 1): every blocked point returns on the next transmission. Flow Control now stores 150 %. Numbers-only in the engine (the resolver already reads the ratio); the Backpressure relic face already prints 'Damage ...' at ratio 1; Flow Control's face drops ', not ...' at ratio 1.",
+  "results": {
+    "A0": {
+      "architect": {
+        "seeds": 300,
+        "winRate": "37%",
+        "turns": {
+          "normal": 4.73,
+          "elite": 5.9,
+          "guardian": 8.11
+        },
+        "ultimateTurnReached": 0.912,
+        "interruptShare": 0.841,
+        "deckAtWin": {
+          "mean": 26.27,
+          "min": 23,
+          "max": 31,
+          "inBand": 1
+        },
+        "energyDevices": {
+          "poePerFight": 0.06,
+          "fightsWith2Online": 0.01,
+          "runsWith2PerFight": {
+            "runs": 0,
+            "winRate": 0
+          },
+          "runsWith1PerFight": {
+            "runs": 2,
+            "winRate": 0.5
+          },
+          "runsWithAny": {
+            "runs": 48,
+            "winRate": 0.313
+          },
+          "runsWith2OnlineInHalf": {
+            "runs": 0,
+            "winRate": 0
+          }
+        },
+        "integrityOnWin": 8,
+        "stageSurvival": [
+          0.897,
+          0.758,
+          0.539
+        ],
+        "lostTo": {
+          "core": 47,
+          "cantor": 34,
+          "regent": 27,
+          "marshal": 19,
+          "reaver": 16,
+          "colossus": 10
+        }
+      },
+      "warden": {
+        "seeds": 300,
+        "winRate": "42%",
+        "turns": {
+          "normal": 6.23,
+          "elite": 8,
+          "guardian": 12.18
+        },
+        "ultimateTurnReached": 0.974,
+        "interruptShare": 0.156,
+        "deckAtWin": {
+          "mean": 26.05,
+          "min": 21,
+          "max": 29,
+          "inBand": 1
+        },
+        "energyDevices": {
+          "poePerFight": 0.05,
+          "fightsWith2Online": 0,
+          "runsWith2PerFight": {
+            "runs": 0,
+            "winRate": 0
+          },
+          "runsWith1PerFight": {
+            "runs": 1,
+            "winRate": 0
+          },
+          "runsWithAny": {
+            "runs": 47,
+            "winRate": 0.383
+          },
+          "runsWith2OnlineInHalf": {
+            "runs": 0,
+            "winRate": 0
+          }
+        },
+        "integrityOnWin": 9.5,
+        "stageSurvival": [
+          0.723,
+          0.866,
+          0.665
+        ],
+        "lostTo": {
+          "regent": 66,
+          "core": 46,
+          "cantor": 23,
+          "serpent": 17,
+          "colossus": 9,
+          "reaver": 4
+        }
+      },
+      "ghost": {
+        "seeds": 300,
+        "winRate": "39%",
+        "turns": {
+          "normal": 4.58,
+          "elite": 5.99,
+          "guardian": 8.34
+        },
+        "ultimateTurnReached": 0.923,
+        "interruptShare": 0.953,
+        "deckAtWin": {
+          "mean": 26.26,
+          "min": 21,
+          "max": 30,
+          "inBand": 1
+        },
+        "energyDevices": {
+          "poePerFight": 0.05,
+          "fightsWith2Online": 0,
+          "runsWith2PerFight": {
+            "runs": 0,
+            "winRate": 0
+          },
+          "runsWith1PerFight": {
+            "runs": 0,
+            "winRate": 0
+          },
+          "runsWithAny": {
+            "runs": 42,
+            "winRate": 0.405
+          },
+          "runsWith2OnlineInHalf": {
+            "runs": 0,
+            "winRate": 0
+          }
+        },
+        "integrityOnWin": 7.2,
+        "stageSurvival": [
+          0.767,
+          0.896,
+          0.568
+        ],
+        "lostTo": {
+          "core": 51,
+          "regent": 49,
+          "serpent": 18,
+          "reaver": 10,
+          "marshal": 10,
+          "cantor": 9
+        }
+      }
+    },
+    "A2": {
+      "architect": {
+        "seeds": 150,
+        "winRate": "25%",
+        "turns": {
+          "normal": 5.01,
+          "elite": 6.37,
+          "guardian": 8.04
+        },
+        "ultimateTurnReached": 0.884,
+        "interruptShare": 0.792,
+        "deckAtWin": {
+          "mean": 26.08,
+          "min": 22,
+          "max": 29,
+          "inBand": 1
+        },
+        "energyDevices": {
+          "poePerFight": 0.04,
+          "fightsWith2Online": 0.01,
+          "runsWith2PerFight": {
+            "runs": 0,
+            "winRate": 0
+          },
+          "runsWith1PerFight": {
+            "runs": 0,
+            "winRate": 0
+          },
+          "runsWithAny": {
+            "runs": 17,
+            "winRate": 0.529
+          },
+          "runsWith2OnlineInHalf": {
+            "runs": 0,
+            "winRate": 0
+          }
+        },
+        "integrityOnWin": 6.9,
+        "stageSurvival": [
+          0.753,
+          0.752,
+          0.435
+        ],
+        "lostTo": {
+          "regent": 32,
+          "cantor": 18,
+          "core": 18,
+          "serpent": 12,
+          "colossus": 7,
+          "reaver": 6
+        }
+      },
+      "warden": {
+        "seeds": 150,
+        "winRate": "21%",
+        "turns": {
+          "normal": 6.35,
+          "elite": 8.39,
+          "guardian": 10.74
+        },
+        "ultimateTurnReached": 0.905,
+        "interruptShare": 0.154,
+        "deckAtWin": {
+          "mean": 25.38,
+          "min": 22,
+          "max": 28,
+          "inBand": 1
+        },
+        "energyDevices": {
+          "poePerFight": 0.03,
+          "fightsWith2Online": 0,
+          "runsWith2PerFight": {
+            "runs": 0,
+            "winRate": 0
+          },
+          "runsWith1PerFight": {
+            "runs": 0,
+            "winRate": 0
+          },
+          "runsWithAny": {
+            "runs": 11,
+            "winRate": 0.273
+          },
+          "runsWith2OnlineInHalf": {
+            "runs": 0,
+            "winRate": 0
+          }
+        },
+        "integrityOnWin": 8.3,
+        "stageSurvival": [
+          0.54,
+          0.741,
+          0.533
+        ],
+        "lostTo": {
+          "regent": 60,
+          "core": 22,
+          "cantor": 19,
+          "serpent": 4,
+          "colossus": 4,
+          "weaver": 2
+        }
+      },
+      "ghost": {
+        "seeds": 150,
+        "winRate": "23%",
+        "turns": {
+          "normal": 4.77,
+          "elite": 6.4,
+          "guardian": 7.99
+        },
+        "ultimateTurnReached": 0.877,
+        "interruptShare": 0.925,
+        "deckAtWin": {
+          "mean": 25.68,
+          "min": 22,
+          "max": 27,
+          "inBand": 1
+        },
+        "energyDevices": {
+          "poePerFight": 0.03,
+          "fightsWith2Online": 0,
+          "runsWith2PerFight": {
+            "runs": 0,
+            "winRate": 0
+          },
+          "runsWith1PerFight": {
+            "runs": 0,
+            "winRate": 0
+          },
+          "runsWithAny": {
+            "runs": 15,
+            "winRate": 0.133
+          },
+          "runsWith2OnlineInHalf": {
+            "runs": 0,
+            "winRate": 0
+          }
+        },
+        "integrityOnWin": 7.1,
+        "stageSurvival": [
+          0.613,
+          0.783,
+          0.472
+        ],
+        "lostTo": {
+          "regent": 43,
+          "core": 16,
+          "cantor": 12,
+          "serpent": 9,
+          "sentinel": 8,
+          "reaver": 6
+        }
+      }
+    },
+    "A4": {
+      "architect": {
+        "seeds": 150,
+        "winRate": "1%",
+        "turns": {
+          "normal": 4.41,
+          "elite": 6.06,
+          "guardian": 6.59
+        },
+        "ultimateTurnReached": 0.674,
+        "interruptShare": 0.771,
+        "deckAtWin": {
+          "mean": 26.5,
+          "min": 26,
+          "max": 27,
+          "inBand": 1
+        },
+        "energyDevices": {
+          "poePerFight": 0.02,
+          "fightsWith2Online": 0,
+          "runsWith2PerFight": {
+            "runs": 0,
+            "winRate": 0
+          },
+          "runsWith1PerFight": {
+            "runs": 0,
+            "winRate": 0
+          },
+          "runsWithAny": {
+            "runs": 9,
+            "winRate": 0.111
+          },
+          "runsWith2OnlineInHalf": {
+            "runs": 0,
+            "winRate": 0
+          }
+        },
+        "integrityOnWin": 6,
+        "stageSurvival": [
+          0.213,
+          0.563,
+          0.111
+        ],
+        "lostTo": {
+          "regent": 74,
+          "serpent": 18,
+          "sentinel": 10,
+          "core": 8,
+          "colossus": 8,
+          "spark-mite": 8
+        }
+      },
+      "warden": {
+        "seeds": 150,
+        "winRate": "1%",
+        "turns": {
+          "normal": 5.01,
+          "elite": 6.92,
+          "guardian": 6.53
+        },
+        "ultimateTurnReached": 0.708,
+        "interruptShare": 0.156,
+        "deckAtWin": {
+          "mean": 27,
+          "min": 27,
+          "max": 27,
+          "inBand": 1
+        },
+        "energyDevices": {
+          "poePerFight": 0.01,
+          "fightsWith2Online": 0,
+          "runsWith2PerFight": {
+            "runs": 0,
+            "winRate": 0
+          },
+          "runsWith1PerFight": {
+            "runs": 0,
+            "winRate": 0
+          },
+          "runsWithAny": {
+            "runs": 5,
+            "winRate": 0.2
+          },
+          "runsWith2OnlineInHalf": {
+            "runs": 0,
+            "winRate": 0
+          }
+        },
+        "integrityOnWin": 4,
+        "stageSurvival": [
+          0.093,
+          0.429,
+          0.167
+        ],
+        "lostTo": {
+          "regent": 74,
+          "serpent": 18,
+          "colossus": 16,
+          "spark-mite": 11,
+          "sentinel": 10,
+          "cantor": 6
+        }
+      },
+      "ghost": {
+        "seeds": 150,
+        "winRate": "1%",
+        "turns": {
+          "normal": 4.16,
+          "elite": 5.76,
+          "guardian": 6.13
+        },
+        "ultimateTurnReached": 0.625,
+        "interruptShare": 0.893,
+        "deckAtWin": {
+          "mean": 26.5,
+          "min": 25,
+          "max": 28,
+          "inBand": 1
+        },
+        "energyDevices": {
+          "poePerFight": 0,
+          "fightsWith2Online": 0,
+          "runsWith2PerFight": {
+            "runs": 0,
+            "winRate": 0
+          },
+          "runsWith1PerFight": {
+            "runs": 0,
+            "winRate": 0
+          },
+          "runsWithAny": {
+            "runs": 2,
+            "winRate": 0
+          },
+          "runsWith2OnlineInHalf": {
+            "runs": 0,
+            "winRate": 0
+          }
+        },
+        "integrityOnWin": 1.5,
+        "stageSurvival": [
+          0.14,
+          0.714,
+          0.133
+        ],
+        "lostTo": {
+          "regent": 68,
+          "spark-mite": 19,
+          "serpent": 15,
+          "colossus": 10,
+          "leech": 5,
+          "sentinel": 5
+        }
+      }
+    },
+    "paths": {
+      "mesh": {
+        "keeper": "architect",
+        "seeds": 150,
+        "winRate": "34%",
+        "ratioToKeeper": 0.93,
+        "turns": {
+          "normal": 4.74,
+          "elite": 6.03,
+          "guardian": 8.16
+        }
+      },
+      "backbone": {
+        "keeper": "architect",
+        "seeds": 150,
+        "winRate": "32%",
+        "ratioToKeeper": 0.87,
+        "turns": {
+          "normal": 4.57,
+          "elite": 5.79,
+          "guardian": 7.7
+        }
+      },
+      "deployment": {
+        "keeper": "architect",
+        "seeds": 150,
+        "winRate": "33%",
+        "ratioToKeeper": 0.91,
+        "turns": {
+          "normal": 4.81,
+          "elite": 6.01,
+          "guardian": 8.34
+        }
+      },
+      "fortress": {
+        "keeper": "warden",
+        "seeds": 150,
+        "winRate": "40%",
+        "ratioToKeeper": 0.96,
+        "turns": {
+          "normal": 6.3,
+          "elite": 7.98,
+          "guardian": 12
+        }
+      },
+      "firewall": {
+        "keeper": "warden",
+        "seeds": 150,
+        "winRate": "30%",
+        "ratioToKeeper": 0.72,
+        "turns": {
+          "normal": 6.07,
+          "elite": 7.96,
+          "guardian": 11.26
+        }
+      },
+      "protocols": {
+        "keeper": "warden",
+        "seeds": 150,
+        "winRate": "29%",
+        "ratioToKeeper": 0.7,
+        "turns": {
+          "normal": 5.94,
+          "elite": 7.79,
+          "guardian": 11.45
+        }
+      },
+      "buffer": {
+        "keeper": "ghost",
+        "seeds": 150,
+        "winRate": "25%",
+        "ratioToKeeper": 0.63,
+        "turns": {
+          "normal": 4.54,
+          "elite": 5.81,
+          "guardian": 7.95
+        }
+      },
+      "evasion": {
+        "keeper": "ghost",
+        "seeds": 150,
+        "winRate": "33%",
+        "ratioToKeeper": 0.84,
+        "turns": {
+          "normal": 4.76,
+          "elite": 6.2,
+          "guardian": 8.44
+        }
+      },
+      "payloads": {
+        "keeper": "ghost",
+        "seeds": 150,
+        "winRate": "29%",
+        "ratioToKeeper": 0.74,
+        "turns": {
+          "normal": 4.42,
+          "elite": 5.68,
+          "guardian": 7.66
+        }
+      }
+    },
+    "power": {
+      "architect": {
+        "seeds": 150,
+        "winRate": "18%",
+        "turns": {
+          "normal": 4.94,
+          "elite": 6.19,
+          "guardian": 8.29
+        },
+        "ultimateTurnReached": 0.891,
+        "interruptShare": 0.694,
+        "deckAtWin": {
+          "mean": 26.3,
+          "min": 24,
+          "max": 29,
+          "inBand": 1
+        },
+        "energyDevices": {
+          "poePerFight": 0.8,
+          "fightsWith2Online": 0.16,
+          "runsWith2PerFight": {
+            "runs": 0,
+            "winRate": 0
+          },
+          "runsWith1PerFight": {
+            "runs": 52,
+            "winRate": 0.288
+          },
+          "runsWithAny": {
+            "runs": 145,
+            "winRate": 0.186
+          },
+          "runsWith2OnlineInHalf": {
+            "runs": 5,
+            "winRate": 0
+          }
+        },
+        "integrityOnWin": 6.7,
+        "stageSurvival": [
+          0.687,
+          0.65,
+          0.403
+        ],
+        "lostTo": {
+          "regent": 35,
+          "core": 18,
+          "cantor": 17,
+          "marshal": 14,
+          "colossus": 10,
+          "serpent": 7
+        }
+      },
+      "warden": {
+        "seeds": 150,
+        "winRate": "21%",
+        "turns": {
+          "normal": 6.25,
+          "elite": 8.37,
+          "guardian": 11.31
+        },
+        "ultimateTurnReached": 0.948,
+        "interruptShare": 0.117,
+        "deckAtWin": {
+          "mean": 25.69,
+          "min": 23,
+          "max": 28,
+          "inBand": 1
+        },
+        "energyDevices": {
+          "poePerFight": 0.54,
+          "fightsWith2Online": 0,
+          "runsWith2PerFight": {
+            "runs": 0,
+            "winRate": 0
+          },
+          "runsWith1PerFight": {
+            "runs": 25,
+            "winRate": 0.6
+          },
+          "runsWithAny": {
+            "runs": 134,
+            "winRate": 0.239
+          },
+          "runsWith2OnlineInHalf": {
+            "runs": 0,
+            "winRate": 0
+          }
+        },
+        "integrityOnWin": 8.8,
+        "stageSurvival": [
+          0.573,
+          0.628,
+          0.593
+        ],
+        "lostTo": {
+          "regent": 53,
+          "cantor": 29,
+          "core": 16,
+          "serpent": 9,
+          "marshal": 3,
+          "colossus": 2
+        }
+      },
+      "ghost": {
+        "seeds": 150,
+        "winRate": "14%",
+        "turns": {
+          "normal": 4.97,
+          "elite": 6.25,
+          "guardian": 8.62
+        },
+        "ultimateTurnReached": 0.888,
+        "interruptShare": 0.895,
+        "deckAtWin": {
+          "mean": 26.38,
+          "min": 24,
+          "max": 28,
+          "inBand": 1
+        },
+        "energyDevices": {
+          "poePerFight": 0.49,
+          "fightsWith2Online": 0.01,
+          "runsWith2PerFight": {
+            "runs": 0,
+            "winRate": 0
+          },
+          "runsWith1PerFight": {
+            "runs": 23,
+            "winRate": 0.391
+          },
+          "runsWithAny": {
+            "runs": 120,
+            "winRate": 0.175
+          },
+          "runsWith2OnlineInHalf": {
+            "runs": 0,
+            "winRate": 0
+          }
+        },
+        "integrityOnWin": 7.1,
+        "stageSurvival": [
+          0.62,
+          0.796,
+          0.284
+        ],
+        "lostTo": {
+          "regent": 41,
+          "core": 27,
+          "cantor": 11,
+          "colossus": 10,
+          "serpent": 10,
+          "reaver": 9
+        }
+      }
+    },
+    "powerNatural": {
+      "architect": {
+        "seeds": 150,
+        "winRate": "38%",
+        "turns": {
+          "normal": 4.78,
+          "elite": 6.03,
+          "guardian": 8.38
+        },
+        "ultimateTurnReached": 0.934,
+        "interruptShare": 0.804,
+        "deckAtWin": {
+          "mean": 25.54,
+          "min": 21,
+          "max": 29,
+          "inBand": 1
+        },
+        "energyDevices": {
+          "poePerFight": 0.09,
+          "fightsWith2Online": 0.01,
+          "runsWith2PerFight": {
+            "runs": 0,
+            "winRate": 0
+          },
+          "runsWith1PerFight": {
+            "runs": 1,
+            "winRate": 0
+          },
+          "runsWithAny": {
+            "runs": 34,
+            "winRate": 0.353
+          },
+          "runsWith2OnlineInHalf": {
+            "runs": 0,
+            "winRate": 0
+          }
+        },
+        "integrityOnWin": 8.2,
+        "stageSurvival": [
+          0.9,
+          0.778,
+          0.543
+        ],
+        "lostTo": {
+          "core": 21,
+          "cantor": 16,
+          "regent": 15,
+          "reaver": 9,
+          "serpent": 8,
+          "colossus": 4
+        }
+      }
+    },
+    "pooledInterruptsA0": 0.569
+  },
+  "changes": {
+    "rules": {
+      "normalHealth": {
+        "old": [
+          14,
+          4,
+          11
+        ],
+        "new": [
+          20,
+          5,
+          16
+        ]
+      },
+      "eliteHealth": {
+        "old": [
+          27,
+          2,
+          9
+        ],
+        "new": [
+          38,
+          3,
+          13
+        ]
+      },
+      "guardianHealth": {
+        "old": [
+          60,
+          86,
+          118
+        ],
+        "new": [
+          90,
+          128,
+          176
+        ]
+      },
+      "rewardRarity.normal": {
+        "old": [
+          0.58,
+          0.37,
+          0.05
+        ],
+        "new": [
+          0.65,
+          0.32,
+          0.03
+        ]
+      },
+      "rewardRarity.elite": {
+        "old": [
+          0.45,
+          0.42,
+          0.13
+        ],
+        "new": [
+          0.55,
+          0.37,
+          0.08
+        ]
+      },
+      "rewardRarity.guardian": {
+        "old": [
+          0,
+          0,
+          1
+        ],
+        "new": [
+          0,
+          0.5,
+          0.5
+        ]
+      },
+      "bufferMultiplier": {
+        "old": 2,
+        "new": 1.5,
+        "why": "The Ghost bought 50 % more damage for a free console; fights 3.3/4.2/5.9 turns and guardians died before their ultimate. x1.5: 49 -> 36 % and fights into range."
+      },
+      "backpressureRatio": {
+        "old": 0.5,
+        "new": 1,
+        "why": "The Warden rule: offense from defense, fights shorter (6.6/8.6/13.3 -> 6.2/7.9/11.9)."
+      },
+      "hardenShield": {
+        "old": 2,
+        "new": 1,
+        "why": "Harden is the Warden's per-turn defense; -16 points alone."
+      },
+      "hardenPerHostile": {
+        "old": 1,
+        "new": 0,
+        "why": "The v4 pending addition; the v5 Warden cards cover packs and adds (-10 points)."
+      },
+      "hardenPerAdd": {
+        "old": 1,
+        "new": 0,
+        "why": "As above."
+      }
+    },
+    "cards": {
+      "architect": {
+        "redundant-paths": "perChannel 2/3 -> 3/4",
+        "ecmp": "perChannel 2/3 -> 3/4",
+        "flood-fill": "perChannelEveryPort 1/2 -> 2/3",
+        "mesh-weave": "cost 1 -> 0",
+        "fabric-controller": "cost 2/1 -> 1/0",
+        "trunk-line": "perDevice 1 -> 2",
+        "traceroute": "perSwitch 1 -> 2",
+        "deep-buffers": "perSwitch 1 -> 2",
+        "carrier-grade": "cost 2/1 -> 1/0, perDevice 1 -> 2",
+        "datacenter": "cost 2/1 -> 1/0"
+      },
+      "warden": {
+        "deep-inspection": "block 3 +2/firewall (5, +3) -> 2 +1 (4, +2)",
+        "acl-gate": "links 1 -> 2",
+        "perimeter": "perFirewall 2/3 -> 3/4",
+        "brace": "5/3 (7/4) -> 3/2 (5/3)",
+        "pushback": "backpressure 2/3 -> 1/2",
+        "stand-firm": "block 11/15 -> 8/12",
+        "hardening-guide": "block 3 -> 1",
+        "persistent-state": "cost 2/1 -> 3/2",
+        "flow-control": "amount 1 -> 1.5 (stores 150 %)",
+        "tripwire": "damage 5/8 -> 7/10",
+        "incident-response": "damage 3/5 -> 4/6"
+      },
+      "ghost": {
+        "flush": "burst 4/6 -> 3/5",
+        "fork-bomb": "tokens 3/4 -> 2/3"
+      },
+      "colorless": {
+        "rebuild": "cost 1/0 -> 2/1 (a whole channel for 1 energy; banning it and Containerlab cost the bots 5-13 points)",
+        "containerlab": "cost 2/1 -> 3/2",
+        "guard": "block 4/7 -> 3/5 (the shared defense; -5/-12/-11)"
+      }
+    }
+  },
+  "rejected": [
+    {
+      "lever": "bufferMultiplier 1.25",
+      "result": "Ghost 45 % (same as card nerfs); kept 1.5 to keep the Buffer identity"
+    },
+    {
+      "lever": "Store and Forward 3/5",
+      "result": "46 vs 44 % (no effect)"
+    },
+    {
+      "lever": "Ghost Protocol 3/2, Deep Queue +0.5, Spoof 2/4, Hold Queue 3/5",
+      "result": "45 vs 51 %, then Ghost 33 % after the health raise: reverted"
+    },
+    {
+      "lever": "Deep Queue (ban)",
+      "result": "43 vs 45 %: not dominant"
+    },
+    {
+      "lever": "backpressureRatio 0.75",
+      "result": "not used: the Backpressure relic face prints only 'Half' or 'Damage'"
+    },
+    {
+      "lever": "Persistent State cost 3/2 alone",
+      "result": "no measurable change (36 vs 36 %); runs holding it 72-78 % vs 17-30 % without. Kept at 3/2; rarity legendary tried (Warden 40 %, fortress 35 %) and rejected"
+    },
+    {
+      "lever": "Entrench cost 3/2",
+      "result": "no effect; banning Entrench -7 (150 seeds)"
+    },
+    {
+      "lever": "Defense in Depth cost 1/0, Null Route cost 1/0",
+      "result": "runs holding them won 78 / 77 %: reverted to 2/1"
+    },
+    {
+      "lever": "Null Route 1, Tripwire 8/11, Incident Response 5/7",
+      "result": "protocols path 24 vs 25 %, Warden +2: rejected"
+    },
+    {
+      "lever": "Rate Limiter 6/9, IPS 7/10, Failover 4/7, Port Security 5/8; maxProtocols 3",
+      "result": "protocols path 22 vs 22 %: no effect"
+    },
+    {
+      "lever": "Fortress nerf: Hardening Guide 1, Vent cost 1, Entrench 3/2 (with the old Warden)",
+      "result": "fortress 54 %, default Warden 27 %: too broad at the time"
+    },
+    {
+      "lever": "bandwidthPerChannel 4",
+      "result": "Architect +3/+4; rejected for Architect card buffs"
+    },
+    {
+      "lever": "configuredDamage 2, overclockDamage 3, compressionDamage 3, Line Rate 1/0, Trunk Line 3",
+      "result": "backbone +2..+3; rejected: the backbone path list (contract partners only) fixed it"
+    },
+    {
+      "lever": "elite/guardian health +25 % (on top)",
+      "result": "Architect -1, Warden 0, Ghost -7: the Warden only fights longer"
+    },
+    {
+      "lever": "escalationStart 3, escalationEvery 2",
+      "result": "no change (54/52/64 vs 54/54/62)"
+    },
+    {
+      "lever": "packRate +0.15, addBreakBonus 6",
+      "result": "no reduction (Architect +4)"
+    },
+    {
+      "lever": "gradedArmorBase 3",
+      "result": "A4 unchanged (3/2/4 %)"
+    },
+    {
+      "lever": "guardianHealth 72/135/185 (softer Regent)",
+      "result": "A4 unchanged (4/2/4 %), A0 +2..+4"
+    },
+    {
+      "lever": "A4 riders: ascensionChargeBreaker 0, ascensionRiderWear 0, addBreakBonusLate 4, packRateAscensionBonus 0, eliteSecondDesignation 0, normalSecondDesignation 0, ascensionAddHealth 0.8",
+      "result": "A4 unchanged (3-4 %): the hard-coded +1 strike/breach (A3) and guardian +15 %/+2 ultimate/-2 integrity (A4) dominate"
+    },
+    {
+      "lever": "PoE Injector cost 1/0",
+      "result": "runs starting with two: 19-22 % at either cost (keepers 36-40 %); kept 2/1"
+    }
+  ]
+}

@@ -65,6 +65,9 @@ function agree(run: RunState) {
 }
 const term = (preview: ReturnType<typeof combatPreview>, label: string) => preview.damageTerms.find(item => item.label === label)?.amount;
 const plus = (id: CardId) => `${id}+` as CardId;
+/** Tuned numbers are read from the data (balance may change them). */
+const V = (id: CardId) => CARDS[id].values as Required<(typeof CARDS)[CardId]["values"]>;
+const cost = (id: CardId) => CARDS[id].cost;
 /** A play that must be refused without changing anything. */
 function refused(run: RunState, play: () => { ok: boolean; message: string }, message: string) {
   const before = structuredClone(run);
@@ -85,22 +88,22 @@ test("the Architect's set is complete: 23 cards of section 9.1 with their costs,
     ecmp: [1, "uncommon", "instant", undefined, 1],
     "flood-fill": [1, "uncommon", "instant", undefined, 1],
     mirror: [1, "uncommon", "instant", undefined, 1],
-    "mesh-weave": [1, "uncommon", "node", undefined, 1],
+    "mesh-weave": [cost("mesh-weave"), "uncommon", "node", undefined, cost("mesh-weave+")],
     "peering-session": [1, "uncommon", "daemon", undefined, 1],
     "spine-leaf": [1, "rare", "ground", "switch", 0],
-    "fabric-controller": [2, "rare", "daemon", undefined, 1],
+    "fabric-controller": [cost("fabric-controller"), "rare", "daemon", undefined, cost("fabric-controller+")],
     "trunk-line": [1, "common", "instant", undefined, 1],
     splice: [1, "common", "instant", undefined, 0],
     traceroute: [0, "common", "instant", undefined, 0],
     "deep-buffers": [1, "uncommon", "daemon", undefined, 0],
-    "line-rate": [2, "rare", "instant", undefined, 1],
-    "carrier-grade": [2, "rare", "daemon", undefined, 1],
+    "line-rate": [cost("line-rate"), "rare", "instant", undefined, cost("line-rate+")],
+    "carrier-grade": [cost("carrier-grade"), "rare", "daemon", undefined, cost("carrier-grade+")],
     "rack-and-stack": [1, "common", "ground", "switch", 0],
     blueprint: [1, "common", "instant", undefined, 1],
     "rapid-redeploy": [1, "uncommon", "instant", undefined, 1],
     "provisioning-script": [1, "uncommon", "daemon", undefined, 1],
     "zero-touch": [1, "rare", "daemon", undefined, 0],
-    datacenter: [2, "rare", "daemon", undefined, 1],
+    datacenter: [cost("datacenter"), "rare", "daemon", undefined, cost("datacenter+")],
   };
   assert.deepEqual(Object.keys(spec), [...ARCHITECT_CARD_IDS]);
   const tally: Record<string, number> = {};
@@ -200,7 +203,7 @@ test("Redundant Paths: block per live channel (none without a route); + gives 3 
   assert.ok(playInstant(r, 0).ok);
   assert.equal(r.block, 2 * CARDS["redundant-paths"].values.perChannel!);
   assert.ok(playInstant(r, 0).ok);
-  assert.equal(r.block, 2 * 2 + 2 * 3);
+  assert.equal(r.block, 2 * V("redundant-paths").perChannel + 2 * V("redundant-paths+").perChannel);
   const empty = table();
   empty.hand = ["redundant-paths"];
   assert.ok(playInstant(empty, 0).ok);
@@ -228,9 +231,9 @@ test("Equal-Cost Multipath: +2 per live channel (0 without a route); + gives 3",
   route(r, "r2", 2.4);
   r.hand = ["ecmp", "ecmp+"];
   assert.ok(playInstant(r, 0).ok);
-  assert.equal(r.packetBoost, 4);
+  assert.equal(r.packetBoost, 2 * V("ecmp").perChannel);
   assert.ok(playInstant(r, 0).ok);
-  assert.equal(r.packetBoost, 4 + 6);
+  assert.equal(r.packetBoost, 2 * V("ecmp").perChannel + 2 * V("ecmp+").perChannel);
   const empty = table();
   empty.hand = ["ecmp"];
   assert.ok(playInstant(empty, 0).ok, "no live-route check any more");
@@ -246,9 +249,9 @@ test("Flood Fill: every hostile per live channel, needs a live route; + gives 2"
   route(r, "r2", 2.4);
   r.hand = ["flood-fill", "flood-fill+"];
   assert.ok(playInstant(r, 0).ok);
-  assert.equal(r.turnEffects!.everyPort, 2);
+  assert.equal(r.turnEffects!.everyPort, 2 * V("flood-fill").perChannelEveryPort);
   assert.ok(playInstant(r, 0).ok);
-  assert.equal(r.turnEffects!.everyPort, 2 + 4);
+  assert.equal(r.turnEffects!.everyPort, 2 * V("flood-fill").perChannelEveryPort + 2 * V("flood-fill+").perChannelEveryPort);
 });
 
 test("Mirror Protocol: needs 2 channels, then damage and block per channel; + gives 3 and 3", () => {
@@ -259,9 +262,10 @@ test("Mirror Protocol: needs 2 channels, then damage and block per channel; + gi
   route(r, "r2", 2.4);
   r.hand = ["mirror", "mirror+"];
   assert.ok(playInstant(r, 0).ok);
-  assert.deepEqual([r.packetBoost, r.block], [4, 4]);
+  const m = 2 * V("mirror").perChannel, mp = 2 * V("mirror+").perChannel;
+  assert.deepEqual([r.packetBoost, r.block], [m, m]);
   assert.ok(playInstant(r, 0).ok);
-  assert.deepEqual([r.packetBoost, r.block], [4 + 6, 4 + 6]);
+  assert.deepEqual([r.packetBoost, r.block], [m + mp, m + mp]);
 });
 
 test("Mesh Weave: links a device to its two nearest unlinked devices; + three", () => {
@@ -306,7 +310,7 @@ test("Peering Session: block per channel any action of yours adds; copies stack;
   s.daemons = ["peering-session", "peering-session", "peering-session+"];
   s.hand = ["patch"];
   assert.ok(playInstant(s, 0).ok);
-  assert.equal(s.block, 3 + 3 + 4);
+  assert.equal(s.block, 2 * V("peering-session").block + V("peering-session+").block);
   assert.deepEqual(runningDaemons(s).map(daemon => [daemon.id, daemon.count]), [["peering-session", 2], ["peering-session+", 1]]);
 });
 
@@ -329,14 +333,15 @@ test("Fabric Controller: every bandwidth delivery deals more, copies stack, labe
   route(r, "r3", -2.4);
   r.hand = ["fabric-controller"];
   assert.ok(playDaemon(r, 0).ok);
-  assert.equal(r.energy, 20 - 2);
+  assert.equal(r.energy, 20 - cost("fabric-controller"));
   r.daemons.push("fabric-controller", "fabric-controller+");
   const p = combatPreview(r);
+  const fc = V("fabric-controller").perChannel, fcp = V("fabric-controller+").perChannel;
   assert.equal(p.channels, 3);
-  assert.equal(term(p, "Fabric Controller ×2 · 2 bandwidth deliveries"), 2 * 2 * 2);
-  assert.equal(term(p, "Fabric Controller+ · 2 bandwidth deliveries"), 2 * 2);
-  assert.equal(p.packetDamage, RULES.baseRouteDamage + 2 * RULES.bandwidthPerChannel + 8 + 4);
-  assert.ok(p.deliveries.slice(1).every(delivery => delivery.amount === RULES.bandwidthPerChannel + 4 + 2), "each bandwidth delivery carries it");
+  assert.equal(term(p, "Fabric Controller ×2 · 2 bandwidth deliveries"), 2 * fc * 2);
+  assert.equal(term(p, "Fabric Controller+ · 2 bandwidth deliveries"), fcp * 2);
+  assert.equal(p.packetDamage, RULES.baseRouteDamage + 2 * RULES.bandwidthPerChannel + 2 * fc * 2 + fcp * 2);
+  assert.ok(p.deliveries.slice(1).every(delivery => delivery.amount === RULES.bandwidthPerChannel + 2 * fc + fcp), "each bandwidth delivery carries it");
   agree(r);
   // One channel: no bandwidth delivery, nothing. Spanning Tree: bandwidth gives nothing, nor does this.
   const one = table();
@@ -349,7 +354,7 @@ test("Fabric Controller: every bandwidth delivery deals more, copies stack, labe
   route(spanning, "r2", 2.4);
   spanning.daemons = ["fabric-controller"];
   assert.ok(!combatPreview(spanning).damageTerms.some(item => item.label.startsWith("Fabric Controller")));
-  assert.equal(CARDS["fabric-controller+"].cost, 1);
+  assert.equal(CARDS["fabric-controller+"].cost, Math.max(0, cost("fabric-controller") - 1));
 });
 
 // ------------------------------------------------------------------ Backbone
@@ -362,9 +367,9 @@ test("Trunk Line: +1 per device on the primary route when played (terminals excl
   r.hand = ["trunk-line", "trunk-line+"];
   r.drawPile = ["pulse"];
   assert.ok(playInstant(r, 0).ok);
-  assert.equal(r.packetBoost, 2);
+  assert.equal(r.packetBoost, 2 * V("trunk-line").perDevice);
   assert.ok(playInstant(r, 0).ok);
-  assert.equal(r.packetBoost, 4);
+  assert.equal(r.packetBoost, 2 * V("trunk-line").perDevice + 2 * V("trunk-line+").perDevice);
   assert.deepEqual(r.hand, ["pulse"]);
   const empty = table();
   empty.hand = ["trunk-line"];
@@ -416,11 +421,11 @@ test("Traceroute: draw 1 and +1 per switch on the primary route, for 0; + draws 
   r.hand = ["traceroute", "traceroute+"];
   r.drawPile = ["pulse", "guard", "barrier"];
   assert.ok(playInstant(r, 0).ok);
-  assert.equal(r.energy, 20);
-  assert.equal(r.packetBoost, 2);
+  assert.equal(r.energy, 20 - cost("traceroute"));
+  assert.equal(r.packetBoost, 2 * V("traceroute").perSwitch);
   assert.deepEqual(r.hand, ["traceroute+", "pulse"]);
   assert.ok(playInstant(r, 0).ok);
-  assert.equal(r.packetBoost, 4);
+  assert.equal(r.packetBoost, 2 * V("traceroute").perSwitch + 2 * V("traceroute+").perSwitch);
   assert.deepEqual(r.hand, ["pulse", "guard", "barrier"]);
 });
 
@@ -441,16 +446,17 @@ test("Deep Buffers: switches on the primary route deal more, scored into the rou
   const r = layout();
   r.hand = ["deep-buffers"];
   assert.ok(playDaemon(r, 0).ok);
-  assert.equal(r.energy, 20 - 1);
+  assert.equal(r.energy, 20 - cost("deep-buffers"));
   const p = combatPreview(r);
+  const db = V("deep-buffers").perSwitch, dbp = V("deep-buffers+").perSwitch;
   assert.deepEqual(p.signalPath, ["alpha", "s1", "r2", "s2", "omega"], "the switches now make B the primary route");
-  assert.equal(term(p, "Deep Buffers · switches ×2"), 2);
+  assert.equal(term(p, "Deep Buffers · switches ×2"), 2 * db);
   agree(r);
   const stacked = layout();
   stacked.daemons = ["deep-buffers", "deep-buffers", "deep-buffers+"];
   const s = combatPreview(stacked);
-  assert.equal(term(s, "Deep Buffers ×2 · switches ×2"), 4);
-  assert.equal(term(s, "Deep Buffers+ · switches ×2"), 2);
+  assert.equal(term(s, "Deep Buffers ×2 · switches ×2"), 2 * 2 * db);
+  assert.equal(term(s, "Deep Buffers+ · switches ×2"), 2 * dbp);
   agree(stacked);
   assert.equal(CARDS["deep-buffers+"].cost, 0);
 });
@@ -464,7 +470,7 @@ test("Line Rate: overclocks every router and compresses every switch on the prim
   device(r, "s2", "switch", 2.5, 2.4);
   r.hand = ["line-rate", "line-rate+"];
   assert.ok(playInstant(r, 0).ok);
-  assert.equal(r.energy, 20 - 2);
+  assert.equal(r.energy, 20 - cost("line-rate"));
   assert.deepEqual([node(r, "r1")!.upgraded, node(r, "s1")!.amplified], [true, true]);
   assert.deepEqual([node(r, "r2")!.upgraded, node(r, "s2")!.amplified], [undefined, undefined], "off the primary route: untouched");
   assert.deepEqual(r.exhaustPile, ["line-rate"]);
@@ -474,7 +480,7 @@ test("Line Rate: overclocks every router and compresses every switch on the prim
   const empty = table();
   empty.hand = ["line-rate+"];
   refused(empty, () => playInstant(empty, 0), "Line Rate needs a live primary route.");
-  assert.equal(CARDS["line-rate+"].cost, 1);
+  assert.equal(CARDS["line-rate+"].cost, Math.max(0, cost("line-rate") - 1));
 });
 
 test("Carrier Grade: +1 per device on the primary route, scored into the route choice, copies stack; forecast equals resolution", () => {
@@ -491,16 +497,17 @@ test("Carrier Grade: +1 per device on the primary route, scored into the route c
   const r = layout();
   r.hand = ["carrier-grade"];
   assert.ok(playDaemon(r, 0).ok);
-  assert.equal(r.energy, 20 - 2);
+  assert.equal(r.energy, 20 - cost("carrier-grade"));
   const p = combatPreview(r);
+  const cg = V("carrier-grade").perDevice, cgp = V("carrier-grade+").perDevice;
   assert.deepEqual(p.signalPath, ["alpha", "s1", "r2", "s2", "omega"], "three devices now outscore one overclocked router");
-  assert.equal(term(p, "Carrier Grade · devices ×3"), 3);
+  assert.equal(term(p, "Carrier Grade · devices ×3"), 3 * cg);
   agree(r);
   const stacked = layout();
   stacked.daemons = ["carrier-grade", "carrier-grade", "carrier-grade+"];
   const s = combatPreview(stacked);
-  assert.equal(term(s, "Carrier Grade ×2 · devices ×3"), 6);
-  assert.equal(term(s, "Carrier Grade+ · devices ×3"), 3);
+  assert.equal(term(s, "Carrier Grade ×2 · devices ×3"), 2 * 3 * cg);
+  assert.equal(term(s, "Carrier Grade+ · devices ×3"), 3 * cgp);
   agree(stacked);
   const none = table();
   none.daemons = ["carrier-grade"];
@@ -574,17 +581,18 @@ test("Provisioning Script: block whenever you deploy a device (auto-deploys too)
   r.hand = ["provisioning-script", "switch", "rebuild", "fiber"];
   assert.ok(playDaemon(r, 0).ok);
   assert.equal(r.block, 0, "starting it deploys nothing");
+  const ps = V("provisioning-script").block;
   assert.ok(playGround(r, 0, 0, 2.4).ok);
-  assert.equal(r.block, 2);
+  assert.equal(r.block, ps);
   assert.ok(playInstant(r, 0).ok, "Emergency Rebuild deploys a router");
-  assert.equal(r.block, 4);
+  assert.equal(r.block, 2 * ps);
   assert.ok(playLink(r, 0, "switch1", "router2").ok);
-  assert.equal(r.block, 4, "a cable is not a device");
+  assert.equal(r.block, 2 * ps, "a cable is not a device");
   const s = table();
   s.daemons = ["provisioning-script", "provisioning-script+"];
   s.hand = ["router"];
   assert.ok(playGround(s, 0, 0, 0).ok);
-  assert.equal(s.block, 2 + 3);
+  assert.equal(s.block, V("provisioning-script").block + V("provisioning-script+").block);
 });
 
 test("Zero-Touch Provisioning: draw whenever you deploy a device, copies stack; + costs 0", () => {
@@ -609,10 +617,11 @@ test("Datacenter: every cluster deals more, copies stack, labelled; forecast equ
   wire(r, "alpha", "s1", "r1", "s2", "omega");
   r.hand = ["datacenter"];
   assert.ok(playDaemon(r, 0).ok);
-  assert.equal(r.energy, 20 - 2);
+  assert.equal(r.energy, 20 - cost("datacenter"));
   const p = combatPreview(r);
+  const dc = V("datacenter").perCluster, dcp = V("datacenter+").perCluster;
   assert.equal(term(p, "CENTER · Cluster"), RULES.clusterDamage);
-  assert.equal(term(p, "Datacenter · clusters ×1"), 3);
+  assert.equal(term(p, "Datacenter · clusters ×1"), dc);
   agree(r);
   // Two clusters, three copies.
   const two = table();
@@ -627,14 +636,14 @@ test("Datacenter: every cluster deals more, copies stack, labelled; forecast equ
   two.daemons = ["datacenter", "datacenter", "datacenter+"];
   const q = combatPreview(two);
   assert.deepEqual(q.clusters, ["north", "center"]);
-  assert.equal(term(q, "Datacenter ×2 · clusters ×2"), 2 * 3 * 2);
-  assert.equal(term(q, "Datacenter+ · clusters ×2"), 3 * 2);
+  assert.equal(term(q, "Datacenter ×2 · clusters ×2"), 2 * dc * 2);
+  assert.equal(term(q, "Datacenter+ · clusters ×2"), dcp * 2);
   agree(two);
   const none = table();
   route(none, "r1", 0);
   none.daemons = ["datacenter"];
   assert.ok(!combatPreview(none).damageTerms.some(item => item.label.startsWith("Datacenter")), "no cluster, nothing");
-  assert.equal(CARDS["datacenter+"].cost, 1);
+  assert.equal(CARDS["datacenter+"].cost, Math.max(0, cost("datacenter") - 1));
 });
 
 // ------------------------------------------------------------------ the three build paths, played together
@@ -658,12 +667,12 @@ test("Mesh path: Peering Session and Fabric Controller pay off Standby Router, B
   assert.equal(r.block, CARDS["peering-session"].values.block);
   assert.ok(playInstant(r, r.hand.indexOf("ecmp")).ok);
   assert.ok(playInstant(r, r.hand.indexOf("redundant-paths")).ok);
-  assert.equal(r.block, 3 + 2 * 2);
-  assert.equal(r.energy, 20 - (1 + 2 + 1 + 1 + 1 + 1));
+  assert.equal(r.block, V("peering-session").block + 2 * V("redundant-paths").perChannel);
+  assert.equal(r.energy, 20 - (["peering-session", "fabric-controller", "standby-router+", "branch-line", "ecmp", "redundant-paths"] as CardId[]).reduce((sum, id) => sum + cost(id), 0));
   const { preview } = agree(r);
-  assert.equal(term(preview, "Fabric Controller · 1 bandwidth delivery"), 2);
-  assert.equal(preview.packetDamage, RULES.baseRouteDamage + RULES.bandwidthPerChannel + 2 + 2 * 2, "5 + bandwidth 3 + Fabric 2 + ECMP 4");
-  assert.equal(preview.incoming, 0, "the strike of 3 meets 7 block");
+  assert.equal(term(preview, "Fabric Controller · 1 bandwidth delivery"), V("fabric-controller").perChannel);
+  assert.equal(preview.packetDamage, RULES.baseRouteDamage + RULES.bandwidthPerChannel + V("fabric-controller").perChannel + 2 * V("ecmp").perChannel, "5 + bandwidth + Fabric + ECMP per channel");
+  assert.equal(preview.incoming, 0, "the strike of 3 meets the block");
 });
 
 test("Backbone path: Splice, Line Rate, Trunk Line and Traceroute under Deep Buffers and Carrier Grade", () => {
@@ -678,15 +687,16 @@ test("Backbone path: Splice, Line Rate, Trunk Line and Traceroute under Deep Buf
   assert.deepEqual([node(r, "r1")!.upgraded, node(r, "switch1")!.amplified], [true, true]);
   assert.ok(playInstant(r, 0).ok, "Trunk Line: two devices");
   assert.ok(playInstant(r, 0).ok, "Traceroute: one switch");
-  assert.equal(r.packetBoost, 2 + 1);
-  assert.equal(r.energy, 20 - (1 + 2 + 1 + 2 + 1 + 0));
+  const boost = 2 * V("trunk-line").perDevice + V("traceroute").perSwitch;
+  assert.equal(r.packetBoost, boost);
+  assert.equal(r.energy, 20 - (["deep-buffers", "carrier-grade", "splice", "line-rate", "trunk-line", "traceroute"] as CardId[]).reduce((sum, id) => sum + cost(id), 0));
   const { preview } = agree(r);
   assert.deepEqual(preview.signalPath, ["alpha", "switch1", "r1", "omega"]);
-  assert.equal(term(preview, "Deep Buffers · switches ×1"), 1);
-  assert.equal(term(preview, "Carrier Grade · devices ×2"), 2);
+  assert.equal(term(preview, "Deep Buffers · switches ×1"), V("deep-buffers").perSwitch);
+  assert.equal(term(preview, "Carrier Grade · devices ×2"), 2 * V("carrier-grade").perDevice);
   assert.equal(preview.packetDamage,
-    RULES.baseRouteDamage + RULES.switchDamage + RULES.compressionDamage + RULES.overclockDamage + 1 + 2 + 3,
-    "5 + switch 1 + compression 2 + overclock 2 + Deep Buffers 1 + Carrier Grade 2 + burst 3");
+    RULES.baseRouteDamage + RULES.switchDamage + RULES.compressionDamage + RULES.overclockDamage + V("deep-buffers").perSwitch + 2 * V("carrier-grade").perDevice + boost,
+    "5 + switch + compression + overclock + Deep Buffers + Carrier Grade + burst");
 });
 
 test("Deployment path: Provisioning Script, Zero-Touch and Datacenter pay off Rack and Stack and Blueprint", () => {
@@ -694,13 +704,14 @@ test("Deployment path: Provisioning Script, Zero-Touch and Datacenter pay off Ra
   r.hand = ["provisioning-script", "zero-touch", "datacenter", "rack-and-stack", "router", "switch", "blueprint"];
   r.drawPile = ["fiber", "fiber", "fiber", "fiber", "hardened-router", "guard", "guard"];
   for (let i = 0; i < 3; i++) assert.ok(playDaemon(r, 0).ok);
-  assert.equal(r.energy, 20 - 4);
+  const daemons = cost("provisioning-script") + cost("zero-touch") + cost("datacenter");
+  assert.equal(r.energy, 20 - daemons);
   // Three devices in the centre band: each gives 2 block and draws 1; Rack and Stack makes the router free.
   assert.ok(playGround(r, 0, -2.5, 0).ok);
   assert.equal(costFor(r, 0), 0, "the router after Rack and Stack");
   assert.ok(playGround(r, 0, 0, 0).ok);
   assert.ok(playGround(r, 0, 2.5, 0).ok);
-  assert.equal(r.block, 3 * 2);
+  assert.equal(r.block, 3 * V("provisioning-script").block);
   assert.deepEqual(r.hand, ["blueprint", "fiber", "fiber", "fiber"], "Zero-Touch drew one per device");
   // Blueprint: a fiber and the Hardened Router, which now costs 0.
   assert.ok(playInstant(r, 0).ok);
@@ -709,13 +720,13 @@ test("Deployment path: Provisioning Script, Zero-Touch and Datacenter pay off Ra
   const cables: [string, string][] = [["alpha", "switch1"], ["switch1", "router2"], ["router2", "switch3"], ["switch3", "omega"]];
   for (const [a, b] of cables) assert.ok(playLink(r, 0, a, b).ok);
   assert.ok(playGround(r, 0, 0, 2.6).ok, "the Hardened Router, free");
-  assert.equal(r.block, 4 * 2 + CARDS["hardened-router"].values.block!, "four deploys, and the Hardened Router's own block");
+  assert.equal(r.block, 4 * V("provisioning-script").block + CARDS["hardened-router"].values.block!, "four deploys, and the Hardened Router's own block");
   assert.deepEqual(r.hand, ["guard"], "and one more draw");
-  assert.equal(r.energy, 20 - (4 + 1 + 0 + 0 + 1 + 4 + 0));
+  assert.equal(r.energy, 20 - (daemons + 1 + 0 + 0 + 1 + 4 + 0));
   const { preview } = agree(r);
   assert.deepEqual(preview.signalPath, ["alpha", "switch1", "router2", "switch3", "omega"]);
   assert.deepEqual(preview.clusters, ["center"]);
-  assert.equal(term(preview, "Datacenter · clusters ×1"), 3);
-  assert.equal(preview.packetDamage, RULES.baseRouteDamage + 2 * RULES.switchDamage + RULES.clusterDamage + 3, "5 + switches 2 + cluster 2 + Datacenter 3");
+  assert.equal(term(preview, "Datacenter · clusters ×1"), V("datacenter").perCluster);
+  assert.equal(preview.packetDamage, RULES.baseRouteDamage + 2 * RULES.switchDamage + RULES.clusterDamage + V("datacenter").perCluster, "5 + switches + cluster + Datacenter");
   assert.equal(preview.incoming, 0, "the strike of 3 meets 11 block");
 });

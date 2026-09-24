@@ -215,7 +215,8 @@ test("the fourteen v4 cards (v5 costs): cost, rarity, target, pool, upgrade, val
   // The values the engine keys on.
   assert.deepEqual(CARDS["broadcast-storm"].values, { everyPort: 2 });
   assert.deepEqual(CARDS["packet-storm+"].values, { everyPort: 7 });
-  assert.deepEqual(CARDS["flood-fill+"].values, { perChannelEveryPort: 2 });
+  assert.deepEqual(Object.keys(CARDS["flood-fill+"].values), ["perChannelEveryPort"]);
+  assert.ok(CARDS["flood-fill+"].values.perChannelEveryPort! > CARDS["flood-fill"].values.perChannelEveryPort!, "the upgrade hits harder (tuned numbers: docs/balance-v5.json)");
   assert.deepEqual(CARDS["traffic-shaping"].values, { focusBonus: 2, draw: 1 });
   assert.deepEqual(CARDS["traffic-shaping+"].values, { focusBonus: 4, draw: 1 });
   assert.deepEqual(CARDS["demolition-charge+"].values, { focusBonus: 4 });

@@ -16,18 +16,18 @@ export const RULES = {
   // Rewards (section 4): each slot picks the keeper pool at this share, else colorless (the other
   // pool when a rarity is empty); then a rarity: [common, uncommon, rare] per room kind.
   keeperShare: 0.55,
-  rewardRarity: { normal: [0.58, 0.37, 0.05], elite: [0.45, 0.42, 0.13], guardian: [0, 0, 1] },
+  rewardRarity: { normal: [0.65, 0.32, 0.03], elite: [0.55, 0.37, 0.08], guardian: [0, 0.5, 0.5] },
   /** Share of rare rolls that become legendary (Clabernetes). */
   legendaryShare: 0.05,
   /** Share of offered cards that arrive upgraded, per stage. */
   upgradedOfferRate: [0, 0.12, 0.25],
   // Enemy health (section 5), read live so the balance probe can --rule them:
   /** Normal room: base + per floor × floor + per stage × stage (zero-based). */
-  normalHealth: [14, 4, 11],
+  normalHealth: [20, 5, 16],
   /** Elite room: base + per floor × floor + per stage × stage. */
-  eliteHealth: [27, 2, 9],
+  eliteHealth: [38, 3, 13],
   /** Guardian health per stage. */
-  guardianHealth: [60, 86, 118],
+  guardianHealth: [90, 128, 176],
   /** Payload token: damage this turn (Payload+ reads its own card values). */
   payloadDamage: 2,
 
@@ -61,9 +61,9 @@ export const RULES = {
   exposedBonus: 3,
   bgpHijackDamage: 3,
   // Engines
-  bufferMultiplier: 2,
+  bufferMultiplier: 1.5,
   /** Share of shield-prevented damage the Warden's Backpressure stores. */
-  backpressureRatio: 0.5,
+  backpressureRatio: 1,
   // Defense
   firewallBreachBlock: 2,
   firewallStrikeBlock: 1,
@@ -72,14 +72,14 @@ export const RULES = {
   separatedCircuitShield: 3,
   shieldArrayPrevent: 2,
   watchdogShield: 5,
-  hardenShield: 2,
+  hardenShield: 1,
   hardenPerFirewall: 1,
   /** v4 · M4 design addition, PENDING THE USER'S APPROVAL (docs/balance-v4.json, CONTRACT §7):
    * Harden also gains this much block per living hostile beyond the first, like Quorum, ... */
-  hardenPerHostile: 1,
+  hardenPerHostile: 0,
   /** ... and this much more per living guardian add. With one hostile and no adds Harden is
    * unchanged (the single-hostile invariant). 0 and 0 restore the design's Harden. */
-  hardenPerAdd: 1,
+  hardenPerAdd: 0,
   // Traps
   honeypotDamage: 3,
   honeynetBonus: 2,

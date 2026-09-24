@@ -17,7 +17,7 @@ const nearest = (n = 1) => (n === 1 ? "nearest device" : `${words[n] ?? n} neare
 const block = (n?: number) => (n ? ` Gain ${n} block.` : "");
 const draw = (n?: number) => (n ? ` Draw ${n}.` : "");
 /** Share of prevented damage as a face reads it: "all", "half", "75 % of". */
-const portion = (ratio = 0) => (ratio >= 1 ? "all" : ratio === 0.5 ? "half" : `${Math.round(ratio * 100)} % of`);
+const portion = (ratio = 0) => (ratio === 1 ? "all" : ratio === 0.5 ? "half" : `${Math.round(ratio * 100)} % of`);
 /** Entrench: "Double your block." (the multiplier lives in `values.amount`). */
 const multiply = (n = 2, what: string) => (n === 2 ? `Double ${what}` : n === 3 ? `Triple ${what}` : `Multiply ${what} by ${n}`);
 /** The Harden console's rule, as Double Shift's detail prints it (run.ts CONSOLES.harden reads the same keys). */
@@ -28,15 +28,15 @@ export const WARDEN_CARDS: CardTable<WardenCardId> = {
   "deep-inspection": {
     name: "Deep Packet Inspection", subtitle: "WARDEN / DEFENSE", cost: 1, rarity: "basic", target: "instant", art: "defense", color: "#f0b476", archetype: "warden",
     text: v => `Gain ${v.block} block, +${v.perFirewall} per online firewall.`,
-    values: { block: 3, perFirewall: 2 },
-    upgrade: { values: { block: 5, perFirewall: 3 } },
+    values: { block: 2, perFirewall: 1 },
+    upgrade: { values: { block: 4, perFirewall: 2 } },
   },
   "acl-gate": {
     name: "ACL Gate", subtitle: "WARDEN / ACCESS LIST", cost: 1, rarity: "common", target: "ground", role: "firewall", art: "defense", color: "#f4b27a", archetype: "warden",
     text: v => `Deploy a firewall linked to its ${nearest(v.links)}.${block(v.block)}`,
     detail: `Online, it blocks ${R.firewallBreachBlock} of each breach and ${R.firewallStrikeBlock} of each strike like any firewall. It links to the nearest device it is not already cabled to (distance ties: device ids).`,
-    values: { links: 1 },
-    upgrade: { values: { links: 1, block: 3 } },
+    values: { links: 2 },
+    upgrade: { values: { links: 2, block: 3 } },
   },
   "stateful-firewall": {
     name: "Stateful Firewall", subtitle: "WARDEN / SECURITY", cost: 2, rarity: "uncommon", target: "ground", role: "firewall", art: "defense", color: "#ffa65c", archetype: "warden",
@@ -59,8 +59,8 @@ export const WARDEN_CARDS: CardTable<WardenCardId> = {
     name: "Perimeter", subtitle: "WARDEN / PERIMETER", cost: 1, rarity: "uncommon", target: "instant", art: "program", color: "#ff9f68", archetype: "warden",
     text: v => `+${v.perFirewall} damage this turn per online firewall.`,
     detail: "It counts the firewalls online when you play it. The damage rides your primary route.",
-    values: { perFirewall: 2 },
-    upgrade: { values: { perFirewall: 3 } },
+    values: { perFirewall: 3 },
+    upgrade: { values: { perFirewall: 4 } },
   },
   bastion: {
     name: "Bastion Firewall", subtitle: "WARDEN / SECURITY", cost: 2, rarity: "rare", target: "ground", role: "firewall", art: "defense", color: "#e5bf82", archetype: "warden", jamProof: true,
@@ -79,21 +79,21 @@ export const WARDEN_CARDS: CardTable<WardenCardId> = {
   brace: {
     name: "Brace", subtitle: "WARDEN / FORTRESS", cost: 1, rarity: "common", target: "instant", art: "defense", color: "#e8b06c", archetype: "warden",
     text: v => `Gain ${v.block} block. Next turn, gain ${v.nextBlock} block.`,
-    values: { block: 5, nextBlock: 3 },
-    upgrade: { values: { block: 7, nextBlock: 4 } },
+    values: { block: 3, nextBlock: 2 },
+    upgrade: { values: { block: 5, nextBlock: 3 } },
   },
   pushback: {
     name: "Pushback", subtitle: "WARDEN / BACKPRESSURE", cost: 1, rarity: "common", target: "instant", art: "defense", color: "#f2a55e", archetype: "warden",
     text: v => `Gain ${v.block} block. Add ${v.backpressure} to your backpressure.`,
     detail: "Your next transmission with a live route releases your backpressure.",
-    values: { block: 4, backpressure: 2 },
-    upgrade: { values: { block: 6, backpressure: 3 } },
+    values: { block: 4, backpressure: 1 },
+    upgrade: { values: { block: 6, backpressure: 2 } },
   },
   "stand-firm": {
     name: "Stand Firm", subtitle: "WARDEN / FORTRESS", cost: 2, rarity: "common", target: "instant", art: "defense", color: "#d8b27a", archetype: "warden",
     text: v => `Gain ${v.block} block.`,
-    values: { block: 11 },
-    upgrade: { values: { block: 15 } },
+    values: { block: 8 },
+    upgrade: { values: { block: 12 } },
   },
   vent: {
     name: "Vent", subtitle: "WARDEN / BACKPRESSURE", cost: 0, rarity: "common", target: "instant", art: "defense", color: "#f5c878", archetype: "warden",
@@ -112,7 +112,7 @@ export const WARDEN_CARDS: CardTable<WardenCardId> = {
     name: "Hardening Guide", subtitle: "WARDEN / HARDEN", cost: 1, rarity: "uncommon", target: "daemon", art: "defense", color: "#dcb47e", archetype: "warden",
     text: v => `Daemon. Harden gains ${v.block} more block.`,
     detail: "It raises your Harden console and every Double Shift. Copies stack.",
-    values: { block: 3 },
+    values: { block: 1 },
     upgrade: { cost: 0 },
   },
   entrench: {
@@ -123,16 +123,16 @@ export const WARDEN_CARDS: CardTable<WardenCardId> = {
     upgrade: { cost: 1 },
   },
   "persistent-state": {
-    name: "Persistent State", subtitle: "WARDEN / PERSISTENCE", cost: 2, rarity: "rare", target: "daemon", art: "defense", color: "#f0d59a", archetype: "warden",
+    name: "Persistent State", subtitle: "WARDEN / PERSISTENCE", cost: 3, rarity: "rare", target: "daemon", art: "defense", color: "#f0d59a", archetype: "warden",
     rules: "Daemon. Your block no longer expires after the enemy phase.",
     detail: "Attacks spend your other shield (fields, circuits, Reclaim) before your block; what they leave of your block carries into your next turn. More copies add nothing.",
-    upgrade: { cost: 1 },
+    upgrade: { cost: 2 },
   },
   "flow-control": {
     name: "Flow Control", subtitle: "WARDEN / BACKPRESSURE", cost: 2, rarity: "rare", target: "daemon", art: "defense", color: "#f7bc6a", archetype: "warden",
-    text: v => `Daemon. Backpressure stores ${portion(v.amount)} the damage your shield prevents, not ${portion(R.backpressureRatio).replace(/ of$/, "")}.`,
+    text: v => `Daemon. Backpressure stores ${portion(v.amount)} the damage your shield prevents${Number(R.backpressureRatio) === 1 ? "" : `, not ${portion(R.backpressureRatio).replace(/ of$/, "")}`}.`,
     detail: "It changes your Backpressure relic's share. More copies add nothing.",
-    values: { amount: 1 },
+    values: { amount: 1.5 },
     upgrade: { cost: 1 },
   },
   reflect: {
@@ -146,8 +146,8 @@ export const WARDEN_CARDS: CardTable<WardenCardId> = {
     name: "Tripwire", subtitle: "WARDEN / TRAP", cost: 1, rarity: "common", target: "protocol", protocol: "strike", art: "program", color: "#ffb070", archetype: "warden", keyword: "ARMED",
     text: v => `Armed. When a hostile strikes: it takes ${v.damage}.`,
     detail: "It fires in the trap step, before the strike lands: a hostile it kills never acts. Otherwise the strike still lands.",
-    values: { damage: 5 },
-    upgrade: { values: { damage: 8 } },
+    values: { damage: 7 },
+    upgrade: { values: { damage: 10 } },
   },
   "policy-engine": {
     name: "Policy Engine", subtitle: "WARDEN / POLICY", cost: 1, rarity: "uncommon", target: "daemon", art: "program", color: "#e6c490", archetype: "warden",
@@ -166,8 +166,8 @@ export const WARDEN_CARDS: CardTable<WardenCardId> = {
     name: "Incident Response", subtitle: "WARDEN / RESPONSE", cost: 1, rarity: "rare", target: "daemon", art: "program", color: "#ff8f6a", archetype: "warden",
     text: v => `Daemon. Whenever a protocol fires, the hostile that set it off takes ${v.damage}.`,
     detail: "It strikes in the trap step, before the action lands (a Jammer Port Security answers takes it too). Copies stack.",
-    values: { damage: 3 },
-    upgrade: { values: { damage: 5 } },
+    values: { damage: 4 },
+    upgrade: { values: { damage: 6 } },
   },
   "null-route": {
     name: "Null Route", subtitle: "WARDEN / BLACKHOLE", cost: 2, rarity: "rare", target: "protocol", protocol: "breach", cancels: true, art: "defense", color: "#e8a27c", archetype: "warden", keyword: "ARMED",

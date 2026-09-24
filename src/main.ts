@@ -971,9 +971,11 @@ function placeIntents() {
   const layer = document.getElementById("intent-layer");
   if (!layer?.firstElementChild || !world) return;
   const scale = interfaceScale(), origin = root.getBoundingClientRect();
+  let shown = false;
   for (const badge of Array.from(layer.children) as HTMLElement[]) {
     const port = (badge.dataset.port ?? badge.dataset.arrival) as Port;
     const at = world.portAnchor(port, !!badge.dataset.arrival);
+    if (badge.hidden && at) shown = true;
     badge.hidden = !at;
     if (!at) continue;
     const place = `translate(${((at.x - origin.left) / scale).toFixed(1)}px, ${((at.y - origin.top) / scale).toFixed(1)}px)`;
@@ -981,6 +983,9 @@ function placeIntents() {
     const width = `${Math.round(at.width / scale)}px`;
     if (badge.style.getPropertyValue("--plate") !== width) badge.style.setProperty("--plate", width);
   }
+  // Badges wait for their plates (a hostile's entrance): a lesson spotlight that fell back to the
+  // port strip moves onto them as soon as they stand.
+  if (shown && practice) spotlightLesson();
 }
 /** Hover cards off the canvas: an intent badge or a port-strip row shows its hostile's card, a
  * delivery row's mark its delivery's card (the canvas raises its own through hoverTable). */

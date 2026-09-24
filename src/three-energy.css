@@ -1,5 +1,5 @@
 /* FAULTLINE v5 · Three Energy: card marks (keywords, keepers, modified costs, daemons, curses,
-   tokens), the energy orb's base, the daemon strip, the forecast's evasions and the v5 screens.
+   tokens), the energy orb's base, the forecast's evasions and the v5 screens.
    Loaded last (main.ts), in the gothic-brass voice of the battle HUD: engraved plates, lit
    markers and glows, the bundled faces. */
 
@@ -159,7 +159,7 @@ dialog .game-card:is(.house-architect, .house-warden, .house-ghost) > .card-head
 /* ------------------------------------------------------------ Kernel Panic: the limit stamped on the card */
 .game-card .card-limit {
   position: absolute; z-index: 4; left: 50%;
-  top: max(8px, calc(6px + var(--picture-height, 105px) / 2 - 22px));
+  top: calc(6px + var(--picture-height, 146px) / 2 - 22px);
   transform: translateX(-50%) rotate(-5deg);
   display: grid; justify-items: center; gap: 1px;
   padding: 3px clamp(6px, 6cqi, 11px) 4px;
@@ -172,106 +172,49 @@ dialog .game-card:is(.house-architect, .house-warden, .house-ghost) > .card-head
 .game-card .card-limit small { font: 700 clamp(9px, 7cqi, 11px)/1 var(--label); letter-spacing: .03em; white-space: nowrap; }
 .game-card .card-limit.is-spent { color: #c9b3ae; border-color: #8f5a52; box-shadow: 0 0 0 2px #0b0906; }
 
-/* ------------------------------------------------------------ the energy orb: current / base */
-.is-battle .energy-orb { display: grid; grid-template-columns: 1fr auto 1fr; align-content: center; align-items: baseline; justify-items: center; }
-.is-battle .energy-orb strong { grid-column: 2; }
-.is-battle .energy-orb .energy-base {
-  grid-column: 3; justify-self: start; margin-left: 2px;
-  font: 600 17px/1 var(--title); font-style: normal; font-variant-numeric: tabular-nums;
-  color: #c7ae7e; text-shadow: 0 1px 0 #000;
+/* ------------------------------------------------------------ the energy orb: a framed sigil
+   The whole reading sits inside the sigil's face: the current energy large, "/base" small beside it,
+   and energy above the base as a lit ember tag set into the rim's south point. The sigil art is
+   --orb-art (public/art/ui/energy-sigil.webp); its face is the inner 60 %. */
+.is-battle .energy-orb {
+  --orb-art: url("/art/ui/energy-sigil.webp");
+  display: block; padding: 0; border: 0; border-radius: 50%; background: none; box-shadow: none; filter: none; overflow: visible;
 }
-.is-battle .energy-orb.is-risen {
-  border-color: #ffd28a;
-  box-shadow: 0 0 0 5px #ffb04a10, 0 0 0 6px #ffb04a44, 0 0 42px #ffb04a55, inset 0 0 26px #ffb04a33;
+.is-battle .energy-orb::before {
+  content: ""; position: absolute; inset: 0; display: block; transform: none; border: 0; border-radius: 50%; opacity: 1;
+  background: var(--orb-art) center / contain no-repeat;
+  filter: drop-shadow(0 6px 10px #000c);
 }
+.is-battle .energy-orb .orb-reading {
+  /* Centred on the ink, not the line box: Grenze's numerals sit high in their em (measured). */
+  position: absolute; left: 50%; top: 50%; z-index: 1; transform: translate(-49%, -57%);
+  display: flex; align-items: baseline; justify-content: center; gap: 1px; margin: 0; white-space: nowrap;
+}
+.is-battle .energy-orb strong { margin: 0; font: 600 calc(var(--orb-size, 96px) * .38)/1 var(--title); font-variant-numeric: tabular-nums; color: #f6e3b6; text-shadow: 0 2px 0 #000, 0 0 16px #ffb04a55; }
+.is-battle .energy-orb .energy-base { position: static; margin: 0; font: 600 calc(var(--orb-size, 96px) * .16)/1 var(--title); font-style: normal; font-variant-numeric: tabular-nums; color: #cbb285; text-shadow: 0 1px 0 #000; }
+.is-battle .energy-orb .orb-word { position: absolute; left: 50%; top: calc(100% + 3px); bottom: auto; transform: translateX(-50%); margin: 0; font: 700 10.5px/1 var(--label); letter-spacing: .12em; color: #cdbb95; white-space: nowrap; text-shadow: 0 1px 2px #000; }
+.is-battle .energy-orb.is-risen::before { filter: drop-shadow(0 0 12px #ffb04a88) drop-shadow(0 6px 10px #000c); }
 .is-battle .energy-orb.is-risen strong { color: #fff3cf; text-shadow: 0 2px 0 #000, 0 0 20px #ffb04a; }
 .is-battle .energy-orb.is-spent strong { color: #b9ab8e; text-shadow: 0 2px 0 #000; }
-.energy-orb .energy-rise {
-  position: absolute; top: -9px; right: -12px; z-index: 2;
-  display: inline-flex; align-items: center; gap: 1px;
-  padding: 2px 6px 3px 3px;
-  font: 600 14px/1 var(--title); font-style: normal; font-variant-numeric: tabular-nums;
-  color: #2a1a06;
-  background: radial-gradient(circle at 40% 30%, #fff1c4, #e2a347 75%);
-  border-radius: 10px 10px 10px 3px;
-  box-shadow: 0 0 0 2px #0b0906, 0 0 14px #ffb04acc;
+/* Above the base: an ember tag on the rim's south point. */
+.is-battle .energy-orb .energy-rise {
+  position: absolute; left: 50%; top: auto; right: auto; bottom: 7%; z-index: 2; transform: translateX(-50%);
+  display: grid; place-items: center; min-width: 22px; height: 17px; padding: 0 5px 1px;
+  font: 700 12px/1 var(--title); font-style: normal; font-variant-numeric: tabular-nums; color: #2a1a06;
+  background: radial-gradient(circle at 40% 30%, #fff1c4, #e2a347 75%); border-radius: 9px;
+  box-shadow: 0 0 0 2px #0b0906, 0 0 12px #ffb04acc;
 }
-.energy-orb .energy-rise svg { width: 11px; height: 11px; stroke-width: 2.4; }
+/* The sigil stands on the pile row: its word lives in the tooltip. */
+.is-battle .energy-orb .orb-word { display: none; }
 @container game (max-width: 900px) {
-  .is-battle .energy-orb .energy-base { font-size: 12px; }
-  .energy-orb .energy-rise { top: -8px; right: -10px; padding: 1px 4px 1px 2px; font-size: 11px; }
+  .is-battle .energy-orb { --orb-size: 44px; }
+  .is-battle .energy-orb .orb-word { display: none; }
+  .is-battle .energy-orb .energy-rise { bottom: auto; top: -8px; left: auto; right: -12px; transform: none; min-width: 18px; height: 15px; font-size: 10px; }
 }
 
-/* ------------------------------------------------------------ the daemon strip beside the protocol dock
-   Running processes hang right above the armed protocols, in the band of the field seals (which give
-   up the room while any daemon runs): up to two plates in full, four with one effect line each, more
-   as name tokens. */
-/* The strip is the field strip's last column, sized like the protocol dock below it. */
-.field-strip.has-daemons { grid-template-columns: repeat(3, minmax(0, 1fr)) var(--dock-width); }
-.field-strip .daemon-strip {
-  align-self: end;
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 4px 6px;
-}
-.daemon-strip.is-token { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.daemon-plate {
-  position: relative;
-  display: grid; grid-template-columns: 24px 1fr; align-items: center; gap: 6px;
-  height: 64px; min-width: 0;
-  padding: 4px 8px 4px 6px;
-  text-align: left; color: #ece3f8;
-  border-radius: 3px 12px 3px 3px;
-  background: linear-gradient(135deg, #2c2540f2, #14121df2 58%, #17141ff0);
-  border: 1px solid #a88fd888;
-  box-shadow: inset 0 0 0 2px #110e18, inset 0 0 0 3px #cbb6ff14, 0 6px 14px #0008;
-  cursor: var(--cursor-default);
-}
-.daemon-plate::before { content: ""; position: absolute; inset: 3px; border-radius: 2px 10px 2px 2px; border: 1px solid #cbb6ff1c; pointer-events: none; }
-/* The daemon's owner rides on its left edge: a keeper's colour, or brass for the shared pool. */
-.daemon-plate::after { content: ""; position: absolute; left: -1px; top: 8px; bottom: 8px; width: 2px; background: var(--house); box-shadow: 0 0 6px var(--house); }
-.daemon-plate:hover, .daemon-plate:focus-visible { border-color: #d6c6ff; box-shadow: inset 0 0 0 2px #110e18, 0 0 0 1px #9b7ff066, 0 0 20px #9b7ff044, 0 6px 14px #0008; }
-.daemon-glyph {
-  display: grid; place-items: center; width: 24px; height: 24px;
-  border-radius: 50%; font-style: normal; color: var(--daemon-hi);
-  background: radial-gradient(circle at 50% 35%, #3b2e5c, #140f20 75%);
-  border: 1px solid #b59cf088;
-  box-shadow: 0 0 10px #8f6fe055;
-}
-.daemon-glyph svg { animation: daemon-run 7s linear infinite; }
-.daemon-copy { min-width: 0; }
-.daemon-copy strong { display: flex; align-items: baseline; gap: 5px; min-width: 0; font: 600 15px/1.05 var(--title); color: #f3ecff; text-shadow: 0 1px 0 #000; white-space: nowrap; }
-.daemon-copy strong > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* ------------------------------------------------------------ daemon counts (the Details ledger; the
+   running seals on the player plate live in battle.css) */
 .daemon-count { flex: none; font: 600 15px/1 var(--title); font-variant-numeric: tabular-nums; color: #ffe6a6; text-shadow: 0 0 9px #ffb04a99; }
-.daemon-copy small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 3px; font: 11px/1.2 var(--text); color: #c7bcda; }
-.daemon-strip.is-half .daemon-plate { height: 32px; grid-template-columns: 18px 1fr; gap: 5px; padding: 2px 6px 2px 4px; }
-.daemon-strip.is-half .daemon-glyph, .daemon-strip.is-token .daemon-glyph { width: 18px; height: 18px; }
-.daemon-strip.is-half .daemon-glyph svg, .daemon-strip.is-token .daemon-glyph svg { width: 12px; height: 12px; }
-.daemon-strip.is-half .daemon-copy strong { font-size: 13px; }
-.daemon-strip.is-half .daemon-copy small { -webkit-line-clamp: 1; margin-top: 1px; font-size: 10px; }
-.daemon-strip.is-token .daemon-plate { height: 30px; grid-template-columns: 18px 1fr; gap: 4px; padding: 2px 5px 2px 3px; }
-.daemon-strip.is-token .daemon-copy strong { font-size: 12.5px; }
-.daemon-strip.is-token .daemon-copy small { display: none; }
-@keyframes daemon-run { to { transform: rotate(360deg); } }
-@container game (max-width: 900px) {
-  .field-strip.has-daemons { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  /* Narrow tables float the plates over the table: the daemons hang under the seals instead, one row. */
-  .field-strip .daemon-strip { position: absolute; top: calc(100% + 4px); left: 0; right: 0; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
-  .daemon-plate, .daemon-strip.is-half .daemon-plate { height: 26px; grid-template-columns: 16px 1fr; gap: 4px; padding: 2px 5px 2px 3px; }
-  .daemon-glyph, .daemon-strip.is-half .daemon-glyph { width: 16px; height: 16px; }
-  .daemon-copy small { display: none; }
-  .daemon-copy strong { font-size: 12px; }
-}
-
-/* ------------------------------------------------------------ protocol dock: a third slot (Policy Engine)
-   Three or four slots fold into two rows of half-height plates: every name still reads in full. */
-.protocol-slots.is-wide { grid-template-columns: 1fr 1fr; grid-auto-rows: 23px; gap: 4px 6px; }
-.protocol-slots.is-wide .protocol-slot { height: 23px; grid-template-columns: 16px 1fr; gap: 5px; padding: 1px 6px 1px 3px; border-radius: 8px 2px 2px 2px; }
-.protocol-slots.is-wide .protocol-slot i { width: 16px; height: 16px; }
-.protocol-slots.is-wide .protocol-slot i svg { width: 10px; height: 10px; }
-.protocol-slots.is-wide .protocol-slot strong { font-size: 13.5px; }
-.protocol-slots.is-wide .protocol-slot small { display: none; }
-.protocol-slots.is-wide .protocol-slot.armed::before { border-radius: 6px 1px 1px 1px; }
-.protocol-slots.is-wide .protocol-slot.empty small { display: none; }
-.protocol-slots.is-wide .protocol-slot.empty::after { content: "Protocol slot"; font: 700 10.5px/1 var(--label); letter-spacing: .04em; color: #9a8f86; }
 
 /* ------------------------------------------------------------ curses in hand, under the survival forecast */
 .hand-omens { display: grid; gap: 3px; margin: -4px 0 9px; }

@@ -37,7 +37,7 @@ import {
 } from "./core/run.ts";
 import type { CardId, DesignationId, Enemy, Installation, Port, RunState, Zone } from "./core/types.ts";
 import { enemyStory } from "./story.ts";
-import { cardMarkup, esc, icon } from "./ui.ts";
+import { artStyle, cardMarkup, esc, icon } from "./ui.ts";
 import { channelCss } from "./channel-palette.ts";
 import { relicEmblem } from "./screens.ts";
 import { designationGlyph } from "./tutorial/icons.ts";
@@ -631,6 +631,9 @@ function engineFor(r: RunState, p: CombatPreview): Engine {
   };
 }
 
+/** The keeper's console command: an engraved brass plate that stands on the energy orb (its glyph in
+ * a small orb of its own, the command's name and state, the cost gem), with the keeper's engine gauge
+ * (buffer, pressure, channels) riveted to its end. */
 function consoleMarkup(r: RunState, p: CombatPreview, v: BattleView): string {
   const c = consoleState(r), engine = engineFor(r, p);
   const brief = c.id === "patch" ? (v.consoleTargeting ? (v.source ? "Pick the second device" : "Pick the first device") : "Connect two devices")
@@ -639,80 +642,45 @@ function consoleMarkup(r: RunState, p: CombatPreview, v: BattleView): string {
   const state = v.consoleTargeting ? "targeting" : c.active ? "active" : c.usable ? "ready" : c.uses >= c.limit ? "spent" : "blocked";
   const status = state === "targeting" ? "Select" : state === "active" ? "On" : state === "spent" ? "Used" : state === "blocked" ? "No energy" : c.limit > 1 ? `${c.limit - c.uses} left` : "Ready";
   const glyph = c.id === "patch" ? "link" : c.id === "harden" ? "shield" : "buffer";
-  return `<div class="console-control">
+  return `<div class="console-dock">
     <button class="console-button console-${c.id} is-${state}" data-action="console" aria-pressed="${c.active || v.consoleTargeting}" ${(!c.usable && !v.consoleTargeting) || v.busy ? "disabled" : ""} data-tooltip="${esc(`${c.name} · ${c.cost} energy. ${c.rules}${c.reason && !c.active ? ` ${c.reason}` : ""}`)}" aria-label="${esc(`Console command ${c.name}, ${c.cost} energy. ${c.rules} ${c.reason}`)}">
       <span class="console-glyph">${icon(glyph, 20)}</span>
-      <span class="console-copy"><small>Console <kbd>C</kbd> · ${status}</small><strong>${esc(c.name)}</strong><em>${esc(brief)}</em></span>
+      <span class="console-copy"><small><span class="console-word">Console</span> <kbd>C</kbd> · ${status}</small><strong>${esc(c.name)}</strong><em>${esc(brief)}</em></span>
       <span class="console-cost"><b>${c.cost}</b></span>
     </button>
     <span class="engine-badge ${engine.state}" tabindex="0" data-tooltip="${esc(engine.tip)}" aria-label="${esc(engine.tip)}"><strong>${esc(engine.value)}</strong><small>${engine.state === "at-risk" ? icon("warning", 9) : ""}${esc(engine.label)}</small></span>
   </div>`;
 }
 
-function protocolDock(r: RunState, p: CombatPreview): string {
+/** Armed protocols as gems set in the Transmit dial's rim (they fire in the enemy phase the dial
+ * starts): each shows its card's painting and its trigger; a protocol that fires this turn burns.
+ * Empty sockets stay dark. Names, rules and the effect are in the tooltip and the label. */
+function protocolRing(r: RunState, p: CombatPreview): string {
   const limit = protocolLimit(r);
-  const slots = Array.from({ length: limit }, (_, i) => {
+  // The dial's sockets: west, north, east, then south; more slots spread evenly over the rim.
+  const angle = (i: number) => limit === 1 ? 0 : limit === 2 ? i * 180 - 90 : limit <= 4 ? i * 90 - 90 : -135 + i * 270 / (limit - 1);
+  const sockets = Array.from({ length: limit }, (_, i) => {
     const id = r.protocols[i];
-    if (!id) return `<span class="protocol-slot empty" aria-label="Empty protocol slot"><i>${icon("protocol", 15)}</i><small>Protocol slot<br><span>Arm a protocol card</span></small></span>`;
+    if (!id) return `<span class="protocol-slot protocol-socket empty" style="--a:${angle(i)}deg" data-tooltip="An empty protocol slot: arm a protocol card to fill it." aria-hidden="true"><i class="socket-trigger">${icon("protocol", 12)}</i></span>`;
     const c = CARDS[id], trigger = p.protocolTriggers.find(t => t.card === id);
-    // What firing does, shortest first: the protocol's own answer, then any retaliation daemon.
-    const fires = trigger ? `${trigger.effect.replace(/\s+[^.]*: it takes \d+\./g, "")}${(trigger.retaliation ?? []).map(term => ` ${term.label} +${term.amount}.`).join("")}` : "";
-    return `<button class="protocol-slot armed ${trigger ? "will-trigger" : ""}" data-card-id="${id}" data-tooltip="${esc(`${c.name}: ${c.rules}${trigger ? ` Fires this turn: ${trigger.effect}` : ""}`)}" aria-label="${esc(`${c.name}, armed. ${trigger ? `Will fire this turn: ${trigger.effect}` : `Waits for ${TRIGGER_WORDS[c.protocol!]}`}`)}"><i>${icon(TRIGGER_ICONS[c.protocol!] ?? "protocol", 15)}</i><span><strong>${esc(c.name)}</strong><small>${trigger ? `${icon("trigger", 10)} Fires · ${esc(fires)}` : `Armed · waits for ${TRIGGER_WORDS[c.protocol!]}`}</small></span></button>`;
+    const tip = `${c.name}, armed: ${c.rules}${trigger ? ` Fires this turn: ${trigger.effect}${(trigger.retaliation ?? []).map(term => ` ${term.label} +${term.amount}.`).join("")}` : ` Waits for ${TRIGGER_WORDS[c.protocol!]}.`}`;
+    return `<button class="protocol-slot protocol-socket armed${trigger ? " will-trigger" : ""}" data-card-id="${id}" style="--a:${angle(i)}deg;${artStyle(id)}" data-tooltip="${esc(tip)}" aria-label="${esc(`${c.name}, armed. ${trigger ? `Will fire this turn: ${trigger.effect}` : `Waits for ${TRIGGER_WORDS[c.protocol!]}`}`)}"><span class="socket-art" aria-hidden="true"></span><i class="socket-trigger" aria-hidden="true">${icon(trigger ? "trigger" : TRIGGER_ICONS[c.protocol!] ?? "protocol", 12)}</i></button>`;
   }).join("");
-  return `<section class="protocol-dock ${p.protocolTriggers.length ? "has-trigger" : ""}" aria-label="Armed protocols, ${r.protocols.length} of ${limit}" style="--slots:${limit}"><div class="protocol-slots${limit > 2 ? " is-wide" : ""}">${slots}</div></section>`;
+  return `<section class="protocol-dock protocol-ring${p.protocolTriggers.length ? " has-trigger" : ""}" aria-label="Armed protocols, ${r.protocols.length} of ${limit}" style="--slots:${limit}">${sockets}</section>`;
 }
 
-/** The daemon strip (v5): every process running this encounter as an engraved plate beside the
- * protocol dock: its name, ×N for stacked copies, its effect, the full text in the tooltip. Empty:
- * nothing at all. Plates are buttons so Tab reaches them like the protocol slots. */
-export function daemonStrip(r: RunState): string {
+/** Running daemons as seals studded along the player plate's edge: each shows its card's painting in
+ * a turning brass cog, ×N for stacked copies; the name and effect are in the tooltip. None: nothing. */
+export function daemonSeals(r: RunState): string {
   const running = runningDaemons(r);
   if (!running.length) return "";
-  const plates = running.map(daemon => {
+  const seals = running.map(daemon => {
     const c = daemon.card, line = daemonLine(c);
     const copies = daemon.count > 1 ? ` ${daemon.count} copies run: each adds its effect.` : "";
     const tip = `${daemonLabel(daemon)}: ${line}${copies}${c.detail ? ` ${c.detail}` : ""}`;
-    return `<button class="daemon-plate${daemon.count > 1 ? " is-stacked" : ""}" data-card-id="${daemon.id}" data-daemon="${daemon.id}" style="--house:${HOUSE_COLORS[cardHouse(c)]}" data-tooltip="${esc(tip)}" aria-label="${esc(`Daemon running: ${tip}`)}"><i class="daemon-glyph">${glyph("daemon", 15)}</i><span class="daemon-copy"><strong><span>${esc(c.name)}</span>${daemon.count > 1 ? `<b class="daemon-count">×${daemon.count}</b>` : ""}</strong><small>${esc(line)}</small></span></button>`;
+    return `<button class="daemon-seal${daemon.count > 1 ? " is-stacked" : ""}" data-card-id="${daemon.id}" data-daemon="${daemon.id}" style="--house:${HOUSE_COLORS[cardHouse(c)]};${artStyle(daemon.id)}" data-tooltip="${esc(tip)}" aria-label="${esc(`Daemon running: ${tip}`)}"><span class="seal-cog" aria-hidden="true"></span><span class="seal-art" aria-hidden="true"></span>${daemon.count > 1 ? `<b class="daemon-count">×${daemon.count}</b>` : ""}</button>`;
   }).join("");
-  // Up to two plates read in full; four fold to one effect line; more become name tokens.
-  const count = running.length, size = count <= 2 ? "full" : count <= 4 ? "half" : "token";
-  return `<section class="daemon-strip is-${size}" data-count="${count}" aria-label="${esc(`Running daemons, ${count}: ${running.map(daemonLabel).join(", ")}. ${keywordTip("daemon")}`)}">${plates}</section>`;
-}
-
-function ledgerMarkup(r: RunState, p: CombatPreview, v: BattleView): string {
-  const devices = r.topology.nodes.filter(n => !n.fixed);
-  const chips: string[] = [];
-  for (const fault of [...r.faultNodes, ...r.faultLinks])
-    chips.push(`<span class="ledger-chip is-fault" data-tooltip="Faults last for this player turn. Hot Patch, Link Recovery or Fast Reroute clear every one; a second channel keeps transmitting.">${icon("link", 13)} Fault · <b>${esc(pretty(fault))}</b></span>`);
-  if (!p.signalPath.length) chips.push(`<span class="ledger-chip is-offline" data-tooltip="A route runs ALPHA → router → OMEGA through live cables.">${icon("online", 13)} No live route</span>`);
-  else {
-    // "3 routes · 2 channels": every live route counts, and routes through one device are one channel.
-    // A diamond per channel in its table colour; the tooltip names the devices where routes merge.
-    const shared = p.sharedDevices.map(item => `${item.id.toUpperCase()} (${item.routes} routes)`).join(", ");
-    const tip = `${plural(p.routeCount, "route")} make ${plural(p.channels, "channel")}. ${bandwidthInfo(r, p.channels).tip}${shared ? ` Shared: ${shared}.` : ""}`;
-    const swatches = Array.from({ length: p.channels }, (_, i) => `<i style="--channel:${channelCss(i)}"></i>`).join("");
-    chips.push(`<span class="ledger-chip is-channels ${p.channels > 1 ? "is-strong" : ""}" data-tooltip="${esc(tip)}" aria-label="${esc(tip)}">${icon("channels", 13)} <b>${p.routeCount > 99 ? "99+" : p.routeCount}</b> route${p.routeCount === 1 ? "" : "s"} · <b>${p.channels}</b> channel${p.channels === 1 ? "" : "s"}<i class="channel-swatches" aria-hidden="true">${swatches}</i></span>`);
-  }
-  if (devices.length) chips.push(`<span class="ledger-chip is-online ${p.online.length < devices.length ? "has-offline" : ""}" data-tooltip="${esc(`Online devices sit on at least one live route; offline devices do nothing. ${devices.filter(n => !p.online.includes(n.id)).map(n => n.id.toUpperCase()).join(", ") || "Everything is online."}`)}">${icon("online", 13)} <b>${p.online.length}/${devices.length}</b> online</span>`);
-  for (const zone of p.clusters) chips.push(`<span class="ledger-chip is-cluster" data-tooltip="${esc(`${zone.toUpperCase()} holds ${RULES.clusterThreshold}+ online devices: +${RULES.clusterDamage} damage. Clustered bands are also easier for band attacks to hit.`)}">${icon("cluster", 13)} ${title(zone)} cluster <b>+${RULES.clusterDamage}</b></span>`);
-  const scrub = scrubCost(r);
-  // One iron tag per installation (kind and integrity pips); a click scrubs one point, or, while
-  // Demolition Charge is choosing, names the installation it destroys.
-  for (const m of r.installations) {
-    const name = INSTALLATION_NAMES[m.kind], next = installationEffectLine(r, p, m);
-    const aim = v.hud?.demolition
-      ? `data-demolish="${m.id}" aria-label="${esc(`Destroy the ${name} in ${zoneForNode(m).toUpperCase()} with the Demolition Charge`)}"`
-      : `data-scrub="${m.id}" aria-label="${esc(`Scrub the ${name}, ${scrub} energy, ${m.integrity} integrity left`)}" ${r.energy < scrub ? "disabled" : ""}`;
-    chips.push(`<button class="ledger-chip is-malware is-installation kind-${m.kind}${v.hud?.installation === m.id ? " is-selected" : ""}${v.hud?.demolition ? " is-target" : ""}" ${aim} data-tooltip="${esc(`${name} in ${zoneForNode(m).toUpperCase()}, integrity ${m.integrity}. ${next} Scrub one point for ${scrub} energy (S), or Purge Field its band.`)}">${glyph(m.kind, 13)}<i class="tag-name">${name}</i><i class="tag-pips">${integrityPips(m)}</i>${m.kind === "breaker" && m.countdown !== undefined ? `<i class="tag-count" aria-label="detonates in ${m.countdown}">${m.countdown}</i>` : ""}<em>${v.hud?.demolition ? "Destroy" : `<b>${scrub}</b>${icon("bolt", 12)}`}</em></button>`);
-  }
-  // One wear tag names every worn device; each device inside it is its own repair button.
-  const repair = repairCost(r), worn = r.topology.nodes.filter(isWorn);
-  if (worn.length) chips.push(`<span class="ledger-chip is-wear" data-tooltip="${esc(`Worn devices break at condition 0 with their cables and leave wreckage. Repair one point for ${repair} energy each (R).`)}">${glyph("cracked", 13)} Worn${worn.map(n => `<button class="is-worn" data-repair="${n.id}" aria-label="${esc(`Repair ${n.id.toUpperCase()}, ${repair} energy, condition ${conditionOf(n)} of ${maxConditionOf(n)}`)}" ${r.energy < repair ? "disabled" : ""}>${esc(pretty(n.id))}<i class="tag-pips">${conditionPips(n)}</i></button>`).join("")}<em><b>${repair}</b>${icon("bolt", 12)}</em></span>`);
-  if (r.terrain) chips.push(`<span class="ledger-chip is-terrain" data-tooltip="${esc(`${r.terrain.name}: ${r.terrain.description}`)}">${icon("terrain", 13)} ${esc(r.terrain.name)}</span>`);
-  const next = nextTurnParts(r, p);
-  const tip = `Next turn, after the forecast enemy action: ${next.energy.total} energy (${next.energy.parts.join(", ")}); ${plural(next.draw.total, "card")} (${next.draw.parts.join(", ")})${next.block.total ? `; ${next.block.total} block (${next.block.parts.join(", ")})` : ""}. A cut or jam can take a PoE Injector or Cache Server offline first.`;
-  chips.push(`<span class="ledger-chip is-next" tabindex="0" data-tooltip="${esc(tip)}" aria-label="${esc(tip)}">${icon("next", 13)} Next · <b>${next.energy.total}</b>${icon("bolt", 12)}${next.energy.total > next.energy.base ? `<i class="ledger-rise" aria-label="above your turn base">${icon("rise", 12)}</i>` : ""} · <b>${next.draw.total}</b> card${next.draw.total === 1 ? "" : "s"}${next.draw.total > next.draw.base ? `<i class="ledger-rise" aria-label="more than usual">${icon("rise", 12)}</i>` : ""}${next.block.total ? ` · <b>${next.block.total}</b>${icon("shield", 12)}<i class="ledger-rise" aria-label="block ready">${icon("rise", 12)}</i>` : ""}</span>`);
-  return `<div class="network-status network-ledger" aria-label="Network status">${chips.join("")}</div>`;
+  return `<section class="daemon-seals" data-count="${running.length}" aria-label="${esc(`Running daemons, ${running.length}: ${running.map(daemonLabel).join(", ")}. ${keywordTip("daemon")}`)}">${seals}</section>`;
 }
 
 /** Next turn's energy, draw and block with their sources (the forecast's totals, split into the
@@ -745,6 +713,16 @@ function handOmens(p: CombatPreview): string {
   }).join("")}</div>`;
 }
 
+/** The piles' engraved glyphs: a face-down stack to draw from, a spent fan of discards, a card burning
+ * to ash, a card held in a brass clip. Same 24-unit line language as ui.icon. */
+const pileSvg = (paths: string) => `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+const PILE_GLYPHS: Record<"draw-pile" | "discard-pile" | "exhaust-pile" | "prepare", string> = {
+  "draw-pile": pileSvg('<path d="M8 6.5V4.8A1.3 1.3 0 0 1 9.3 3.5h9.4A1.3 1.3 0 0 1 20 4.8v12.4a1.3 1.3 0 0 1-1.3 1.3H17"/><rect x="4" y="6.5" width="13" height="15" rx="1.3"/><path d="m10.5 10.5 2.5 3.5-2.5 3.5-2.5-3.5 2.5-3.5Z"/>'),
+  "discard-pile": pileSvg('<path d="M4.1 8.9 9.5 7.4l2.9 11-5.4 1.5a1.2 1.2 0 0 1-1.5-.9L3.2 10.4a1.2 1.2 0 0 1 .9-1.5Z"/><path d="m11 5.6 7.4-1.2a1.2 1.2 0 0 1 1.4 1l1.9 11.4a1.2 1.2 0 0 1-1 1.4l-7.4 1.2a1.2 1.2 0 0 1-1.4-1L10 7a1.2 1.2 0 0 1 1-1.4Z"/><path d="m13.3 9.2 4.4-.7m-3.9 3.4 4.4-.7m-3.9 3.4 2.6-.4"/>'),
+  "exhaust-pile": pileSvg('<path d="M6 10.2 8 8.8l1.6 1.3 2-1.6 1.9 1.4 2.1-1.5 1.4 1v10.1a1.4 1.4 0 0 1-1.4 1.4H7.4A1.4 1.4 0 0 1 6 19.5Z"/><path d="M11.8 7.2c-1.7-1.5-.8-3.3.8-4.7 0 1.6 1.4 2.2 1.9 3 .5.9 0 2-.8 2.4"/><path d="M8.6 5h.01M16.8 5.6h.01M7.6 7.3h.01M9.5 14.5h5M9.5 17.5h3.5"/>'),
+  prepare: pileSvg('<rect x="5.5" y="7" width="13" height="14.5" rx="1.3"/><path d="M9.5 10V4.6a2.5 2.5 0 0 1 5 0V10"/><path d="M8.5 10h7M12 13.5v4.5M9.8 15.8h4.4"/>'),
+};
+
 /** The energy orb (v5): current / base, the base being the relic-derived turn base; temporary energy
  * above it rises as a lit marker. The tooltip names every source. */
 function energyOrb(r: RunState, p: CombatPreview): string {
@@ -758,36 +736,21 @@ function energyOrb(r: RunState, p: CombatPreview): string {
     `Turn base ${base}: ${RULES.baseEnergy} energy${relics.map(id => ` + ${RELICS[id].name} 1`).join("")}${capped ? ` (relics raise the base to ${RULES.relicEnergyCap} at most)` : ""}.`,
     rise > 0 ? "Above the base: PoE Injectors online, next-turn energy and cards, never capped." : "",
     injectors ? `${injectors} PoE Injector${injectors === 1 ? "" : "s"} online: +${injectors} at the start of your turn.` : "",
-    `Next turn: ${next.energy.total} (${next.energy.parts.join(", ")}).`,
+    `Next turn: ${next.energy.total} energy (${next.energy.parts.join(", ")}); ${plural(next.draw.total, "card")} (${next.draw.parts.join(", ")})${next.block.total ? `; ${next.block.total} block (${next.block.parts.join(", ")})` : ""}.`,
   ].filter(Boolean).join(" ");
-  return `<div class="energy-orb${rise > 0 ? " is-risen" : ""}${r.energy === 0 ? " is-spent" : ""}" tabindex="0" role="img" aria-label="${esc(`${r.energy} of ${base} energy available. ${tip}`)}" data-tooltip="${esc(tip)}"><strong>${r.energy}</strong><em class="energy-base" aria-hidden="true">/${base}</em><span>Energy</span>${rise > 0 ? `<i class="energy-rise" aria-hidden="true">${icon("rise", 11)}+${rise}</i>` : ""}</div>`;
-}
-
-/** The field seals, and at their right end (above the protocol dock) the running daemons. */
-function fieldStrip(r: RunState, p: CombatPreview, targeting: boolean): string {
-  const daemons = daemonStrip(r);
-  return `<div class="field-strip${daemons ? " has-daemons" : ""}" aria-label="Battlefield bands${daemons ? " and running daemons" : ""}">${ZONES.map((zone: Zone) => {
-    const effects = r.zoneEffects.filter(effect => effect.zone === zone);
-    const threatened = p.hazardZone === zone;
-    const inBand = r.topology.nodes.filter(n => !n.fixed && zoneForNode(n) === zone);
-    const online = inBand.filter(n => p.online.includes(n.id)).length;
-    const cluster = p.clusters.includes(zone);
-    const installed = r.installations.filter(m => zoneForNode(m) === zone);
-    const anchored = installed.some(m => m.kind === "anchor");
-    const description = `${zoneDescription(r, zone)}${cluster ? `. Cluster: +${RULES.clusterDamage} damage` : ""}${installed.length ? `. ${installed.map(m => `${INSTALLATION_NAMES[m.kind]} ${integrityPips(m)}`).join(", ")}` : ""}${anchored ? ". Anchored: hostile fields here do not tick down" : ""}${threatened ? ". Enemy targets this band next." : ""}`;
-    return `<button class="field-seal ${effects.some(effect => FIELD_RULES[effect.kind].hostile) ? "corrupted" : effects.length ? "empowered" : ""} ${threatened ? "threatened" : ""} ${cluster ? "clustered" : ""} ${targeting ? "targetable" : ""}" data-field-zone="${zone}" data-tooltip="${esc(description)}" aria-label="${zone} band: ${esc(description)}"><span class="field-name">${icon("field", 16)} ${zone.toUpperCase()} ${threatened ? `<i class="threat-mark">${icon("warning", 15)}</i>` : ""}${cluster ? `<i class="cluster-mark">Cluster +${RULES.clusterDamage}</i>` : ""}</span><span class="field-effects">${effects.length ? effects.map(effect => `<span class="${FIELD_RULES[effect.kind].hostile ? "hostile-field" : "allied-field"}">${FIELD_RULES[effect.kind].name} <b>${effect.permanent ? "∞" : anchored && FIELD_RULES[effect.kind].hostile ? `<i class="anchor-mark" aria-label="anchored: it does not tick down">${glyph("anchor", 12)}</i>` : `${effect.turns}t`}</b></span>`).join("") : `<span>${threatened ? "Threat inbound" : "Clear ground"}</span>`}</span><span class="band-meta">${inBand.length ? `${online}/${inBand.length} online` : "empty"}${installed.length ? ` · <span class="band-installs" aria-label="${installed.length} installation${installed.length === 1 ? "" : "s"}">${glyph(installed.length === 1 ? installed[0].kind : "malware", 11)} ${installed.length}</span>` : ""}</span></button>`;
-  }).join("")}${daemons}</div>`;
+  return `<div class="energy-orb${rise > 0 ? " is-risen" : ""}${r.energy === 0 ? " is-spent" : ""}" tabindex="0" role="img" aria-label="${esc(`${r.energy} of ${base} energy available. ${tip}`)}" data-tooltip="${esc(tip)}"><span class="orb-reading"><strong>${r.energy}</strong><em class="energy-base" aria-hidden="true">/${base}</em></span>${rise > 0 ? `<i class="energy-rise" aria-hidden="true">+${rise}</i>` : ""}<span class="orb-word">Energy</span></div>`;
 }
 
 /** The battle HUD in two parts, so keyboard focus follows the design's order (13.8): `hud` (plates,
- * seals, console, protocols, hostile plate, ledger) renders before the hand, `foot` (piles, prepare,
- * transmit) after it, in a layer beneath the HUD's so the plates still lie over the dial's shade. */
+ * daemons, console, hostile plate) renders before the hand, `foot` (orb, piles, prepare, transmit and
+ * its protocol gems) after it, in a layer beneath the HUD's so the plates still lie over the dial's
+ * shade. The bands, their fields and the network read on the table itself (World, table-cards.ts). */
 export function battleMarkup(r: RunState, v: BattleView): { hud: string; foot: string } {
   const stage = STAGES[r.stage], p = combatPreview(r), enemy = leaderOf(r)!, intent = p.intent ?? intentFor(r, enemy);
   const target = v.selected === null ? null : CARDS[r.hand[v.selected]];
   const hint = v.consoleTargeting ? `Patch Cable · ${v.source ? "choose the second device" : "choose the first device"}`
     : v.hud?.demolition ? `${target?.name ?? "Demolition Charge"} · choose an installation on the table or a tag below`
-    : !target ? "Choose your next move" : target.target === "zone" ? "Choose a band on the table or a field seal below" : target.target === "ground" ? "Choose an empty socket on the table" : target.target === "link" ? v.source ? "Choose the second device" : "Choose the first device" : "Choose a device";
+    : !target ? "" : target.target === "zone" ? "Choose a band on the table" : target.target === "ground" ? "Choose an empty socket on the table" : target.target === "link" ? v.source ? "Choose the second device" : "Choose the first device" : "Choose a device";
   const intentName = intent.ultimate ? ENEMIES[enemy.id].pattern[enemy.turn % ENEMIES[enemy.id].pattern.length].label : INTENT_NAMES[intent.kind];
   const heading = intent.ultimate ? `${intentName} · ${p.interrupted ? "Break ready" : "Inbound"}` : intent.kind === "charge" ? "The guardian gathers power" : enemy.exposed ? "The guardian is exposed" : v.training ? "Field Training" : stage.chapters[r.floor] ?? "";
   const buffering = p.buffering;
@@ -800,8 +763,8 @@ export function battleMarkup(r: RunState, v: BattleView): { hud: string; foot: s
     : p.channels < 2 ? `Your route is alive. A second channel adds +${RULES.bandwidthPerChannel} and keeps transmitting through a cut.`
     : "Two channels: bandwidth is flowing and one cut can't silence you. Arm a protocol for what's coming.";
 
-  // Keyboard order (13.8): player plate, field seals, console, protocols, hostile plate, then (after
-  // the hand, in #battle-foot) piles, prepare and transmit.
+  // Keyboard order (13.8): player plate (its running daemons last), console, hostile plate, then
+  // (after the hand, in #battle-foot) the orb, piles, prepare, Transmit and the protocols in its rim.
   const hud = `
     <div class="encounter-heading"><span class="eyebrow">${esc(heading)}</span><span class="round-banner"><i></i> TURN ${String(r.turn).padStart(2, "0")} <i></i></span></div>
     <aside class="battle-left battle-plate player-plate" aria-label="Your network">
@@ -819,21 +782,20 @@ export function battleMarkup(r: RunState, v: BattleView): { hud: string; foot: s
       <div class="perk-heading"><span>Relics & perks</span><small>${r.relics.length} carried</small></div>
       <div class="battle-relics">${relicTokens(r)}</div>
       ${r.reserveEnergy ? `<span class="reserve-note">${icon("bolt", 12)} +${r.reserveEnergy} energy next turn</span>` : ""}
+      ${daemonSeals(r)}
     </aside>
     ${v.tips && !v.training ? `<div class="tutorial-callout"><span>Field note</span><p>${esc(note)}</p><button data-action="dismiss-tutorial" aria-label="Dismiss field note">${icon("close", 10)}</button></div>` : ""}
-    ${fieldStrip(r, p, target?.target === "zone")}
-    <div class="command-dock command-left">${consoleMarkup(r, p, v)}</div>
-    <div class="command-dock command-right">${protocolDock(r, p)}</div>
+    ${consoleMarkup(r, p, v)}
     ${enemyPlate(r, p, v, stage)}
-    ${ledgerMarkup(r, p, v)}
     <button class="combat-log" data-action="combat-log" aria-label="Open combat history">${icon("book", 13)}<span>${esc(r.log[0] || "")}</span></button>`;
   const foot = `
     <div class="battle-bottom battle-shade" aria-hidden="true"></div>
     <div class="battle-bottom battle-controls">
       ${energyOrb(r, p)}
-      <div class="draw-piles">${([["draw-pile", r.drawPile.length, "Draw"], ["discard-pile", r.discardPile.length, "Discard"], ["exhaust-pile", r.exhaustPile.length, "Exhaust"]] as const).map(([action, count, label]) => `<button data-action="${action}" class="${action}" data-tooltip="${label === "Exhaust" ? "Exhausted cards return next encounter" : `Inspect your ${label.toLowerCase()} pile`}">${icon("deck", 18)}<span>${count}<small>${label}</small></span></button>`).join("")}<button data-action="prepare" class="prepared-pile ${r.preparedCard ? "occupied" : ""}" aria-label="${r.preparedCard ? `Prepared: ${esc(CARDS[r.preparedCard].name)}` : "Prepare a card for next turn"}" data-tooltip="${r.preparedCard ? `${esc(CARDS[r.preparedCard].name)} is held for next turn` : "Hold one card for next turn, replacing one draw · P"}" ${v.busy ? "disabled" : ""}>${icon("battery", 18)}<span>${r.preparedCard ? "1" : "+"}<small>${r.preparedCard ? "Ready" : "Prepare"}</small></span></button></div>
-      <div class="target-hint ${v.selected !== null || v.consoleTargeting ? "active" : ""}">${esc(hint)}${v.selected !== null || v.consoleTargeting ? '<button data-action="cancel">Cancel <kbd>Esc</kbd></button>' : `<span class="hint-keys"><span><kbd>1</kbd>–<kbd>0</kbd> Play</span><span><kbd>C</kbd> Console</span><span>${icon("mouse", 14)} Inspect</span></span>`}</div>
+      <div class="pile-cluster">${([["draw-pile", r.drawPile.length, "Draw", "Inspect your draw pile"], ["discard-pile", r.discardPile.length, "Discard", "Inspect your discard pile"], ["exhaust-pile", r.exhaustPile.length, "Exhaust", "Exhausted cards return next encounter"]] as const).map(([action, count, label, tip]) => `<button data-action="${action}" class="pile-plate ${action}" data-tooltip="${tip}" aria-label="${label} pile: ${plural(count, "card")}"><i class="pile-glyph" aria-hidden="true">${PILE_GLYPHS[action]}</i><b>${count}</b><small>${label}</small></button>`).join("")}<button data-action="prepare" class="pile-plate prepared-pile ${r.preparedCard ? "occupied" : ""}" aria-label="${r.preparedCard ? `Prepared: ${esc(CARDS[r.preparedCard].name)}` : "Prepare a card for next turn"}" data-tooltip="${r.preparedCard ? `${esc(CARDS[r.preparedCard].name)} is held for next turn` : "Hold one card for next turn, replacing one draw · P"}" ${v.busy ? "disabled" : ""}><i class="pile-glyph" aria-hidden="true">${PILE_GLYPHS.prepare}</i><b>${r.preparedCard ? "1" : "+"}</b><small>${r.preparedCard ? "Ready" : "Prepare"}</small></button></div>
+      ${hint ? `<div class="target-hint active" role="status">${esc(hint)}<button data-action="cancel">Cancel <kbd>Esc</kbd></button></div>` : ""}
       <button class="transmit-button ${shownDamage ? "ready" : ""} ${buffering ? "buffering" : ""} ${v.busy ? "transmitting" : ""}${dialNote ? " has-note" : ""}${finishing ? " is-finishing" : ""}" data-action="transmit" aria-label="${buffering ? `Store · ${p.bufferGain} into the buffer · End turn` : `Transmit · ${p.packetDamage} damage${dialNote ? ` · ${dialNote}` : ""} · End turn`}" ${v.busy ? "disabled" : ""}><span class="transmit-dial" aria-hidden="true"></span><span class="transmit-power" aria-hidden="true"><strong>${v.busy ? "· · ·" : buffering ? `+${p.bufferGain}` : p.packetDamage}</strong><small>${v.busy ? "sending" : buffering ? "to buffer" : "damage"}</small></span><span class="transmit-label">${v.busy ? "Transmitting" : buffering ? "Store" : "Transmit"}${dialNote ? `<small class="transmit-note">${esc(dialNote)}</small>` : ""}</span><span class="transmit-shortcut">End turn <kbd>Space</kbd></span></button>
+      ${protocolRing(r, p)}
     </div>`;
   return { hud, foot };
 }

@@ -208,7 +208,11 @@ export function cardMarkup(
   const inHand = variant === "hand" && !!run;
   const note = inHand ? costNote(run!, index) : null;
   const cost = note ? note.cost : c.cost;
-  const central = inHand ? index - (run!.hand.length - 1) / 2 : 0;
+  // The hand is held as a gentle fan: the middle rises and the ends tilt outward, each card turning
+  // on its inner bottom corner so no corner dips below the band; more cards, a wider fan.
+  const half = inHand ? (run!.hand.length - 1) / 2 : 0;
+  const reach = half ? (index - half) / half : 0;
+  const fan = inHand ? `--angle:${(reach * Math.min(6, 1.5 * half)).toFixed(2)}deg;--lift:${((1 - reach * reach) * Math.min(16, 4 * half)).toFixed(1)}px;--pivot:${reach > 0 ? "100%" : reach < 0 ? "0%" : "50%"};` : "";
   const junk = !!(c.junk || c.curse);
   const upgradedCard = isUpgraded(id);
   // Kernel Panic: with no plays left this turn, every card in hand is blocked.
@@ -228,5 +232,5 @@ export function cardMarkup(
   const classes = ["game-card", `rarity-${c.rarity}`, `kind-${kind}`, `house-${house}`, upgradedCard ? "upgraded" : "", junk ? "junk-card" : "", c.curse ? "curse-card" : "", c.token ? "token-card" : "",
     selected ? "selected" : "", blocked ? "unplayable" : "", moved ? `cost-${moved.direction}` : ""].filter(Boolean).join(" ");
   // --name-len lets the nameplate shrink a long name to fit instead of wrapping it.
-  return `<button class="${classes}" data-${variant}="${variant === "hand" ? index : id}" data-card-id="${id}" style="${artStyle(id)};--card-fallback:${artFallback(c)};--card-color:${c.color};--house:${HOUSE_COLORS[house]};--house-edge:${HOUSE_EDGES[house]};--angle:${Math.max(-10, Math.min(10, central * 3))}deg;--lift:${Math.min(15, Math.abs(central) * 5)}px;--order:${index};--name-len:${Math.max(10, c.name.length)}" aria-label="${esc(label)}"><span class="card-image"></span><span class="card-etch"></span><span class="card-cost ${c.unplayable ? "no-cost" : ""}${moved ? ` is-${moved.direction}` : ""}"${costTip ? ` data-tooltip="${esc(costTip)}"` : ""}>${c.unplayable ? icon("close", 14) : cost}${moved ? `<s class="cost-printed" aria-hidden="true">${moved.printed}</s>` : ""}</span>${upgradedCard ? '<span class="card-upgrade-mark" aria-hidden="true">+</span>' : ""}${panic}<span class="card-heading"><span class="card-name">${esc(c.name)}</span></span><span class="card-copy"><span class="card-type">${typeLine(c)}</span><span class="card-rule">${esc(c.rules)}</span></span><span class="card-footer" data-tooltip="${esc(`${ownerWords(c)} · ${rarity}`)}"><span>${rarity}</span><span class="card-gem" aria-hidden="true"></span><span>${footRight}</span></span></button>`;
+  return `<button class="${classes}" data-${variant}="${variant === "hand" ? index : id}" data-card-id="${id}" style="${artStyle(id)};--card-fallback:${artFallback(c)};--card-color:${c.color};--house:${HOUSE_COLORS[house]};--house-edge:${HOUSE_EDGES[house]};${fan}--order:${index};--name-len:${Math.max(10, c.name.length)}" aria-label="${esc(label)}"><span class="card-image"></span><span class="card-etch"></span><span class="card-cost ${c.unplayable ? "no-cost" : ""}${moved ? ` is-${moved.direction}` : ""}"${costTip ? ` data-tooltip="${esc(costTip)}"` : ""}>${c.unplayable ? icon("close", 14) : cost}${moved ? `<s class="cost-printed" aria-hidden="true">${moved.printed}</s>` : ""}</span>${upgradedCard ? '<span class="card-upgrade-mark" aria-hidden="true">+</span>' : ""}${panic}<span class="card-heading"><span class="card-name">${esc(c.name)}</span></span><span class="card-copy"><span class="card-type">${typeLine(c)}</span><span class="card-rule">${esc(c.rules)}</span></span><span class="card-footer" data-tooltip="${esc(`${ownerWords(c)} · ${rarity}`)}"><span>${rarity}</span><span class="card-gem" aria-hidden="true"></span><span>${footRight}</span></span></button>`;
 }

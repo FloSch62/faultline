@@ -1,4 +1,4 @@
-/* FAULTLINE v3 battle layer: console, protocols, network ledger, card states.
+/* FAULTLINE v3 battle layer: console, protocols, daemons, card states.
    Built on the fieldcraft layout variables (--rail, --hand-height, --hand-edge,
    --field-bottom) so it follows every breakpoint of the existing battle table. */
 
@@ -10,220 +10,204 @@
   --v3-danger: #ef8f86;
   --v3-violet: #b99cf0;
   --v3-ink: #08111b;
-  --dock-bottom: calc(var(--hand-height) + 38px);
-  --dock-width: clamp(238px, 20cqw, 318px);
 }
 
-/* ------------------------------------------------------------ command docks
-   One row between the field seals and the hand (≈54px at every size): the console
-   command left beside the energy, armed protocols right beside Transmit. */
-.command-dock {
-  position: absolute;
-  bottom: var(--dock-bottom);
-  z-index: 6;
-  width: var(--dock-width);
-  pointer-events: auto;
-}
-.command-left { left: calc(var(--hand-edge) + 38px); }
-.command-right { right: calc(var(--hand-edge) + 38px); }
-.is-battle .target-hint { left: calc(var(--hand-edge) + var(--dock-width) + 50px); right: calc(var(--hand-edge) + var(--dock-width) + 50px); }
+/* ------------------------------------------------------------ the hand's surroundings
+   Nothing stands between the table and the hand but the target hint: the bands and the network read
+   on the table itself (World: tinted bands, their fields engraved under their names, hover cards).
+   The keeper's console stands on the energy sigil (bottom left), the armed protocols are gems set in
+   the Transmit dial's sockets (bottom right), the running daemons are seals on the player plate. */
+.is-battle .target-hint { left: calc(var(--hand-left, var(--hand-edge)) + 40px); right: calc(var(--hand-edge) + 40px); }
 
-.console-control { display: flex; align-items: stretch; gap: 6px; }
+/* ---- the console: an engraved brass plate standing on the energy sigil */
+.console-dock {
+  position: absolute; z-index: 6; left: var(--cluster-left, 16px); bottom: var(--console-bottom, 250px);
+  display: flex; align-items: center; width: var(--console-width, 210px); pointer-events: auto;
+}
 .console-button {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 36px 1fr auto;
-  align-items: center;
-  gap: 9px;
-  height: 50px;
-  padding: 4px 8px 4px 6px;
-  color: #efe3c6;
-  text-align: left;
-  cursor: var(--cursor-pointer);
+  position: relative; flex: 1; min-width: 0; height: 54px;
+  display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 8px;
+  padding: 0 20px 0 3px; margin: 0; text-align: left; color: #efe3c6; cursor: var(--cursor-pointer);
   background:
-    linear-gradient(90deg, #d3b27418, transparent 38%),
-    linear-gradient(135deg, #243431f2, #0e1920f5 55%, #111a22f5);
-  border: 1px solid #b89b6488;
-  border-radius: 4px 14px 4px 4px;
-  box-shadow: inset 0 0 0 2px #0a141b, inset 0 0 0 3px #d9bd8520, 0 8px 18px #0009;
-  transition: transform .18s, box-shadow .18s, border-color .18s, filter .18s;
+    radial-gradient(90% 120% at 18% 50%, #ffb04a14, transparent 60%),
+    linear-gradient(#241d14, #110d09 62%, #19140e);
+  border: 1px solid #a8864f; border-radius: 27px 5px 5px 27px;
+  box-shadow: inset 0 1px 0 #f3dca024, inset 0 0 0 2px #0c0906, inset 0 0 0 3px #c9a26340, 0 7px 18px #000c;
+  transition: filter .18s, box-shadow .18s, border-color .18s;
+}
+/* Rivets at the plate's far corners, like the orb's frame. */
+.console-button::before {
+  content: ""; position: absolute; right: 7px; top: 7px; bottom: 7px; width: 4px; pointer-events: none;
+  background: radial-gradient(circle, #f3dca0 0 1.4px, #8a6a3a 1.6px 2px, transparent 2.2px) center top / 4px 4px no-repeat,
+              radial-gradient(circle, #f3dca0 0 1.4px, #8a6a3a 1.6px 2px, transparent 2.2px) center bottom / 4px 4px no-repeat;
 }
 .console-button::after {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  pointer-events: none;
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
   background: linear-gradient(115deg, transparent 35%, #fff4d31c 48%, transparent 60%) -120% 0 / 240% 100% no-repeat;
 }
 .console-button.is-ready::after { animation: console-sheen 5.5s ease-in-out infinite; }
-@keyframes console-sheen { 0%, 65% { background-position: -120% 0; } 100% { background-position: 140% 0; } }
-.console-button:not(:disabled):hover, .console-button:focus-visible {
-  transform: translateY(-2px);
-  border-color: #efd497;
-  box-shadow: inset 0 0 0 2px #0a141b, inset 0 0 0 3px #e9ce9433, 0 0 22px #e0bd7a33, 0 10px 22px #000b;
-}
+.console-button:not(:disabled):hover, .console-button:focus-visible { border-color: #f3dca0; filter: brightness(1.12); box-shadow: inset 0 1px 0 #f3dca033, inset 0 0 0 2px #0c0906, inset 0 0 0 3px #c9a26366, 0 0 20px #ffb04a33, 0 7px 18px #000c; }
 .console-button:disabled { cursor: var(--cursor-default); filter: saturate(.55) brightness(.78); }
+/* The command's glyph in a small copy of the energy sigil it stands on. */
 .console-glyph {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  color: #f3dca6;
-  border-radius: 50%;
-  background: radial-gradient(circle at 40% 30%, #5d5033, #1c1f1f 72%);
-  border: 1px solid #d8bd85aa;
-  box-shadow: 0 0 0 3px #0c161d, 0 0 14px #d6b57433;
+  position: relative; display: grid; place-items: center; width: 48px; height: 48px; color: #f6e2b0;
+  background: url("/art/ui/energy-sigil.webp") center / contain no-repeat;
+  filter: drop-shadow(0 2px 3px #000c);
 }
-.console-copy { display: grid; min-width: 0; line-height: 1.12; }
-.console-copy small { display: flex; align-items: center; gap: 4px; font: 700 10.5px/1.2 var(--label); letter-spacing: .06em; color: #c2ae82; white-space: nowrap; }
-.console-copy small kbd { min-width: 15px; padding: 1px 3px 0; font: 700 9.5px/1.15 var(--label); letter-spacing: 0; }
-.console-copy strong { font: 600 18px/1.05 var(--title); letter-spacing: .01em; color: #f6e7c4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 0 #000; }
-.console-copy em { font: italic 12px/1.2 var(--text); color: #c6cdc0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.console-glyph svg { width: 19px; height: 19px; filter: drop-shadow(0 0 5px #ffb04a88); }
+.console-copy { display: grid; min-width: 0; line-height: 1.1; }
+.console-copy small { display: flex; align-items: center; gap: 4px; font: 700 10px/1.2 var(--label); letter-spacing: .06em; color: #c2ae82; white-space: nowrap; }
+.console-copy small kbd { min-width: 14px; padding: 1px 3px 0; font: 700 9px/1.15 var(--label); letter-spacing: 0; }
+/* The plate reads as the console by itself; the word stays in its label and tooltip. */
+.console-copy .console-word { display: none; }
+.console-copy strong { font: 600 16px/1.05 var(--title); letter-spacing: .01em; color: #f6e7c4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.console-copy em { font: italic 11.5px/1.2 var(--text); color: #c6cdc0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The cost gem sits on the sigil's rim, like a card's. */
 .console-cost {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 32px;
-  font: 700 17px/1 var(--title);
-  color: #ffe4a1;
-  background: linear-gradient(#3b3222, #1b1a18);
-  border: 1px solid #c9a86a99;
-  clip-path: polygon(50% 0, 100% 22%, 100% 78%, 50% 100%, 0 78%, 0 22%);
+  position: absolute; left: 34px; top: 30px; display: grid; place-items: center; width: 19px; height: 19px;
+  font: 700 12px/1 var(--title); color: #fff0cc; text-shadow: 0 1px 0 #000;
+  background: radial-gradient(circle at 50% 30%, #54432a, #1c160e 68%); border: 1px solid #e3c68b; border-radius: 50%;
+  box-shadow: 0 0 0 2px #0c0906, 0 2px 5px #000c;
 }
 .console-cost b { line-height: 1; }
-.console-cost small { font-size: 7px; margin-top: -3px; color: #d9bf83; }
-.console-button.is-active, .console-button.is-targeting {
-  border-color: var(--v3-cyan);
-  background: linear-gradient(90deg, #74e0ec22, transparent 50%), linear-gradient(135deg, #16353af2, #0b1a22f5);
-  box-shadow: inset 0 0 0 2px #0a141b, 0 0 0 1px #74e0ec55, 0 0 26px #5fd4e244, 0 10px 22px #000b;
-}
-.console-button.is-active .console-glyph, .console-button.is-targeting .console-glyph {
-  color: #dffbff;
-  background: radial-gradient(circle at 40% 30%, #2f7580, #0f2329 72%);
-  border-color: #9aeef6;
-  animation: console-pulse 1.6s ease-in-out infinite;
-}
-@keyframes console-pulse { 50% { box-shadow: 0 0 0 3px #0c161d, 0 0 24px #74e0ec88; } }
+.console-button.is-active, .console-button.is-targeting { border-color: #9aeef6; box-shadow: inset 0 1px 0 #bff3f833, inset 0 0 0 2px #0a141b, inset 0 0 0 3px #74e0ec55, 0 0 22px #74e0ec44, 0 7px 18px #000c; }
+.console-button.is-active .console-glyph, .console-button.is-targeting .console-glyph { color: #e4fdff; filter: hue-rotate(150deg) saturate(.8) drop-shadow(0 0 10px #74e0ecaa); animation: console-pulse 1.6s ease-in-out infinite; }
 .console-button.is-spent .console-copy small { color: #8d8f86; }
-
+/* The keeper's engine: a round gauge riveted to the plate's end. */
 .engine-badge {
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  width: 66px;
-  height: 50px;
-  padding: 2px 4px;
-  cursor: var(--cursor-default);
-  color: #d8e3d9;
-  background: linear-gradient(160deg, #13262ae8, #0a141be8);
-  border: 1px solid #8fd9c044;
-  border-radius: 4px 4px 12px 4px;
-  box-shadow: inset 0 0 0 2px #0a141b, 0 8px 18px #0009;
+  position: relative; z-index: 1; flex: none; display: grid; place-items: center; align-content: center;
+  width: 50px; height: 50px; margin-left: -18px; text-align: center; border-radius: 50%; cursor: var(--cursor-help, help);
+  background: radial-gradient(circle at 50% 35%, #2c2519, #0e0b08 70%);
+  border: 1px solid #c9a263; box-shadow: inset 0 0 0 2px #0c0906, inset 0 0 0 3px #c9a26344, 0 5px 12px #000c;
 }
-.engine-badge strong { font: 600 25px/1 var(--title); font-variant-numeric: tabular-nums; color: #f0e2bd; text-shadow: 0 1px 0 #000; }
-.engine-badge small { display: flex; align-items: center; gap: 3px; margin-top: 3px; font: 700 10px/1 var(--label); letter-spacing: .04em; color: #a9cdbf; white-space: nowrap; }
-.engine-badge.is-active { border-color: #74e0ec88; box-shadow: inset 0 0 0 2px #0a141b, 0 0 16px #74e0ec33, 0 8px 18px #0009; }
+.engine-badge strong { font: 600 19px/1 var(--title); font-variant-numeric: tabular-nums; color: #f0e2bd; text-shadow: 0 1px 0 #000; }
+.engine-badge small { display: flex; align-items: center; gap: 2px; margin-top: 1px; font: 700 7.5px/1 var(--label); letter-spacing: .04em; color: #c8b489; white-space: nowrap; }
+.engine-badge.is-active { border-color: #74e0ec; box-shadow: inset 0 0 0 2px #0a141b, 0 0 16px #74e0ec44, 0 5px 12px #000c; }
 .engine-badge.is-active strong { color: #c9f7fc; text-shadow: 0 0 12px #74e0ec88; }
-.console-control:has(.console-harden) .engine-badge.is-active { border-color: #f0b46e88; }
-.console-control:has(.console-harden) .engine-badge.is-active strong { color: #ffd7a0; text-shadow: 0 0 12px #f0b46e77; }
-.engine-badge.at-risk { border-color: #ef8f86; background: linear-gradient(160deg, #3a1818ee, #1a0e12ee); animation: engine-risk 1.4s ease-in-out infinite; }
+.console-dock:has(.console-harden) .engine-badge.is-active { border-color: #f0b46e; }
+.console-dock:has(.console-harden) .engine-badge.is-active strong { color: #ffd7a0; text-shadow: 0 0 12px #f0b46e77; }
+.engine-badge.at-risk { border-color: #ef8f86; background: radial-gradient(circle at 50% 35%, #4a1c1c, #1a0e12 70%); animation: engine-risk 1.4s ease-in-out infinite; }
 .engine-badge.at-risk strong { color: #ffd0c9; }
 .engine-badge.at-risk small { color: #ffb2a8; }
+
+/* ---- the piles: four engraved plates under the energy sigil, each with its own glyph and count */
+.is-battle .pile-cluster {
+  position: absolute; z-index: 5; left: var(--cluster-left, 16px); bottom: var(--pile-bottom, 16px); width: var(--cluster-width, 190px);
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--pile-gap, 5px); pointer-events: auto;
+}
+/* Glyph and count; the pile's name is in its label and tooltip (a row of four leaves no room for it). */
+.is-battle .pile-plate {
+  position: relative; display: grid; grid-template-columns: auto auto; align-items: center; justify-content: center; column-gap: 4px;
+  height: var(--pile-height, 34px); min-width: 0; padding: 0 4px; margin: 0; text-align: left; color: #d8c79e;
+  background: linear-gradient(#211b13, #0f0c08 70%, #17120c);
+  border: 1px solid #8a6a3a; border-radius: 4px;
+  box-shadow: inset 0 1px 0 #f3dca01c, inset 0 0 0 2px #0c0906, inset 0 0 0 3px #c9a26326, 0 4px 10px #000a;
+  cursor: var(--cursor-pointer); transition: border-color .18s, filter .18s, box-shadow .18s;
+}
+.is-battle .pile-plate .pile-glyph { display: grid; place-items: center; width: 21px; height: 21px; color: #c9a263; font-style: normal; filter: drop-shadow(0 1px 0 #000); }
+.is-battle .pile-plate .pile-glyph svg { width: 20px; height: 20px; }
+.is-battle .pile-plate b { font: 600 16px/1 var(--title); font-variant-numeric: tabular-nums; color: #f3e2b8; text-shadow: 0 1px 0 #000; }
+.is-battle .pile-plate small { display: none; }
+.is-battle .pile-plate:not(:disabled):hover, .is-battle .pile-plate:focus-visible { border-color: #f3dca0; filter: brightness(1.12); box-shadow: inset 0 1px 0 #f3dca033, inset 0 0 0 2px #0c0906, inset 0 0 0 3px #c9a2634d, 0 0 14px #ffb04a33, 0 4px 10px #000a; }
+.is-battle .pile-plate:disabled { cursor: var(--cursor-default); filter: saturate(.6) brightness(.75); }
+.is-battle .pile-plate.draw-pile .pile-glyph { color: #9fc4d6; }
+.is-battle .pile-plate.discard-pile .pile-glyph { color: #c9a263; }
+.is-battle .pile-plate.exhaust-pile .pile-glyph { color: #e79a6c; }
+.is-battle .pile-plate.prepared-pile .pile-glyph { color: #a8d6c2; }
+.is-battle .pile-plate.prepared-pile.occupied { border-color: #74e0ec99; }
+.is-battle .pile-plate.prepared-pile.occupied .pile-glyph { color: #c9f7fc; filter: drop-shadow(0 0 6px #74e0ecaa); }
+.is-battle .pile-plate.prepared-pile.occupied b { color: #d9fbff; }
+
+
+/* Narrow tables: Transmit keeps its sigil at the energy's size, level with it, its name beside it. */
+@container game (max-width: 900px) {
+  .is-battle .transmit-button, .is-battle .transmit-button.ready { right: 12px; bottom: 5px; width: auto; height: 44px; padding: 0 52px 0 0; background: none; border: 0; box-shadow: none; display: flex; align-items: center; }
+  .is-battle .transmit-button .transmit-dial { display: block; position: absolute; top: 0; left: auto; right: 0; width: 44px; height: 44px; margin: 0; background: url("/art/ui/transmit-sigil.webp") center / contain no-repeat; filter: drop-shadow(0 3px 5px #000b); }
+  .is-battle .transmit-button .transmit-power { position: absolute; top: 0; left: auto; right: 0; width: 44px; height: 44px; display: grid; place-content: center; }
+  .is-battle .transmit-button .transmit-power strong { font-size: 17px; }
+  .is-battle .transmit-button .transmit-label { position: static; width: auto; font: 600 14px/1 var(--display); color: #ead3a0; text-shadow: 0 1px 3px #000; }
+}
+
+/* Narrow tables: the sigil and the piles sit in one row under the hand, left of Transmit. */
+@container game (max-width: 900px) {
+  .is-battle .pile-cluster { left: 64px; bottom: 9px; width: auto; display: flex; gap: 6px; }
+  .is-battle .pile-plate { height: 36px; padding: 0 9px 0 5px; }
+}
+@container game (max-width: 520px) {
+  .is-battle .pile-cluster { gap: 4px; }
+  .is-battle .pile-plate { padding: 0 6px 0 3px; }
+  .is-battle .pile-plate .pile-glyph, .is-battle .pile-plate .pile-glyph svg { width: 17px; height: 17px; }
+  .is-battle .pile-plate b { font-size: 14px; }
+}
+
+/* ---- armed protocols: gems in the Transmit dial's sockets (west, north, east, then south) */
+/* The ring is the sigil's own square; the sockets stand on its studs around its centre. */
+.protocol-ring {
+  position: absolute; z-index: 7; width: var(--dial-size, 140px); height: var(--dial-size, 140px); pointer-events: none;
+  right: calc(var(--dial-right, 11px) + (var(--dial-box, 145px) - var(--dial-size, 140px)) / 2); bottom: calc(var(--dial-bottom, 64px) + var(--dial-label, 40px));
+  /* The Transmit sigil's four gem studs sit at 38.6 % of its diameter from its centre. */
+  --reach: calc(var(--dial-size, 96px) * .386); --gem: clamp(22px, calc(var(--dial-size, 96px) * .23), 32px);
+}
+.protocol-socket {
+  position: absolute; left: calc(50% - var(--gem) / 2); top: calc(50% - var(--gem) / 2); width: var(--gem); height: var(--gem); padding: 0; margin: 0;
+  display: grid; place-items: center; border-radius: 50%; pointer-events: auto;
+  transform: rotate(var(--a, 0deg)) translateY(calc(var(--reach) * -1)) rotate(calc(var(--a, 0deg) * -1));
+  background: radial-gradient(circle at 45% 35%, #2a2016, #0b0906 72%);
+  border: 1px solid #c9a263; box-shadow: 0 0 0 2px #0c0906, 0 0 0 3px #8a6a3a, 0 3px 8px #000d;
+}
+.protocol-socket .socket-art { position: absolute; inset: 2px; border-radius: 50%; background-image: var(--card-image); background-size: var(--art-size, cover); background-position: var(--art-x, 50%) var(--art-y, 50%); filter: saturate(.85) brightness(.85); }
+.protocol-socket .socket-trigger { position: relative; display: grid; place-items: center; width: 16px; height: 16px; margin: 17px -17px 0 0; color: #f3dca0; font-style: normal; background: #120f0b; border: 1px solid #8a6a3a; border-radius: 50%; }
+.protocol-socket .socket-trigger svg { width: 10px; height: 10px; }
+.protocol-socket.empty { cursor: var(--cursor-default); background: radial-gradient(circle at 45% 35%, #1b1712, #070605 72%); border-color: #6f5a3a; box-shadow: 0 0 0 2px #0c0906, 0 0 0 3px #4a3a24, inset 0 2px 5px #000; }
+.protocol-socket.empty .socket-trigger { margin: 0; width: auto; height: auto; color: #6f6250; background: none; border: 0; }
+.protocol-socket.armed { cursor: var(--cursor-help, help); }
+.protocol-socket.armed:hover, .protocol-socket.armed:focus-visible { box-shadow: 0 0 0 2px #0c0906, 0 0 0 3px #f3dca0, 0 0 16px #ffb04a66, 0 3px 8px #000d; }
+.protocol-socket.will-trigger { border-color: #bff3f8; box-shadow: 0 0 0 2px #0c0906, 0 0 0 3px #74e0ec, 0 0 18px #74e0ecaa, 0 3px 8px #000d; animation: protocol-ready 1.8s ease-in-out infinite; }
+.protocol-socket.will-trigger .socket-art { filter: saturate(1.1) brightness(1.05); }
+.protocol-socket.will-trigger .socket-trigger { color: #e4fdff; border-color: #9aeef6; background: #0f3036; }
+
+/* ---- running daemons: seals studded on the player plate's edge */
+.daemon-seals { position: absolute; z-index: 3; top: 64px; right: -34px; display: grid; gap: 7px; pointer-events: auto; }
+.daemon-seal {
+  position: relative; display: grid; place-items: center; width: 38px; height: 38px; padding: 0; margin: 0;
+  border-radius: 50%; cursor: var(--cursor-help, help);
+  background: radial-gradient(circle at 45% 35%, #2c2140, #0d0a14 72%);
+  border: 1px solid var(--daemon, #b9a3ee); box-shadow: 0 0 0 2px #0c0906, 0 0 12px #9b7ff044, 0 4px 9px #000d;
+}
+/* The cog: brass teeth that turn while the process runs. */
+.daemon-seal .seal-cog {
+  position: absolute; inset: -5px; border-radius: 50%; pointer-events: none;
+  background: repeating-conic-gradient(from 0deg, #c9a263 0 7deg, transparent 7deg 22.5deg);
+  -webkit-mask: radial-gradient(circle, transparent 0 21px, #000 21.5px 24px, transparent 24.5px);
+  mask: radial-gradient(circle, transparent 0 21px, #000 21.5px 24px, transparent 24.5px);
+  opacity: .85; animation: daemon-turn 14s linear infinite;
+}
+.daemon-seal .seal-art { position: absolute; inset: 3px; border-radius: 50%; background-image: var(--card-image); background-size: var(--art-size, cover); background-position: var(--art-x, 50%) var(--art-y, 50%); filter: saturate(.9); box-shadow: inset 0 0 8px #000c; }
+.daemon-seal .daemon-count { position: absolute; right: -8px; bottom: -5px; display: grid; place-items: center; min-width: 20px; height: 17px; padding: 0 3px; font: 600 12px/1 var(--title); color: #f2eaff; background: #1a1428; border: 1px solid var(--daemon, #b9a3ee); border-radius: 9px; box-shadow: 0 0 0 1px #0c0906; }
+.daemon-seal:hover, .daemon-seal:focus-visible { border-color: #fff3dc; box-shadow: 0 0 0 2px #0c0906, 0 0 18px #b9a3eeaa, 0 4px 9px #000d; }
+@keyframes daemon-turn { to { transform: rotate(360deg); } }
+.reduced-motion .daemon-seal .seal-cog, .reduced-motion .protocol-socket.will-trigger { animation: none; }
+@media (prefers-reduced-motion: reduce) { .daemon-seal .seal-cog, .protocol-socket.will-trigger { animation: none; } }
+
+@keyframes console-sheen { 0%, 65% { background-position: -120% 0; } 100% { background-position: 140% 0; } }
+@keyframes console-pulse { 50% { filter: hue-rotate(150deg) saturate(.8) drop-shadow(0 0 16px #74e0ecdd); } }
 @keyframes engine-risk { 50% { box-shadow: inset 0 0 0 2px #1a0e12, 0 0 20px #ef8f8677; } }
+@keyframes protocol-ready { 50% { box-shadow: 0 0 0 2px #0c0906, 0 0 0 3px #9aeef6, 0 0 30px #74e0eccc, 0 3px 8px #000d; } }
 
-/* ------------------------------------------------------------ protocol dock */
-.protocol-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.protocol-slot {
-  position: relative;
-  display: grid;
-  grid-template-columns: 26px 1fr;
-  align-items: center;
-  gap: 7px;
-  height: 50px;
-  min-width: 0;
-  padding: 4px 8px 4px 6px;
-  text-align: left;
-  color: #e9e0cc;
-  border-radius: 12px 3px 3px 3px;
-  background: linear-gradient(135deg, #2b2327ee, #15131bee);
-  border: 1px solid #a8807055;
-  box-shadow: inset 0 0 0 2px #120e14, 0 6px 14px #0008;
+/* Narrow tables: no side columns. The console stands left above the hand, the protocol gems right. */
+@container game (max-width: 900px) {
+  .console-dock { left: 12px; bottom: calc(var(--hand-height) + 62px); width: min(230px, calc(50% - 24px)); }
+  .console-button { height: 44px; grid-template-columns: 40px minmax(0, 1fr); }
+  .console-glyph { width: 40px; height: 40px; }
+  .console-cost { left: 28px; top: 25px; }
+  .console-copy em, .engine-badge small { display: none; }
+  .engine-badge { width: 42px; height: 42px; }
+  .protocol-ring { right: 12px; bottom: calc(var(--hand-height) + 64px); width: auto; height: 38px; display: flex; gap: 10px; align-items: center; padding: 0 10px; background: linear-gradient(#211a12e6, #0e0b08e6); border: 1px solid #8a6a3a; border-radius: 19px; box-shadow: inset 0 0 0 2px #0c0906, 0 5px 12px #000b; pointer-events: auto; }
+  .protocol-ring .protocol-socket { position: relative; left: 0; top: 0; transform: none; width: 26px; height: 26px; }
+  .daemon-seals { top: auto; bottom: -46px; right: auto; left: 0; display: flex; }
+  .daemon-seal { width: 30px; height: 30px; }
+  .daemon-seal .seal-cog { -webkit-mask: radial-gradient(circle, transparent 0 17px, #000 17.5px 20px, transparent 20.5px); mask: radial-gradient(circle, transparent 0 17px, #000 17.5px 20px, transparent 20.5px); }
 }
-.protocol-slot > span { min-width: 0; }
-.protocol-slot i { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; color: #f0c7ae; background: #1a1117; border: 1px solid #c79a8166; font-style: normal; }
-.protocol-slot strong { display: block; font: 600 16px/1.05 var(--title); letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 0 #000; }
-.protocol-slot small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font: 11px/1.15 var(--text); color: #c0b4a4; }
-.protocol-slot small svg { vertical-align: -1px; }
-.protocol-slot.empty { color: #8a8580; background: repeating-linear-gradient(135deg, #14141acc 0 6px, #19181fcc 6px 12px); border-style: dashed; border-color: #6d5f5a66; box-shadow: none; }
-.protocol-slot.empty i { color: #6f6660; border-color: #5a4e4a66; }
-.protocol-slot.empty small { display: block; font: 700 10.5px/1.25 var(--label); letter-spacing: .06em; color: #9a8f86; }
-.protocol-slot.empty small span { font: italic 11px var(--text); letter-spacing: 0; color: #857d77; }
-.protocol-slot.armed { cursor: var(--cursor-default); border-color: #d59f8488; }
-.protocol-slot.armed::before { content: ""; position: absolute; inset: 3px; border-radius: 10px 2px 2px 2px; border: 1px solid #e2b49a22; pointer-events: none; }
-.protocol-slot.will-trigger {
-  border-color: #9aeef6;
-  background: linear-gradient(135deg, #173a40f2, #10202af2);
-  box-shadow: inset 0 0 0 2px #0a171d, 0 0 0 1px #74e0ec66, 0 0 22px #74e0ec44;
-  animation: protocol-ready 1.8s ease-in-out infinite;
-}
-.protocol-slot.will-trigger i { color: #e4fdff; border-color: #9aeef6; background: #0f3036; }
-.protocol-slot.will-trigger small { color: #bff3f8; font-weight: 600; }
-@keyframes protocol-ready { 50% { box-shadow: inset 0 0 0 2px #0a171d, 0 0 0 1px #9aeef6aa, 0 0 30px #74e0ec77; } }
-
-/* ------------------------------------------------------------ network ledger */
-.is-battle .network-ledger { left: calc(var(--rail) + 30px); right: calc(var(--rail) + 30px); gap: 6px; pointer-events: none; }
-.network-ledger .ledger-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  font: 700 11px/1 var(--label);
-  letter-spacing: .05em;
-  color: #c9d5c7;
-  background: #0a1820c4;
-  border: 1px solid #89a79733;
-  border-radius: 20px;
-  pointer-events: auto;
-  white-space: nowrap;
-}
-.network-ledger .ledger-chip.is-channels { color: #d7ecdf; }
-.network-ledger .ledger-chip.is-strong { color: #c7f6fb; border-color: #74e0ec66; box-shadow: 0 0 12px #74e0ec22; }
-.network-ledger .ledger-chip.is-offline { color: #e5b5a6; border-color: #c9887566; }
-.network-ledger .ledger-chip.has-offline { color: #e0c9a1; }
-.network-ledger .ledger-chip.is-fault { color: #f0a597; border-color: #c96f6399; background: #2a1414cc; }
-.network-ledger .ledger-chip.is-cluster { color: #f4dfae; border-color: #d4b06f77; }
-.network-ledger .ledger-chip.is-terrain { color: #c7bda8; font-weight: 500; letter-spacing: .06em; }
-.network-ledger .ledger-chip.is-next { color: #b9cfc7; }
-.network-ledger .ledger-chip.is-malware {
-  cursor: var(--cursor-pointer);
-  color: #f7c9ff;
-  border-color: #c77adf99;
-  background: linear-gradient(90deg, #3a1740d9, #1a0f22d9);
-  box-shadow: 0 0 14px #b85ad044;
-}
-.network-ledger .ledger-chip.is-malware b { color: #fff; padding-left: 5px; border-left: 1px solid #c77adf66; }
-.network-ledger .ledger-chip.is-malware:hover { border-color: #f0b6ff; box-shadow: 0 0 18px #d07ae877; }
-.network-ledger .ledger-chip.is-malware:disabled { cursor: var(--cursor-default); opacity: .6; }
-
-/* ------------------------------------------------------------ field seals */
-.field-seal { position: relative; }
-.field-seal .cluster-mark {
-  margin-left: auto;
-  padding: 1px 6px;
-  font: 700 10px/1.2 var(--label);
-  letter-spacing: .05em;
-  font-style: normal;
-  color: #1f1a10;
-  background: linear-gradient(#f3d796, #c79d57);
-  border-radius: 2px;
-  box-shadow: 0 0 10px #e7c27a66;
-}
-.field-seal.clustered { box-shadow: inset 0 0 0 1px #e2c18255, 0 0 18px #e2c18222; }
-.field-seal .band-meta { display: flex; align-items: center; gap: 4px; margin-top: 3px; font: 500 11px var(--label); letter-spacing: .04em; color: #97ab9f; }
-.field-seal .band-meta svg { color: #d58aeb; }
 
 /* ------------------------------------------------------------ intent extras */
 .intent-extras { display: flex; flex-wrap: wrap; gap: 4px 8px; }
@@ -235,13 +219,15 @@
 .intent-medallion.intent-infect .intent-emblem { color: #e5a8f7; }
 
 /* ------------------------------------------------------------ transmit states */
-.transmit-button.buffering .transmit-dial { filter: hue-rotate(155deg) saturate(1.2); }
+/* The Transmit sigil: the energy sigil's twin in the signal's teal (public/art/ui/transmit-sigil.webp). */
+.is-battle .transmit-button .transmit-dial { background-image: url("/art/ui/transmit-sigil.webp"); }
+.transmit-button.buffering .transmit-dial { filter: saturate(1.2) brightness(1.08) drop-shadow(0 0 14px #74e0ecaa) drop-shadow(0 6px 9px #000b); }
 .transmit-button.buffering .transmit-power strong { color: #c9f7fc; text-shadow: 0 0 18px #74e0ecaa; }
 .transmit-button.buffering .transmit-label { color: #c9f7fc; }
 .transmit-button.buffering::after {
   content: "";
   position: absolute;
-  inset: 12% 14% auto;
+  top: calc(var(--dial-size, 96px) * .09); left: 50%; width: calc(var(--dial-size, 96px) * .82); margin-left: calc(var(--dial-size, 96px) * -.41);
   aspect-ratio: 1;
   border-radius: 50%;
   border: 1px dashed #74e0ec88;
@@ -272,7 +258,7 @@ dialog .game-card > .card-heading::before, dialog .game-card > .card-heading::af
 }
 .game-root .game-card > .card-heading::before, dialog .game-card > .card-heading::before { left: 4px; }
 .game-root .game-card > .card-heading::after, dialog .game-card > .card-heading::after { right: 4px; }
-.card-name { display: block; max-width: 100%; font-size: min(1em, calc((100cqi - 20px) / (var(--name-len, 12) * .45))); }
+.card-name { display: block; max-width: 100%; }
 .game-root .game-card .card-rule, dialog .game-card .card-rule { font-weight: 400; color: #e6dfcf; text-shadow: 0 1px 1px #0008; }
 .game-root .game-card > .card-cost, dialog .game-card > .card-cost {
   padding-bottom: 1px;
@@ -398,9 +384,8 @@ dialog .game-card > .card-heading::before, dialog .game-card > .card-heading::af
 }
 .terrain-title.leaving { opacity: 0 !important; }
 /* The title owns the table for its beat; the log line and ledger step back. */
-.game-root:has(.terrain-title:not(.leaving)) .combat-log,
-.game-root:has(.terrain-title:not(.leaving)) .network-ledger { opacity: 0; transition: opacity .25s; }
-.game-root .combat-log, .game-root .network-ledger { transition: opacity .35s; }
+.game-root:has(.terrain-title:not(.leaving)) .combat-log { opacity: 0; transition: opacity .25s; }
+.game-root .combat-log { transition: opacity .35s; }
 .terrain-title span { display: flex; align-items: center; gap: 8px; font: 700 13px var(--label); letter-spacing: .12em; color: #cbb584; text-shadow: 0 1px 3px #000; }
 .terrain-title strong { font: 600 38px/1.15 var(--display); letter-spacing: .05em; color: #f6e8c6; text-shadow: 0 2px 18px #000, 0 0 30px #e2c18244; }
 .terrain-title p { margin: 2px 0 0; max-width: 460px; font: italic 17px/1.4 var(--text); color: #d6d6c8; text-shadow: 0 2px 8px #000; }
@@ -470,48 +455,20 @@ dialog .game-card > .card-heading::before, dialog .game-card > .card-heading::af
   .is-practice #lesson-layer .training-foot { margin-top: 8px; padding-top: 7px; }
   .is-practice #lesson-layer .training-foot { flex-wrap: wrap; row-gap: 4px; }
   .is-battle.is-practice #lesson-layer .training-panel.is-collapsed { max-height: none; }
-  .is-battle.is-practice .battle-left { top: auto; bottom: calc(var(--hand-height) + 22px); padding-top: 14px; padding-bottom: 14px; }
+  .is-battle.is-practice .battle-left { top: auto; bottom: max(calc(var(--hand-height) + 22px), calc(var(--console-bottom) + 66px)); padding-top: 14px; padding-bottom: 14px; }
   .is-battle.is-practice .battle-left .combatant-identity,
   .is-battle.is-practice .battle-left .perk-heading,
   .is-battle.is-practice .battle-left .battle-relics,
   .is-battle.is-practice .battle-left .reserve-note { display: none; }
-  .is-battle.is-practice .command-left { left: calc(var(--rail) + 32px); }
-  .is-battle.is-practice .target-hint { left: calc(var(--rail) + var(--dock-width) + 58px); }
+
   .is-battle.is-practice .tutorial-callout { display: none; }
-  .is-battle.is-practice #target-dock, .is-battle.is-practice .network-ledger, .is-battle.is-practice .combat-log { z-index: 26; }
+  .is-battle.is-practice #target-dock, .is-battle.is-practice .combat-log { z-index: 26; }
 }
 @keyframes training-dock { from { opacity: 0; transform: translateY(-8px); } }
 .lesson-debrief .transmit-button, .lesson-debrief .console-button { pointer-events: none; opacity: .6; }
 
 /* ------------------------------------------------------------ smaller tables */
-/* Short screens: the painted plates reach down to the dock row, so the docks start
-   past the rails instead of at the hand's edge. */
-@container game (min-width: 901px) and (max-height: 800px) {
-  .command-left { left: calc(var(--rail) + 26px); }
-  .command-right { right: calc(var(--rail) + 26px); }
-  .is-battle .target-hint { left: calc(var(--rail) + var(--dock-width) + 36px); right: calc(var(--rail) + var(--dock-width) + 36px); }
-  .is-battle .target-hint:not(.active) > span { display: none; }
-}
-@container game (max-width: 1250px) and (min-width: 901px) {
-  .is-battle { --dock-width: 236px; }
-  .console-copy em { font-size: 10px; }
-  .engine-badge { width: 56px; }
-}
-@container game (max-width: 1100px) and (min-width: 901px) {
-  .is-battle { --dock-width: 214px; }
-  .console-copy em, .protocol-slot small { display: none; }
-}
-@container game (max-width: 900px) {
-  .is-battle { --dock-bottom: calc(var(--hand-height) + 8px); --dock-width: calc(50% - 20px); }
-  .command-left { left: 12px; }
-  .command-right { right: 12px; }
-  .console-copy em, .protocol-slot small, .engine-badge small { display: none; }
-  .console-button, .protocol-slot, .engine-badge { height: 40px; }
-  .console-button { grid-template-columns: 28px 1fr auto; }
-  .console-glyph { width: 28px; height: 28px; }
-  .engine-badge { width: 44px; }
-  .network-ledger .ledger-chip.is-terrain, .network-ledger .ledger-chip.is-next { display: none; }
-}
+/* Short screens: the target hint keeps to the table between the rails. */
 @media (prefers-reduced-motion: reduce) {
   .console-button::after, .game-card.upgraded::after, .protocol-slot.will-trigger, .transmit-button.buffering::after, .engine-badge.at-risk { animation: none; }
 }
@@ -530,28 +487,6 @@ dialog .game-card > .card-heading::before, dialog .game-card > .card-heading::af
    intent line keeps clear of them at every rail width. */
 @container game (min-width: 901px) {
   .is-battle .battle-plate.enemy-plate { padding-bottom: max(36px, calc(var(--rail) * .175)); }
-}
-
-/* The console reads in full: the cost sits on the glyph like a card's cost gem,
-   so the command name and its effect get the whole face of the button. */
-.console-button { grid-template-columns: 38px minmax(0, 1fr); gap: 10px; padding: 4px 10px 4px 7px; }
-.console-glyph { position: relative; width: 38px; height: 38px; }
-.console-cost {
-  position: absolute; left: 29px; top: 27px; z-index: 1;
-  width: 20px; height: 22px; font-size: 12.5px;
-  box-shadow: 0 0 0 2px #0a141b;
-}
-.console-cost small { display: none; }
-.console-copy strong { font-size: 14px; letter-spacing: .03em; overflow: visible; text-overflow: clip; }
-.console-copy em { overflow: visible; text-overflow: clip; font-size: 11px; }
-@container game (max-width: 1250px) and (min-width: 901px) {
-  .console-copy strong { font-size: 13px; letter-spacing: .01em; }
-  .console-copy em { font-size: 10.5px; }
-}
-@container game (max-width: 900px) {
-  .console-button { grid-template-columns: 30px minmax(0, 1fr); }
-  .console-glyph { width: 30px; height: 30px; }
-  .console-cost { left: 21px; top: 19px; width: 17px; height: 19px; font-size: 11px; }
 }
 
 /* Field Training: the coach and a compact vitals card form one quiet column, both
@@ -582,7 +517,7 @@ dialog .game-card > .card-heading::before, dialog .game-card > .card-heading::af
   .is-battle.is-practice .player-resources strong { font-size: 20px !important; }
   .is-battle.is-practice .player-resources > div > span { grid-column: 1 / -1; font-size: 10px; }
   .is-battle.is-practice .player-tools { padding-top: 4px; }
-  .is-battle.is-practice .command-left { left: calc(var(--rail) + 44px); }
+
 }
 /* Docked coach: the words come first. The seal steps aside, the kicker keeps to one
    line, and the title stays compact so the coach's advice is visible without scrolling. */
@@ -602,26 +537,10 @@ dialog .game-card > .card-heading::before, dialog .game-card > .card-heading::af
   .is-battle.is-practice .player-resources { margin: 5px 0 0; border-bottom: 0; }
 }
 
-/* Big hands overlap to fit instead of scrolling (Slay the Spire style): every card
-   stays in view, later cards sit on top, and the hovered or selected card rises. */
-@container game (min-width: 901px) {
-  .is-battle .card-fan,
-  .is-battle .card-fan:has(.game-card:nth-child(7)) {
-    justify-content: center; overflow: visible; height: 100%; transform: none; padding: 0; gap: 0;
-  }
-  .is-battle .card-fan .game-card + .game-card {
-    margin-left: min(8px, calc((100cqw - 2 * var(--hand-edge) - 8px - var(--hand-size) * var(--card-width)) / (var(--hand-size) - 1)));
-  }
-  .is-battle .card-fan .game-card { position: relative; }
-  .is-battle .card-fan .game-card.selected { z-index: 40; }
-  .is-battle .card-fan:has(.game-card:nth-child(7)) .game-card:not(:hover):not(:focus-visible):not(.selected) { box-shadow: -10px 0 16px -8px #000c, inset 0 0 0 3px #080f1b; }
-  .is-battle .hand-scroll { display: none; }
-}
-
 /* In battle the hostile owns the top of the screen: messages speak from the
    narration line on the table instead, briefly replacing the log line. */
 @container game (min-width: 901px) {
-  .is-battle #toast { top: auto; bottom: calc(var(--field-bottom) + 90px); max-width: min(620px, calc(100cqw - 2 * var(--rail) - 120px)); transform: translate(-50%, 8px); }
+  .is-battle #toast { top: auto; bottom: calc(var(--field-bottom) + 124px); max-width: min(620px, calc(100cqw - 2 * var(--rail) - 120px)); transform: translate(-50%, 8px); }
   .is-battle #toast.show { transform: translate(-50%, 0); }
   .game-root.is-battle:has(#toast.show) .combat-log { opacity: 0; }
 }
@@ -651,45 +570,6 @@ dialog .game-card > .card-heading::before, dialog .game-card > .card-heading::af
 .is-battle .intent-extras .hazard-caption { margin: 0; }
 
 /* Network ledger: small riveted brass tags under the table. */
-.network-ledger .ledger-chip {
-  gap: 6px;
-  padding: 4px 13px 3px;
-  color: #d8cfb6;
-  text-shadow: 0 1px 0 #000;
-  background:
-    radial-gradient(circle at 5px 50%, #f0d49a 0 1.2px, #6d4f25 1.8px, transparent 2.4px),
-    radial-gradient(circle at calc(100% - 5px) 50%, #f0d49a 0 1.2px, #6d4f25 1.8px, transparent 2.4px),
-    linear-gradient(#241d14f2, #120e0af2);
-  border: 1px solid #7b5a2ccc;
-  border-radius: 1px;
-  box-shadow: inset 0 1px 0 #f3dca01c, inset 0 -1px 0 #000a, 0 3px 8px #000a;
-}
-.network-ledger .ledger-chip svg { color: #c9a263; }
-.network-ledger .ledger-chip b { font: 600 14px/.8 var(--title); letter-spacing: 0; color: #f3dca0; }
-.network-ledger .ledger-chip.is-channels { color: #dcd6c0; }
-.network-ledger .ledger-chip.is-strong { color: #d9f6f8; border-color: #6fbcc4aa; box-shadow: inset 0 1px 0 #bff3f81f, 0 0 12px #74e0ec2e, 0 3px 8px #000a; }
-.network-ledger .ledger-chip.is-strong svg, .network-ledger .ledger-chip.is-strong b { color: #9aeef6; }
-.network-ledger .ledger-chip.is-offline { color: #efbfae; border-color: #a8604cbb; }
-.network-ledger .ledger-chip.is-offline svg { color: #e8977f; }
-.network-ledger .ledger-chip.has-offline b { color: #eccb96; }
-.network-ledger .ledger-chip.is-fault { color: #f4b3a4; border-color: #b4574bcc; background: radial-gradient(circle at 5px 50%, #f5b0a0 0 1.2px, #6b2a22 1.8px, transparent 2.4px), radial-gradient(circle at calc(100% - 5px) 50%, #f5b0a0 0 1.2px, #6b2a22 1.8px, transparent 2.4px), linear-gradient(#2e1714f2, #160b0af2); }
-.network-ledger .ledger-chip.is-fault svg, .network-ledger .ledger-chip.is-fault b { color: #ffc2b2; }
-.network-ledger .ledger-chip.is-fault b { font: 700 11px/1 var(--label); letter-spacing: .04em; }
-.network-ledger .ledger-chip.is-cluster { color: #f4dfae; border-color: #c9a263; }
-.network-ledger .ledger-chip.is-terrain { color: #cfc4ab; font-weight: 700; letter-spacing: .05em; }
-.network-ledger .ledger-chip.is-next { color: #cdd6ca; }
-.network-ledger .ledger-chip .ledger-rise { display: inline-grid; margin-left: -2px; color: #9fe4c4; }
-.network-ledger .ledger-chip .ledger-rise svg { color: inherit; }
-.network-ledger .ledger-chip.is-malware {
-  color: #f3d2fb;
-  border-color: #b57ad0cc;
-  background: radial-gradient(circle at 5px 50%, #f0c4ff 0 1.2px, #5a2a6a 1.8px, transparent 2.4px), radial-gradient(circle at calc(100% - 5px) 50%, #f0c4ff 0 1.2px, #5a2a6a 1.8px, transparent 2.4px), linear-gradient(#2c1733f2, #150c19f2);
-  box-shadow: inset 0 1px 0 #f0c4ff1c, 0 0 14px #b85ad033, 0 3px 8px #000a;
-}
-.network-ledger .ledger-chip.is-malware svg { color: #e0a4f4; }
-.network-ledger .ledger-chip.is-malware em { display: inline-flex; align-items: center; gap: 2px; margin-left: 3px; padding-left: 8px; font-style: normal; color: #fff0ff; border-left: 1px solid #c77adf66; }
-.network-ledger .ledger-chip.is-malware em b { color: #fff0ff; }
-.network-ledger .ledger-chip.is-malware:hover:not(:disabled) { border-color: #f0b6ff; box-shadow: inset 0 1px 0 #f0c4ff2e, 0 0 20px #d07ae866, 0 3px 8px #000a; }
 
 /* The narration line: the latest log entry, read like a caption on the table. */
 .is-battle .combat-log {
@@ -742,14 +622,11 @@ dialog .game-card > .card-heading::before, dialog .game-card > .card-heading::af
 }
 .is-battle .tutorial-callout button:hover { color: #fff3d0; box-shadow: inset 0 0 0 1px var(--brass-hi), inset 0 0 0 2px #0f0c08, 0 0 12px var(--ember-glow), 0 2px 5px #000b; }
 
-/* Prompt line above the hand: the move, then its keys as keycaps. */
-.is-battle .target-hint { font: italic 14px/1.4 var(--text); color: #d6d3c2; text-shadow: 0 1px 3px #000; }
-.is-battle .target-hint.active { color: #f2d9a2; }
-.target-hint > .hint-keys { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; margin-top: 4px; font: 700 11px/1 var(--label); letter-spacing: .05em; font-style: normal; color: #a9b2a6; }
-.target-hint > .hint-keys > span { display: inline-flex; align-items: center; gap: 4px; }
-.target-hint > .hint-keys svg { color: #c9a263; }
+/* The prompt while a card or the console aims: one slim line on the hand's top edge, the move and
+   its way back. Idle, there is none (the keys are listed in Options · Controls). */
+.is-battle .target-hint { font: italic 14px/1.4 var(--text); color: #f2d9a2; text-shadow: 0 1px 3px #000, 0 0 12px #000; pointer-events: none; }
 .target-hint kbd { min-width: 18px; padding: 2px 5px 1px; }
-.is-battle .target-hint > button { display: inline-flex; align-items: center; gap: 6px; margin-left: 14px; font: 700 11.5px var(--label); letter-spacing: .06em; font-style: normal; color: #d9c79a; transition: color .18s; }
+.is-battle .target-hint > button { pointer-events: auto; display: inline-flex; align-items: center; gap: 6px; margin-left: 14px; font: 700 11.5px var(--label); letter-spacing: .06em; font-style: normal; color: #d9c79a; transition: color .18s; }
 .is-battle .target-hint > button:hover { color: #fff0cc; }
 .is-battle .transmit-button .transmit-shortcut { display: flex; align-items: center; justify-content: center; gap: 6px; font: italic 12px var(--text); color: #aea58f; }
 .is-battle .transmit-shortcut kbd { font: 700 10px/1.3 var(--label); letter-spacing: .06em; padding: 2px 6px 1px; color: #f0dcae; border: 1px solid #8a6a3a; border-bottom-width: 2px; border-radius: 3px; }
@@ -767,10 +644,8 @@ dialog .game-card > .card-heading::before, dialog .game-card > .card-heading::af
 .target-options kbd { min-width: 0; padding: 1px 5px 0; }
 
 /* Valid bands light up from inside; the seal's cut corners keep any outer glow clipped. */
-.field-seal.targetable { outline: 0; border-color: #f3dca0; background: linear-gradient(135deg, #3a3a28ed, #17261fed); box-shadow: inset 0 0 0 1px #0b0906, inset 0 0 0 3px #f3dca033, inset 0 0 26px #ffb04a33; animation: seal-ready 1.8s ease-in-out infinite; }
-.field-seal.targetable:hover { filter: brightness(1.25); }
+
 @keyframes seal-ready { 50% { box-shadow: inset 0 0 0 1px #0b0906, inset 0 0 0 3px #f3dca055, inset 0 0 34px #ffb04a55; } }
-.field-seal .cluster-mark { color: #221a0c; background: linear-gradient(#f3d796, #c79d57); }
 
 /* Hand arrows: brass studs. */
 .hand-scroll {
@@ -800,25 +675,10 @@ dialog .game-card > .card-heading::before, dialog .game-card > .card-heading::af
 .is-battle .enemy-plate::after { background: linear-gradient(135deg, #ffd8c8, #b8664e); box-shadow: 0 0 0 1px #05070a, 0 0 10px #e8aa8e60; }
 @media (prefers-reduced-motion: reduce) { .field-seal.targetable { animation: none; } }
 .reduced-motion .field-seal.targetable { animation: none; }
-@container game (max-width: 1250px) and (min-width: 901px) {
-  .is-battle .network-ledger { gap: 5px; }
-  .network-ledger .ledger-chip { gap: 5px; padding: 3px 11px 2px; font-size: 10.5px; }
-  .network-ledger .ledger-chip b { font-size: 13px; }
-  .protocol-slot.empty small { white-space: nowrap; }
-  .protocol-slot.empty small span { display: none; }
-}
-/* Wide tables keep the ledger on one line: the terrain tag gives way first. */
-@container game (min-width: 901px) {
-  .is-battle .network-ledger { flex-wrap: nowrap; }
-  .network-ledger .ledger-chip { flex-shrink: 0; }
-  .network-ledger .ledger-chip.is-terrain { flex-shrink: 1; min-width: 34px; overflow: hidden; text-overflow: ellipsis; }
-}
-/* Narrow tables: prompt and ledger span the table instead of the gap between the docks. */
+/* Narrow tables: the prompt spans the table. */
 @container game (max-width: 900px) {
   .is-battle .target-hint { left: 12px; right: 12px; }
-  .target-hint > .hint-keys { display: none; }
-  .is-battle .network-ledger { left: 12px; right: 12px; flex-wrap: wrap; }
-  .network-ledger .ledger-chip { padding: 3px 11px 2px; font-size: 10.5px; }
+
 }
 
 /* Short desktop windows: relic names give way to icons (their tooltips keep the name),
@@ -989,9 +849,13 @@ dialog .game-card > .card-heading::before, dialog .game-card > .card-heading::af
 /* ---- transmit dial: a second small line when the surplus overflows or the fight ends */
 .is-battle .transmit-button .transmit-note { display: block; margin-top: 1px; font: 700 10px/1.1 var(--label); letter-spacing: .08em; color: #e9cf95; text-shadow: 0 1px 2px #000; }
 .is-battle .transmit-button.is-finishing .transmit-note { color: #ffe29a; text-shadow: 0 0 8px #ffb04a88; }
+/* The note joins the name under the sigil; the key line steps down to make room. */
 @container game (min-width: 901px) {
-  .is-battle .transmit-button.has-note .transmit-label { top: 139px; }
-  .is-battle .transmit-button.has-note .transmit-shortcut { top: 178px; }
+  .is-battle .transmit-button.has-note .transmit-shortcut { top: calc(var(--dial-size) + 34px); }
+}
+/* Short tables: the note takes the key line's place (the key stays in the label and in Options). */
+@container game (min-width: 901px) and (max-height: 800px) {
+  .is-battle .transmit-button.has-note .transmit-shortcut { display: none; }
 }
 
 /* ---- the table front in the target dock and the ledger */
@@ -1018,41 +882,8 @@ dialog .game-card > .card-heading::before, dialog .game-card > .card-heading::af
 .target-options .repair-button svg, .target-options .scrub-button svg { flex: none; }
 .target-options.installation-targets { border-color: #9a6aa8; }
 .target-options.installation-targets button { color: #f3d2fb; }
-.network-ledger .ledger-chip .tag-pips { font-style: normal; letter-spacing: .04em; color: #f0c4ff; }
-.network-ledger .ledger-chip .tag-count { display: inline-grid; place-items: center; min-width: 15px; height: 15px; font: 600 12px/1 var(--title); font-style: normal; color: #ffe29a; border-radius: 50%; background: #0b0706; box-shadow: inset 0 0 0 1px #d6a24a, 0 0 6px #ffb04a66; }
-.network-ledger .ledger-chip .tag-name, .network-ledger .ledger-chip .tag-extra { font-style: normal; }
-/* A crowded ledger keeps one line by folding, step by step (main.ts fitLedger): installation
-   names, then per-tag costs and tighter tags, then the terrain and online tags. Every folded word
-   stays in the tag's tooltip and aria-label. Only then does it wrap, lifting the log line above it. */
-.is-battle .network-ledger.tight-1 .ledger-chip.is-installation .tag-name, .is-battle .network-ledger.tight-1 .ledger-chip .tag-extra { display: none; }
-.is-battle .network-ledger.tight-2 { gap: 4px; }
-.is-battle .network-ledger.tight-2 .ledger-chip { gap: 4px; padding-inline: 9px; }
-.is-battle .network-ledger.tight-2 .ledger-chip.is-installation em { display: none; }
-.is-battle .network-ledger.tight-3 .ledger-chip.is-terrain, .is-battle .network-ledger.tight-3 .ledger-chip.is-online { display: none; }
-@container game (min-width: 901px) {
-  .is-battle .network-ledger.is-wrapping { flex-wrap: wrap; row-gap: 4px; }
-  .is-battle .network-ledger.is-wrapping + .combat-log { transform: translate(-50%, -28px); }
-}
-.network-ledger .ledger-chip.is-installation.is-selected { border-color: #f0b6ff; box-shadow: inset 0 1px 0 #f0c4ff2e, 0 0 18px #d07ae866, 0 3px 8px #000a; }
-.network-ledger .ledger-chip.is-installation.is-target { border-color: #ffd0a0; box-shadow: 0 0 14px #ffb04a55, 0 3px 8px #000a; animation: seal-ready 1.8s ease-in-out infinite; }
+
 /* Wear: an iron tag in the fray colour; each worn device inside it repairs on click. */
-.network-ledger .ledger-chip.is-wear {
-  color: #f3cfb0; border-color: #a8683acc;
-  background: radial-gradient(circle at 5px 50%, #ffd0a0 0 1.2px, #6b3a1a 1.8px, transparent 2.4px), radial-gradient(circle at calc(100% - 5px) 50%, #ffd0a0 0 1.2px, #6b3a1a 1.8px, transparent 2.4px), linear-gradient(#2c1c12f2, #150d08f2);
-}
-.network-ledger .ledger-chip.is-wear svg { color: var(--fray); }
-.network-ledger .ledger-chip.is-wear .is-worn {
-  display: inline-flex; align-items: center; gap: 4px; padding: 0 5px; font: 700 11px/1.3 var(--label); letter-spacing: .05em; color: #ffe2c6;
-  background: none; border: 0; border-left: 1px solid #a8683a66; pointer-events: auto; transition: color .15s, text-shadow .15s;
-}
-.network-ledger .ledger-chip.is-wear .is-worn .tag-pips { margin-left: 3px; font-style: normal; color: var(--fray); }
-.network-ledger .ledger-chip.is-wear .is-worn:hover:not(:disabled) { color: #fff3e0; text-shadow: 0 0 8px #ffb04a88; }
-.network-ledger .ledger-chip.is-wear .is-worn:disabled { opacity: .55; }
-.network-ledger .ledger-chip.is-wear em { display: inline-flex; align-items: center; gap: 2px; padding-left: 6px; font-style: normal; border-left: 1px solid #a8683a66; }
-.network-ledger .ledger-chip.is-installation em { margin-left: 1px; padding-left: 6px; }
-.field-seal .band-meta .band-installs { display: inline-flex; align-items: center; gap: 3px; color: #e5b4f7; }
-.field-seal .band-meta .band-installs svg { color: #d58aeb; }
-.field-seal .anchor-mark { display: inline-grid; vertical-align: -2px; color: #f0c4ff; font-style: normal; }
 
 /* ---- packs on shorter tables: the identity line gives way to the strip, the ribbon rides
    beside the name as glyphs, the description keeps two lines (the rest in its tooltip) and
@@ -1129,24 +960,17 @@ dialog .game-card > .card-heading::before, dialog .game-card > .card-heading::af
 
 /* Reduced motion: the table front and the rail rest; state is carried by colour and pips alone. */
 .reduced-motion .port-bar > i, .reduced-motion .port-row { transition: none; }
-.reduced-motion .network-ledger .ledger-chip.is-installation.is-target { animation: none; }
 @media (prefers-reduced-motion: reduce) {
   .port-bar > i, .port-row { transition: none; }
-  .network-ledger .ledger-chip.is-installation.is-target { animation: none; }
 }
 
 /* Wide tables (≥ 1650 × 950 container px): a pack's plate reaches down to the dock row, so the docks
    line up with the field seals' outer edges, clear of both painted frames. */
-@container game (min-width: 1650px) and (min-height: 950px) {
-  .command-left { left: calc(var(--rail) + 44px); }
-  .command-right { right: calc(var(--rail) + 50px); }
-  .is-battle .target-hint { left: calc(var(--rail) + var(--dock-width) + 56px); right: calc(var(--rail) + var(--dock-width) + 62px); }
-}
 
-/* A device's or an installation's plate sits on the field seals' row (the seals dim beneath it), so
-   it never covers the hardware it describes. */
-.is-battle #target-dock.is-front { bottom: calc(var(--field-bottom) + 4px); }
-.is-battle:has(#target-dock.is-front:not(:empty)) .field-strip { opacity: .28; transition: opacity .15s; }
+/* A device's or an installation's plate stands just above the hand, low on the table's front edge,
+   so it never covers the hardware it describes. */
+.is-battle #target-dock.is-front { bottom: calc(var(--field-bottom) + 48px); }
+
 .is-battle #target-dock .device-controls > span:first-child { flex-basis: auto; margin-bottom: 0; }
 /* Relocation and repair travel together: one row on a wide table, a second row on a narrow one. */
 .target-options .dock-actions { display: inline-flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 7px; margin: 0; }
@@ -1157,3 +981,9 @@ dialog .game-card > .card-heading::before, dialog .game-card > .card-heading::af
 /* The plates take the pointer: their rules, ribbons and gauges answer hover with their tooltips, and a
    lesson can spotlight a reading (the guardian's window) that a click acknowledges. */
 .is-battle .battle-plate { pointer-events: auto; }
+
+/* Field Training's marks on the table: invisible rings over an installation or a worn device, placed
+   every frame with the camera (main.ts), so the spotlight can point at a thing that lives in the 3D. */
+#intent-layer .table-anchor { position: absolute; left: 0; top: 0; width: 76px; height: 76px; border-radius: 50%; pointer-events: none; }
+/* In a lesson the lit mark takes the click (a device in front can hide the installation behind it). */
+.is-practice #intent-layer .table-anchor.lesson-focus { pointer-events: auto; cursor: var(--cursor-pointer, pointer); }

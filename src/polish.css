@@ -2,9 +2,28 @@
 .game-root:not(.is-battle) #hand-zone, #hand-zone[hidden] { display: none !important; }
 .is-battle {
   --rail: 224px;
-  --hand-height: 274px;
+  /* The hand band is exactly one card tall: the hand's card scale (card-layout.css) sets it. */
+  --hand-scale: .772;
+  --hand-height: calc(355px * var(--hand-scale));
   --hand-edge: 158px;
-  --field-bottom: calc(var(--hand-height) + 94px);
+  /* The table's front edge above the hand: the target dock, the log line and messages stand on it. */
+  --field-bottom: calc(var(--hand-height) + 12px);
+  /* The energy sigil and the Transmit dial; the console stands on the one, the protocol gems sit in
+     the other (battle.css). */
+  /* The left cluster beside the hand: the pile plates, the energy sigil standing on them and the
+     console standing on the sigil (battle.css, three-energy.css); the hand starts right of it. */
+  --hand-left: 214px; --cluster-left: 16px; --cluster-width: calc(var(--hand-left) - 24px);
+  /* The energy sigil is as large as the Transmit dial (140 px): the piles lie in one row under it. */
+  --pile-height: 34px; --pile-gap: 5px; --pile-bottom: 10px;
+  --orb-size: 140px; --orb-bottom: calc(var(--pile-bottom) + var(--pile-height) + 8px);
+  --orb-left: calc(var(--cluster-left) + (var(--cluster-width) - var(--orb-size)) / 2);
+  --console-bottom: calc(var(--orb-bottom) + var(--orb-size) + 8px);
+  --console-width: var(--cluster-width);
+  /* Transmit: the energy sigil's twin, the same diameter, its centre level with the energy's. The box
+     holds the sigil, then its name and key (--dial-label); so it stands that much lower than the orb.
+     It stays as narrow as the original dial (145 px), clear of the hand band's right edge. */
+  --dial-size: var(--orb-size); --dial-label: 40px; --dial-right: 11px; --dial-bottom: calc(var(--orb-bottom) - var(--dial-label));
+  --dial-box: calc(var(--dial-size) + 5px);
 }
 .is-battle .world-stage { inset: -25px 0 160px; }
 .is-battle .encounter-heading { top: 80px; left: 50%; width: auto; min-width: 240px; transform: translateX(-50%); text-align: center; }
@@ -99,76 +118,30 @@
 .is-battle .enemy-plate .intent-description { display: block; margin: 0 0 12px; font: 12px/1.5 var(--text); color: #c4b8ab; }
 .is-battle .hazard-caption { display: flex; align-items: center; gap: 5px; color: #e5a497; font: 700 11px/1.25 var(--label); letter-spacing: .05em; margin: 9px 0 12px; }
 .is-battle .enemy-plate > .formula-button { font: 11px var(--text); display: flex; align-items: center; gap: 7px; margin: 8px 0 0; color: #c6b795; border: 0; }
-.field-strip { position: absolute; left: calc(var(--rail) + 52px); right: calc(var(--rail) + 52px); bottom: var(--field-bottom); display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; pointer-events: auto; }
-.field-seal { min-height: 56px; position: relative; padding: 9px 14px; text-align: left; border: 1px solid #8a9b7755; background: linear-gradient(145deg,#203028ec,#101c22ed); box-shadow: inset 0 0 0 3px #09141c,0 4px 16px #0008; clip-path: polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px); }
-.field-name { display: flex; align-items: center; gap: 7px; color: #e0cfa4; font: 600 14px var(--display); letter-spacing: .06em; text-shadow: 0 1px 0 #000; }
-.field-name svg { color: #8bb4ac; }
-.field-effects { display: flex; flex-wrap: wrap; column-gap: 10px; row-gap: 2px; margin-top: 5px; color: #9fb3a8; font: 700 11.5px/1.25 var(--label); letter-spacing: .05em; }
-.field-effects b { color: #f3e4bb; font: 600 14px/1 var(--title); letter-spacing: 0; padding-left: 3px; }
-.field-effects .hostile-field { color: #e6a5a5; }
-.field-effects .allied-field { color: #b5d8b7; }
-.field-seal.corrupted { background: linear-gradient(135deg,#432c39ed,#1b1928ed); border-color: #cb879c88; }
-.field-seal.empowered { border-color: #cfbd76aa; }
-.field-seal.threatened { border-bottom: 3px solid #d6927b; }
-.field-seal.targetable { outline: 2px solid #dbc585; background: linear-gradient(135deg,#505337ed,#1d302fed); cursor: var(--cursor-target); }
-.field-seal:hover, .field-seal:focus-visible { filter: brightness(1.3); }
+
 .threat-mark { margin-left: auto; color: #f0a888; font: 700 18px/1 var(--title); font-style: normal; text-shadow: 0 0 10px #e0603f88; }
-.is-battle .network-status { bottom: calc(var(--field-bottom) + 70px); left: 30%; right: 30%; margin: 0; font: 11px var(--text); }
-.is-battle .network-status span { background: #0a1820aa; padding: 4px 12px; border: 0; color: #c2cfb6; }
-.is-battle .combat-log { bottom: calc(var(--field-bottom) + 98px); max-width: calc(100% - 600px); font: 11px var(--text); border: 0; display: flex; align-items: center; gap: 7px; }
+
+.is-battle .combat-log { bottom: calc(var(--field-bottom) + 84px); max-width: calc(100% - 600px); font: 11px var(--text); border: 0; display: flex; align-items: center; gap: 7px; }
 .is-battle .combat-log svg { flex-shrink: 0; }
 .is-battle .battle-bottom { height: calc(var(--hand-height) + 58px); background: linear-gradient(0deg,#08111bf5 35%,#08111bd4 70%,transparent); }
-.is-battle .target-hint { position: absolute; bottom: calc(var(--hand-height) + 36px); top: auto; left: var(--hand-edge); right: var(--hand-edge); text-align: center; transform: none; width: auto; max-width: none; display: block; padding: 0; font: italic 13px/1.5 var(--text); color: #c8cfb9; white-space: normal; }
-.target-hint > span { display: block; font: 700 11px var(--label); letter-spacing: .05em; color: #a4b1a8; margin-top: 3px; }
+.is-battle .target-hint { position: absolute; bottom: calc(var(--hand-height) + 30px); top: auto; left: var(--hand-edge); right: var(--hand-edge); text-align: center; transform: none; width: auto; max-width: none; display: block; padding: 0; font: italic 13px/1.5 var(--text); color: #c8cfb9; white-space: normal; }
 .target-hint > button { margin-left: 12px; font: 700 11px var(--label); letter-spacing: .05em; }
-.is-battle #hand-zone { left: var(--hand-edge); right: var(--hand-edge); bottom: 12px; height: var(--hand-height); overflow: visible; }
-.is-battle .card-fan { display: flex; width: 100%; height: 100%; align-items: flex-end; justify-content: center; gap: 8px; padding: 0; overflow: visible; }
-.is-battle .card-fan:has(.game-card:nth-child(7)) { justify-content: flex-start; overflow-x: auto; overflow-y: hidden; height: calc(100% + 40px); transform: translateY(-40px); padding: 40px 4px 4px; scroll-snap-type: x proximity; scrollbar-width: none; }
+.is-battle #hand-zone { left: var(--hand-left, var(--hand-edge)); right: var(--hand-edge); bottom: 12px; height: var(--hand-height); overflow: visible; }
 .hand-scroll { position: absolute; top: -28px; width: 28px; height: 24px; display: grid; place-items: center; pointer-events: auto; color: #d9c697; border: 1px solid #b3a16b66; background: linear-gradient(135deg,#394135,#0f202a); z-index: 3; }
 .hand-scroll-left { left: 0; }
 .hand-scroll-right { right: 0; }
 .hand-scroll:hover { color: #fff0ca; border-color: #d6c18a; }
-.is-battle .card-fan::-webkit-scrollbar { display: none; }
-.game-root .game-card, dialog .game-card {
-  --card-height: 290px; --card-width: 178px; --picture-height: 105px;
-  display: grid; grid-template-rows: var(--picture-height) minmax(32px,auto) 1fr 22px; gap: 0;
-  width: var(--card-width); height: var(--card-height); padding: 6px; flex-shrink: 0;
-  transform: none; text-align: center; border-radius: 9px 9px 7px 7px;
-  background: radial-gradient(ellipse at 10% 0,#706344,#26302e 42%,#121d26 100%);
-  border: 1px solid #baa06b; box-shadow: inset 0 0 0 3px #080f1b,0 5px 14px #000a;
-}
-.game-root .game-card > .card-image, dialog .game-card > .card-image { position: relative; inset: auto; width: 100%; height: 100%; min-height: 0; border-radius: 4px 4px 0 0; }
-.game-root .game-card > .card-heading, dialog .game-card > .card-heading { position: relative; inset: auto; height: auto; min-height: 30px; display: grid; place-items: center; padding: 3px 10px 4px; font: 600 clamp(14px,12.4cqi,25px)/1.05 var(--title); letter-spacing: .01em; white-space: nowrap; }
-.game-root .game-card > .card-copy, dialog .game-card > .card-copy { position: relative; inset: auto; height: auto; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; padding: 9px 5px 3px; text-align: center; }
-.game-root .game-card .card-type, dialog .game-card .card-type { font: 600 clamp(10px,7cqi,12.5px)/1.15 var(--label); letter-spacing: .05em; color: #cdb582; margin: 0 0 6px; }
-.game-root .game-card .card-rule, dialog .game-card .card-rule { color: #e0dcc9; font: 12px/1.35 var(--text); }
-.game-root .game-card > .card-footer, dialog .game-card > .card-footer { position: relative; inset: auto; padding: 3px 5px 0; font: 600 10px/1 var(--label); letter-spacing: .05em; text-transform: none; color: #b3aa92; }
-.game-root .game-card > .card-cost, dialog .game-card > .card-cost { top: 8px; left: 8px; height: clamp(26px,19cqi,40px); width: clamp(26px,19cqi,40px); font: 700 clamp(18px,13.5cqi,28px)/1 var(--title); }
-.game-root .game-card .card-etch, dialog .game-card .card-etch { inset: 3px; border-color: #dbc49655; }
-.is-battle .card-fan .game-card { --card-height: var(--hand-height); --card-width: clamp(140px,11.35cqw,178px); --picture-height: 86px; margin: 0; animation: none; scroll-snap-align: center; }
-.game-root .game-card:hover, .game-root .game-card:focus-visible { z-index: 50 !important; transform: translateY(-20px); border-color: #f3dca0; filter: brightness(1.1); box-shadow: inset 0 0 0 3px #080f1b,0 0 22px #ffb04a2e,0 10px 26px #000d; }
-.game-root .game-card.selected { transform: translateY(-18px); border-color: #fff0c4; filter: brightness(1.14); box-shadow: inset 0 0 0 3px #080f1b,inset 0 0 22px #ffb04a26,0 0 0 1px #0b0906,0 0 30px 3px #ffb04a5c,0 12px 26px #000c; }
-.game-root .game-card.unplayable { filter: saturate(.7) brightness(.72); }
-.game-root .reward-cards .game-card { --card-width: 230px; --card-height: 355px; --picture-height: 148px; }
-.game-root .reward-cards .card-rule { font-size: 14px; }
-.is-battle .energy-orb { width: 89px; height: 89px; left: 35px; bottom: 133px; }
-.is-battle .energy-orb strong { font: 600 40px/1 var(--title); font-variant-numeric: tabular-nums; text-shadow: 0 2px 0 #000, 0 0 16px #ffb04a55; }
-.is-battle .energy-orb span { bottom: -20px; font: 700 12px var(--label); color: #dcc89c; letter-spacing: .08em; }
-.is-battle .draw-piles { left: 26px; right: auto; bottom: 24px; width: 114px; display: grid; grid-template-columns: 1fr 1fr; gap: 9px; justify-content: center; }
-.is-battle .draw-piles button { display: flex; width: auto; padding: 0; align-items: center; gap: 4px; font: 600 19px/1 var(--title); font-variant-numeric: tabular-nums; }
-.is-battle .draw-piles small { font: 700 10px var(--label); letter-spacing: .05em; margin-top: 2px; }
-.is-battle .draw-piles .exhaust-pile { grid-column: 1 / -1; justify-content: center; }
-.is-battle .draw-piles button > span { display: grid; gap: 2px; margin: 0; }
-.is-battle .energy-orb span { top: auto; }
+/* Cards (their one layout, the hand fan and the scale per view) live in card-layout.css. */
+.is-battle .energy-orb { width: var(--orb-size); height: var(--orb-size); left: var(--orb-left); bottom: var(--orb-bottom); }
 .is-battle .survival-forecast b { font-weight: 600; }
-.is-battle .transmit-button, .is-battle .transmit-button.ready { right: 11px; bottom: 65px; width: 145px; height: 187px; background: none; border: 0; box-shadow: none; display: block; }
-.is-battle .transmit-button .transmit-dial { display: block; width: 140px; height: 140px; left: 0; right: 0; margin-inline: auto; top: 0; transform: none; }
-.is-battle .transmit-button .transmit-power { position: absolute; top: 39px; left: 0; right: 0; }
-.is-battle .transmit-power strong { font: 600 38px/1 var(--title); font-variant-numeric: tabular-nums; }
-.is-battle .transmit-button .transmit-label { position: absolute; top: 145px; width: 100%; font: 17px var(--display); }
-.is-battle .transmit-button .transmit-shortcut { position: absolute; display: block; top: 172px; width: 100%; font: 10px var(--text); }
-.is-battle #target-dock { bottom: calc(var(--field-bottom) + 70px); max-width: calc(100% - 570px); width: max-content; }
-.is-battle:has(#target-dock:not(:empty)) .network-status, .is-battle:has(#target-dock:not(:empty)) .combat-log { visibility: hidden; }
+.is-battle .transmit-button, .is-battle .transmit-button.ready { right: var(--dial-right); bottom: var(--dial-bottom); width: var(--dial-box); height: calc(var(--dial-size) + var(--dial-label)); background: none; border: 0; box-shadow: none; display: block; }
+.is-battle .transmit-button .transmit-dial { display: block; width: var(--dial-size); height: var(--dial-size); left: 0; right: 0; margin-inline: auto; top: 0; transform: none; }
+.is-battle .transmit-button .transmit-power { position: absolute; top: 0; left: 0; right: 0; height: var(--dial-size); display: grid; place-content: center; justify-items: center; gap: 1px; }
+.is-battle .transmit-power strong { font: 600 calc(var(--dial-size) * .36)/1 var(--title); font-variant-numeric: tabular-nums; }
+.is-battle .transmit-button .transmit-label { position: absolute; top: calc(var(--dial-size) + 1px); width: 100%; font: 16px/1.1 var(--display); }
+.is-battle .transmit-button .transmit-shortcut { position: absolute; display: block; top: calc(var(--dial-size) + 20px); width: 100%; font: 10px var(--text); }
+.is-battle #target-dock { bottom: calc(var(--field-bottom) + 48px); max-width: calc(100% - 570px); width: max-content; }
+.is-battle:has(#target-dock:not(:empty)) .combat-log { visibility: hidden; }
 .target-options { background: linear-gradient(120deg,#29372beb,#0f1c23f7); border: 1px solid #b5a56b88; box-shadow: 0 0 0 3px #0b141aaa,0 8px 22px #0009; padding: 10px 14px; }
 .target-options > span { font: 700 11.5px var(--label); letter-spacing: .06em; color: #dbc9a0; }
 .target-options button { font: 700 12px var(--label); letter-spacing: .05em; padding: 7px 12px; }
@@ -177,17 +150,12 @@
 .game-root.in-market .reward-screen { background: radial-gradient(ellipse at center,#0c172055,transparent 70%); }
 
 @container game (min-width: 1650px) and (min-height: 950px) {
-  .is-battle { --rail: 254px; --hand-height: 312px; --hand-edge: 205px; }
+  .is-battle { --rail: 254px; --hand-scale: .879; --hand-edge: 205px; --hand-left: 262px; --cluster-left: 24px; --pile-height: 38px; --pile-bottom: 18px; --dial-right: 34px; }
   .is-battle .world-stage { inset: 10px 0 210px; }
   .is-battle .battle-plate { top: 168px; padding: 25px; }
-  .is-battle .card-fan .game-card { --card-width: 185px; --picture-height: 115px; }
-  .is-battle .card-rule { font-size: 13px; }
-  .is-battle .energy-orb { left: 55px; bottom: 156px; width: 108px; height: 108px; }
-  .is-battle .draw-piles { left: 55px; bottom: 35px; }
-  .is-battle .transmit-button { right: 34px; bottom: 83px; }
 }
 @container game (min-width: 901px) and (max-height: 900px) {
-  .is-battle { --rail: 208px; --hand-height: 248px; }
+  .is-battle { --rail: 208px; --hand-scale: .699; }
   .is-battle .world-stage { inset: -35px 0 140px; }
   .is-battle .battle-plate { top: 116px; padding: 17px 24px 24px 30px; }
   .is-battle .enemy-plate { padding-bottom: 32px; }
@@ -215,25 +183,16 @@
   .is-battle .enemy-plate .intent-description { font-size: 11px; }
   .intent-medallion { margin-block: 9px; }
   .is-battle .trait-badge { margin-block: 10px; }
-  .is-battle .card-fan .game-card { --picture-height: 64px; }
-  .is-battle .card-fan .card-rule { font-size: 11px; }
   .is-battle .combat-log { display: flex; max-width: 400px; font-size: 10px; }
-  .is-battle .energy-orb { bottom: 127px; }
-  .is-battle .transmit-button,.is-battle .transmit-button.ready { bottom: 46px; }
-  .field-strip { gap: 9px; }
-  .field-seal { min-height: 53px; padding: 8px 10px; }
+
 }
 @container game (max-width: 1100px) and (min-width: 901px) {
   .is-battle { --rail: 184px; --hand-edge: 145px; }
   .is-battle .battle-plate { padding-inline: 13px; }
-  .is-battle .card-fan { justify-content: flex-start; overflow-x: auto; }
-  .field-strip { left: 225px; right: 225px; gap: 6px; }
-  .field-seal { padding: 9px; }
-  .field-name { font-size: 13px; }
-  .field-effects { font-size: 10.5px; }
+
 }
 @container game (max-width: 900px) {
-  .is-battle { --rail: 170px; --hand-height: 249px; --hand-edge: 12px; --field-bottom: calc(var(--hand-height) + 125px); }
+  .is-battle { --rail: 170px; --hand-scale: .701; --hand-edge: 12px; --hand-left: 12px; --field-bottom: calc(var(--hand-height) + 60px); }
   .is-battle .battle-plate { top: 94px; padding: 12px; }
   .is-battle .battle-left { left: 12px; }
   .is-battle .battle-right { right: 12px; }
@@ -278,27 +237,16 @@
   .is-battle .intent-emblem { width: 30px; height: 30px; flex-basis: 30px; }
   .intent-emblem svg { width: 21px; height: 21px; }
   .is-battle .enemy-plate .intent-description { font-size: 11px; }
-  .field-strip { left: 16px; right: 16px; gap: 7px; }
-  .field-name { font-size: 13px; }
-  .field-effects { font-size: 10px; }
+
   .is-battle .combat-log { display: none; }
-  .is-battle .network-status { bottom: calc(var(--field-bottom) + 63px); left: 15%; right: 15%; }
+
   .is-battle .world-stage { inset: 133px -90px 225px; }
   .is-battle #hand-zone { bottom: 54px; }
-  .is-battle .card-fan { overflow-x: auto; justify-content: flex-start; align-items: stretch; padding: 0 2px 4px; }
-  .is-battle .card-fan .game-card { --card-width: 158px; --picture-height: 72px; }
-  .is-battle .card-fan .card-rule { font-size: 11px; }
-  .is-battle .game-card:hover,.is-battle .game-card.selected { transform: none; }
-  .is-battle .target-hint { bottom: calc(var(--hand-height) + 70px); font-size: 12.5px; }
-  .target-hint > span { display: none; }
+  .is-battle .target-hint { bottom: calc(var(--hand-height) + 62px); font-size: 12.5px; }
   .is-battle .battle-bottom { height: calc(var(--hand-height) + 64px); }
-  .is-battle .energy-orb { width: 38px; height: 38px; bottom: 8px; left: 14px; background: radial-gradient(#545c3e,#182721); border: 1px solid #b5b287; }
-  .is-battle .energy-orb strong { font: 600 23px/1 var(--title); }
-  .is-battle .energy-orb span { display: none; }
-  .is-battle .draw-piles { display: flex; left: 64px; bottom: 13px; width: 150px; gap: 10px; flex-wrap: nowrap; }
-  .is-battle .draw-piles .exhaust-pile { flex-basis: auto; }
+  .is-battle .energy-orb { width: 44px; height: 44px; bottom: 5px; left: 12px; }
   .is-battle .transmit-button,.is-battle .transmit-button.ready { width: 125px; height: 38px; min-height: 0; padding: 0; color: #ead3a0; right: 12px; bottom: 8px; border: 1px solid #baa16a; background: linear-gradient(#615237,#262b24); display: flex; align-items: center; justify-content: center; gap: 10px; }
-  .is-battle .transmit-button .transmit-dial,.is-battle .transmit-button .transmit-shortcut { display: none; }
+  .is-battle .transmit-button .transmit-shortcut { display: none; }
   .is-battle .transmit-button .transmit-power { position: static; }
   .is-battle .transmit-power strong { font: 600 22px/1 var(--title); }
   .is-battle .transmit-power small { display: none; }
@@ -317,11 +265,7 @@
   .is-battle .player-tools .undo-button { padding-top: 4px; }
   .is-battle .enemy-plate > .formula-button { font-size: 10px; }
   .is-battle .world-stage { inset: 215px -130px 230px; }
-  .field-seal { padding: 7px; min-height: 51px; }
-  .field-name { gap: 4px; font: 700 12px var(--label); letter-spacing: .04em; }
-  .field-name svg { width: 13px; }
-  .game-root .reward-cards .game-card { --card-width: 180px; --card-height: 310px; --picture-height: 112px; }
-  .game-root .reward-cards .card-rule { font-size: 12px; }
+
 }
 
 /* The painted rim is decoration; reserve an interior gutter for every control. */
@@ -440,7 +384,7 @@ body { min-width: 320px; }
   .is-battle { --rail: 208px; }
   .is-battle .battle-plate { padding-left: 30px; padding-right: 24px; }
   .is-battle .player-resources strong { font-size: 24px; }
-  .field-strip { left: 247px; right: 247px; }
+
 }
 @container game (max-width: 900px) {
   .game-root.is-battle { min-height: 820px; }
@@ -460,10 +404,6 @@ body { min-width: 320px; }
   .is-battle .player-tools { grid-template-columns: 1fr 24px 24px; }
   .is-battle .player-tools .devices-button { justify-content: center; }
   .is-battle .player-tools .devices-button span { display: none; }
-  .is-battle .draw-piles { left: 57px; width: 106px; gap: 7px; }
-  .is-battle .draw-piles button { font-size: 16px; }
-  .is-battle .draw-piles button > svg { display: none; }
-  .is-battle .draw-piles small { font-size: 9.5px; }
   .is-battle .transmit-button, .is-battle .transmit-button.ready { width: 108px; gap: 6px; }
 }
 .is-battle .enemy-plate .intent-medallion strong { min-width: 0; overflow-wrap: anywhere; }
@@ -472,14 +412,12 @@ body { min-width: 320px; }
 @container game (min-width: 1200px) and (min-height: 761px) {
   .is-battle .tutorial-callout { display: block; }
 }
-.game-root .game-card.drag-ghost { position: absolute; margin: 0; transform-origin: center; transform: translate(-50%, -50%) rotate(-7deg) scale(.82); }
 #game-tooltip { position: absolute; }
 .intent-states { display: flex; flex-wrap: wrap; gap: 6px; }
 .enrage-warning { color: #f1a18b; font: 700 11px var(--label); letter-spacing: .07em; }
 /* Keep a complete hand on 720p laptops without shrinking its rules text. */
 @container game (min-width: 901px) and (max-height: 710px) {
-  .game-root.is-battle { min-height: 665px; --hand-height: 224px; }
-  .is-battle .card-fan .game-card { --picture-height: 40px; }
+  .game-root.is-battle { min-height: 665px; --hand-scale: .631; }
   .is-battle .battle-plate { top: 96px; }
   .is-battle .battle-plate::before { inset: -30px -17px -20px -24px; }
   .is-battle .plate-kicker { display: none; }
@@ -498,7 +436,6 @@ body { min-width: 320px; }
 .enemy-pattern small { display: block; margin-top: 5px; color: #d5a9c6; font-size: 10px; }
 
 /* One held card trades a draw for a planned answer. */
-.is-battle .draw-piles .exhaust-pile { grid-column: auto; justify-content: start; }
 .prepared-pile.occupied { color: #b8ebd1; }
 .boss-window { padding: 8px 0; margin-bottom: 8px; border-block: 1px solid #c887674f; color: #f1bb99; }
 .boss-window > span, .boss-window > strong { display: block; }
@@ -547,3 +484,22 @@ body { min-width: 320px; }
   .is-battle .round-banner { justify-content: flex-end; margin-top: 4px; font-size: 14px; gap: 8px; text-shadow: 0 1px 3px #000; }
   .is-battle .round-banner i { display: none; }
 }
+
+/* Short tables (≤ 800 container px): the left cluster tightens (smaller plates, a smaller sigil) so
+   the console stays clear of the player plate. */
+@container game (min-width: 901px) and (max-height: 800px) {
+  /* The table is taller than a 720p window by a few pixels here: the row stands clear of its foot. */
+  .is-battle { --pile-height: 32px; --pile-bottom: 12px; }
+}
+@container game (min-width: 901px) and (max-width: 1100px) and (max-height: 800px) {
+  .is-battle { --hand-left: 182px; }
+}
+
+/* Options · Controls: the battle's keys as keycaps beside what they do (the table itself shows none). */
+.key-legend { display: grid; gap: 0; margin: 4px 0 0; }
+.key-legend > div { display: grid; grid-template-columns: 170px minmax(0, 1fr); align-items: center; gap: 14px; min-height: 32px; border-bottom: 1px solid #c9a2631a; }
+.key-legend dt { display: flex; align-items: center; gap: 4px; font: 700 11px/1 var(--label); letter-spacing: .05em; color: #c2ae82; white-space: nowrap; }
+.key-legend dd { margin: 0; font: 14.5px/1.25 var(--text); color: var(--text-body, #cfc7b5); }
+.key-legend kbd { min-width: 20px; padding: 3px 6px 2px; font: 700 11px/1 var(--label); letter-spacing: .04em; color: #f0dcae; border: 1px solid #8a6a3a; border-bottom-width: 2px; border-radius: 3px; background: linear-gradient(#2a2217, #140f0a); text-align: center; }
+@container game (max-width: 600px) { .key-legend > div { grid-template-columns: 120px minmax(0, 1fr); } }
+

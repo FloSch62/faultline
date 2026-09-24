@@ -260,10 +260,7 @@
 .pick-tile { position: relative; display: grid; justify-items: center; align-content: start; gap: 8px; padding: 0; animation: screen-rise .4s backwards; }
 .pick-tile:focus-visible { outline: none; box-shadow: none; }
 .pick-face { display: block; transition: opacity .2s, transform .25s; }
-.pick-tile .game-card { --card-width: 146px; --card-height: 224px; --picture-height: 70px; pointer-events: none; animation: none; }
-.game-root .pick-tile .game-card .card-heading { font-size: 15px; min-height: 26px; }
-.game-root .pick-tile .game-card .card-rule { font-size: 11px; line-height: 1.3; }
-.game-root .pick-tile .game-card .card-cost { width: 24px; height: 24px; font-size: 17px; }
+.pick-tile .game-card { pointer-events: none; animation: none; }
 .pick-after { position: absolute; top: 0; opacity: 0; transform: translateY(6px); }
 .pick-upgrade:not(.blocked):hover .pick-before, .pick-upgrade:not(.blocked):focus-visible .pick-before { opacity: 0; }
 .pick-upgrade:not(.blocked):hover .pick-after, .pick-upgrade:not(.blocked):focus-visible .pick-after { opacity: 1; transform: translateY(-6px); }
@@ -312,9 +309,7 @@
 }
 .market-shelf::after { content: ""; position: absolute; left: 4%; right: 4%; bottom: -1px; height: 1px; background: linear-gradient(90deg, transparent, #e0b86aaa, transparent); }
 .market-offer { position: relative; display: grid; justify-items: center; gap: 10px; animation: screen-rise .5s calc(var(--order) * .07s) backwards; }
-.market-offer .game-card { --card-width: 164px; --card-height: 252px; --picture-height: 88px; transition: transform .22s, box-shadow .22s, border-color .22s; }
-.game-root .market-offer .game-card .card-heading { font-size: 16px; }
-.game-root .market-offer .game-card .card-rule { font-size: 11.5px; line-height: 1.35; }
+.market-offer .game-card { transition: transform .22s, box-shadow .22s, border-color .22s; }
 .market-offer:not(.sold):hover .game-card { transform: translateY(-8px); border-color: var(--brass-hi); box-shadow: 0 0 0 1px #0b0906, 0 0 24px #ffb04a40, 0 16px 30px #000b; }
 .market-offer.sold .game-card { filter: grayscale(.9) brightness(.45); transform: none; box-shadow: none; }
 .sold-stamp { position: absolute; top: 96px; left: 50%; transform: translateX(-50%) rotate(-10deg); padding: 7px 18px 6px; font: 600 18px/1 var(--display); letter-spacing: .14em; color: #e0c38a; border: 1px solid #e0c38a; background: #0b0f14e0; box-shadow: inset 0 0 0 2px #0b0f14, inset 0 0 0 3px #e0c38a55; pointer-events: none; }
@@ -456,8 +451,6 @@
   .relic-screen.v3 .relic-options, .service-row { margin-top: 44px; }
   .full-screen .screen-head h1 { font-size: 40px; }
   .market-screen { justify-content: safe center; padding-bottom: 60px; }
-  .market-offer .game-card { --card-width: 180px; --card-height: 276px; --picture-height: 96px; }
-  .game-root .market-offer .game-card .card-rule { font-size: 12.5px; }
 }
 @container game (max-width: 1250px) {
   .map-screen { inset: 80px 24px 18px; }
@@ -483,8 +476,6 @@
   .reward-screen.v3 { padding-top: 14px; }
   .reward-screen.v3 .spoils { margin-top: 10px; padding-block: 5px; }
   .reward-screen.v3 .reward-cards { margin: 16px 0 12px; gap: 26px; }
-  .game-root .reward-screen.v3 .reward-cards .game-card { --card-width: 196px; --card-height: 296px; --picture-height: 112px; }
-  .game-root .reward-screen.v3 .reward-cards .card-rule { font-size: 13px; }
   .reward-skip { min-height: 36px; }
   .relic-screen.v3 { padding-top: 18px; }
   .relic-screen.v3 .relic-options { margin-top: 18px; }
@@ -506,8 +497,6 @@
   .purse strong { font-size: 27px; }
   .market-shelf { margin: 10px auto 10px; padding: 14px 10px 12px; gap: 12px; }
   .market-offer { gap: 7px; }
-  .market-offer .game-card { --card-width: 146px; --card-height: 222px; --picture-height: 66px; }
-  .game-root .market-offer .game-card .card-rule { font-size: 10.5px; }
   .price-button, .price-tag { min-height: 32px; min-width: 84px; padding: 4px 12px; }
   .market-lower { gap: 14px; }
   .market-relics, .market-services { gap: 6px; }
@@ -538,9 +527,6 @@
   .market-lower { grid-template-columns: 1fr 1fr; }
   .market-exit { grid-column: 1 / -1; flex-direction: row; justify-content: flex-end; align-items: center; }
   .market-shelf { gap: 10px; flex-wrap: nowrap; }
-  .market-offer .game-card { --card-width: 132px; --card-height: 212px; --picture-height: 58px; }
-  .game-root .market-offer .game-card .card-heading { font-size: 14px; }
-  .game-root .market-offer .game-card .card-rule { font-size: 10px; }
   .market-offer .price-button { min-width: 0; width: 100%; }
   .relic-screen.v3 .relic-option { width: 236px; }
 }
@@ -592,7 +578,6 @@
   .service-row { gap: 14px; }
   .service-card { width: 100%; min-height: 0; }
   .service-art { height: 90px; }
-  .market-offer .game-card { --card-width: 140px; --card-height: 222px; --picture-height: 64px; }
   .purse strong { font-size: 26px; }
   .event-screen { padding: 8px 6px 14px; }
   .event-frame { --frame-side: 26px; }

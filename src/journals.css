@@ -32,7 +32,7 @@ dialog.medium { max-width: min(820px, calc(100cqw - 24px)); }
 .archive-search::-webkit-search-cancel-button { -webkit-appearance: none; display: none; }
 .collection-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); justify-items: center; gap: 30px 10px; padding: 26px 12px 34px; background: radial-gradient(90% 60% at 50% 0, #18202b, transparent 70%), linear-gradient(#0a0e13, #080b10); border: 1px solid #4a3920; box-shadow: inset 0 0 0 1px #05070a, inset 0 4px 22px #000c, 0 1px 0 #f3dca012; }
 .collection-entry { position: relative; }
-.collection-entry .game-card { --card-height: 272px; position: relative; z-index: 1; transition: transform .18s, border-color .18s, box-shadow .18s, filter .18s; }
+.collection-entry .game-card { position: relative; z-index: 1; transition: transform .18s, border-color .18s, box-shadow .18s, filter .18s; }
 .collection-entry .game-card:hover, .collection-entry .game-card:focus-visible { transform: translateY(-5px); border-color: var(--brass-hi); filter: brightness(1.08); box-shadow: inset 0 0 0 3px #080f1b, 0 0 0 1px #0b0906, 0 0 24px #ffb04a3d, 0 12px 26px #000c; }
 /* More than one copy: a second card edge shows behind, and a count plate hangs below. */
 .collection-entry.is-stacked::before { content: ""; position: absolute; inset: 0; transform: translate(6px, -6px); border: 1px solid #7b5a2c; border-radius: 9px 9px 7px 7px; background: linear-gradient(160deg, #26241c, #10151b); box-shadow: 0 4px 12px #000a; }
@@ -41,8 +41,7 @@ dialog.medium { max-width: min(820px, calc(100cqw - 24px)); }
 /* ---------------------------------------------------------------- card inspection */
 .card-inspect { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 46px; align-items: start; padding: 4px 6px 0; }
 .inspect-card { display: grid; justify-items: center; padding-top: 6px; }
-.card-inspect .game-card { --card-width: 240px; --card-height: 380px; --picture-height: 172px; transform: none; pointer-events: none; cursor: var(--cursor-default); box-shadow: inset 0 0 0 3px #080f1b, 0 0 30px #ffb04a1f, 0 16px 34px #000d; }
-.card-inspect .card-rule { font-size: 14px; }
+.card-inspect .game-card { transform: none; pointer-events: none; cursor: var(--cursor-default); box-shadow: inset 0 0 0 3px #080f1b, 0 0 30px #ffb04a1f, 0 16px 34px #000d; }
 .inspect-head h2 { margin: 0; font-size: 33px; line-height: 1.1; }
 .inspect-kind { margin: 8px 0 0; font: 700 14px/1.3 var(--label); letter-spacing: .08em; color: #c9a263; }
 .inspect-rules { margin: 18px 0 0; font: 19px/1.55 var(--text); color: var(--text-hi); }
@@ -350,7 +349,7 @@ dialog.offer-dialog .dialog-surface { padding-bottom: 22px; }
     #0a0d11; }
 .offer-cards { display: flex; gap: 18px; }
 .offer-card { display: grid; justify-items: center; gap: 10px; }
-.offer-card .game-card { --card-width: 178px; --card-height: 290px; --picture-height: 96px; animation: none; transition: transform .18s, border-color .18s, box-shadow .18s, filter .18s; }
+.offer-card .game-card { animation: none; transition: transform .18s, border-color .18s, box-shadow .18s, filter .18s; }
 .offer-card .game-card:hover, .offer-card .game-card:focus-visible { transform: translateY(-5px); border-color: var(--brass-hi); filter: brightness(1.08); box-shadow: inset 0 0 0 3px #080f1b, 0 0 0 1px #0b0906, 0 0 24px #ffb04a3d, 0 12px 26px #000c; }
 .offer-card kbd { font-size: 12px; min-width: 26px; padding: 4px 6px 3px; }
 
@@ -415,13 +414,11 @@ button.dossier-port:hover:not(.is-lit), button.dossier-port:focus-visible { bord
 @container game (min-width: 1500px) and (min-height: 900px) {
   dialog.offer-dialog { max-width: min(700px, calc(100cqw - 24px)); }
   dialog.offer-dialog:has(.offer-page.is-crate) { max-width: min(860px, calc(100cqw - 24px)); }
-  .offer-card .game-card { --card-width: 196px; --card-height: 304px; --picture-height: 110px; }
 }
 @container game (max-height: 700px) {
   .archive-toolbar { padding-block: 10px 18px; }
   .collection-grid { padding-top: 20px; }
   .card-inspect { grid-template-columns: 214px minmax(0, 1fr); gap: 38px; }
-  .card-inspect .game-card { --card-width: 206px; --card-height: 326px; --picture-height: 142px; }
   .inspect-rules { margin-top: 12px; font-size: 18px; }
   .inspect-facts { gap: 4px; margin-top: 14px; padding-block: 10px 11px; }
   .upgrade-compare, .synergy-note { margin-top: 12px; }
@@ -429,8 +426,6 @@ button.dossier-port:hover:not(.is-lit), button.dossier-port:focus-visible { bord
 }
 @container game (max-width: 900px) {
   .card-inspect { grid-template-columns: 180px minmax(0, 1fr); gap: 26px; }
-  .card-inspect .game-card { --card-width: 176px; --card-height: 290px; --picture-height: 118px; }
-  .card-inspect .card-rule { font-size: 12px; }
   .calculation-grid { gap: 0 32px; }
   .collection-grid { padding-inline: 8px; }
   .archive-find { flex-basis: 100%; }
@@ -464,7 +459,6 @@ button.dossier-port:hover:not(.is-lit), button.dossier-port:focus-visible { bord
   .offer-plate { padding: 0 14px 14px; }
   .offer-plate.is-crate { grid-template-columns: 1fr; justify-items: center; }
   .offer-crate-art { max-width: 150px; }
-  .offer-card .game-card { --card-width: 140px; --card-height: 226px; --picture-height: 70px; }
   .dossier-port { grid-template-columns: 48px minmax(0, 1fr); }
   .dossier-port > .port-tag { grid-column: 1 / -1; justify-self: start; margin: 0; }
   .dossier-health { grid-column: 2; justify-items: start; }

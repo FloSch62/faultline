@@ -796,6 +796,19 @@ export function trackMarkup(title: string) {
   return `${NOTE}${sicon("warn", 16)}<span class="track-title">${esc(title)}</span>`;
 }
 
+/** The battle's keys (main.ts keydown): the table carries no legend, Options lists them. */
+const KEY_LEGEND: [string, string][] = [
+  ["<kbd>1</kbd>–<kbd>0</kbd>", "Play or choose a card in hand"],
+  ["<kbd>C</kbd>", "Console command"],
+  ["<kbd>Space</kbd> <kbd>Enter</kbd>", "Transmit and end the turn"],
+  ["<kbd>P</kbd>", "Prepare a card for next turn"],
+  ["<kbd>Z</kbd>", "Undo"],
+  ["<kbd>Esc</kbd>", "Put a card back · Options"],
+  ["<kbd>F</kbd>", "Target the next hostile"],
+  ["<kbd>S</kbd> · <kbd>R</kbd>", "Scrub an installation · repair a worn device"],
+  ["<kbd>I</kbd> · right-click", "Inspect a card"],
+  ["Point · <kbd>Tab</kbd>", "Read a card in hand, large"],
+];
 export function settingsMarkup(s: AudioSettings, inRun: boolean, preferences: Preferences, fullscreen: boolean) {
   const volume = (key: "music" | "effects", label: string) => {
     const value = Math.round(s[key] * 100);
@@ -807,6 +820,7 @@ export function settingsMarkup(s: AudioSettings, inRun: boolean, preferences: Pr
     <section class="settings-group"><h3>Audio</h3>${toggle("Sound", 'data-setting="sound"', !s.muted)}${volume("music", "Music")}${volume("effects", "Sound effects")}</section>
     <section class="settings-group"><h3>Gameplay</h3>${toggle("Motion & screen shake", 'data-setting="motion"', s.motion)}${toggle("Contextual field notes", 'data-preference="tips"', preferences.tips)}${toggle("Quick transmissions", 'data-preference="fast"', preferences.fast)}</section>
     <section class="settings-group"><h3>Display</h3>${toggle("Fullscreen", 'data-setting="fullscreen"', fullscreen)}</section>
+    <section class="settings-group controls-group"><h3>Controls</h3><dl class="key-legend">${KEY_LEGEND.map(([keys, what]) => `<div><dt>${keys}</dt><dd>${what}</dd></div>`).join("")}</dl></section>
     <div class="settings-actions button-row"><button class="gold-button" data-action="close">Return</button>${inRun ? '<button class="plate-button" data-action="save-exit">Save & return to title</button>' : ""}<button class="text-button" data-action="credits">Credits</button></div></div>`;
 }
 

@@ -1,0 +1,176 @@
+/* FAULTLINE · the card, one layout for every view (Slay the Spire / Hearthstone style).
+   Every card is built once at its design size, 230 × 355, with fixed proportions: a 146 px picture
+   window (41 % of the card), a 36 px nameplate, the type line and rules box, a 24 px footer. A view
+   never re-lays a card out: it scales the whole card with --card-scale, applied as CSS zoom so the
+   layout space matches what is drawn. The same painting therefore shows the same crop in the hand,
+   the archive, the market, a picker, the inspector and the rewards.
+   Loaded last (main.ts); the skins (owner frames, kinds, curses, keyword marks) live in battle.css and
+   three-energy.css. Sizes below are design pixels, before the scale. */
+
+/* ------------------------------------------------------------ the design */
+.game-root .game-card, dialog .game-card {
+  --picture-height: 146px;
+  zoom: var(--card-scale, 1);
+  display: grid; grid-template-rows: 146px 36px minmax(0, 1fr) 24px; gap: 0;
+  width: 230px; height: 355px; min-width: 0; padding: 6px; margin: 0; flex-shrink: 0;
+  transform: none; text-align: center; border-radius: 9px 9px 7px 7px;
+  background: radial-gradient(ellipse at 10% 0, #706344, #26302e 42%, #121d26 100%);
+  border: 1px solid #baa06b; box-shadow: inset 0 0 0 3px #080f1b, 0 5px 14px #000a;
+}
+.game-root .game-card > .card-image, dialog .game-card > .card-image {
+  position: relative; inset: auto; width: 100%; height: 100%; min-height: 0; border-radius: 4px 4px 0 0;
+  background-position: var(--art-x) var(--art-y); background-repeat: no-repeat;
+}
+.game-root .game-card > .card-heading, dialog .game-card > .card-heading {
+  position: relative; inset: auto; height: auto; min-height: 0; display: grid; place-items: center;
+  padding: 3px 12px 4px; font: 600 25px/1.05 var(--title); letter-spacing: .01em; white-space: nowrap;
+}
+/* A long name sets smaller on its plate instead of wrapping (196 px of plate between the rivets). */
+.game-root .game-card .card-name, dialog .game-card .card-name { font-size: min(1em, calc(196px / (var(--name-len, 12) * .45))); }
+.game-root .game-card > .card-copy, dialog .game-card > .card-copy {
+  position: relative; inset: auto; height: auto; min-height: 0; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: flex-start; align-items: center; padding: 9px 5px 2px; text-align: center;
+}
+.game-root .game-card .card-type, dialog .game-card .card-type { font: 600 13px/1.15 var(--label); letter-spacing: .05em; color: #cdb582; margin: 0 0 6px; }
+.game-root .game-card .card-rule, dialog .game-card .card-rule { font: 400 15px/1.32 var(--text); color: #e6dfcf; }
+.game-root .game-card > .card-footer, dialog .game-card > .card-footer {
+  position: relative; inset: auto; display: flex; justify-content: space-between; align-items: center;
+  padding: 4px 6px 0; font: 600 11px/1 var(--label); letter-spacing: .05em; text-transform: none; color: #b3aa92;
+}
+.game-root .game-card .card-footer kbd, dialog .game-card .card-footer kbd { min-width: 19px; padding: 2px 5px 1px; font: 700 12px/1 var(--label); }
+.game-root .game-card > .card-cost, dialog .game-card > .card-cost { top: 8px; left: 8px; width: 40px; height: 40px; font: 700 28px/1 var(--title); }
+.game-root .game-card .card-etch, dialog .game-card .card-etch { inset: 3px; border-color: #dbc49655; }
+.game-root .game-card .card-upgrade-mark, dialog .game-card .card-upgrade-mark { top: 9px; right: 9px; width: 24px; height: 24px; font-size: 20px; }
+
+/* States that read the same in every view. */
+.game-root .game-card:hover, .game-root .game-card:focus-visible { z-index: 50; transform: translateY(-20px); border-color: #f3dca0; filter: brightness(1.1); box-shadow: inset 0 0 0 3px #080f1b, 0 0 22px #ffb04a2e, 0 10px 26px #000d; }
+.game-root .game-card.selected { transform: translateY(-18px); border-color: #fff0c4; filter: brightness(1.14); box-shadow: inset 0 0 0 3px #080f1b, inset 0 0 22px #ffb04a26, 0 0 0 1px #0b0906, 0 0 30px 3px #ffb04a5c, 0 12px 26px #000c; }
+.game-root .game-card.unplayable { filter: saturate(.7) brightness(.72); }
+
+/* ------------------------------------------------------------ the scale per view
+   Each view sets one number; nothing else about the card changes. */
+.reward-cards { --card-scale: 1; }
+.market-offer { --card-scale: .72; }
+.pick-tile { --card-scale: .64; }
+.collection-entry { --card-scale: .77; }
+.offer-card { --card-scale: .78; }
+.card-inspect .inspect-card { --card-scale: 1.04; }
+@container game (min-width: 1650px) and (min-height: 950px) {
+  .reward-cards { --card-scale: 1.1; }
+  .market-offer { --card-scale: .77; }
+  .offer-card { --card-scale: .86; }
+}
+@container game (min-width: 1700px) {
+  /* Six offers on the 1180 px shelf. */
+  .market-offer { --card-scale: .77; }
+}
+@container game (min-width: 901px) and (max-height: 760px) {
+  .reward-cards { --card-scale: .84; }
+  .market-offer { --card-scale: .68; }
+}
+@container game (max-height: 700px) {
+  .card-inspect .inspect-card { --card-scale: .9; }
+}
+@container game (max-height: 620px) {
+  .reward-cards { --card-scale: .74; }
+}
+@container game (max-width: 1100px) {
+  .market-offer { --card-scale: .58; }
+}
+@container game (max-width: 900px) {
+  .card-inspect .inspect-card { --card-scale: .77; }
+}
+@container game (max-width: 600px) {
+  .market-offer { --card-scale: .6; }
+  .offer-card { --card-scale: .61; }
+}
+@container game (max-width: 520px) {
+  .reward-cards { --card-scale: .78; }
+}
+
+/* ------------------------------------------------------------ the hand: an overlapping fan
+   The hand's scale comes from the table's hand band (--hand-scale, polish.css). More cards overlap
+   more, never shrink: each card after the first steps in by what the band's width allows, between a
+   light overlap (10 %) and a deep one (74 %), with room kept at both ends for the fan's tilt. */
+.is-battle #hand-zone { overflow: visible; }
+.is-battle .card-fan {
+  --card-scale: var(--hand-scale);
+  display: flex; align-items: flex-end; justify-content: safe center; gap: 0;
+  width: 100%; height: 100%; padding: 0; overflow: visible; transform: none; scroll-snap-type: none;
+}
+.is-battle .card-fan .game-card {
+  position: relative; z-index: auto; margin: 0; animation: none; scroll-snap-align: none;
+  transform-origin: var(--pivot, 50%) 100%;
+  transform: translateY(calc(var(--lift, 0px) * -1)) rotate(var(--angle, 0deg));
+  transition: transform .18s ease-out, filter .18s, box-shadow .18s, opacity .08s;
+}
+.is-battle .card-fan .game-card + .game-card {
+  margin-left: clamp(-170px, calc(((100cqw - var(--hand-left, var(--hand-edge)) - var(--hand-edge) - var(--fan-trim, 0px)) / var(--card-scale) - 304px) / max(1, var(--hand-size) - 1) - 230px), -22px);
+}
+/* Narrow tables: the hand band reaches under the Transmit dial; the fan stops short of it. */
+@container game (min-width: 901px) and (max-width: 1100px) {
+  .is-battle .card-fan { --fan-trim: 36px; }
+}
+/* A pointed card does not move: its large copy (#card-zoom) rises above the fan instead, so the
+   hit areas of the fan stay where they are. The card itself rests unseen under its copy. */
+.is-battle .card-fan .game-card:hover, .is-battle .card-fan .game-card:focus-visible {
+  z-index: auto; transform: translateY(calc(var(--lift, 0px) * -1)) rotate(var(--angle, 0deg));
+}
+.is-battle .card-fan .game-card.is-zoomed { opacity: 0; transition: none; }
+/* The chosen card stands up out of the fan and stays lit while it looks for a target. */
+.is-battle .card-fan .game-card.selected { z-index: 40; transform: translateY(-34px) rotate(0deg); }
+/* In Field Training the one card the step needs lies on top of its parked neighbours. */
+.is-battle .card-fan .game-card.lesson-focus { z-index: 30; }
+/* Its parts carry no tooltips in the fan: the notes stand beside the large copy. */
+.is-battle .card-fan .game-card * { pointer-events: none; }
+.is-battle .hand-scroll { display: none; }
+@container game (max-width: 760px) {
+  /* Phones and narrow windows: a hand that cannot fit even at the deepest overlap scrolls. */
+  .is-battle .card-fan { overflow-x: auto; overflow-y: hidden; height: calc(100% + 40px); margin-top: -40px; padding: 40px 4px 0; scrollbar-width: none; }
+  .is-battle .card-fan .game-card + .game-card {
+    margin-left: clamp(-120px, calc(((100cqw - 2 * var(--hand-edge) - 8px) / var(--card-scale) - 304px) / max(1, var(--hand-size) - 1) - 230px), -22px);
+  }
+  .is-battle .hand-scroll { display: grid; }
+}
+
+/* The dragged copy of a hardware card keeps the hand's size. */
+.game-root .game-card.drag-ghost { --card-scale: var(--hand-scale, .7); position: absolute; margin: 0; opacity: .92; transform-origin: center; transform: translate(-50%, -50%) rotate(-7deg) scale(.9); }
+
+/* ------------------------------------------------------------ the pointed card, large
+   A copy of the pointed or focused card in hand at about the reward size, above everything but the
+   tooltip. main.ts places it over its slot (inside the window) and fills its notes. */
+#card-zoom {
+  --card-scale: var(--zoom-scale, 1);
+  position: absolute; left: 0; top: 0; z-index: 140; display: none; pointer-events: none; transform-origin: 0 0;
+}
+#card-zoom.is-shown { display: block; }
+.game-root #card-zoom .game-card {
+  transform: none; transition: none; animation: none; opacity: 1;
+  box-shadow: inset 0 0 0 3px #080f1b, 0 0 0 1px #0b0906, 0 0 34px #ffb04a33, 0 22px 44px #000e;
+}
+.game-root #card-zoom.via-keyboard .game-card { outline: 1px solid var(--brass-hi, #f3dca0); outline-offset: 4px; box-shadow: inset 0 0 0 3px #080f1b, 0 0 0 1px #0b0906, 0 0 0 7px #0b090680, 0 0 26px 4px var(--ember-glow, #ffb04a55), 0 22px 44px #000e; }
+.game-root #card-zoom .game-card.unplayable { filter: saturate(.75) brightness(.8); }
+.game-root #card-zoom .game-card.lesson-parked { filter: grayscale(.35) brightness(.78); }
+/* The notes: the card's keywords and its modified cost, as engraved plates beside it. */
+.zoom-tips { position: absolute; top: 10px; left: calc(100% + 12px); display: grid; gap: 8px; width: 232px; }
+#card-zoom.tips-left .zoom-tips { left: auto; right: calc(100% + 12px); }
+.zoom-tip {
+  margin: 0; padding: 9px 13px 10px; font: 14px/1.42 var(--text); color: #e6dac0; text-align: left;
+  background: linear-gradient(170deg, #182029f7, #0c1016f7 70%);
+  border: 1px solid #8a6a3a; box-shadow: inset 0 0 0 1px #05070a, inset 0 1px 0 #f3dca01f, 0 10px 26px #000c;
+}
+.zoom-tip b { display: block; margin-bottom: 3px; font: 700 13px/1.1 var(--label); letter-spacing: .07em; color: var(--kw, #f0d9a2); text-shadow: 0 0 9px color-mix(in srgb, var(--kw, #f0d9a2) 40%, transparent); }
+.zoom-tip.is-cost { border-color: #4f9e86; }
+.zoom-tip.is-cost.is-up { border-color: #a4574c; }
+.zoom-tip.is-limit { border-color: #b65f53; }
+@container game (min-width: 1650px) and (min-height: 950px) {
+  #card-zoom { --zoom-scale: 1.15; }
+}
+/* Reduced motion: the fan and its chosen card move without easing (the large copy never animates). */
+.reduced-motion .is-battle .card-fan .game-card { transition: none; }
+@media (prefers-reduced-motion: reduce) { .is-battle .card-fan .game-card { transition: none; } }
+@container game (max-width: 900px) {
+  #card-zoom { --zoom-scale: .92; }
+  .zoom-tips { width: 200px; }
+  .zoom-tip { font-size: 13px; }
+}

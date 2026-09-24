@@ -180,6 +180,11 @@ export interface CombatPreview {
   breakDamage: number | null;
   channels: number;
   channelPaths: string[][];
+  /** Live router routes, one per device set (the HUD's "3 routes · 2 channels"). */
+  routeCount: number;
+  /** Devices where live routes merge and so carry one channel between them, with the number of
+   * routes through each: the devices of a smallest set every route passes through (graph.mergePoints). */
+  sharedDevices: { id: string; routes: number }[];
   online: string[];
   clusters: Zone[];
   protocolTriggers: ProtocolTrigger[];
@@ -1403,6 +1408,8 @@ function buildResolution(s: RunState, network: Network, tx: Transmission, plans:
     breakDamage: leaderPlan ? tx.ports[leaderPlan.enemy.port]?.breakThreshold ?? definition?.boss?.breakDamage ?? null : null,
     channels: network.channelCount,
     channelPaths: network.channels.map(route => route.path),
+    routeCount: network.routes.length,
+    sharedDevices: network.shared.map(item => ({ ...item })),
     online: [...network.online],
     clusters: network.clusters,
     protocolTriggers: ended === "transmission" ? [] : records.protocolTriggers,

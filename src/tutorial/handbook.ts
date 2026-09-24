@@ -103,14 +103,14 @@ const CHAPTER_BODIES: Record<string, () => string> = {
     ${tip("Integrity is your life", "Integrity carries over between rooms. At zero the expedition ends. Winning a battle never heals by itself — sanctuaries, events and a few relics do.", "rule")}`,
 
   routes: () => `
-    ${lead(`A ${strong("route")} is a path of live cables from ALPHA to OMEGA through at least one router. ${strong("Channels")} are routes that share no device between the terminals. Your ${strong("primary route")} — the strongest one — carries the damage; every extra channel adds bandwidth.`)}
+    ${lead(`A ${strong("route")} is a path of live cables from ALPHA to OMEGA through at least one router, and every one counts. ${strong("Every device carries one channel")}: when two routes go through the same device, they are one channel, not two. Your ${strong("primary route")} — the strongest one — carries the damage; every extra channel adds bandwidth.`)}
     ${figure(routesDiagram(), `Two channels: ${R.baseRouteDamage} + ${R.switchDamage} (switch) on the primary route, +${R.bandwidthPerChannel} bandwidth for the second channel.`)}
     ${table(["Damage term", "Amount", "Where it counts"], [
       ["Live router route", `+${R.baseRouteDamage}`, "Primary route"],
       ["Edge Switch", `+${R.switchDamage} each`, "Each switch on the primary route"],
       ["Startup Config · Overclock", `+${R.configuredDamage} · +${R.overclockDamage} per router`, "Routers on the primary route"],
       ["Packet Compression", `+${R.compressionDamage} per switch`, "Compressed switches on the primary route"],
-      ["Amplified cable", `+${R.amplifiedCableDamage} each`, "Amplified cables on the primary route"],
+      ["Amplified cable (violet fibre)", `+${R.amplifiedCableDamage} each`, "Amplified cables on the primary route"],
       ["Frayed cable", `−${R.frayedCableDamage} each`, "Unarmored primary-route cables crossing wreckage"],
       ["Resonance · Suppression", `+${R.resonanceDamage} · −${R.suppressionPenalty} per band`, "Bands crossed by primary-route hardware"],
       ["Bandwidth", `+${R.bandwidthPerChannel} per channel beyond the first`, "Whole network"],
@@ -120,7 +120,8 @@ const CHAPTER_BODIES: Record<string, () => string> = {
       ["Burst · Buffer · Backpressure", "as shown", "This transmission"],
       ["Exposed guardian", `+${R.exposedBonus}`, "After an interrupted ultimate"],
     ])}
-    ${figure(bottleneckDiagram(), "Two paths through one shared switch are a single channel.")}
+    ${figure(bottleneckDiagram(), "Two routes through one switch: the ledger reads 2 routes · 1 channel, and the switch wears a brass seal.")}
+    ${tip("Reading the table", "Each channel glows in its own colour: gold for the primary, then cyan, green, blue, silver and rose, the same colours as its delivery. A cable wound with violet fibre is amplified, whichever channel it carries. A brass seal with a number marks a device that many routes pass through. Rest the pointer on any device, cable or installation for its card.")}
     ${tip("No hidden caps", "Every switch, every channel and every balancer counts. The limits are physical: 14 sockets on the table, your energy, and what the enemy can cut.", "rule")}`,
 
   devices: () => `
@@ -199,7 +200,7 @@ const CHAPTER_BODIES: Record<string, () => string> = {
       <li><b>Build width when you can.</b> A second channel answers every future cut at once — and pays bandwidth every turn.</li>
       <li><b>After a cut:</b> ${name("patch")} or ${name("reroute")} reconnect; relocating a device can bridge around a jam.</li>
     </ol>
-    ${tip("Avoid bottlenecks", "Two routes through one shared switch or firewall are one channel. Give each channel its own devices.", "warn")}
+    ${tip("Avoid bottlenecks", "A device carries one channel: two routes through one shared switch or firewall are one channel. Give each channel its own devices.", "warn")}
     ${tip("Short spans", `Cables longer than ${R.cableExposureLength} units draw extra damage from the Cable Wraith. Keep routers near the middle or split long spans.`, "warn")}`,
 
   tools: () => {

@@ -32,6 +32,8 @@ import {
 import {
   brassRingTexture, crestTexture, drawRailPlate, makeLabel, packetTexture, railPlateSprite, TABLE_LABEL_ORDER, type RailPlateData,
 } from "./plates.ts";
+import { AMPLIFIED_COLOR, channelColor } from "../channel-palette.ts";
+import { amplifiedWinding, junctionSeal } from "./junction.ts";
 
 export type WorldPoint = { x: number; z: number };
 export type BoardZone = Zone;
@@ -163,6 +165,10 @@ interface CableVisual {
   body: THREE.MeshPhysicalMaterial;
   filament: THREE.MeshBasicMaterial;
   haze: THREE.MeshBasicMaterial;
+  /** An amplified cable's violet winding: its own colour whatever channel carries the cable. */
+  winding: THREE.MeshBasicMaterial | null;
+  /** The cable's group (userData: kind "cable", key, channel, sheath, fibre, for the tests). */
+  group: THREE.Group;
   color: number;
   faulty: boolean;
   source: string;
@@ -224,8 +230,10 @@ interface DeliveryGlyph {
   phase: number;
 }
 
-/** Primary route is gold; every other independent channel is cyan. */
-export const CHANNEL_COLORS = { primary: 0xf2c46d, secondary: 0x6fe0f0 } as const;
+/** v3 names for the first two channel colours; every channel has its own (channel-palette.ts). */
+export const CHANNEL_COLORS = { primary: channelColor(0), secondary: channelColor(1) } as const;
+/** A cable on a live route that no channel of the set claims: a dim neutral. */
+const CABLE_COLOR = 0xe4c58f;
 /** Unarmored cable crossing wreckage, and a worn device's rim. */
 const FRAYED_COLOR = 0xd08a52;
 const REPAIR_COLOR = 0x83eec7;
@@ -321,6 +329,10 @@ export class World {
   private readonly channelNodes = new Map<string, number>();
   private channelPaths: string[][] = [];
   private routeSignature = "";
+  /** Devices where routes merge (forecast sharedDevices): id → routes through it. */
+  private shared = new Map<string, number>();
+  private sharedSignature = "";
+  private readonly seals = new WeakMap<DeviceGroup, THREE.Sprite>();
   private online: Set<string> | null = null;
   private terrainSignature = "";
   private terrain: Terrain | null = null;
@@ -1228,7 +1240,7 @@ export class World {
       group.userData.rings.push(crown);
     }
     if (node.amplified) {
-      const amplifier = ring(0.72, 0.034, 0x8ce6ef, 2.05, 0.85);
+      const amplifier = ring(0.72, 0.034, AMPLIFIED_COLOR, 2.05, 0.85);
       amplifier.rotation.x = Math.PI / 3;
       group.add(amplifier);
       group.userData.rings.push(amplifier);
@@ -1339,10 +1351,25 @@ export class World {
     const channel = this.channelNodes.get(id);
     const color = channel === undefined || group.userData.role === "client"
       ? group.userData.worn ? FRAYED_COLOR : group.userData.skirtColor
-      : channel === 0 ? CHANNEL_COLORS.primary : CHANNEL_COLORS.secondary;
+      : channelColor(channel);
     skirt.material.color.setHex(color);
     skirt.scale.setScalar(active ? 1.15 : 1);
     skirt.material.opacity = active ? 1 : group.userData.online ? channel === undefined ? 0.8 : 1 : 0.35;
+    skirt.userData.channel = channel ?? null;
+    // Where routes merge: a brass junction seal on the nameplate names the routes it carries.
+    const routes = group.userData.online && group.userData.role !== "client" ? this.shared.get(id) ?? 0 : 0;
+    const seal = this.seals.get(group);
+    if (seal && seal.userData.junction !== routes) {
+      group.remove(seal);
+      seal.material.dispose();
+      this.seals.delete(group);
+    }
+    if (routes && !this.seals.has(group)) {
+      const next = junctionSeal(routes, TABLE_LABEL_ORDER + 1);
+      next.position.y = group.userData.label?.position.y ?? 2.86;
+      group.add(next);
+      this.seals.set(group, next);
+    }
   }
 
   private addCable(a: string, b: string) {
@@ -1354,7 +1381,9 @@ export class World {
     const link = this.topology.links.find((edge) => linkKey(edge.a, edge.b) === key);
     const faulty = this.faultLinks.includes(key);
     const crossings = link && !link.armored && this.terrain ? wreckCrossings(from, to, this.terrain.debris) : [];
-    const color = faulty ? 0xec755d : link?.boosted ? 0x8ce6ef : link?.armored ? 0xf5d196 : crossings.length ? FRAYED_COLOR : 0xe4c58f;
+    // The sheath carries the state (cut, armored, frayed) and, once routed, its channel's colour;
+    // an amplified cable's own colour lives in its violet winding (refreshSignalRoute).
+    const color = faulty ? 0xec755d : link?.armored ? 0xf5d196 : crossings.length ? FRAYED_COLOR : CABLE_COLOR;
     const cable = new THREE.Group();
     const geometry = new THREE.TubeGeometry(curve, 48, 0.055, 8, false);
     const body = new THREE.Mesh(
@@ -1382,6 +1411,12 @@ export class World {
         cable.add(collar);
       }
     }
+    let winding: THREE.MeshBasicMaterial | null = null;
+    if (link?.boosted) {
+      winding = glow(AMPLIFIED_COLOR, faulty ? 0.35 : 1);
+      winding.transparent = true;
+      cable.add(new THREE.Mesh(amplifiedWinding(curve, 0.07), winding));
+    }
     for (const t of crossings) cable.add(this.frayMark(curve, t, true));
     const hit = new THREE.Mesh(
       new THREE.TubeGeometry(curve, 48, 0.17, 5, false),
@@ -1401,7 +1436,8 @@ export class World {
       this.cableBeads.push({ bead, curve, key, offset: i / 3, active: !faulty, reversed: false, routed: false });
     }
     this.cableCurves.set(key, curve);
-    this.cableVisuals.set(key, { body: body.material, filament: filament.material, haze: haze.material, color, faulty, source: a });
+    cable.userData = { kind: "cable", key, amplified: !!link?.boosted, channel: null, sheath: color, fibre: winding ? AMPLIFIED_COLOR : null };
+    this.cableVisuals.set(key, { body: body.material, filament: filament.material, haze: haze.material, winding, group: cable, color, faulty, source: a });
     this.cableGroups.set(key, cable);
     this.dynamic.add(cable);
   }
@@ -1562,7 +1598,7 @@ export class World {
     this.setChannels([path, alternate].filter((route) => route.length > 1));
   }
 
-  /** Every live channel: paths[0] is the primary (gold) route, the rest are cyan. */
+  /** Every live channel, each in its own colour (channel-palette.ts): paths[0] is the primary (gold). */
   setChannels(paths: string[][]) {
     const signature = JSON.stringify(paths);
     if (signature === this.routeSignature) return;
@@ -1587,22 +1623,36 @@ export class World {
       const route = this.channelSources.get(key);
       const primary = route?.channel === 0;
       const secondary = route !== undefined && !primary;
-      const color = visual.faulty ? 0xec755d : primary ? CHANNEL_COLORS.primary : secondary ? CHANNEL_COLORS.secondary : visual.color;
+      // Each channel in its own colour on the sheath, haze and beads; the fibre of an amplified
+      // cable keeps its violet whichever channel carries it.
+      const color = visual.faulty ? 0xec755d : route ? channelColor(route.channel) : visual.color;
       visual.body.emissive.setHex(color);
       visual.body.emissiveIntensity = visual.faulty ? 0.18 : primary ? 0.85 : secondary ? 0.6 : hasRoute ? 0.15 : 0.34;
-      visual.filament.color.setHex(color);
+      visual.filament.color.setHex(visual.winding && !visual.faulty ? AMPLIFIED_COLOR : color);
       visual.filament.opacity = visual.faulty ? 0.4 : primary ? 1 : secondary ? 0.92 : hasRoute ? 0.38 : 0.95;
       visual.haze.color.setHex(color);
       visual.haze.opacity = visual.faulty ? 0.075 : primary ? 0.16 : secondary ? 0.1 : hasRoute ? 0.025 : 0.055;
+      if (visual.winding) visual.winding.opacity = visual.faulty ? 0.35 : route ? 1 : hasRoute ? 0.72 : 0.92;
+      Object.assign(visual.group.userData, { channel: route?.channel ?? null, sheath: color, fibre: visual.winding ? AMPLIFIED_COLOR : null });
     }
     for (const item of this.cableBeads) {
       const visual = this.cableVisuals.get(item.key)!;
       const route = this.channelSources.get(item.key);
       item.routed = route !== undefined;
       item.reversed = route !== undefined && route.source !== visual.source;
-      item.bead.material.color.copy(visual.filament.color);
+      item.bead.material.color.copy(visual.haze.color);
       item.bead.material.opacity = visual.faulty ? 0.12 : item.routed ? 0.95 : hasRoute ? 0.25 : 0.8;
     }
+    for (const group of this.devices.values()) this.refreshSkirt(group);
+  }
+
+  /** Devices where live routes merge and so carry one channel between them: each gets a brass
+   * junction seal with the number of routes through it. */
+  setShared(devices: readonly { id: string; routes: number }[]) {
+    const signature = devices.map(item => `${item.id}:${item.routes}`).join();
+    if (signature === this.sharedSignature) return;
+    this.sharedSignature = signature;
+    this.shared = new Map(devices.map(item => [item.id, item.routes]));
     for (const group of this.devices.values()) this.refreshSkirt(group);
   }
 
@@ -1619,7 +1669,7 @@ export class World {
       const wasOnline = group.userData.online;
       this.applyOnline(group, node);
       // Coming online is a small event: the device lights up with a gold ring.
-      if (!wasOnline && group.userData.online && previous) this.pulseAt(node.x, node.z, CHANNEL_COLORS.primary, 1.1);
+      if (!wasOnline && group.userData.online && previous) this.pulseAt(node.x, node.z, channelColor(0), 1.1);
     }
   }
 
@@ -2463,14 +2513,14 @@ export class World {
     let remaining = routes.length;
     const finished = () => { if (--remaining === 0) done?.(); };
     routes.forEach((path, channel) =>
-      this.playPacket(path, finished, channel === 0 ? CHANNEL_COLORS.primary : CHANNEL_COLORS.secondary, channel === 0 ? 4 : 3));
+      this.playPacket(path, finished, channelColor(channel), channel === 0 ? 4 : 3));
   }
 
   /**
    * A split transmission: each delivery runs its channel, then crosses the air to its port.
    * `onPort` fires when the last packet of a port lands (its impact); `done` after every port.
    */
-  playTransmission(deliveries: readonly { path: string[]; port: Port; primary: boolean }[], onPort: (port: Port) => void, done: () => void) {
+  playTransmission(deliveries: readonly { path: string[]; port: Port; primary: boolean; index?: number }[], onPort: (port: Port) => void, done: () => void) {
     const live = deliveries.filter(delivery => delivery.path.length > 1);
     if (!live.length || !this.active) { done(); return; }
     const remaining = new Map<Port, number>();
@@ -2484,7 +2534,7 @@ export class World {
         if (left > 0) return;
         onPort(delivery.port);
         if (--ports === 0) done();
-      }, delivery.primary ? CHANNEL_COLORS.primary : CHANNEL_COLORS.secondary, delivery.primary ? 4 : 3, this.portTarget(visual));
+      }, channelColor(delivery.index ?? (delivery.primary ? 0 : 1)), delivery.primary ? 4 : 3, this.portTarget(visual));
     }
   }
 

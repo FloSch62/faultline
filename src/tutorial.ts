@@ -227,7 +227,7 @@ export const WALKTHROUGH_PAGES: readonly WalkthroughPage[] = [
   },
   {
     title: "Before You Set Out", tagline: "Carry the signal home.", body: () => `
-      <ul class="walk-list"><li><b>Build first, then widen.</b> One route on turn one; a second channel as soon as you can (+${RULES.bandwidthPerChannel} and cut-proof).</li><li><b>Read, then spend.</b> Cover the forecast exactly; everything else goes into damage or network.</li><li><b>Answer in advance.</b> Arm protocols and prepare cards for the turn you can already see.</li><li><b>Keep the deck lean.</b> Skipping a reward is often the strongest pick.</li></ul>
+      <ul class="walk-list"><li><b>Build first, then widen.</b> One route on turn one; a second channel as soon as you can (+${RULES.bandwidthPerChannel}, and it survives a cut).</li><li><b>Read, then spend.</b> Cover the forecast exactly; everything else goes into damage or network.</li><li><b>Answer in advance.</b> Arm protocols and prepare cards for the turn you can already see.</li><li><b>Keep the deck lean.</b> Skipping a reward is often the strongest pick.</li></ul>
       <p class="walk-note">The Handbook holds every rule and number, including the Danger Playbook.</p>`,
   },
 ];

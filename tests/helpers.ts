@@ -180,6 +180,11 @@ export interface TableState {
   selectRing: { x: number; z: number; radius: number } | null;
   /** Visible rail plates (world position of the plate's centre). */
   plates: { port: string; x: number; y: number; z: number }[];
+  /** Cables: the channel drawn on the sheath (null: none), the sheath colour and an amplified
+   * cable's fibre colour (hex numbers). */
+  cables: { key: string; channel: number | null; sheath: number; fibre: number | null; amplified: boolean }[];
+  /** Devices: the channel their skirt shows (null: none) and the routes on their junction seal. */
+  devices: { id: string; channel: number | null; junction: number | null }[];
 }
 
 /**
@@ -235,6 +240,8 @@ export async function tableState(page: Page): Promise<TableState> {
       props: [] as { x: number; y: number; z: number }[],
       selectRing: null as { x: number; z: number; radius: number } | null,
       plates: [] as { port: string; x: number; y: number; z: number }[],
+      cables: [] as TableState["cables"],
+      devices: [] as TableState["devices"],
     };
     const walk = (node: Node) => {
       const kind = node.userData?.kind;
@@ -250,6 +257,13 @@ export async function tableState(page: Page): Promise<TableState> {
         state.installations.push({ id: data.id, kind: data.kind, x: round(node.position.x), z: round(node.position.z), countdown: data.countdown, blast: !!data.blast });
       } else if (kind === "debris" && live) state.debris.push({ x: round(node.position.x), z: round(node.position.z) });
       else if (kind === "prop" && shown(node)) state.props.push({ x: round(node.position.x), y: round(node.position.y), z: round(node.position.z) });
+      else if (kind === "cable" && live) {
+        const data = node.userData;
+        state.cables.push({ key: data.key, channel: data.channel, sheath: data.sheath, fibre: data.fibre, amplified: data.amplified });
+      } else if (node.userData?.nodeId && Array.isArray(node.userData.rings) && live) {
+        const seal = node.children.find(child => child.isSprite && typeof child.userData?.junction === "number");
+        state.devices.push({ id: node.userData.nodeId, channel: node.userData.rings[0]?.userData?.channel ?? null, junction: seal ? seal.userData.junction : null });
+      }
       if (node.isSprite && node.userData?.port && shown(node)) {
         const [x, y, z] = node.matrixWorld.elements.slice(12, 15);
         state.plates.push({ port: node.userData.port, x: round(x), y: round(y), z: round(z) });

@@ -146,8 +146,14 @@ let practice: {
   collapsed: boolean;
   /** Reading steps the player acknowledged (Got it, or a click on the spotlit control). */
   read: string[];
+  /** The finished lesson's completion plate is up (it rises a beat after the last goal). */
+  plate: boolean;
 } | null = null;
 let hintTimer = 0;
+/** The beat between a lesson's last goal and its completion plate. */
+let lessonEndTimer = 0;
+/** The spotlight's hole follows moving targets (badges over the rail) frame by frame. */
+let spotlightFrame = 0;
 /** Patch Cable (Architect console) is choosing its two devices. */
 let consoleTargeting = false;
 /** The encounter whose terrain title card has already been shown. */
@@ -287,13 +293,15 @@ function clearSelection() {
   document.getElementById("movement-preview")?.remove();
 }
 function playable() {
-  return view === "run" && run.phase === "battle" && !busy && !dialog.open;
+  // A finished lesson is over: its board stays on screen, frozen, until the player moves on.
+  return view === "run" && run.phase === "battle" && !busy && !dialog.open && !practice?.progress?.complete;
 }
 function interfaceScale() { return Number.parseFloat(getComputedStyle($("#app")).zoom) || 1; }
 function render(rebuild = true) {
   // Numbers may have changed under the pointer: the next pointer move rebuilds the hover card.
   hideHoverCard();
-  // A finished training battle stays on its board: the coach panel carries the debrief.
+  // A training battle that ended (every hostile down, or the drill lost) stays on its board, frozen:
+  // the completion plate or the coach's restart note carries the debrief.
   const debrief = !!practice && view === "run" && run.phase !== "battle" && run.enemies.length > 0;
   const battle = view === "run" && (run.phase === "battle" || debrief);
   root.dataset.view = view === "run" ? (debrief ? "battle" : run.phase) : view;
@@ -307,9 +315,8 @@ function render(rebuild = true) {
   root.classList.toggle("busy", busy);
   root.classList.toggle("is-practice", !!practice);
   root.dataset.training = practice ? practice.id : "";
-  patchLessonLayer(practice && battle && practice.progress
-    ? training.lessonPanelMarkup(practice.progress, { showHint: practice.showHint, collapsed: practice.collapsed })
-    : "");
+  root.classList.toggle("lesson-over", !!practice?.progress?.complete && battle);
+  patchLessonLayer(battle ? lessonMarkup() : "");
   $("#header").innerHTML = screens.headerMarkup(
     expedition,
     view === "title" || view === "select",
@@ -395,9 +402,10 @@ function render(rebuild = true) {
       );
   if (selected !== null) document.querySelector(`[data-hand="${selected}"]`)?.scrollIntoView({block:"nearest",inline:"nearest"});
   if (practice && battle) fitLesson();
+  renderTargetDock();
+  // After the dock: a step may point at one of its controls (a relocation band, a scrub plate).
   spotlightLesson();
   if (practice && battle) railHand();
-  renderTargetDock();
   if (selected !== null && run.hand[selected])
     world?.setPlacement(CARDS[run.hand[selected]].role ?? null, source, laysArmoredCable(run.hand[selected]));
   else if (consoleTargeting) world?.setPlacement(null, source);
@@ -1415,15 +1423,20 @@ async function action(name: string) {
   if (name === "lesson-restart" && practice) { startLesson(practice.id); return; }
   if (name === "lesson-next" && practice) {
     const next = training.nextLesson(practice.id);
+    // A guide opens in the dialog: leave the finished board first, so nothing of it waits behind.
+    if (!next || next.kind === "walkthrough") finishPractice();
     if (next) openLesson(next.id);
-    else finishPractice();
     return;
   }
   if (name === "lesson-exit") { finishPractice(); return; }
-  if (name === "lesson-finish") {
+  // The completion plate's Training menu leaves the lesson; the menu opens over what was parked.
+  if (name === "lesson-training") { finishPractice(); openModal("training"); return; }
+  if (name === "lesson-finish" || name === "lesson-finish-next") {
     training.markLessonComplete(training.WALKTHROUGH_LESSON);
     sound.effect("reward");
-    openModal("training");
+    const next = name === "lesson-finish-next" ? training.nextLesson(training.WALKTHROUGH_LESSON) : undefined;
+    if (next) openLesson(next.id);
+    else openModal("training");
     return;
   }
   if (name === "inspect-back" && inspectReturn) {
@@ -2017,13 +2030,14 @@ function startLesson(id: training.LessonId) {
   modal = "";
   cancelDrag();
   clearTimeout(hintTimer);
+  clearTimeout(lessonEndTimer);
   const parked = practice
     ? { expedition: practice.expedition, run: practice.run, view: practice.view, undo: practice.undo }
     : { expedition, run, view, undo: undoStack.map(state => structuredClone(state)) };
   const lessonRun = training.createLessonRun(id);
   // Short screens start with the coach folded to its current goal; it expands on demand.
   const short = root.getBoundingClientRect().height / interfaceScale() < 780;
-  practice = { id, ...parked, progress: null, showHint: false, collapsed: practice?.collapsed ?? short, read: [] };
+  practice = { id, ...parked, progress: null, showHint: false, collapsed: practice?.collapsed ?? short, read: [], plate: false };
   expedition = { version: EXPEDITION_VERSION, run: lessonRun, archetype: lessonRun.archetype, daily: false, startedAt: Date.now(), recorded: true };
   run = lessonRun;
   view = "run";
@@ -2045,6 +2059,7 @@ function finishPractice() {
   if (!practice) { if (dialog.open) closeModal(); return; }
   cancelDrag();
   clearTimeout(hintTimer);
+  clearTimeout(lessonEndTimer);
   const previous = practice;
   practice = null;
   expedition = previous.expedition;
@@ -2077,25 +2092,53 @@ function updateLesson() {
   if (progress.complete && !before?.complete) {
     training.markLessonComplete(practice.id);
     clearTimeout(hintTimer);
-    sound.effect("reward", { delay: .35 });
+    endLesson();
   }
 }
-/** What the lessons read beyond the run: the selected port and the reading steps acknowledged. */
+/** The last goal is met: the lesson is over. The board freezes at once (playable() refuses every
+ * move, the scrim takes the pointer, nothing can be undone into it), and after a beat, so the final
+ * transmission's numbers or the last card's effect can land, the completion plate rises. */
+function endLesson() {
+  if (!practice) return;
+  undoStack.length = 0;
+  root.classList.add("lesson-over");
+  sound.effect("reward", { delay: .35 });
+  const lesson = practice, generation = battleGeneration;
+  clearTimeout(lessonEndTimer);
+  lessonEndTimer = window.setTimeout(() => {
+    if (practice !== lesson || generation !== battleGeneration || !lesson.progress?.complete) return;
+    lesson.plate = true;
+    renderLesson();
+    document.querySelector<HTMLElement>(".lesson-end [data-autofocus]")?.focus({ preventScroll: true });
+  }, sound.settings.motion && !preferences.fast ? 1100 : 300);
+}
+/** The lesson layer: the coach panel, and once the lesson is over the scrim and its completion plate. */
+function lessonMarkup(): string {
+  if (!practice?.progress) return "";
+  return training.lessonPanelMarkup(practice.progress, { showHint: practice.showHint, collapsed: practice.collapsed })
+    + training.lessonEndMarkup(practice.progress, practice.plate);
+}
+// Browser tests read the drill's state (lesson runs are never saved). Dev server only.
+if (import.meta.env.DEV) (globalThis as { __faultlineLesson?: unknown }).__faultlineLesson = () => practice && {
+  id: practice.id, turn: run.turn, focus: effectiveFocus(run), aims: { ...run.aims }, delivery: hud.delivery,
+  deliveries: run.phase === "battle" && run.enemies.length ? combatPreview(run).deliveries.map(item => item.channelKey) : [],
+  step: practice.progress?.current ?? 0, complete: !!practice.progress?.complete, plate: practice.plate,
+};
+/** What the lessons read beyond the run: the selected port, the picked-up delivery and the reading steps acknowledged. */
 function lessonView(): training.LessonView {
-  return { port: hud.port, read: practice?.read ?? [], selected: selected !== null ? run.hand[selected] ?? null : null };
+  return { port: hud.port, read: practice?.read ?? [], selected: selected !== null ? run.hand[selected] ?? null : null, delivery: hud.delivery };
 }
 let lessonViewKey = "";
 /** Selection is reading, not a move, so no action recomputes the lesson: a step met by
  * selecting (or reading) moves on here, on the render that shows the selection. */
 function syncLessonView() {
   if (!practice?.progress || view !== "run") return;
-  const key = `${practice.id}|${hud.port}|${practice.read.join(",")}|${selected !== null ? run.hand[selected] : ""}`;
+  const key = `${practice.id}|${hud.port}|${practice.read.join(",")}|${selected !== null ? run.hand[selected] : ""}|${hud.delivery}`;
   if (key === lessonViewKey) return;
   lessonViewKey = key;
   const before = practice.progress;
   updateLesson();
-  if (practice.progress !== before && root.classList.contains("is-battle"))
-    patchLessonLayer(training.lessonPanelMarkup(practice.progress!, { showHint: practice.showHint, collapsed: practice.collapsed }));
+  if (practice.progress !== before && root.classList.contains("is-battle")) patchLessonLayer(lessonMarkup());
 }
 /** A reading step is done: "Got it" in the panel, or a click on the spotlit control. */
 function acknowledgeLesson() {
@@ -2108,10 +2151,15 @@ function acknowledgeLesson() {
   railHand();
   sound.effect("select");
 }
+// A click on the spotlit control of a reading step reads it, and does nothing else: captured before
+// the table's own handlers, so clicking a spotlit hostile never also tries to target it.
 document.addEventListener("click", event => {
   if (!practice?.progress?.reading || dialog.open || busy) return;
-  if ((event.target as HTMLElement).closest(".lesson-focus")) acknowledgeLesson();
-});
+  const target = event.target as HTMLElement;
+  if (!target.closest(".lesson-focus") || target.closest("#lesson-layer")) return;
+  event.stopPropagation();
+  acknowledgeLesson();
+}, { capture: true });
 /** Offer the hint after a stretch of inactivity (the lesson owns the delay). */
 function armHint() {
   clearTimeout(hintTimer);
@@ -2124,9 +2172,7 @@ function armHint() {
 }
 function renderLesson() {
   if (!practice?.progress) return;
-  patchLessonLayer(view === "run" && root.classList.contains("is-battle")
-    ? training.lessonPanelMarkup(practice.progress, { showHint: practice.showHint, collapsed: practice.collapsed })
-    : "");
+  patchLessonLayer(view === "run" && root.classList.contains("is-battle") ? lessonMarkup() : "");
   fitLesson();
   spotlightLesson();
 }
@@ -2162,6 +2208,15 @@ function morphChildren(from: ParentNode & Node, to: ParentNode) {
 }
 // Window size changes move the vitals card and the spotlit control.
 window.addEventListener("resize", () => { if (practice) { fitLesson(); spotlightLesson(); } });
+// A relocation's confirm plate is a step's control too (drag, then confirm): when it opens or
+// closes, the spotlight moves to it or back, whoever rendered it.
+let relocateAsking = false;
+new MutationObserver(() => {
+  const asking = !!document.getElementById("relocate-confirm");
+  if (asking === relocateAsking) return;
+  relocateAsking = asking;
+  if (practice) spotlightLesson();
+}).observe(root, { childList: true, subtree: true });
 /** The coach panel fills the left column down to the compact vitals card. */
 /** Field Training points at the control its current step needs (e.g. the Prepare slot).
  * `A || B` falls back to B while nothing matching A is on screen. */
@@ -2172,7 +2227,7 @@ function spotlightLesson() {
   try {
     for (const tier of focus.split("||").map(part => part.trim()).filter(Boolean)) {
       targets = Array.from(document.querySelectorAll(tier));
-      if (targets.some(el => el instanceof HTMLElement && el.offsetParent !== null)) break;
+      if (targets.some(onScreen)) break;
     }
   } catch { targets = []; /* A malformed selector must never break the lesson. */ }
   // Leave elements that keep the spotlight untouched: re-adding the class would not
@@ -2183,21 +2238,48 @@ function spotlightLesson() {
   // player is mid-action — targeting, dragging or reading a dialog — and glides when
   // the step moves on.
   const overlay = $("#lesson-spotlight"), hole = overlay.firstElementChild as HTMLElement;
-  const target = targets.find((el): el is HTMLElement => el instanceof HTMLElement && el.offsetParent !== null);
+  const shown = targets.filter(onScreen);
+  // One control, or (a spread step) every match: the three hostiles' badges in one band.
+  const lit = practice?.progress?.spread ? shown : shown.slice(0, 1);
+  const target = lit[0];
   // A lifted card rests the dimmer, unless the step points past the hand at what the card targets.
-  const resting = (selected !== null && !!target?.closest("#hand-zone")) || consoleTargeting || !!cardDrag || deviceDragging || !!pendingMove || dialog.open;
+  const resting = (selected !== null && !!target?.closest("#hand-zone")) || consoleTargeting || !!cardDrag || deviceDragging || dialog.open;
+  cancelAnimationFrame(spotlightFrame);
   if (!target || resting) { overlay.classList.remove("active"); return; }
   const fresh = !overlay.classList.contains("active");
   if (fresh) hole.style.transition = "none";
-  const scale = interfaceScale(), origin = root.getBoundingClientRect(), rect = target.getBoundingClientRect();
-  // A tiny control (a delivery stud) still gets a hole the eye finds: at least 40 px a side.
-  const padX = Math.max(9, (40 - rect.width / scale) / 2), padY = Math.max(9, (40 - rect.height / scale) / 2);
-  hole.style.left = `${(rect.left - origin.left) / scale - padX}px`;
-  hole.style.top = `${(rect.top - origin.top) / scale - padY}px`;
-  hole.style.width = `${rect.width / scale + padX * 2}px`;
-  hole.style.height = `${rect.height / scale + padY * 2}px`;
+  placeSpotlight(hole, lit);
   if (fresh) { void hole.offsetWidth; hole.style.transition = ""; }
   overlay.classList.add("active");
+  // Badges over the rail follow the 3D table every frame; the hole follows them while they are lit.
+  if (lit.some(el => el.closest("#intent-layer"))) {
+    const follow = () => {
+      if (!overlay.classList.contains("active") || !lit.every(el => el.isConnected)) return;
+      placeSpotlight(hole, lit);
+      spotlightFrame = requestAnimationFrame(follow);
+    };
+    spotlightFrame = requestAnimationFrame(follow);
+  }
+}
+/** Laid out and visible (fixed-position overlays included, which have no offsetParent). */
+function onScreen(el: Element): el is HTMLElement {
+  return el instanceof HTMLElement && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
+}
+/** Cut the dimmer's hole around the lit controls (their joint box). */
+function placeSpotlight(hole: HTMLElement, lit: readonly HTMLElement[]) {
+  const scale = interfaceScale(), origin = root.getBoundingClientRect();
+  const boxes = lit.map(el => el.getBoundingClientRect());
+  const rect = {
+    left: Math.min(...boxes.map(box => box.left)), top: Math.min(...boxes.map(box => box.top)),
+    right: Math.max(...boxes.map(box => box.right)), bottom: Math.max(...boxes.map(box => box.bottom)),
+  };
+  const width = rect.right - rect.left, height = rect.bottom - rect.top;
+  // A tiny control (a delivery stud) still gets a hole the eye finds: at least 40 px a side.
+  const padX = Math.max(9, (40 - width / scale) / 2), padY = Math.max(9, (40 - height / scale) / 2);
+  hole.style.left = `${(rect.left - origin.left) / scale - padX}px`;
+  hole.style.top = `${(rect.top - origin.top) / scale - padY}px`;
+  hole.style.width = `${width / scale + padX * 2}px`;
+  hole.style.height = `${height / scale + padY * 2}px`;
 }
 /** In training, cards outside the current step rest visibly parked in the hand. */
 function railHand() {

@@ -58,7 +58,7 @@ export const ARCHITECT_CARD_IDS = [
 export const WARDEN_CARD_IDS = [
   "deep-inspection", "brace", "pushback", "stand-firm", "vent", "double-shift", "entrench", "persistent-state",
   "flow-control", "reflect", "acl-gate", "stateful-firewall", "sentry-firewall", "bulkhead", "perimeter", "bastion",
-  "defense-in-depth", "tripwire", "policy-engine", "rearm", "incident-response", "null-route",
+  "defense-in-depth", "tripwire", "policy-engine", "rearm", "incident-response", "null-route", "hardening-guide",
 ] as const;
 /** The Ghost's cards (section 9.3), the Payload token included. */
 export const GHOST_CARD_IDS = [

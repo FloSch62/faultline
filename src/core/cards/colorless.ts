@@ -2,15 +2,14 @@
  * this file imports rules.ts and card-types.ts and nothing else; behaviour lives in
  * src/core/effects/colorless.ts (new cards) or in the engine's legacy if-chains (v4 cards).
  *
- * PHASE C (colorless agent): the table is `CardTable<ColorlessCardId>`, a partial record, so
- * definitions are added here and nowhere else. `missingCards("colorless")` (cards.ts) lists the ids
- * still undefined; once it is empty, turn the completeness check on in your test file:
- *   assert.deepEqual(missingCards("colorless"), []);
- * Still missing: ping, hotfix, rollback, firmware-update. Keepalive is the engine's worked example
- * of a daemon (definition here, turnStart hook in effects/colorless.ts, test in engine-v5.test.ts).
+ * The table is `CardTable<ColorlessCardId>` and complete (`missingCards("colorless")` is empty;
+ * src/core/colorless.test.ts checks it). The v5 cards (Ping, Hotfix, Keepalive, Rollback, Firmware
+ * Update) close the table; their effects sit in effects/colorless.ts.
  *
  * Faces are generated from `values` (`text`), so tuning a number changes the face; RULES numbers are
- * read from rules.ts. Long exceptions go in `detail`. */
+ * read from rules.ts. Faces stay short and use one vocabulary: Deploy, Link, Gain N block, Draw N,
+ * "+N damage this turn", "while on your primary route", jam-proof, cut-proof, link card. Edge cases
+ * go in `detail`. */
 import { RULES as R } from "../rules.ts";
 import type { CardTable, ColorlessCardId } from "../card-types.ts";
 
@@ -87,7 +86,7 @@ export const COLORLESS_CARDS: CardTable<ColorlessCardId> = {
   },
   relay: {
     name: "Signal Relay", subtitle: "HARDWARE / FABRIC", cost: 1, rarity: "common", target: "ground", role: "switch", art: "hardware", color: "#a5b4ff", jamProof: true,
-    text: v => `Deploy a jam-proof switch (+${R.switchDamage} on your primary route). Draw ${v.draw}.`,
+    text: v => `Deploy a jam-proof switch: +${R.switchDamage} damage while on your primary route. Draw ${v.draw}.`,
     values: { draw: 1 },
     upgrade: { cost: 0 },
   },
@@ -142,7 +141,7 @@ export const COLORLESS_CARDS: CardTable<ColorlessCardId> = {
   },
   vxlan: {
     name: "VXLAN Tunnel", subtitle: "CONTAINERLAB / OVERLAY", cost: 1, rarity: "uncommon", target: "link", art: "cable", color: "#bba3e3", cutProof: true, amplified: true,
-    rules: `Link two devices with a cut-proof cable: +${R.amplifiedCableDamage} damage on your primary route.`,
+    rules: `Link two devices with a cut-proof cable: +${R.amplifiedCableDamage} damage while on your primary route.`,
     detail: "A cut-proof cable never frays over wreckage either.",
     upgrade: { cost: 0 },
   },
@@ -150,22 +149,25 @@ export const COLORLESS_CARDS: CardTable<ColorlessCardId> = {
   shield: {
     name: "Faraday Shell", subtitle: "SYSTEM / DEFENSE", cost: 1, rarity: "uncommon", target: "node", art: "defense", color: "#f4ce82", exhaust: true,
     rules: "Make a device jam-proof and clear its jam. Exhaust.",
-    detail: "Jam-proof does not stop an overload.",
+    detail: "Jam-proof does not stop an overload. A device that is already jam-proof cannot be chosen.",
     upgrade: { cost: 0 },
   },
   firmware: {
     name: "Overclock", subtitle: "SYSTEM / UPGRADE", cost: 1, rarity: "rare", target: "node", art: "program", color: "#ff8ca8", exhaust: true,
     rules: `Overclock a router: +${R.overclockDamage} damage while on your primary route. Exhaust.`,
+    detail: "Once per router. It stacks with Startup Config.",
     upgrade: { cost: 0 },
   },
   compression: {
     name: "Packet Compression", subtitle: "UNCOMMON / UPGRADE", cost: 1, rarity: "uncommon", target: "node", art: "program", color: "#b0a5e6", exhaust: true,
     rules: `Compress a switch: +${R.compressionDamage} damage while on your primary route. Exhaust.`,
+    detail: "Once per switch.",
     upgrade: { cost: 0 },
   },
   "startup-config": {
     name: "Startup Config", subtitle: "CONTAINERLAB / CONFIGURATION", cost: 0, rarity: "common", target: "node", art: "program", color: "#88cfb5", exhaust: true,
     text: v => `Configure a router: +${R.configuredDamage} damage while on your primary route.${block(v.block)} Exhaust.`,
+    detail: "Once per router. It stacks with Overclock.",
     upgrade: { values: { block: 4 } },
   },
   clabernetes: {
@@ -196,6 +198,7 @@ export const COLORLESS_CARDS: CardTable<ColorlessCardId> = {
   containerlab: {
     name: "Containerlab", subtitle: "SYSTEM / ORCHESTRATION", cost: 2, rarity: "rare", target: "instant", art: "hardware", color: "#e7c37d", exhaust: true,
     rules: `Deploy an overclocked router linked to ALPHA and OMEGA: a new ${R.baseRouteDamage + R.overclockDamage}-damage route. Exhaust.`,
+    detail: "The router takes the first free auto-deploy socket; with none, it cannot be played.",
     upgrade: { cost: 1 },
   },
   guard: {
@@ -237,13 +240,15 @@ export const COLORLESS_CARDS: CardTable<ColorlessCardId> = {
   },
   salvage: {
     name: "Salvage Cycle", subtitle: "COMMON / RECOVERY", cost: 0, rarity: "common", target: "instant", art: "program", color: "#98ceb0", exhaust: true,
-    text: v => `Return your ${v.recover} most recent cable cards from discard to hand. Exhaust.`,
+    text: v => `Return your ${v.recover} most recent link cards from discard to hand. Exhaust.`,
+    detail: "Playable only with a link card in your discard pile; a full hand takes fewer.",
     values: { recover: 2 },
     upgrade: { values: { recover: 3 } },
   },
   rebuild: {
     name: "Emergency Rebuild", subtitle: "UNCOMMON / DEPLOY", cost: 1, rarity: "uncommon", target: "instant", art: "hardware", color: "#a9cbc2", exhaust: true,
     rules: `Deploy a router linked to ALPHA and OMEGA: a new ${R.baseRouteDamage}-damage route. Exhaust.`,
+    detail: "The router takes the first free auto-deploy socket; with none, it cannot be played.",
     upgrade: { cost: 0 },
   },
   "zero-day": {
@@ -273,14 +278,14 @@ export const COLORLESS_CARDS: CardTable<ColorlessCardId> = {
   wireshark: {
     name: "Wireshark", subtitle: "OBSERVABILITY / PACKET CAPTURE", cost: 1, rarity: "uncommon", target: "instant", art: "program", color: "#86c9e9", exhaust: true,
     text: v => `Draw ${v.draw}. +1 damage this turn per device type on your primary route. Exhaust.`,
-    detail: "Needs a live route. Device types: router, switch, firewall, cache, power, balancer, honeypot.",
+    detail: "Playable only with a live route. Device types: router, switch, firewall, cache, power, balancer, honeypot.",
     values: { draw: 2 },
     upgrade: { values: { draw: 3 } },
   },
   "broadcast-storm": {
     name: "Broadcast Storm", subtitle: "SIGNAL / BROADCAST", cost: 1, rarity: "uncommon", target: "instant", art: "program", color: "#6fd8e8",
     text: v => `+${v.everyPort} damage to every hostile this turn.`,
-    detail: "Needs a live route: the amount joins every living port's packet.",
+    detail: "It rides your transmission: every living hostile's packet grows by it, and with no live route it deals nothing.",
     values: { everyPort: 2 },
     upgrade: { values: { everyPort: 3 } },
   },
@@ -293,6 +298,7 @@ export const COLORLESS_CARDS: CardTable<ColorlessCardId> = {
   "packet-storm": {
     name: "Packet Storm", subtitle: "RARE / OFFENSE", cost: 2, rarity: "rare", target: "instant", art: "program", color: "#5fb9e0", exhaust: true,
     text: v => `+${v.everyPort} damage to every hostile this turn. Exhaust.`,
+    detail: "It rides your transmission: every living hostile's packet grows by it, and with no live route it deals nothing.",
     values: { everyPort: 5 },
     upgrade: { values: { everyPort: 7 } },
   },
@@ -352,13 +358,38 @@ export const COLORLESS_CARDS: CardTable<ColorlessCardId> = {
     values: { damage: 8 },
     upgrade: { values: { damage: 12 } },
   },
-  // ---------------------------------------------------------------- v5 new colorless
-  // Worked example (engine): a daemon whose turnStart hook lives in effects/colorless.ts.
+  // ---------------------------------------------------------------- v5 new colorless (effects/colorless.ts)
+  ping: {
+    name: "Ping", subtitle: "SIGNAL / PROBE", cost: 0, rarity: "common", target: "instant", art: "program", color: "#7fe3d8",
+    text: v => `+${v.burst} damage this turn. Draw ${v.draw}.`,
+    values: { burst: 1, draw: 1 },
+    upgrade: { values: { burst: 2 } },
+  },
+  hotfix: {
+    name: "Hotfix", subtitle: "SYSTEM / REPAIR", cost: 0, rarity: "common", target: "node", art: "program", color: "#f0b46a",
+    text: v => `Repair a device by ${v.repair}. Draw ${v.draw}.`,
+    detail: "Choose a worn device; a repair never lifts it above its maximum condition. Jams stay.",
+    values: { repair: 1, draw: 1 },
+    upgrade: { values: { repair: 2 } },
+  },
+  // The engine's worked example of a daemon: its turnStart hook adds the block.
   keepalive: {
     name: "Keepalive", subtitle: "DAEMON / HEARTBEAT", cost: 1, rarity: "uncommon", target: "daemon", art: "defense", color: "#8fd9b6",
     text: v => `Daemon. At the start of your turn, gain ${v.block} block.`,
+    detail: "Every running copy adds its block, after your draw. The block expires after the enemy phase like any other.",
     values: { block: 2 },
     upgrade: { values: { block: 3 } },
   },
-  // PHASE C (colorless agent): ping, hotfix, rollback, firmware-update.
+  rollback: {
+    name: "Rollback", subtitle: "SYSTEM / REVERT", cost: 1, rarity: "uncommon", target: "instant", art: "program", color: "#c3a4f2", exhaust: true,
+    rules: "Return the last non-Exhaust card you played this turn to your hand. Exhaust.",
+    detail: "It takes the most recent card you played this turn that is still in your discard pile (daemons and armed protocols never are); replaying it costs its energy again. With none, Rollback cannot be played.",
+    upgrade: { cost: 0 },
+  },
+  "firmware-update": {
+    name: "Firmware Update", subtitle: "SYSTEM / FIRMWARE", cost: 1, rarity: "rare", target: "instant", art: "program", color: "#ffdf8a", exhaust: true,
+    rules: "Upgrade every card in your hand for this battle. Exhaust.",
+    detail: "Each card in your hand becomes its + version until the battle ends; your deck keeps the originals. Curses and upgraded cards stay as they are. With nothing to upgrade, it cannot be played.",
+    upgrade: { cost: 0 },
+  },
 };

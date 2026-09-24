@@ -10,6 +10,7 @@ import type {
   Offer, Port, Reinforcement, Role, RunState, SignalId,
 } from "./types.ts";
 import { CARDS, RULES, baseCard } from "./cards.ts";
+import { PURGE_ORDER } from "./cards/curses.ts";
 import { pickCard, rollSlot } from "./rewards.ts";
 import {
   DESIGNATIONS, ENEMIES, ESCORT_THREAT, MESSAGE_OPTIONS, REINFORCEMENT_ESCORTS, SHED_SPAWN, SIGNALS, SIGNAL_IDS,
@@ -320,7 +321,7 @@ export function messageOffer(run: RunState, source: "laden" | "crate", salt: str
     if (id === "restore") options.push({ id, amount: RULES.messageRestore });
     else if (id === "reinforce") options.push({ id, amount: RULES.messageMaxIntegrity });
     else if (id === "credit") options.push({ id, amount: credit(run, RULES.messageCredits) });
-    else if (id === "purge") options.push({ id });
+    else if (id === "purge") { const curse = purgeCurse(run.deck); options.push(curse ? { id, card: curse } : { id }); }
     else {
       // Recover: a named rare card from either pool (the keeper's first, like a reward slot).
       const card = pickCard(run, random, random() < RULES.keeperShare ? "keeper" : "colorless", "rare");
@@ -338,8 +339,16 @@ export function messageOptionText(option: MessageOption): string {
     case "reinforce": return `+${option.amount ?? RULES.messageMaxIntegrity} maximum integrity, permanently.`;
     case "credit": return `Take ${option.amount ?? RULES.messageCredits} credits.`;
     case "recover": return `${option.card && CARDS[option.card] ? CARDS[option.card].name : "A rare card"} enters your hand for this encounter; it exhausts when played.`;
-    case "purge": return MESSAGE_OPTIONS.purge.rule;
+    case "purge": return option.card && CARDS[option.card]?.curse
+      ? `Every junk card leaves your piles for this encounter, and ${CARDS[option.card].name} leaves your deck permanently.`
+      : "Every junk card leaves your piles for this encounter.";
   }
+}
+
+/** Purge: the curse an undelivered message removes (PURGE_ORDER: CVE first), or null. The offer
+ * names it (`option.card`); the deck does not change before it is answered. */
+export function purgeCurse(deck: readonly CardId[]): CardId | null {
+  return PURGE_ORDER.find(id => deck.includes(id)) ?? null;
 }
 
 /** Credits taken during a fight are banked like crate credits and paid by grantVictory;
@@ -411,9 +420,13 @@ export function chooseOffer(run: RunState, optionIndex: number): ActionResult {
       run.hand = run.hand.filter(id => !junk(id));
       run.drawPile = run.drawPile.filter(id => !junk(id));
       run.discardPile = run.discardPile.filter(id => !junk(id));
-      const cve = removeOne(run.deck, "cve");
-      if (cve) [run.hand, run.drawPile, run.discardPile, run.exhaustPile].some(pile => removeOne(pile, "cve"));
-      message = `The message purges ${removed} junk card${removed === 1 ? "" : "s"}${cve ? " and a CVE from your deck" : ""}.`;
+      // The named curse (or, for an offer that named none, the one PURGE_ORDER picks now).
+      const curse = option.card && CARDS[option.card]?.curse && run.deck.includes(option.card) ? option.card : purgeCurse(run.deck);
+      if (curse) {
+        removeOne(run.deck, curse);
+        [run.hand, run.drawPile, run.discardPile, run.exhaustPile].some(pile => removeOne(pile, curse));
+      }
+      message = `The message purges ${removed} junk card${removed === 1 ? "" : "s"}${curse ? ` and a ${CARDS[curse].name} from your deck` : ""}.`;
     }
   }
   log(run, message);

@@ -283,6 +283,8 @@ export function prepareCard(run: RunState, index: number): ActionResult {
   if (run.preparedCard) return { ok: false, message: "Return your prepared card before choosing another." };
   if (!Number.isInteger(index) || index < 0 || !run.hand[index]) return { ok: false, message: "Choose a card from your hand." };
   if (card(run.hand[index]).junk) return { ok: false, message: "Junk cannot be prepared." };
+  // v5: a curse cannot leave the hand this way (Backdoor, Bitrot and Kernel Panic act from the hand).
+  if (card(run.hand[index]).curse) return { ok: false, message: "Curses cannot be prepared." };
   run.preparedCard = run.hand.splice(index, 1)[0];
   log(run, `${card(run.preparedCard).name} prepared for the next turn, replacing one draw.`);
   return { ok: true, message: `${card(run.preparedCard).name} held for next turn.` };
@@ -745,7 +747,7 @@ function instantPlay(run: RunState, index: number, installationId?: string): Act
   if (base === "flood-fill" && !primary)
     return { ok: false, message: `${card(id).name} needs a live route.` };
   if (base === "salvage" && !run.discardPile.some((held) => card(held).target === "link"))
-    return { ok: false, message: "No cable cards are in your discard pile." };
+    return { ok: false, message: "No link cards are in your discard pile." };
   if (base === "reflect" && !run.backpressure)
     return { ok: false, message: "No backpressure is stored yet." };
   if (base === "replay-attack" && !run.buffer)

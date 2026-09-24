@@ -546,15 +546,13 @@ function roomDetail(r: RunState, n: MapRoom): string {
     event: "Unknown signal · a short encounter. Every answer states its price before you choose.",
   }[n.type as "forge" | "cache" | "shop" | "event"] ?? "A hostile encounter.";
 }
-/** A hostile's portrait, cropped from its sprite sheet with the same background-position
- * crop as the guardian entrance. A sheet still being painted leaves an empty, sized disc. */
+/** A hostile's portrait (its square cut-out, the rail's own image), as on the guardian entrance.
+ * An unknown hostile leaves an empty, sized disc. */
 export function hostilePortrait(id: string, cls = "hostile-portrait"): string {
   const art = ENEMIES[id]?.art;
   const attr = cls ? ` class="${cls}"` : "";
   if (!art) return `<span${attr}></span>`;
-  const x = art.columns === 1 ? 0 : art.index % art.columns / (art.columns - 1) * 100;
-  const y = art.rows === 1 ? 0 : Math.floor(art.index / art.columns) / (art.rows - 1) * 100;
-  return `<span${attr} style="background-image:url('${asset(`art/${art.file}.png`)}');background-size:${art.columns * 100}% ${art.rows * 100}%;background-position:${x}% ${y}%"></span>`;
+  return `<span${attr} style="background-image:url('${asset(`art/${art}`)}');background-size:contain;background-position:center"></span>`;
 }
 /** The chart's designation glyphs for a room: one diamond per ribbon, or the UNKNOWN static. */
 function roomDesignations(scout: RoomScout): string {

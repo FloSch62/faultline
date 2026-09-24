@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { CARDS, RELICS, REWARD_POOL, RULES, offeredTo } from "./cards.ts";
 import {
   ADD_IDS, DESIGNATIONS, DESIGNATION_IDS, ENEMIES, ESCORT_IDS, ESCORT_THREAT, MESSAGE_OPTIONS, PACKS, REINFORCEMENT_ESCORTS,
@@ -23,18 +24,13 @@ const reach = RULES.reach.toFixed(1);
 test("the v4 roster: seven escorts, three adds and four leaders, each with art, story, pattern, trait and badge", () => {
   assert.deepEqual(ESCORT_IDS, ["spark-mite", "splicer", "relay-drone", "ward-node", "tap-spinner", "glass-echo", "rigger-drone"]);
   assert.deepEqual(ADD_IDS, ["gate-warden", "chorister", "quarantine-drone"]);
-  const sheets: Record<string, [string, number, number, string[]]> = {
-    escort: ["hostiles-escorts", 4, 2, ESCORT_IDS],
-    add: ["hostiles-adds", 3, 1, ADD_IDS],
-    hostile: ["hostiles-front", 4, 1, NEW_LEADERS],
-  };
-  for (const [kind, [file, columns, rows, ids]] of Object.entries(sheets)) ids.forEach((id, index) => {
-    const definition = ENEMIES[id];
-    assert.equal(definition.kind, kind, id);
-    assert.deepEqual(definition.art, { file, columns, rows, index }, `${id} art`);
-  });
+  const kinds: Record<string, string[]> = { escort: ESCORT_IDS, add: ADD_IDS, hostile: NEW_LEADERS };
+  for (const [kind, ids] of Object.entries(kinds)) for (const id of ids) assert.equal(ENEMIES[id].kind, kind, id);
   for (const [id, definition] of Object.entries(ENEMIES)) {
     assert.equal(definition.id, id);
+    // Every hostile has its own cut-out portrait (scripts/cut_hostiles.py).
+    assert.equal(definition.art, `hostiles/${id}.webp`, `${id} art`);
+    assert.ok(existsSync(new URL(`../../public/art/${definition.art}`, import.meta.url)), `${id} portrait file`);
     assert.ok(definition.pattern.length >= 1, `${id} pattern`);
     for (const step of definition.pattern) {
       assert.ok(KINDS.includes(step.kind) && step.kind !== "dormant", `${id} ${step.kind}: DORMANT comes from the engine`);

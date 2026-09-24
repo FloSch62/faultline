@@ -413,7 +413,7 @@ export function titleMarkup(saved: Expedition | null) {
   const item = (action: string, label: string, extra = "") =>
     `<button class="menu-item" data-action="${action}"><span>${label}</span>${extra}</button>`;
   return `<section class="title-screen"><div class="title-copy"><h1 class="logotype">FAULTLINE</h1><p class="logo-subtitle"><i></i><span>A Containerlab Odyssey</span><i></i></p>
-    <nav class="title-menu" aria-label="Main menu">${canContinue ? item("continue", "Continue expedition", `<small>${where}</small>`) : ""}${item("new", "New expedition")}${item("daily", "Daily expedition")}<i class="menu-gap" aria-hidden="true"></i>${item("tutorial", "Field training")}${item("help", "Handbook")}${item("collection", "Card archive")}${item("settings", "Options")}</nav>
+    <nav class="title-menu" aria-label="Main menu">${canContinue ? item("continue", "Continue expedition", `<small>${where}</small>`) : ""}${item("new", "New expedition")}<i class="menu-gap" aria-hidden="true"></i>${item("tutorial", "Field training")}${item("help", "Handbook")}${item("collection", "Card archive")}${item("settings", "Options")}</nav>
   </div><span class="version-mark">v${__APP_VERSION__}</span></section>`;
 }
 
@@ -453,7 +453,7 @@ function starterRow(id: Archetype): string {
 }
 
 const sentence = (text: string) => text.charAt(0) + text.slice(1).toLowerCase();
-export function selectMarkup(selected: Archetype, daily: boolean) {
+export function selectMarkup(selected: Archetype) {
   const ids = Object.keys(ARCHETYPES) as Archetype[];
   const cards = ids.map(id => {
     const a = ARCHETYPES[id], consoleDef = CONSOLES[a.console], engine = ENGINES[id], relic = RELICS[a.relic];
@@ -472,7 +472,7 @@ export function selectMarkup(selected: Archetype, daily: boolean) {
         <span class="archetype-health">${icon("heart", 16)}<b>${a.integrity}</b><small>Integrity</small></span>
       </span></button>`;
   }).join("");
-  return `<section class="selection-screen full-screen"><button class="back-control text-button" data-action="title"><kbd>Esc</kbd>Return</button><button class="plate-button deck-plate" data-action="loadout">${icon("deck", 16)}Starting deck</button><div class="screen-heading">${daily ? '<span class="eyebrow">Daily Expedition</span>' : ""}<h1>Choose Your Keeper</h1><p class="chosen-story">${esc(ARCHETYPE_STORIES[selected].story)}</p></div><div class="archetypes">${cards}</div><div class="selection-footer">${ascensionPanel(selected)}<button class="gold-button embark" data-action="embark">Enter the Faultline</button></div></section>`;
+  return `<section class="selection-screen full-screen"><button class="back-control text-button" data-action="title"><kbd>Esc</kbd>Return</button><button class="plate-button deck-plate" data-action="loadout">${icon("deck", 16)}Starting deck</button><div class="screen-heading"><h1>Choose Your Keeper</h1><p class="chosen-story">${esc(ARCHETYPE_STORIES[selected].story)}</p></div><div class="archetypes">${cards}</div><div class="selection-footer">${ascensionPanel(selected)}<button class="gold-button embark" data-action="embark">Enter the Faultline</button></div></section>`;
 }
 
 // ------------------------------------------------------------------ header & map

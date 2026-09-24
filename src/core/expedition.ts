@@ -61,7 +61,6 @@ export interface Expedition {
   version: 5;
   run: RunState;
   archetype: Archetype;
-  daily: boolean;
   startedAt: number;
   recorded: boolean;
 }
@@ -83,7 +82,6 @@ export function starterDeck(archetype: Archetype): CardId[] {
 export function newExpedition(
   archetype: Archetype = "architect",
   seed = Date.now() >>> 0,
-  daily = false,
   ascension = 0,
 ): Expedition {
   const run = createRun(seed);
@@ -102,13 +100,9 @@ export function newExpedition(
     version: EXPEDITION_VERSION,
     run,
     archetype,
-    daily,
     startedAt: Date.now(),
     recorded: false,
   };
-}
-export function dailySeed(date = new Date()): number {
-  return Number(date.toISOString().slice(0, 10).replaceAll("-", ""));
 }
 
 // ---------------------------------------------------------------- validation
@@ -283,7 +277,7 @@ export function parseExpedition(value: string | null): Expedition | null {
     // Only the current version loads: an older save is simply not continued (a new expedition starts).
     const e = raw as unknown as Expedition;
     if (e.version !== EXPEDITION_VERSION || !Object.hasOwn(ARCHETYPES, e.archetype)) return null;
-    if (typeof e.daily !== "boolean" || typeof e.recorded !== "boolean" || !finite(e.startedAt)) return null;
+    if (typeof e.recorded !== "boolean" || !finite(e.startedAt)) return null;
     const r = e.run;
     if (!r || !PHASES.includes(r.phase)) return null;
     if (![r.seed, r.rng, r.integrity, r.maxIntegrity, r.energy, r.turn, r.floor, r.score, r.nextNodeId].every(v => finite(v)))

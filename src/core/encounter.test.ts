@@ -13,7 +13,7 @@ import { ASCENSION_RULES } from "./ascension.ts";
 import type { Archetype, CardId, MapRoom, RunState } from "./types.ts";
 
 function expedition(stage = 0, seed = 7, ascension = 0, archetype: Archetype = "architect"): RunState {
-  const run = newExpedition(archetype, seed, false, ascension).run;
+  const run = newExpedition(archetype, seed, ascension).run;
   run.stage = stage;
   run.map = createMap(stage, seed, ascension);
   return run;

@@ -14,7 +14,6 @@ import { TRACK_TITLES } from "./core/music.ts";
 import { CARDS, RULES, baseCard } from "./core/cards.ts";
 import {
   ARCHETYPES,
-  dailySeed,
   EXPEDITION_VERSION,
   newExpedition,
   parseExpedition,
@@ -121,7 +120,6 @@ try {
 let run = expedition?.run ?? createRun();
 let view: "title" | "select" | "run" = "title";
 let archetype: Archetype = "architect";
-let daily = false;
 let selected: number | null = null;
 let source: string | null = null;
 let selectedNode: string | null = null;
@@ -355,7 +353,7 @@ function render(rebuild = true) {
   if (debrief) screen = "";
   else if (view === "title") screen = screens.titleMarkup(expedition);
   else if (view === "select")
-    screen = screens.selectMarkup(archetype, daily);
+    screen = screens.selectMarkup(archetype);
   else if (run.phase === "map") screen = screens.mapMarkup(expedition!);
   else if (run.phase === "reward") screen = screens.rewardMarkup(run);
   else if (run.phase === "relic") screen = screens.relicMarkup(run);
@@ -719,10 +717,7 @@ function begin() {
   discardArmed = false;
   expedition = newExpedition(
     archetype,
-    daily
-      ? dailySeed()
-      : (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0,
-    daily,
+    (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0,
     screens.chosenAscension(archetype),
   );
   run = expedition.run;
@@ -1615,9 +1610,8 @@ async function action(name: string) {
     return;
   }
   if (dialog.open && name !== "save-exit" && name !== "export") return;
-  if (name === "new" || name === "daily") {
+  if (name === "new") {
     clearSelection();
-    daily = name === "daily";
     archetype = "architect";
     view = "select";
     render();
@@ -2259,7 +2253,7 @@ function startLesson(id: training.LessonId) {
   // Short screens start with the coach folded to its current goal; it expands on demand.
   const short = root.getBoundingClientRect().height / interfaceScale() < 780;
   practice = { id, ...parked, progress: null, showHint: false, collapsed: practice?.collapsed ?? short, read: [], plate: false };
-  expedition = { version: EXPEDITION_VERSION, run: lessonRun, archetype: lessonRun.archetype, daily: false, startedAt: Date.now(), recorded: true };
+  expedition = { version: EXPEDITION_VERSION, run: lessonRun, archetype: lessonRun.archetype, startedAt: Date.now(), recorded: true };
   run = lessonRun;
   view = "run";
   busy = false;

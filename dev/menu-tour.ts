@@ -129,7 +129,6 @@ const shots: Shot[] = [
   { name: "04-credits", save: null, go: async page => { await dialog("settings")(page); await dialog("credits")(page); } },
   { name: "05-select", save: null, go: dialog("new") },
   { name: "05c-select-ascension", save: null, go: async page => { await dialog("new")(page); await page.evaluate(() => localStorage.setItem("faultline-progress-v1", JSON.stringify({ cleared: { ghost: 4 } }))); await page.locator('[data-archetype="ghost"]').click(); await page.locator('[data-screen="ascension"][data-level="3"]').click(); await page.locator('[data-screen="ascension"][data-level="4"]').hover(); await page.waitForTimeout(500); } },
-  { name: "05b-select-daily", save: null, go: async page => { await dialog("daily")(page); await page.locator('[data-archetype="warden"]').hover(); await page.waitForTimeout(400); } },
   { name: "06-collection", save: null, go: dialog("collection") },
   { name: "07-handbook", save: null, go: dialog("help") },
   { name: "08-training", save: null, go: dialog("tutorial") },

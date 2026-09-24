@@ -55,7 +55,7 @@ test("every event offers two to four stated choices, and every available choice 
       assert.equal(run.event!.resolved, true);
       assert.equal(run.event!.outcome, result.message);
       assert.equal(chooseEvent(run, choice).ok, false, "an answered event cannot be answered again");
-      assert.ok(parseExpedition(JSON.stringify({ version: EXPEDITION_VERSION, run, archetype: "architect", daily: false, startedAt: 1, recorded: false })), `${id}/${choice} saves`);
+      assert.ok(parseExpedition(JSON.stringify({ version: EXPEDITION_VERSION, run, archetype: "architect", startedAt: 1, recorded: false })), `${id}/${choice} saves`);
       assert.ok(leaveEvent(run).ok);
       assert.equal(run.phase, "map");
       assert.equal(run.event, null);

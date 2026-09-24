@@ -20,7 +20,7 @@ function enter(run: RunState, type: RoomType): RunState {
   assert.equal(chooseRoom(run, room.id).ok, true, `enter ${type}`);
   return run;
 }
-const fresh = (archetype: Archetype = "architect", seed = 11, ascension = 0) => newExpedition(archetype, seed, false, ascension).run;
+const fresh = (archetype: Archetype = "architect", seed = 11, ascension = 0) => newExpedition(archetype, seed, ascension).run;
 const createStageMap = (run: RunState, stage: number) => createMap(stage, run.seed, run.ascension);
 
 test("victories pay seeded credits by room type, with Credit Line and ascension", () => {
@@ -279,7 +279,7 @@ test("the market sells priced cards and relics, and removes or upgrades once per
   assert.ok(shopUpgradeCard(r, router).ok);
   assert.equal(r.deck[router], "router+");
   assert.equal(shopUpgradeCard(r, r.deck.indexOf("pulse")).ok, false, "one upgrade per visit");
-  assert.ok(parseExpedition(JSON.stringify({ version: EXPEDITION_VERSION, run: r, archetype: "architect", daily: false, startedAt: 1, recorded: false })));
+  assert.ok(parseExpedition(JSON.stringify({ version: EXPEDITION_VERSION, run: r, archetype: "architect", startedAt: 1, recorded: false })));
   assert.ok(leaveShop(r).ok);
   assert.equal(r.phase, "map");
   assert.equal(r.shop, null);

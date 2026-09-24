@@ -81,7 +81,7 @@ export const WARDEN_EFFECTS: OwnerEffects = {
   },
   daemons: {
     // Persistent State: block survives the enemy phase (what the attacks left of it). A flag: copies add nothing.
-    "persistent-state": { blockCarry: () => true },
+    "persistent-state": { blockCarry: ({ card }) => card.values.amount ?? 0 },
     // Flow Control: the Backpressure relic stores this share of the prevented damage (the highest wins).
     "flow-control": { backpressureRatio: ({ card }) => card.values.amount ?? 0 },
     // Defense in Depth: every online firewall blocks N more against each strike and breach; copies stack.

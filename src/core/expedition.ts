@@ -92,7 +92,7 @@ export function newExpedition(
   run.ascension = clampAscension(ascension);
   // The chart reads the ascension (pack frequency, second designations).
   run.map = createMap(0, seed, run.ascension);
-  run.maxIntegrity = profile.integrity - (ascends(run.ascension, "wornBackbone") ? 2 : 0);
+  run.maxIntegrity = profile.integrity - (ascends(run.ascension, "wornBackbone") ? RULES.ascensionIntegrityLoss : 0);
   run.integrity = run.maxIntegrity;
   run.relics = [profile.relic];
   run.deck = starterDeck(archetype);

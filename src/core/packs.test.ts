@@ -80,7 +80,9 @@ test("escorts and adds get no stage threat, pressure or enrage; ascension 4 stil
   assert.equal(leader.amount, 2 + 2 + 2 + 1);
   assert.equal(leader.escalation, 3);
   r.ascension = 4;
-  assert.equal(intentFor(r, r.enemies[0]).amount, 3);
+  // Sharper Teeth reaches escorts unless RULES.ascensionAttackRoles limits it to leaders and singles.
+  const sharper = r.stage >= RULES.ascensionAttackFromStage && !RULES.ascensionAttackRoles ? RULES.ascensionAttackBonus : 0;
+  assert.equal(intentFor(r, r.enemies[0]).amount, 2 + sharper);
 });
 
 // ------------------------------------------------------------------ deliveries, the target, merge, armor, overflow

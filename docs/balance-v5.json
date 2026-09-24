@@ -1036,5 +1036,99 @@
       "lever": "PoE Injector cost 1/0",
       "result": "runs starting with two: 19-22 % at either cost (keepers 36-40 %); kept 2/1"
     }
-  ]
+  ],
+  "followUp": {
+    "persistentState": {
+      "rule": "blockCarry is now a number: the most block that carries into the next turn (the highest running cap counts; copies add nothing). Pure in the resolver (daemonMax), forecast = resolution.",
+      "face": "Daemon. Up to 2 of your block carries into the next turn.",
+      "before": {
+        "cost": "3/2",
+        "carry": "all the block the attacks leave"
+      },
+      "after": {
+        "cost": "2/2",
+        "carry": "up to 2 (upgrade: up to 4)"
+      },
+      "measured150": {
+        "cap 6/9": {
+          "warden": "40 %",
+          "holders": "72 % (39 runs)"
+        },
+        "cap 4/6": {
+          "warden": "41 %",
+          "holders": "74 %"
+        },
+        "cap 3/5": {
+          "warden": "37 %",
+          "holders": "59 %"
+        },
+        "cap 2/4 (kept)": {
+          "warden": "37 %",
+          "holders": "62 % (39 runs)"
+        },
+        "cap 0 (dead card)": {
+          "warden": "31 %",
+          "holders": "38.5 %"
+        },
+        "banned": {
+          "warden": "36 %"
+        }
+      },
+      "note": "Holding a rare carries survivorship bias: a dead Persistent State still shows holders at 1.24 x the keeper rate. At cap 2 the holder ratio reads 1.66 x on only 39 runs (+/- 8 points); the 1.4 x target is not demonstrated at 150 seeds."
+    },
+    "ascensionKeys": {
+      "new": {
+        "ascensionNormalHealth": 1.1,
+        "ascensionEliteHealth": 1.15,
+        "ascensionRepair": 0.75,
+        "ascensionPrices": 1.2,
+        "ascensionCredits": 0.9,
+        "ascensionAttackBonus": 1,
+        "ascensionAttackFromStage": 1,
+        "ascensionAttackRoles": 1,
+        "ascensionFieldTurns": 1,
+        "ascensionGuardianHealth": 1.05,
+        "ascensionUltimateBonus": 2,
+        "ascensionEnrageThreshold": 0.5,
+        "ascensionIntegrityLoss": 2
+      },
+      "tuned": {
+        "A3 attack bonus": "every hostile, every stage -> leaders, singles and guardians from stage II",
+        "ascensionGuardianHealth": "1.15 -> 1.05",
+        "ascensionEnrageThreshold": "0.6 -> 0.5 (the Last Signal no longer enrages guardians earlier)"
+      },
+      "levelTexts": "ascension.ts builds the level 1-4 texts from the keys.",
+      "rejected": [
+        {
+          "lever": "attack bonus from stage II, leaders only",
+          "A4": "architect 7, warden 1, ghost 4 %"
+        },
+        {
+          "lever": "+ ultimate 1, integrity loss 1 (FX7)",
+          "A4": "architect 15, warden 7, ghost 13 %: Architect/Ghost above 12"
+        },
+        {
+          "lever": "attack bonus 0, guardian 1.05, ultimate 1",
+          "A4": "architect 19 %"
+        }
+      ]
+    },
+    "results150": {
+      "A0": {
+        "architect": "32 % (300 seeds: 37 %)",
+        "warden": "37 %",
+        "ghost": "39 %"
+      },
+      "A2": {
+        "architect": "25 %",
+        "warden": "21 %",
+        "ghost": "23 %"
+      },
+      "A4": {
+        "architect": "9 %",
+        "warden": "4 %",
+        "ghost": "11 %"
+      }
+    }
+  }
 }

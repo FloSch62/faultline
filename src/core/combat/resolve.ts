@@ -25,7 +25,7 @@ import { addBreakBonus, ascends } from "../ascension.ts";
 import { actsInPhase, advanceSteps, intentFor, nextLevel, scales } from "./intent.ts";
 import { announceSignal, emptySidePort, fireSignal, raiseAdds, reinforce, type ArrivalRecord } from "./surprises.ts";
 import {
-  daemonAmounts, daemonFlag, daemonMax, daemonRouteTerms, daemonShieldTerms, handHooks, protocolRetaliation,
+  daemonAmounts, daemonMax, daemonRouteTerms, daemonShieldTerms, handHooks, protocolRetaliation,
   type EndOfTurnEffect,
 } from "../effects/index.ts";
 
@@ -645,7 +645,7 @@ function nearerDevice(run: RunState, key: string): NetworkNode | null {
 
 function isEnraged(run: RunState, enemy: Enemy) {
   const definition = definitionOf(enemy);
-  const threshold = definition.boss && ascends(run.ascension, "lastSignal") ? 0.6 : 0.5;
+  const threshold = definition.boss && ascends(run.ascension, "lastSignal") ? RULES.ascensionEnrageThreshold : 0.5;
   return scales(enemy) && !!definition.enrages && enemy.hp <= enemy.maxHp * threshold;
 }
 
@@ -1489,8 +1489,9 @@ function attackPhase(run: RunState, network: Network, plans: Plan[], context: At
   const backpressureGain = has(run, "backpressure") ? Math.ceil(prevented * backpressureRatio(run).value) : 0;
   // v5 · blockCarry (Persistent State): the pool's other terms expire first, so the block that
   // survives is what is left of the pool, up to the block itself.
-  const carrier = run.block > 0 ? daemonFlag(run, "blockCarry") : null;
-  const blockCarried = carrier ? { amount: Math.max(0, Math.min(run.block, pool)), by: carrier } : null;
+  // The daemon's value caps it (the highest running cap counts; copies add nothing).
+  const carrier = run.block > 0 ? daemonMax(run, "blockCarry", 0) : null;
+  const blockCarried = carrier?.label && carrier.value > 0 ? { amount: Math.max(0, Math.min(run.block, pool, carrier.value)), by: carrier.label } : null;
   return { incoming, raw, incomingTerms, shieldTerms, shield: sumTerms(shieldTerms), backpressureGain, blockCarried };
 }
 

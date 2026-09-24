@@ -242,13 +242,13 @@ test("ascension raises hostile integrity by room type and is shown by the same h
   const { stubbornSignals, hardenedElites, ancientGuardians } = ASCENSION_RULES;
   assert.equal(encounterHealth(0, battle, 0), normal);
   assert.equal(encounterHealth(0, battle, stubbornSignals - 1), normal);
-  assert.equal(encounterHealth(0, battle, stubbornSignals), Math.round(normal * 1.1));
+  assert.equal(encounterHealth(0, battle, stubbornSignals), Math.round(normal * RULES.ascensionNormalHealth));
   assert.equal(encounterHealth(0, elite, hardenedElites - 1), hardened);
-  assert.equal(encounterHealth(0, elite, hardenedElites), Math.round(hardened * 1.15));
+  assert.equal(encounterHealth(0, elite, hardenedElites), Math.round(hardened * RULES.ascensionEliteHealth));
   assert.equal(encounterHealth(0, boss, ancientGuardians - 1), RULES.guardianHealth[0]);
-  assert.equal(encounterHealth(0, boss, ancientGuardians), Math.round(RULES.guardianHealth[0] * 1.15));
+  assert.equal(encounterHealth(0, boss, ancientGuardians), Math.round(RULES.guardianHealth[0] * RULES.ascensionGuardianHealth));
   assert.equal(encounterHealth(1, boss, 0), RULES.guardianHealth[1]);
-  assert.equal(encounterHealth(0, event, stubbornSignals), Math.round(Math.round(normal * 1.1) * RULES.eventHealthScale), "Signal in the Static: normal health × 1.4");
+  assert.equal(encounterHealth(0, event, stubbornSignals), Math.round(Math.round(normal * RULES.ascensionNormalHealth) * RULES.eventHealthScale), "Signal in the Static: normal health × the event scale");
   const run = planner(0, 77, [], ancientGuardians);
   assert.equal(planEncounter(run, { ...boss, enemyId: "regent" }).enemies[0].maxHp, encounterHealth(0, boss, ancientGuardians));
   assert.ok(ENEMIES.regent.boss);

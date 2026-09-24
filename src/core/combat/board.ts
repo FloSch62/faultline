@@ -108,7 +108,7 @@ export function installField(run: RunState, effect: ZoneEffect) {
   run.zoneEffects.push(effect);
 }
 export function hostileFieldTurns(run: RunState) {
-  return RULES.hostileFieldTurns + (ascends(run.ascension, "lingeringCorruption") ? 1 : 0);
+  return RULES.hostileFieldTurns + (ascends(run.ascension, "lingeringCorruption") ? RULES.ascensionFieldTurns : 0);
 }
 /** Fields of one kind per band. A cast field and a permanent terrain field stack. */
 export function fieldBands(run: RunState, kind: ZoneEffectKind): Map<Zone, number> {

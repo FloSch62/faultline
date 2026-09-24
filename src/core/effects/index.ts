@@ -73,7 +73,7 @@ export function daemonAmounts(run: RunState, hook: NumericHook): CombatTerm[] {
 export const daemonTotal = (run: RunState, hook: NumericHook) => daemonAmounts(run, hook).reduce((sum, term) => sum + term.amount, 0);
 /** The highest value a replacing hook offers over the rule's own (Flow Control, Deep Queue), and
  * the daemon that set it (null when the rule stands). */
-export function daemonMax(run: RunState, hook: "backpressureRatio" | "bufferMultiplier", base: number): { value: number; label: string | null } {
+export function daemonMax(run: RunState, hook: "backpressureRatio" | "bufferMultiplier" | "blockCarry", base: number): { value: number; label: string | null } {
   let best = { value: base, label: null as string | null };
   for (const term of daemonAmounts(run, hook)) if (term.amount > best.value) best = { value: term.amount, label: term.label };
   return best;

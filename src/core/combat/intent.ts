@@ -72,7 +72,7 @@ const patternMarks = (enemy: Enemy) => {
   return { length: pattern.length, charge: pattern.findIndex(step => step.kind === "charge"), ultimate: pattern.findIndex(step => step.ultimate) };
 };
 export function enrageThreshold(run: RunState, enemy: Enemy) {
-  return definitionOf(enemy).boss && ascends(run.ascension, "lastSignal") ? 0.6 : 0.5;
+  return definitionOf(enemy).boss && ascends(run.ascension, "lastSignal") ? RULES.ascensionEnrageThreshold : 0.5;
 }
 /** Wounded: at or below the enrage threshold (half health; 60 % at ascension 10). */
 export const wounded = (run: RunState, enemy: Enemy) => enemy.hp <= enemy.maxHp * enrageThreshold(run, enemy);
@@ -167,8 +167,10 @@ export function intentFor(run: RunState, enemy: Enemy, phasesAhead = 0): Intent 
   const enraged = grows && !!definition.enrages && wounded(run, enemy);
   const level = escalationLevel(run, enemy, turn + 1);
   const attack = base.kind === "strike" || base.kind === "breach";
-  const ascension = attack && ascends(run.ascension, "sharperTeeth") ? 1 : 0;
-  const ultimate = base.ultimate && ascends(run.ascension, "lastSignal") ? 2 : 0;
+  const sharper = attack && ascends(run.ascension, "sharperTeeth") && run.stage >= RULES.ascensionAttackFromStage
+    && (!RULES.ascensionAttackRoles || enemy.role === "leader" || enemy.role === "single");
+  const ascension = sharper ? RULES.ascensionAttackBonus : 0;
+  const ultimate = base.ultimate && ascends(run.ascension, "lastSignal") ? RULES.ascensionUltimateBonus : 0;
   const escalated = attack && level >= 3 ? 1 : 0;
   const hardened = base.kind === "strike" && has(enemy, "hardened") ? RULES.hardenedStrike : 0;
   const raw = base.amount + (attack

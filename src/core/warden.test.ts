@@ -427,7 +427,7 @@ test("Entrench: double your block (+: cost 1); refused without block, nothing sp
   agree(r);
 });
 
-test("Persistent State: the block the attacks leave carries into the next turn; copies add nothing", () => {
+test("Persistent State: the block the attacks leave carries into the next turn, up to its cap; the highest cap counts", () => {
   const r = table("wraith", 1); // a strike
   route(r, "r1", 0);
   r.hand = ["persistent-state", "persistent-state+", "stand-firm"];
@@ -439,9 +439,14 @@ test("Persistent State: the block the attacks leave carries into the next turn; 
   const strike = combatPreview(r).incomingRaw;
   assert.ok(strike > 0);
   const { preview } = agree(r);
-  assert.deepEqual(preview.blockCarried, { amount: wall - strike, by: "Persistent State" }, "the first running daemon names it; two copies carry once");
-  assert.equal(preview.nextTurn.block, wall - strike);
-  assert.equal(r.block, wall - strike);
+  // The upgraded copy's cap is the higher one: it names the carry, and copies never add up.
+  const cap = Math.max(values("persistent-state").amount!, values("persistent-state+").amount!);
+  assert.ok(values("persistent-state+").amount! >= values("persistent-state").amount!);
+  const carried = Math.min(wall - strike, cap);
+  assert.ok(carried < wall - strike, "the cap binds against a Stand Firm wall");
+  assert.deepEqual(preview.blockCarried, { amount: carried, by: CARDS["persistent-state+"].name });
+  assert.equal(preview.nextTurn.block, carried);
+  assert.equal(r.block, carried);
   // Without the daemon, block expires.
   const plain = table("wraith", 1);
   route(plain, "r1", 0);
@@ -629,20 +634,21 @@ test("Fortress path: Persistent State, Flow Control and Hardening Guide turn two
   assert.equal(first.incoming, 0);
   const gain = Math.ceil(strike * Math.max(RULES.backpressureRatio, values("flow-control").amount!));
   assert.equal(first.backpressureGain, gain, "Flow Control's share of it");
-  assert.deepEqual(first.blockCarried, { amount: wall1 - strike, by: "Persistent State" });
-  assert.deepEqual([r.block, r.backpressure], [wall1 - strike + values("brace").nextBlock!, gain]);
+  const carried = Math.min(wall1 - strike, values("persistent-state").amount!);
+  assert.deepEqual(first.blockCarried, { amount: carried, by: "Persistent State" });
+  assert.deepEqual([r.block, r.backpressure], [carried + values("brace").nextBlock!, gain]);
   // Turn 2: Pushback, Vent and Entrench stack the kept block; the backpressure rides the route.
   r.energy = 20;
   r.hand = ["pushback", "vent", "entrench"];
   for (let i = 0; i < 3; i++) assert.ok(playInstant(r, 0).ok);
-  const kept = wall1 - strike + values("brace").nextBlock!, pushed = gain + values("pushback").backpressure!;
+  const kept = carried + values("brace").nextBlock!, pushed = gain + values("pushback").backpressure!;
   assert.equal(r.block, 2 * (kept + values("pushback").block! + pushed));
   const hp = r.enemies[0].hp;
   const second = agree(r).preview;
   assert.equal(term(second.damageTerms, "Backpressure"), pushed);
   assert.equal(second.packetDamage, RULES.baseRouteDamage + pushed);
   assert.equal(r.enemies[0].hp, hp - RULES.baseRouteDamage - pushed);
-  assert.equal(second.blockCarried?.amount, 2 * (kept + values("pushback").block! + pushed), "a jam spends no block: all of it carries");
+  assert.equal(second.blockCarried?.amount, Math.min(2 * (kept + values("pushback").block! + pushed), values("persistent-state").amount!), "a jam spends no block: up to the cap carries");
 });
 
 test("Firewall wall path: ACL Gate and Trust Gate online, Defense in Depth and Bulkhead thicken them, DPI and Perimeter cash them in", () => {

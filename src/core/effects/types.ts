@@ -167,7 +167,8 @@ export interface DaemonHooks {
   /** Damage to the hostile (or installation) that set off a protocol, each time one fires (trap step). */
   protocolFired?(ctx: DaemonContext & { protocol: CardId; trigger: ProtocolTrigger }): number;
   /** Block no longer expires after the enemy phase (what the attacks left of it carries over). */
-  blockCarry?(ctx: DaemonContext): boolean;
+  /** The most block that survives the enemy phase (Persistent State's cap); the highest running value counts. */
+  blockCarry?(ctx: DaemonContext): number;
   /** The first N jams or cuts each enemy phase miss. */
   missDisruptions?(ctx: DaemonContext): number;
   /** The first N strikes or breaches each enemy phase deal 0. */

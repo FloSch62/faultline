@@ -229,6 +229,27 @@ export const RULES = {
    * 2 / 4 / 4 %, v3's band is 5–9 %): ascension 6 — adds' integrity multiple (design 1.15 → 1), and
    * the wear Close the Gates / Stolen Voice add; */
   ascensionAddHealth: 1,
+  // v5 ascension riders as RULES keys (contract section 6b; balance-v5 follow-up), read live:
+  /** Level 1: normal hostiles' and elites' integrity multiples. */
+  ascensionNormalHealth: 1.1,
+  ascensionEliteHealth: 1.15,
+  /** Level 2: sanctuary repair, market prices and credits earned multiples. */
+  ascensionRepair: 0.75,
+  ascensionPrices: 1.2,
+  ascensionCredits: 0.9,
+  /** Level 3: hostile strikes and breaches deal this much more, from this zero-based stage on
+   * (`ascensionAttackRoles`: 0 every hostile, 1 leaders, singles and guardians only). */
+  ascensionAttackBonus: 1,
+  ascensionAttackFromStage: 1,
+  ascensionAttackRoles: 1,
+  /** Level 3: hostile fields last this many turns more. */
+  ascensionFieldTurns: 1,
+  /** Level 4: guardians' integrity multiple, their ultimates' extra damage, the enrage threshold
+   * (share of maximum integrity), and maximum integrity lost at the start. */
+  ascensionGuardianHealth: 1.05,
+  ascensionUltimateBonus: 2,
+  ascensionEnrageThreshold: 0.5,
+  ascensionIntegrityLoss: 2,
   ascensionRiderWear: 1,
   /** ascension 7 — the chance an elite carries a second designation (design 1 → 0.5); ascension 10 —
    * the share of a normal room's designation chance that rolls a second (1 → 0.5); */

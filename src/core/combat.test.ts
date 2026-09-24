@@ -527,27 +527,36 @@ test("SDN Controller costs a starting energy; Spare Parts adds a Fiber; Watchdog
 // ------------------------------------------------------------------ ascension hooks
 
 test("ascension: Sharper Teeth raises attacks and lengthens fields; The Last Signal enrages guardians sooner", () => {
+  // The attack bonus is RULES.ascensionAttackBonus from stage RULES.ascensionAttackFromStage on.
   const r = table("wraith", 1);
+  r.stage = RULES.ascensionAttackFromStage;
   const base = intentFor(r, r.enemies[0]).amount;
   r.ascension = ASCENSION_RULES.sharperTeeth - 1;
   assert.equal(intentFor(r, r.enemies[0]).amount, base);
   r.ascension = ASCENSION_RULES.sharperTeeth;
-  assert.equal(intentFor(r, r.enemies[0]).amount, base + 1);
+  assert.equal(intentFor(r, r.enemies[0]).amount, base + RULES.ascensionAttackBonus);
+  if (RULES.ascensionAttackFromStage > 0) {
+    r.stage = RULES.ascensionAttackFromStage - 1;
+    const early = intentFor(r, r.enemies[0]).amount;
+    r.ascension = 0;
+    assert.equal(intentFor(r, r.enemies[0]).amount, early, "no bonus before its stage");
+  }
   const f = table("prophet", 0);
   route(f, "r1", 0);
   f.ascension = ASCENSION_RULES.lingeringCorruption;
-  assert.equal(combatPreview(f).zoneThreat!.turns, RULES.hostileFieldTurns + 1);
+  assert.equal(combatPreview(f).zoneThreat!.turns, RULES.hostileFieldTurns + RULES.ascensionFieldTurns);
   const g = table("regent", 0);
-  g.enemies[0].hp = Math.floor(g.enemies[0].maxHp * 0.55);
+  // Between half health and The Last Signal's threshold (when that is higher).
+  g.enemies[0].hp = Math.floor(g.enemies[0].maxHp * (0.5 + Math.max(0.5, RULES.ascensionEnrageThreshold)) / 2) + 1;
   assert.ok(!intentFor(g, g.enemies[0]).label.startsWith("ENRAGED"));
   g.ascension = ASCENSION_RULES.lastSignal;
-  assert.ok(intentFor(g, g.enemies[0]).label.startsWith("ENRAGED"));
+  assert.equal(intentFor(g, g.enemies[0]).label.startsWith("ENRAGED"), g.enemies[0].hp <= g.enemies[0].maxHp * RULES.ascensionEnrageThreshold);
   g.enemies[0].turn = 5;
   g.enemies[0].hp = g.enemies[0].maxHp;
   g.ascension = ASCENSION_RULES.lastSignal - 1;
   const ultimate = intentFor(g, g.enemies[0]).amount;
   g.ascension = ASCENSION_RULES.lastSignal;
-  assert.equal(intentFor(g, g.enemies[0]).amount, ultimate + 2);
+  assert.equal(intentFor(g, g.enemies[0]).amount, ultimate + RULES.ascensionUltimateBonus);
 });
 
 // ------------------------------------------------------------------ forecast contract

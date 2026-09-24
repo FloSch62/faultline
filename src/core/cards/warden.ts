@@ -123,10 +123,11 @@ export const WARDEN_CARDS: CardTable<WardenCardId> = {
     upgrade: { cost: 1 },
   },
   "persistent-state": {
-    name: "Persistent State", subtitle: "WARDEN / PERSISTENCE", cost: 3, rarity: "rare", target: "daemon", art: "defense", color: "#f0d59a", archetype: "warden",
-    rules: "Daemon. Your block no longer expires after the enemy phase.",
-    detail: "Attacks spend your other shield (fields, circuits, Reclaim) before your block; what they leave of your block carries into your next turn. More copies add nothing.",
-    upgrade: { cost: 2 },
+    name: "Persistent State", subtitle: "WARDEN / PERSISTENCE", cost: 2, rarity: "rare", target: "daemon", art: "defense", color: "#f0d59a", archetype: "warden",
+    text: v => `Daemon. Up to ${v.amount} of your block carries into the next turn.`,
+    detail: "Attacks spend your other shield (fields, circuits, Reclaim) before your block; up to this much of what they leave of your block carries into your next turn. More copies add nothing: the highest cap counts.",
+    values: { amount: 2 },
+    upgrade: { values: { amount: 4 } },
   },
   "flow-control": {
     name: "Flow Control", subtitle: "WARDEN / BACKPRESSURE", cost: 2, rarity: "rare", target: "daemon", art: "defense", color: "#f7bc6a", archetype: "warden",

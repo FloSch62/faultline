@@ -393,7 +393,7 @@ test("buffer multiplier, backpressure ratio and block carry: the highest daemon 
   const FLOW = testCard("engine-test-flow", { name: "Flow", target: "daemon" });
   const CARRY = testCard("engine-test-carry", { name: "Carry", target: "daemon" });
   DAEMON_HOOKS[as(FLOW)] = { backpressureRatio: () => 1 };
-  DAEMON_HOOKS[as(CARRY)] = { blockCarry: () => true };
+  DAEMON_HOOKS[as(CARRY)] = { blockCarry: () => 99 };
   w.daemons = [FLOW, CARRY];
   w.block = 10;
   const { preview } = agree(w);

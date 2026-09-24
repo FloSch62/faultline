@@ -1,1 +1,234 @@
-/* Targeting: click a hostile to target it, per-hostile intent badges, hostile hover cards. */
+/* Targeting: click a hostile to target it, per-hostile intent badges, hostile hover cards.
+ * Intent colours by kind (the badges, the port strip and the cards share them). */
+.hostile-intent, .row-intent, .hostile-card { --kind: #f0ad76; }
+:is(.hostile-intent, .row-intent, .hostile-card).kind-strike { --kind: #f4b07a; }
+:is(.hostile-intent, .row-intent, .hostile-card).kind-breach { --kind: #ff7d6b; }
+:is(.hostile-intent, .row-intent, .hostile-card).kind-sever { --kind: #f1d5a0; }
+:is(.hostile-intent, .row-intent, .hostile-card).kind-jam { --kind: #c0a6ff; }
+:is(.hostile-intent, .row-intent, .hostile-card).kind-corrupt { --kind: #db95e6; }
+:is(.hostile-intent, .row-intent, .hostile-card).kind-charge { --kind: #ffd27a; }
+:is(.hostile-intent, .row-intent, .hostile-card).kind-install-tap { --kind: #ff5d9e; }
+:is(.hostile-intent, .row-intent, .hostile-card).kind-install-jammer { --kind: #8fbcff; }
+:is(.hostile-intent, .row-intent, .hostile-card).kind-install-spike { --kind: #e9a37c; }
+:is(.hostile-intent, .row-intent, .hostile-card).kind-install-anchor { --kind: #c3aaf0; }
+:is(.hostile-intent, .row-intent, .hostile-card).kind-install-breaker { --kind: #ff8a86; }
+:is(.hostile-intent, .row-intent, .hostile-card).kind-overload { --kind: #e89a5e; }
+:is(.hostile-intent, .row-intent, .hostile-card).kind-dormant { --kind: #a29d92; }
+.hostile-intent.kind-arrival { --kind: #ffb096; }
+
+/* ---- the intent layer: one engraved badge hung over each hostile's rail plate (main.ts places
+   them every frame). The layer lets the table take every click except on a badge itself. */
+#intent-layer { position: absolute; inset: 0; z-index: 5; overflow: hidden; pointer-events: none; }
+.game-root:not(.is-battle) #intent-layer, .game-root.busy #intent-layer, .game-root.lesson-debrief #intent-layer { display: none; }
+.hostile-intent {
+  position: absolute; left: 0; top: -6px;
+  display: grid; justify-items: center; gap: 3px;
+  min-width: 96px; max-width: max(168px, calc(var(--plate, 150px) * 1.08));
+  padding: 6px 12px 7px;
+  color: #efe3c6; text-shadow: 0 1px 0 #000, 0 0 6px #000;
+  pointer-events: auto; cursor: var(--cursor-pointer);
+  filter: drop-shadow(0 5px 7px #000d);
+  transition: filter .15s;
+}
+.hostile-intent[hidden] { display: none; }
+/* The engraved plate: iron, a brass rim, a hairline in the intent's colour along its crown. */
+.hostile-intent::before {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background:
+    linear-gradient(90deg, transparent 8%, color-mix(in srgb, var(--kind) 75%, transparent) 50%, transparent 92%) top / 100% 2px no-repeat,
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--kind) 16%, transparent), transparent 70%),
+    linear-gradient(170deg, #221d1ef7, #0d0e13f7 72%);
+  box-shadow: inset 0 0 0 1px #8a6a3a, inset 0 0 0 2px #07060a, inset 0 1px 0 3px #f3dca010;
+  clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px), 0 8px);
+}
+.hostile-intent:hover { filter: drop-shadow(0 5px 7px #000d) drop-shadow(0 0 7px color-mix(in srgb, var(--kind) 55%, transparent)); }
+.hi-main { display: flex; align-items: center; gap: 7px; min-width: 0; max-width: 100%; }
+.hi-glyph { display: grid; flex: none; place-items: center; color: var(--kind); filter: drop-shadow(0 0 5px color-mix(in srgb, var(--kind) 55%, transparent)); }
+.hi-value { flex: none; font: 700 30px/0.9 var(--title); font-variant-numeric: tabular-nums; color: var(--kind); }
+.hi-words { display: grid; min-width: 0; gap: 1px; text-align: left; }
+.hi-verb { font: 700 15px/1.05 var(--label); letter-spacing: .07em; white-space: nowrap; color: #f6ead0; }
+.hi-target { overflow: hidden; font: italic 12.5px/1.1 var(--text); white-space: nowrap; text-overflow: ellipsis; color: #d8cbb0; }
+.hi-level { display: inline-flex; flex: none; flex-direction: column; gap: 3px; margin-left: 1px; }
+.hi-level i { width: 6px; height: 6px; transform: rotate(45deg); border: 1px solid #b0786680; background: #140c0e; }
+.hi-level i.on { border-color: #ffc2b2; background: linear-gradient(135deg, #ffd6c6, #ef8f86 55%, #9b3a2e); box-shadow: 0 0 5px #ef8f8699; }
+.hi-level i.next { border-color: #ef8f86; animation: level-next 1.6s ease-in-out infinite; }
+@keyframes level-next { 50% { box-shadow: 0 0 6px #ef8f86; } }
+.hi-riders { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 8px; max-width: 100%; }
+.hi-rider { display: inline-flex; align-items: center; gap: 3px; font: 700 10.5px/1.1 var(--label); letter-spacing: .05em; white-space: nowrap; color: var(--kind); }
+.hi-rider.kind-junk { --kind: #d9c79a; }
+.hi-rider.kind-heal { --kind: #9fe0a8; }
+.hi-note { font: 700 10.5px/1 var(--label); letter-spacing: .1em; white-space: nowrap; color: #ffe29a; text-shadow: 0 0 8px #ffb04a99, 0 1px 0 #000; }
+/* Resting escorts read as quiet; a hostile that falls this turn keeps its intent, struck through in gold. */
+.hostile-intent.state-rests, .hostile-intent.state-skips { min-width: 84px; padding-block: 5px; }
+.hostile-intent.state-rests .hi-verb, .hostile-intent.state-skips .hi-verb { font-size: 13px; color: #c9c2b4; }
+.hostile-intent.state-rests .hi-glyph svg, .hostile-intent.state-skips .hi-glyph svg { width: 20px; height: 20px; }
+.hostile-intent.state-rests::before, .hostile-intent.state-skips::before { opacity: .82; }
+.hostile-intent:is(.state-falls, .state-broken) .hi-main { opacity: .62; }
+.hostile-intent:is(.state-falls, .state-broken) :is(.hi-value, .hi-verb) { text-decoration: line-through 2px #ffe29a; }
+.hostile-intent:is(.state-falls, .state-broken)::before { box-shadow: inset 0 0 0 1px #d6a24a, inset 0 0 0 2px #07060a, inset 0 0 14px #ffb04a33; }
+.hostile-intent.state-spiteful .hi-note { color: #ffb4a6; text-shadow: 0 0 8px #ef8f8699, 0 1px 0 #000; }
+.hostile-intent.is-enraged .hi-note { color: #ffb4a6; }
+.hostile-intent.kind-arrival { cursor: var(--cursor-default); }
+.hostile-intent.kind-arrival::before { background: repeating-linear-gradient(135deg, #1e1618f0 0 6px, #150f12f0 6px 12px); box-shadow: inset 0 0 0 1px #a07565; }
+.hostile-intent.kind-arrival .hi-verb { color: #ffc6b2; }
+/* The target: a lit brass rim with an ember glow and the crest jewel on its crown. */
+.hostile-intent.is-target { filter: drop-shadow(0 5px 7px #000d) drop-shadow(0 0 8px #ffb04a88); }
+.hostile-intent.is-target::before { box-shadow: inset 0 0 0 1.5px var(--brass-hi), inset 0 0 0 3px #07060a, inset 0 0 16px #ffb04a2e; }
+/* The target's tag on the badge's crown: the lit crest jewel and the word, engraved in brass. */
+.hi-tag {
+  position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px 1px 4px;
+  font: 700 10px/1.3 var(--label); letter-spacing: .16em; white-space: nowrap; color: #ffe7b0;
+  text-shadow: 0 0 6px #ffb04a99, 0 1px 0 #000;
+  background: linear-gradient(#2a2016, #120d09); box-shadow: inset 0 0 0 1px var(--brass-hi), 0 0 9px #ffb04a66, 0 2px 4px #000c;
+}
+.hi-crest { position: relative; display: grid; flex: none; place-items: center; width: 13px; height: 13px; color: #2a1605; animation: crest-pulse 2.6s ease-in-out infinite; }
+.hi-crest::before { content: ""; position: absolute; inset: 1px; transform: rotate(45deg); background: linear-gradient(135deg, #fff2c9, #e8c47c 45%, #9b7424); box-shadow: 0 0 0 1px #0b0906, 0 0 7px #ffb04acc; }
+.hi-crest svg { position: relative; width: 9px; height: 9px; }
+.hi-crest svg path:first-child { display: none; }
+.hostile-intent.is-target { padding-top: 9px; }
+/* A picked-up delivery waits for a hostile: every badge offers itself in the channel's colour. */
+.hostile-intent.is-aiming { cursor: var(--cursor-target); }
+.hostile-intent.is-aiming:hover { filter: drop-shadow(0 5px 7px #000d) drop-shadow(0 0 10px var(--channel)); }
+.hostile-intent.is-aiming:hover::before { box-shadow: inset 0 0 0 1.5px var(--channel), inset 0 0 0 3px #07060a, inset 0 0 18px color-mix(in srgb, var(--channel) 30%, transparent); }
+@container game (max-height: 760px) {
+  .hostile-intent { min-width: 84px; padding: 5px 10px 6px; gap: 2px; }
+  .hi-value { font-size: 26px; }
+  .hi-verb { font-size: 13.5px; }
+  .hi-target { font-size: 11.5px; }
+  .hi-glyph svg { width: 22px; height: 22px; }
+}
+.reduced-motion :is(.hi-crest, .hi-level i.next) { animation: none; }
+@media (prefers-reduced-motion: reduce) { :is(.hi-crest, .hi-level i.next) { animation: none; } }
+
+/* ---- the port strip: whole rows target; the target's stud is the lit crest */
+.port-row { cursor: var(--cursor-pointer); }
+.row-crest {
+  position: relative; display: grid; flex: none; place-items: center; width: 16px; height: 16px; color: #2a1605;
+  animation: crest-pulse 2.6s ease-in-out infinite;
+}
+.row-crest::before { content: ""; position: absolute; inset: 2px; transform: rotate(45deg); background: linear-gradient(135deg, #fff2c9, #e8c47c 45%, #9b7424); box-shadow: 0 0 0 1px #0b0906, 0 0 7px #ffb04a99; }
+.row-crest svg { position: relative; width: 11px; height: 11px; }
+.row-crest svg path:first-child { display: none; }
+.port-row.is-target { border-color: var(--brass-hi); background: linear-gradient(170deg, #2c2318f4, #130f0cf4 72%); box-shadow: inset 0 0 0 1px #07060a, inset 0 1px 0 #f3dca040, inset 0 0 18px #ffb04a26, 0 0 12px #ffb04a40; }
+.port-row:not(.is-target):hover .port-letter { color: #fff0cc; box-shadow: inset 0 0 0 1px var(--brass-hi), 0 0 6px #ffb04a55; }
+.row-intent svg { color: var(--kind); }
+.row-intent b { color: color-mix(in srgb, var(--kind) 70%, #fff4e0); }
+.port-strip.is-aiming .port-row { cursor: var(--cursor-target); }
+.port-strip.is-aiming .port-row:hover { border-color: var(--channel); box-shadow: inset 0 0 0 1px #07060a, inset 0 0 16px color-mix(in srgb, var(--channel) 26%, transparent), 0 0 10px color-mix(in srgb, var(--channel) 45%, transparent); }
+.reduced-motion .row-crest { animation: none; }
+@media (prefers-reduced-motion: reduce) { .row-crest { animation: none; } }
+.detail-crest { position: relative; display: inline-block; width: 14px; height: 14px; margin-right: 5px; vertical-align: -1px; }
+.detail-crest::before { content: ""; position: absolute; inset: 2px; transform: rotate(45deg); background: linear-gradient(135deg, #fff2c9, #e8c47c 45%, #9b7424); box-shadow: 0 0 0 1px #0b0906, 0 0 6px #ffb04a88; }
+.detail-crest svg { display: none; }
+
+/* ---- deliveries: each row in its channel's colour; a click picks it up (lit), a stud aims it */
+.delivery-row { --channel: #f2c46d; padding-left: 2px; }
+.delivery-row + .delivery-row { border-top-color: #b8947514; }
+.delivery-pick {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px; min-width: 0; height: 100%;
+  padding: 0 3px 0 4px; color: inherit; background: none; border: 0; border-left: 2px solid transparent; text-align: left;
+  cursor: var(--cursor-pointer); transition: background .15s, border-color .15s;
+}
+.delivery-row { grid-template-columns: minmax(0, 1fr) auto; gap: 4px; }
+.delivery-pick .delivery-mark { gap: 4px; letter-spacing: .02em; }
+.delivery-pick:hover, .delivery-pick:focus-visible { outline: none; background: linear-gradient(90deg, color-mix(in srgb, var(--channel) 16%, transparent), transparent); border-left-color: color-mix(in srgb, var(--channel) 60%, transparent); }
+.delivery-pick .delivery-mark { cursor: inherit; }
+.delivery-row .delivery-mark svg, .delivery-row.is-primary .delivery-mark svg { color: var(--channel); filter: drop-shadow(0 0 3px color-mix(in srgb, var(--channel) 60%, transparent)); }
+.delivery-row.is-selected::before { display: none; }
+.delivery-row.is-selected .delivery-pick { background: linear-gradient(90deg, color-mix(in srgb, var(--channel) 30%, transparent), color-mix(in srgb, var(--channel) 6%, transparent)); border-left-color: var(--channel); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--channel) 45%, transparent); }
+.delivery-row.is-selected .delivery-mark { color: #fff4dc; }
+.delivery-row.is-selected .delivery-mark svg { animation: pick-glow 1.4s ease-in-out infinite; }
+@keyframes pick-glow { 50% { filter: drop-shadow(0 0 7px var(--channel)); } }
+.reduced-motion .delivery-row.is-selected .delivery-mark svg { animation: none; }
+@media (prefers-reduced-motion: reduce) { .delivery-row.is-selected .delivery-mark svg { animation: none; } }
+.delivery-row .port-stud { width: 19px; height: 19px; font-size: 10px; }
+.delivery-row .port-stud.is-current { background: radial-gradient(circle at 45% 35%, #fff8e6, var(--channel) 60%, color-mix(in srgb, var(--channel) 50%, #000)); box-shadow: 0 0 0 1px #0b0906, 0 0 9px color-mix(in srgb, var(--channel) 70%, transparent); }
+.delivery-studs { gap: 3px; }
+.deliveries-foot .foot-cells b { width: 19px; }
+@container game (min-width: 901px) and (max-height: 900px) {
+  .delivery-row .port-stud, .deliveries-foot .foot-cells b { width: 18px; }
+  .delivery-row .port-stud { height: 18px; }
+}
+
+/* ---- the aim hint under the table while a delivery is picked up */
+.is-battle .target-hint.is-aiming { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; color: #fff0d6; }
+.is-battle .target-hint.is-aiming > button { flex: none; margin-left: 8px; }
+.is-battle .target-hint.is-aiming > svg { flex: none; color: var(--channel); filter: drop-shadow(0 0 5px var(--channel)); }
+
+/* ---- hover cards (#hover-card): a hostile, a delivery */
+.hostile-card, .delivery-card, .aim-card { display: grid; gap: 6px; width: 280px; font: 14px/1.4 var(--text); }
+.aim-card { width: 230px; }
+.hostile-card .hc-head, .delivery-card .hc-head, .aim-card .hc-head { display: flex; align-items: baseline; gap: 7px; padding-bottom: 5px; border-bottom: 1px solid #8a6a3a55; }
+.hc-head > b { font: 600 18px/1.15 var(--title); letter-spacing: .02em; color: #f6e2b4; }
+.hc-head > span { margin-left: auto; font: 700 10.5px/1 var(--label); letter-spacing: .08em; white-space: nowrap; color: #b9a78a; }
+.hostile-card .hc-head { border-bottom-color: color-mix(in srgb, var(--hostile) 45%, transparent); }
+.hc-crest { position: relative; display: grid; flex: none; place-items: center; align-self: center; width: 14px; height: 14px; }
+.hc-crest::before { content: ""; position: absolute; inset: 1px; transform: rotate(45deg); background: linear-gradient(135deg, #fff2c9, #e8c47c 45%, #9b7424); box-shadow: 0 0 0 1px #0b0906, 0 0 7px #ffb04a99; }
+.hc-crest svg { display: none; }
+.hc-ribbons { display: grid; gap: 3px; }
+.hc-ribbon { display: flex; align-items: flex-start; gap: 5px; font: 12.5px/1.3 var(--text); color: #d6c8ad; }
+.hc-ribbon svg { flex: none; margin-top: 1px; }
+.hc-ribbon b { flex: none; font: 700 11px/1.45 var(--label); letter-spacing: .08em; color: #f6b9ae; }
+.hc-ribbon.good b { color: #b6ecdb; }
+.hc-ribbon.unknown b { color: #c9ccc6; }
+.hc-intent { display: flex; align-items: center; gap: 8px; }
+.hc-intent .hc-glyph { display: grid; flex: none; place-items: center; width: 34px; height: 34px; color: var(--kind); border-radius: 50%; background: radial-gradient(color-mix(in srgb, var(--kind) 22%, transparent), transparent 70%); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kind) 55%, transparent); }
+.hc-intent .hc-glyph svg { width: 22px; height: 22px; }
+.hc-intent > b { font: 700 28px/1 var(--title); font-variant-numeric: tabular-nums; color: var(--kind); }
+.hc-intent > span { display: grid; min-width: 0; }
+.hc-intent strong { font: 700 13.5px/1.2 var(--label); letter-spacing: .07em; color: #f6ead0; }
+.hc-intent small { font: italic 12.5px/1.25 var(--text); color: #d8cbb0; }
+.hc-intent em { font: italic 12px/1.25 var(--text); color: #a99c84; }
+.hostile-card:is(.state-falls, .state-broken) .hc-intent > :is(b, span) { opacity: .65; text-decoration: line-through 1.5px #ffe29a; }
+.hc-copy { margin: 0; font: 13.5px/1.4 var(--text); color: #ddd1b8; }
+.hc-lines { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.hc-lines li { display: flex; align-items: flex-start; gap: 5px; font: 12.5px/1.3 var(--text); color: #cdbfa5; }
+.hc-lines li svg { flex: none; margin-top: 2px; color: var(--kind, #c9a263); }
+.hc-lines li[class*="kind-"] { font: 700 11px/1.35 var(--label); letter-spacing: .05em; color: var(--kind); }
+.hc-lines li.kind-junk { --kind: #d9c79a; }
+.hc-lines li.kind-heal { --kind: #9fe0a8; }
+.hc-lines li.kind-crate { --kind: #e3c68b; }
+.hc-lines li.hc-level { color: #f0a89c; }
+.hc-lines li.hc-terms { font-size: 12px; color: #b9ab92; }
+.hc-health { display: flex; align-items: baseline; flex-wrap: wrap; gap: 3px 5px; padding-top: 5px; border-top: 1px solid #8a6a3a40; }
+.hc-health > span { font: 700 10.5px/1 var(--label); letter-spacing: .08em; color: #b9a78a; }
+.hc-health > b { font: 600 19px/1 var(--title); font-variant-numeric: tabular-nums; color: #f3dca0; }
+.hc-health > small { font: 13px var(--text); color: #9f937c; }
+.hc-health > i { font-style: normal; color: #c9a263; }
+.hc-health > b.is-lethal, .hc-health > em.is-lethal { color: #ffe29a; text-shadow: 0 0 8px #ffb04a88; }
+.hc-health > em { font: italic 12px var(--text); color: #b9ab92; }
+.hc-lands { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 8px; font: 12.5px/1.3 var(--text); color: #cdbfa5; }
+.hc-lands > span:first-child { font: 700 10.5px/1 var(--label); letter-spacing: .08em; color: #b9a78a; }
+.hc-packet { display: inline-flex; align-items: center; gap: 3px; font: 700 11px/1 var(--label); letter-spacing: .05em; color: #eadcc0; }
+.hc-packet svg { color: var(--channel); filter: drop-shadow(0 0 3px var(--channel)); }
+.hc-packet b { font: 600 14px/1 var(--title); color: #f3dca0; }
+.hc-lands > i { font-style: italic; color: #b9ab92; }
+.hc-total { margin-left: auto; font: 600 16px/1 var(--title); color: #f3dca0; }
+.hc-total.is-lethal { color: #ffe29a; text-shadow: 0 0 8px #ffb04a88; }
+.hc-trait { font: 12.5px/1.35 var(--text); color: #b9ab92; }
+.hc-trait b { font: 700 10.5px/1 var(--label); letter-spacing: .08em; color: #d9c79a; }
+.hc-hint { padding-top: 5px; border-top: 1px solid #8a6a3a40; font: 700 10.5px/1.3 var(--label); letter-spacing: .07em; color: #e6c98c; }
+.hostile-card.is-target .hc-hint { color: #ffe29a; }
+.delivery-card .hc-head, .aim-card .hc-head { border-bottom-color: color-mix(in srgb, var(--channel) 50%, transparent); }
+.aim-card .hc-head > b { font-size: 16px; }
+.ac-ports { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.ac-ports li { display: flex; align-items: baseline; gap: 5px; font: 13px/1.35 var(--text); color: #cdbfa5; }
+.ac-ports li > span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac-ports li.is-here > span { color: #f6e2b4; }
+.ac-ports li > b { font: 600 15px/1 var(--title); font-variant-numeric: tabular-nums; color: #f3dca0; }
+.ac-ports li > b.is-lethal { color: #ffe29a; text-shadow: 0 0 8px #ffb04a88; }
+.ac-ports li > i { font-style: normal; color: var(--channel); }
+.ac-ports li > em { font: 700 10px/1 var(--label); letter-spacing: .08em; font-style: normal; color: #ffe29a; }
+.ac-ports li.ac-incoming { margin-top: 2px; padding-top: 3px; border-top: 1px solid #8a6a3a40; }
+.ac-ports li.ac-incoming > b { color: #f0b0a0; }
+.dc-swatch { display: grid; flex: none; place-items: center; align-self: center; color: var(--channel); filter: drop-shadow(0 0 4px var(--channel)); }
+.dc-amount { margin-left: auto; font: 700 24px/1 var(--title); color: var(--channel); }
+.dc-lands { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 6px; font: 13.5px/1.35 var(--text); color: #ddd1b8; }
+.dc-lands svg { flex: none; color: var(--channel); }
+.dc-lands b { font-weight: 700; color: #f6e2b4; }
+.dc-lands em { font: 700 10.5px/1 var(--label); letter-spacing: .08em; font-style: normal; color: #b9a78a; }
+.dc-terms { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; }
+.dc-terms li { display: flex; justify-content: space-between; gap: 10px; font: 12.5px/1.35 var(--text); color: #cdbfa5; }
+.dc-terms li b { font: 600 14px/1.2 var(--title); color: #f3dca0; }
+.dc-path { font: 700 10px/1.3 var(--label); letter-spacing: .06em; color: #9f937c; }

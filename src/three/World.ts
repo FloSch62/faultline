@@ -30,8 +30,9 @@ import {
   type InstallationGroup,
 } from "./front.ts";
 import {
-  brassRingTexture, crestTexture, drawRailPlate, makeLabel, packetTexture, railPlateSprite, TABLE_LABEL_ORDER, type RailPlateData,
+  brassRingTexture, drawRailPlate, haloTexture, makeLabel, packetTexture, railPlateSprite, reticleTexture, TABLE_LABEL_ORDER, type RailPlateData,
 } from "./plates.ts";
+import { channelColor } from "../channel-palette.ts";
 
 export type WorldPoint = { x: number; z: number };
 export type BoardZone = Zone;
@@ -43,10 +44,14 @@ export interface WorldCallbacks {
   onNode: (id: string) => void;
   onLink: (key: string) => void;
   onMove: (id: string, point: WorldPoint | null, finished: boolean) => void;
-  /** A hostile's sprite or rail plate was clicked: select that port (selection never focuses). */
+  /** A hostile's sprite or rail plate was clicked: target it (or aim the selected delivery there). */
   onPort?: (port: Port) => void;
   /** A packet glyph was dropped on a port. */
   onAim?: (channelKey: string, port: Port | null) => void;
+  /** A packet glyph was clicked (select that delivery), or the empty table while one is selected (null). */
+  onDelivery?: (channelKey: string | null) => void;
+  /** After every drawn frame: DOM overlays that follow the table (the intent badges) re-anchor. */
+  onFrame?: () => void;
   /** An installation was clicked: its plate, or a Demolition Charge's target. */
   onInstallation?: (id: string) => void;
   /** The pointer rests on something on the table (null: on nothing, dragging, placing or
@@ -69,8 +74,9 @@ export interface RailReadout {
   escalation: number | null;
 }
 export interface RailState {
+  /** The target: its rail plate wears the reticle. */
   focus: Port | null;
-  /** The port the right plate shows (a dimmer crest when it is not the focus). */
+  /** The port the right plate details (the table marks only the target). */
   selected: Port | null;
   readouts: Partial<Record<Port, RailReadout>>;
 }
@@ -179,7 +185,7 @@ interface EnemyAction {
   done: () => void;
   onImpact: () => void;
 }
-/** One stand on the far rail: its sprite rig, embers, light, rail plate and crest. */
+/** One stand on the far rail: its sprite rig, embers, light, rail plate and target reticle. */
 interface PortVisual {
   port: Port;
   group: THREE.Group;
@@ -208,7 +214,7 @@ interface PortVisual {
   plate: THREE.Sprite;
   plateCanvas: HTMLCanvasElement;
   plateKey: string;
-  crest: THREE.Sprite;
+  reticle: THREE.Sprite;
   highlight: THREE.Sprite;
   hit: THREE.Sprite;
   readout: RailReadout | null;
@@ -218,6 +224,8 @@ interface PortVisual {
 interface DeliveryGlyph {
   view: DeliveryView;
   glyph: THREE.Sprite;
+  /** The selected delivery's lit ring in its channel colour. */
+  halo: THREE.Sprite | null;
   line: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
   base: THREE.Vector3;
   toward: THREE.Vector3;
@@ -407,6 +415,8 @@ export class World {
   } | null = null;
   /** A packet glyph being dragged toward a port. */
   private aimDrag: { key: string; pointerId: number; x: number; y: number; moved: boolean; over: Port | null } | null = null;
+  /** While a delivery is selected: a lit line from its glyph to the pointer. */
+  private tether: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | null = null;
   private active = true;
   private visible = true;
   private frame = 0;
@@ -915,11 +925,13 @@ export class World {
     plate.position.set(plateX(port), PLATE_FOOT + height / 2, PLATE_Z);
     plate.userData.port = port;
     plate.visible = false;
-    const crest = new THREE.Sprite(new THREE.SpriteMaterial({ map: crestTexture(), transparent: true, depthWrite: false, depthTest: false }));
-    crest.renderOrder = 41;
-    crest.scale.setScalar(centre ? 1.35 : 1.1);
-    crest.position.set(plate.position.x, plate.position.y + height / 2 + 0.4 + crest.scale.y * 0.3, PLATE_Z + 0.05);
-    crest.visible = false;
+    // The target's reticle: brass corner brackets framing the plate, drawn over nearer hardware.
+    const reticle = new THREE.Sprite(new THREE.SpriteMaterial({ map: reticleTexture(), transparent: true, depthWrite: false, depthTest: false }));
+    reticle.renderOrder = 41;
+    reticle.scale.set(width * 1.13, height * 1.62, 1);
+    reticle.position.set(plate.position.x, plate.position.y, PLATE_Z + 0.05);
+    reticle.userData.base = reticle.scale.clone();
+    reticle.visible = false;
     const highlight = new THREE.Sprite(new THREE.SpriteMaterial({ map: brassRingTexture(), transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending }));
     highlight.renderOrder = 39;
     highlight.scale.set(width * 1.28, height * 2.1, 1);
@@ -928,7 +940,7 @@ export class World {
     const hit = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, opacity: 0 }));
     hit.visible = false;
     hit.userData.port = port;
-    this.rail.add(plate, crest, highlight, hit);
+    this.rail.add(plate, reticle, highlight, hit);
     // Escort lights live on the always-visible rail: the light count never changes when a pack
     // arrives, so no material has to recompile mid-fight.
     if (!centre) this.rail.add(light);
@@ -936,7 +948,7 @@ export class World {
       port, group, actor, light, under, enemy: null, uid: null, art: "", texture: null, placeholder: false,
       size: centre ? 10.5 : 7.14, drop: 0, boss: false, hitAt: 0, dead: false, dying: false, ready: false,
       dimFrom: 0, dimUntil: 0, action: null, state: "idle",
-      plate, plateCanvas, plateKey: "", crest, highlight, hit, readout: null, shownHp: null,
+      plate, plateCanvas, plateKey: "", reticle, highlight, hit, readout: null, shownHp: null,
     };
   }
 
@@ -1059,7 +1071,7 @@ export class World {
     this.burst(new THREE.Vector3(x, 1.2, -6), visual.enemy.color, 22, 3.2);
   }
 
-  /** Rail plates, crests and focus (packs only: a single hostile is today's rail, untouched). */
+  /** Rail plates and the target reticle (packs only: a single hostile is today's rail, untouched). */
   setRail(state: RailState) {
     this.railState = { focus: state.focus, selected: state.selected, readouts: { ...state.readouts } };
     for (const visual of this.ports) {
@@ -1077,14 +1089,13 @@ export class World {
     this.refreshRail();
   }
   private refreshRail() {
+    const standing = this.ports.filter(visual => visual.enemy && visual.enemy.hp > 0 && !visual.dead && !visual.dying).length;
     for (const visual of this.ports) {
       const enemy = visual.enemy;
       const show = this.pack && !!enemy && this.visible && (!visual.dead || visual.dying) && visual.ready;
       visual.plate.visible = show;
-      visual.crest.visible = show && this.railState.focus === visual.port && enemy!.hp > 0 && !visual.dying;
-      const selectedCrest = show && this.railState.selected === visual.port && this.railState.selected !== this.railState.focus && enemy!.hp > 0;
-      if (selectedCrest) visual.crest.visible = true;
-      visual.crest.userData.dim = selectedCrest;
+      // The reticle marks the target while there is a choice (two or more standing).
+      visual.reticle.visible = show && standing > 1 && this.railState.focus === visual.port && enemy!.hp > 0 && !visual.dying;
       if (!show || !enemy) continue;
       const readout = visual.readout;
       const hp = visual.shownHp ?? enemy.hp;
@@ -1095,8 +1106,6 @@ export class World {
         damage: midPlayback ? 0 : readout?.damage ?? 0,
         overflowIn: midPlayback ? 0 : readout?.overflowIn ?? 0,
         lethal: !midPlayback && !!readout?.lethal,
-        intent: enemy.hp > 0 && !visual.dying ? readout?.intent ?? null : null,
-        amount: readout?.amount ?? 0,
         state: enemy.hp <= 0 || visual.dying ? "dead" : readout?.state ?? "acts",
         escalation: readout?.escalation ?? null,
         placeholder: visual.placeholder,
@@ -2027,9 +2036,12 @@ export class World {
       glyph.line.geometry.dispose();
       glyph.line.material.dispose();
       glyph.glyph.material.dispose();
+      if (glyph.halo) { this.deliveryGroup.remove(glyph.halo); glyph.halo.material.dispose(); }
     }
     this.glyphs.length = 0;
     this.canvas.dataset.deliveries = show ? String(this.deliveries.length) : "0";
+    this.canvas.dataset.armed = show && this.selectedDelivery && this.deliveries.some(view => view.key === this.selectedDelivery) ? this.selectedDelivery : "";
+    if (!this.canvas.dataset.armed) this.showTether(null);
     if (!show) return;
     const lastSpan = new Map<string, number>();
     this.deliveries.forEach((view, index) => {
@@ -2049,19 +2061,29 @@ export class World {
       const base = curve.getPoint(startsAtEnd ? 1 - t : t).add(new THREE.Vector3(0, 0.42, 0));
       const plate = this.portOf(view.port)!.plate.position;
       const toward = new THREE.Vector3(plate.x - base.x, 0, plate.z - base.z).normalize();
-      const color = view.primary ? CHANNEL_COLORS.primary : CHANNEL_COLORS.secondary;
+      // Channel i wears colour i of the shared palette, as its delivery row in the HUD does.
+      const color = channelColor(index);
       const selectedGlyph = view.key === this.selectedDelivery;
       const glyph = new THREE.Sprite(new THREE.SpriteMaterial({
         map: packetTexture(view.primary), color, transparent: true, depthWrite: false, toneMapped: false,
       }));
-      glyph.scale.setScalar(selectedGlyph ? 1.25 : 0.98);
+      glyph.scale.setScalar(selectedGlyph ? 1.4 : 0.98);
       glyph.position.copy(base);
       // Over the table's labels and the rail plates it drifts toward (still hidden by nearer hardware).
       glyph.renderOrder = TABLE_LABEL_ORDER + 3;
       glyph.userData.deliveryKey = view.key;
+      // The selected delivery: a lit ring in its channel colour around the glyph.
+      let halo: THREE.Sprite | null = null;
+      if (selectedGlyph) {
+        halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTexture(), color, transparent: true, depthWrite: false, depthTest: false, toneMapped: false, blending: THREE.AdditiveBlending }));
+        halo.renderOrder = TABLE_LABEL_ORDER + 2;
+        halo.scale.setScalar(1.9);
+        halo.position.copy(base);
+        this.deliveryGroup.add(halo);
+      }
       const line = this.aimLine(base, new THREE.Vector3(plate.x, plate.y - 0.35, plate.z + 0.05), color, selectedGlyph ? 0.95 : view.aimed ? 0.7 : 0.5);
       this.deliveryGroup.add(glyph, line);
-      this.glyphs.push({ view, glyph, line, base, toward, phase: index * 1.7 });
+      this.glyphs.push({ view, glyph, halo, line, base, toward, phase: index * 1.7 });
     });
   }
   /** A faint dashed arc from a packet glyph up to its port's rail plate (one draw call). */
@@ -2152,8 +2174,12 @@ export class World {
       for (const material of this.placementMaterials) material.color.setHex(blocked ? 0xf07a64 : 0x80ffe6);
     }
   }
-  /** The standing port under the pointer (its sprite or its rail plate). */
+  /** The standing port under the pointer: its intent badge (the DOM layer over the canvas, which a
+   * captured drag still passes over), its sprite or its rail plate. */
   private portAt(event: { clientX: number; clientY: number }): Port | null {
+    const badge = (document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null)?.closest<HTMLElement>(".hostile-intent[data-port]");
+    const badgePort = badge?.dataset.port as Port | undefined;
+    if (badgePort && this.ports.some(visual => visual.port === badgePort && visual.enemy && visual.enemy.hp > 0 && !visual.dead)) return badgePort;
     this.updateRay(event);
     const targets: THREE.Object3D[] = [];
     for (const visual of this.ports) {
@@ -2173,6 +2199,52 @@ export class World {
     if (this.aimDrag) this.aimDrag.over = port;
     for (const visual of this.ports) visual.highlight.visible = visual.port === port && visual.plate.visible;
     if (this.aimDrag) this.canvas.dataset.cursor = port ? "target" : "grabbing";
+  }
+  /** Where the pointer is over the table for a glyph or a tether: a hand above the deck, and past
+   * the far rail in front of the plates. */
+  private pointerPoint(event: { clientX: number; clientY: number }) {
+    this.updateRay(event);
+    const point = new THREE.Vector3();
+    const deck = this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.1), point);
+    if (!deck || point.z < -5.6) this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), 5.6), point);
+    return new THREE.Vector3(THREE.MathUtils.clamp(point.x, -9, 9), THREE.MathUtils.clamp(point.y, 0.6, 6), THREE.MathUtils.clamp(point.z, -5.6, 5));
+  }
+  /** The selected delivery's tether: its glyph to the pointer, or (over a hostile) to that hostile's
+   * plate, in the channel's colour. null removes it. */
+  private showTether(event: { clientX: number; clientY: number } | null) {
+    const glyph = event && this.glyphs.find(item => item.view.key === this.selectedDelivery && item.halo);
+    if (!glyph || !event || this.placementRole || this.linkSource || this.aimDrag) {
+      if (this.tether) {
+        this.deliveryGroup.remove(this.tether);
+        this.tether.geometry.dispose();
+        this.tether.material.dispose();
+        this.tether = null;
+      }
+      if (!this.aimDrag) for (const visual of this.ports) visual.highlight.visible = false;
+      return;
+    }
+    const port = this.portAt(event);
+    this.highlightPort(port);
+    const plate = port ? this.portOf(port)!.plate.position : null;
+    const to = plate ? new THREE.Vector3(plate.x, plate.y + 0.2, plate.z + 0.05) : this.pointerPoint(event);
+    const from = glyph.glyph.position;
+    const middle = from.clone().lerp(to, 0.5);
+    middle.y += 0.6 + from.distanceTo(to) * 0.12;
+    const geometry = new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(from.clone(), middle, to), 24, 0.05, 5, false);
+    if (this.tether) {
+      this.tether.geometry.dispose();
+      this.tether.geometry = geometry;
+      return;
+    }
+    const material = glow(glyph.glyph.material.color.getHex(), 0.8);
+    material.transparent = true;
+    material.depthWrite = false;
+    material.depthTest = false;
+    material.toneMapped = false;
+    material.blending = THREE.AdditiveBlending;
+    this.tether = new THREE.Mesh(geometry, material);
+    this.tether.renderOrder = TABLE_LABEL_ORDER + 1;
+    this.deliveryGroup.add(this.tether);
   }
   private hit(event: PointerEvent) {
     this.updateRay(event);
@@ -2218,12 +2290,9 @@ export class World {
       const glyph = this.glyphs.find(item => item.view.key === this.aimDrag!.key);
       if (glyph && this.aimDrag.moved) {
         // The glyph follows the pointer over the table, lifted toward the rail.
-        // Over the table it rides a hand above the deck; past the far rail it hangs in front of the plates.
-        this.updateRay(event);
-        const point = new THREE.Vector3();
-        const deck = this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.1), point);
-        if (!deck || point.z < -5.6) this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), 5.6), point);
-        glyph.glyph.position.set(THREE.MathUtils.clamp(point.x, -9, 9), THREE.MathUtils.clamp(point.y, 0.6, 6), THREE.MathUtils.clamp(point.z, -5.6, 5));
+        glyph.glyph.position.copy(this.pointerPoint(event));
+        glyph.halo?.position.copy(glyph.glyph.position);
+        this.showTether(null);
       }
       this.highlightPort(this.portAt(event));
       return;
@@ -2264,8 +2333,11 @@ export class World {
       this.callbacks.onHover?.(null, event.clientX, event.clientY);
     } else if (!this.placementRole) {
       const hit = this.hit(event);
+      const armed = !!this.canvas.dataset.armed;
+      if (armed) this.showTether(event);
       this.canvas.dataset.cursor = hit.delivery ? "grab"
         : hit.installation && this.targetingInstallations ? "target"
+        : hit.port && armed ? "target"
         : hit.node || hit.installation || hit.port ? "pointer" : "grab";
       this.hover(hit.installation ? { kind: "installation", id: hit.installation } : hit.node ? { kind: "node", id: hit.node } : null);
       const target: TableHover | null = hit.delivery ? { kind: "delivery", id: hit.delivery }
@@ -2332,6 +2404,8 @@ export class World {
       this.canvas.dataset.cursor = "grab";
       this.refreshDeliveries(true);
       if (port) this.callbacks.onAim?.(aim.key, port);
+      // A click (no drag) picks the delivery up: the next hostile clicked receives it.
+      else if (!aim.moved) this.callbacks.onDelivery?.(aim.key);
       return;
     }
     const down = this.pointerDown;
@@ -2348,6 +2422,7 @@ export class World {
     else if (hit.node) this.callbacks.onNode(hit.node);
     else if (hit.link && !this.targetingZone) this.callbacks.onLink(hit.link);
     else if (hit.port && !this.placementRole && !this.linkSource && this.callbacks.onPort) this.callbacks.onPort(hit.port);
+    else if (this.canvas.dataset.armed && !this.placementRole && !this.linkSource && !this.targetingZone) this.callbacks.onDelivery?.(null);
     else {
       const point = this.pointFromScreen(event.clientX, event.clientY);
       if (point) this.callbacks.onGround(point);
@@ -2367,12 +2442,15 @@ export class World {
     this.placement.visible = false;
     this.canvas.dataset.cursor = "grab";
     for (const visual of this.ports) visual.highlight.visible = false;
+    this.showTether(null);
     if (aimed) this.refreshDeliveries(true);
     if (pointerId !== undefined && this.canvas.hasPointerCapture(pointerId))
       this.canvas.releasePointerCapture(pointerId);
   }
   private onPointerLeave = (event: PointerEvent) => {
     this.placement.visible = false;
+    // Onto a hostile's intent badge the tether follows (it reaches that hostile); elsewhere it goes.
+    if (!this.aimDrag) this.showTether((event.relatedTarget as HTMLElement | null)?.closest?.(".hostile-intent[data-port]") ? event : null);
     this.showLinkGhost(null);
     this.hover(null);
     this.callbacks.onHover?.(null, event.clientX, event.clientY);
@@ -2380,6 +2458,28 @@ export class World {
 
   // ================================================================ playback primitives
 
+  /** Where a port's intent badge hangs (client pixels): the top centre of its rail plate, which is
+   * also where a lone hostile's lower body meets the far rail. `width` is the plate's width on screen.
+   * null while the table is hidden, or for a port without a standing hostile (unless `empty`: an
+   * announced arrival's badge holds its empty port). */
+  portAnchor(port: Port, empty = false): { x: number; y: number; width: number } | null {
+    const visual = this.portOf(port);
+    if (!visual || !this.visible) return null;
+    if (!empty && (!visual.enemy || visual.enemy.hp <= 0 || visual.dead || !visual.ready)) return null;
+    const rect = this.canvas.getBoundingClientRect();
+    const [width, height] = port === "centre" ? PLATE_SIZE.leader : PLATE_SIZE.side;
+    const at = (point: THREE.Vector3) => {
+      point.project(this.camera);
+      return { x: rect.left + (point.x + 1) / 2 * rect.width, y: rect.top + (1 - point.y) / 2 * rect.height };
+    };
+    // A plate is a sprite: it faces the camera, so its crown lies along the camera's up axis (the
+    // drawn plate leaves a 1/32 margin inside the sprite).
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion);
+    const side = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
+    const crown = new THREE.Vector3(plateX(port), PLATE_FOOT + height / 2, PLATE_Z).addScaledVector(up, height / 2 * (30 / 32));
+    const centre = at(crown.clone()), left = at(crown.clone().addScaledVector(side, -width / 2)), right = at(crown.clone().addScaledVector(side, width / 2));
+    return { x: centre.x, y: centre.y, width: right.x - left.x };
+  }
   /** Where a port's hostile is on screen (client pixels), for numbers that rise over it. */
   portScreen(port: Port): { x: number; y: number } | null {
     const visual = this.portOf(port);
@@ -2979,17 +3079,29 @@ export class World {
       }
     const glyphPulse = reduced ? 1 : 0.85 + 0.15 * Math.sin(time * 3);
     for (const item of this.glyphs) {
-      if (this.aimDrag?.key === item.view.key && this.aimDrag.moved) continue;
-      // Each glyph drifts a hand's width toward its port and eases back (static under reduced motion).
-      const drift = reduced ? 0 : (0.5 - 0.5 * Math.cos(time * 1.3 + item.phase)) * 0.42;
-      item.glyph.position.copy(item.base).addScaledVector(item.toward, drift);
-      item.glyph.material.opacity = glyphPulse;
+      const dragged = this.aimDrag?.key === item.view.key && this.aimDrag.moved;
+      if (!dragged) {
+        // Each glyph drifts a hand's width toward its port and eases back (static under reduced motion);
+        // the selected one holds still and lit, so its tether has a fixed end.
+        const drift = reduced || item.halo ? 0 : (0.5 - 0.5 * Math.cos(time * 1.3 + item.phase)) * 0.42;
+        item.glyph.position.copy(item.base).addScaledVector(item.toward, drift);
+        item.glyph.material.opacity = item.halo ? 1 : glyphPulse;
+      }
+      if (item.halo) {
+        item.halo.position.copy(item.glyph.position);
+        item.halo.material.opacity = reduced ? 0.9 : 0.7 + 0.3 * Math.sin(time * 4);
+        item.halo.scale.setScalar(reduced ? 1.9 : 1.8 + 0.18 * Math.sin(time * 4));
+      }
     }
+    // The target's reticle breathes (still under reduced motion).
     for (const visual of this.ports) {
-      if (!visual.crest.visible) continue;
-      const dim = visual.crest.userData.dim as boolean;
-      visual.crest.material.opacity = (dim ? 0.45 : 1) * (reduced ? 1 : 0.8 + 0.2 * Math.sin(time * 1.6));
+      if (!visual.reticle.visible) continue;
+      const base = visual.reticle.userData.base as THREE.Vector3;
+      const breath = reduced ? 1 : 1 + 0.035 * (0.5 + 0.5 * Math.sin(time * 2.4));
+      visual.reticle.scale.set(base.x * breath, base.y * breath, 1);
+      visual.reticle.material.opacity = reduced ? 1 : 0.82 + 0.18 * Math.sin(time * 2.4);
     }
+    if (this.tether) this.tether.material.opacity = reduced ? 0.85 : 0.6 + 0.3 * Math.sin(time * 5);
   }
 
   private animateProps(now: number, time: number, motion: number, reduced: boolean) {
@@ -3154,6 +3266,7 @@ export class World {
     }
     this.composer.render();
     if (shaking) this.camera.position.copy(this.cameraRest);
+    this.callbacks.onFrame?.();
   };
   dispose() {
     if (!this.active) return;

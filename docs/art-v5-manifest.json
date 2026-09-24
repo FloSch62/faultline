@@ -1,0 +1,1490 @@
+{
+  "description": "FAULTLINE v5 card paintings (new colorless cards, curses and the Architect, Warden and Ghost keeper sets). Same local Krea 2 recipe as the v3 cards: original Switch crop as style reference at 0.8, resolution-dependent shift. Keeper sets carry a faint keeper accent (Architect teal-cyan, Warden warm amber, Ghost pale violet-teal); curses lean colder. Two candidates per card, the chosen seed is 'seed'; generate with scripts/generate_card_art.py --manifest docs/art-v5-manifest.json --only <id> --seed <n>, export with --webp.",
+  "local": {
+    "model": "Krea-2-Turbo",
+    "diffusionModel": "krea2_turbo_fp8_scaled.safetensors",
+    "textEncoder": "qwen3vl_4b_fp8_scaled.safetensors",
+    "vae": "qwen_image_vae.safetensors",
+    "width": 1536,
+    "height": 1024,
+    "steps": 8,
+    "cfg": 1,
+    "sampler": "euler",
+    "scheduler": "simple",
+    "modelSource": "https://huggingface.co/Comfy-Org/Krea-2",
+    "modelRevision": "eb1eddd3983a54678545a9b2c178c5853b30f7be",
+    "runtime": "ComfyUI",
+    "runtimeRevision": "b5cc8830279eae909a59de030af1e50761c36751",
+    "styleReference": {
+      "source": "public/art/card-atlas.png",
+      "cell": 1,
+      "grid": 3,
+      "inputName": "faultline-original-style.png",
+      "lora": "krea2_style_reference.safetensors",
+      "strength": 0.8
+    },
+    "export": {
+      "format": "webp",
+      "quality": 86,
+      "maxBytes": 350000,
+      "fallbackSize": [
+        1200,
+        800
+      ]
+    }
+  },
+  "cards": [
+    {
+      "id": "ping",
+      "name": "Ping",
+      "set": "colorless",
+      "effect": "+1 damage this turn. Draw 1.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924001,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A small brass dish antenna on a slender chipped ivory mast stands on a broken cathedral ledge. From the center of the dish a single bright teal packet pulse flies outward: one compact glowing spark followed by a thin expanding ring of light crossing the dark, a faint echo ring returning. Small, quick and precise; the little dish and its single pulse fill the center of the picture. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/ping.webp",
+      "candidates": [
+        260924000,
+        260924001
+      ],
+      "rejected": [
+        {
+          "seed": 260924000,
+          "why": "subject too small (first test, before the close-view sentence)"
+        }
+      ],
+      "sha256": "91b227a6980a26255d750d657bcac67cff2842a9712847f1d3008a8d9c1ca9d4"
+    },
+    {
+      "id": "hotfix",
+      "name": "Hotfix",
+      "set": "colorless",
+      "effect": "Repair a device by 1. Draw 1.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924011,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. Close view of a cracked brass-and-ivory device faceplate on a dark engineering bench. A gloved hand holds a fine brass welding stylus whose tip throws one tiny brilliant white-gold spark onto the crack; behind the spark the crack is sealed by a short glowing seam, ahead of it the crack is still open. Small, fast, targeted repair; the spark and the crack are the center of the picture. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/hotfix.webp",
+      "candidates": [
+        260924010,
+        260924011
+      ],
+      "rejected": [
+        {
+          "seed": 260924010,
+          "why": "the whole crack network glows; no single welding spark"
+        }
+      ],
+      "sha256": "f893d38aa20ad498f123ea3fd856da4e0941129cc102e2212f83f817fe5c7424"
+    },
+    {
+      "id": "keepalive",
+      "name": "Keepalive",
+      "set": "colorless",
+      "effect": "Daemon. At the start of your turn, gain 2 block.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924020,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A tall brass heartbeat metronome on a chipped ivory base, its weighted pendulum mid-swing. From its base a steady luminous teal pulse travels along a cable as a floating line of light with regular heartbeat peaks, reaching a small ivory router that sits inside a faint protective teal glow. Steady rhythm, a tireless guarding process. The pulse is light in the air, not a screen. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/keepalive.webp",
+      "candidates": [
+        260924020,
+        260924021
+      ],
+      "rejected": [
+        {
+          "seed": 260924021,
+          "why": "pulse painted as lightning, not a steady heartbeat line"
+        }
+      ],
+      "sha256": "40b7868ae5c6b2690f257f1ba3e2fc786444286b4cd44d9d89255622fecc23c8"
+    },
+    {
+      "id": "rollback",
+      "name": "Rollback",
+      "set": "colorless",
+      "effect": "Return the last non-Exhaust card you played this turn to your hand. Exhaust.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924033,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A large round dark brass dial plate, perfectly plain and smooth with no numerals, no markings and no engraving, is set into ruined cathedral machinery; its single long ornate golden pointer hand sweeps backwards, counter-clockwise, leaving a curved arrow-like trail of teal light. Below the dial a thin glowing blank ivory plate slides back out of a brass slot toward the viewer. Reversal and undo; the backward-sweeping hand and the returning plate are the focus. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/rollback.webp",
+      "candidates": [
+        260924030,
+        260924031,
+        260924032,
+        260924033
+      ],
+      "rejected": [
+        {
+          "seed": 260924030,
+          "why": "Roman numerals on the clock face (text)"
+        },
+        {
+          "seed": 260924031,
+          "why": "Roman numerals on the clock face (text)"
+        },
+        {
+          "seed": 260924032,
+          "why": "numeral-like marks at the top of the dial"
+        }
+      ],
+      "sha256": "1084b9a5cdd2f06b5908177a38d6d2b4c63f3a66702f004dd6c0676d86e385fc"
+    },
+    {
+      "id": "firmware-update",
+      "name": "Firmware Update",
+      "set": "colorless",
+      "effect": "Upgrade every card in your hand for this battle. Exhaust.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924041,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. An ivory tape reel on a brass spindle at the left unspools a ribbon of glowing gold-teal firmware light. The ribbon flows across a dark bench into a row of five small dark dormant devices; each device the light has reached now glows warm gold, the last ones still dark, a wave of upgrade travelling along the row. Reel and lit row across the center. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/firmware-update.webp",
+      "candidates": [
+        260924040,
+        260924041
+      ],
+      "rejected": [
+        {
+          "seed": 260924040,
+          "why": "ribbon rollers only; no row of devices lighting in sequence"
+        }
+      ],
+      "sha256": "91987e0304e6a7de47c49f192ec0bdf27c1337cf511df7f88c8254373325a12c"
+    },
+    {
+      "id": "zombie-process",
+      "name": "Zombie Process",
+      "set": "curse",
+      "effect": "Unplayable. Innate.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924052,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A tall derelict equipment rack in the dark, every slot dead, cold and black except one module pulled halfway out at the center that still flickers with a sickly dead-green inner light; a ghostly wisp of pale green vapor rises from it and curls upward like a restless spirit. Slack corroded cables hang around it. It refuses to stop. Unsettling and cold; no screens. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass, corroded rusted iron and stained ivory plates. Deep indigo-black shadows, cold sickly light: rust, dead green and a dim red warning glow, only a trace of warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/zombie-process.webp",
+      "candidates": [
+        260924050,
+        260924051,
+        260924052,
+        260924053
+      ],
+      "rejected": [
+        {
+          "seed": 260924050,
+          "why": "no dead-green light; reads as an ordinary rack"
+        },
+        {
+          "seed": 260924051,
+          "why": "green light small and buried in the rack"
+        },
+        {
+          "seed": 260924053,
+          "why": "vapor good but the module sits low, rack dominates"
+        }
+      ],
+      "sha256": "f28cff7342146b78cb1d8431f07ff62935cedbd1f9f9b13267d30ca8ddd54ac3"
+    },
+    {
+      "id": "kernel-panic",
+      "name": "Kernel Panic",
+      "set": "curse",
+      "effect": "Unplayable. While it is in your hand, you can play at most 3 cards.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924061,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A brass-framed glass console pane on a dark control desk is shattered like a spider web; from the fracture a cascade of jagged red light shards and sparks spills out over broken brass levers, emergency red glow flooding the desk. The red panic bursts outward from the center. Abstract light fragments only, no symbols, no glyphs, no characters. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass, corroded rusted iron and stained ivory plates. Deep indigo-black shadows, cold sickly light: rust, dead green and a dim red warning glow, only a trace of warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/kernel-panic.webp",
+      "candidates": [
+        260924060,
+        260924061
+      ],
+      "rejected": [
+        {
+          "seed": 260924060,
+          "why": "weaker red spill, shards read as a dark hole"
+        }
+      ],
+      "sha256": "8b7860f1e41906e7f4566fc66a677a5dd7fb1bd69b9ea290196a4289af795785"
+    },
+    {
+      "id": "backdoor",
+      "name": "Backdoor",
+      "set": "curse",
+      "effect": "Unplayable. End of turn in hand: lose 1 integrity.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924071,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A heavy ivory-and-brass device chassis on a dark bench, sound and solid everywhere except one small concealed hatch in its side panel standing slightly ajar. Inside the narrow dark gap a single thin red light glows, and a fine red thread creeps out of it. The hidden hatch and its red light are the center of the picture. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass, corroded rusted iron and stained ivory plates. Deep indigo-black shadows, cold sickly light: rust, dead green and a dim red warning glow, only a trace of warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/backdoor.webp",
+      "candidates": [
+        260924070,
+        260924071
+      ],
+      "rejected": [
+        {
+          "seed": 260924070,
+          "why": "opening is not a hatch ajar; red light less readable"
+        }
+      ],
+      "sha256": "6b1f2fed43c70508ec3a8ccaa12596f340df4ba7999a8b5ec9653b9ec3cc36af"
+    },
+    {
+      "id": "bitrot",
+      "name": "Bitrot",
+      "set": "curse",
+      "effect": "Unplayable. End of turn in hand: the first router on your primary route loses 1 condition.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924080,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A once-fine brass-and-ivory circuit board lies on a dark bench, crumbling from one corner into rust-red dust and flakes; corroded traces and pitted solder, the decay creeping across it while a single faint teal light still survives on the intact half. Rust dust drifts in the air. Slow entropy. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass, corroded rusted iron and stained ivory plates. Deep indigo-black shadows, cold sickly light: rust, dead green and a dim red warning glow, only a trace of warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/bitrot.webp",
+      "candidates": [
+        260924080,
+        260924081
+      ],
+      "rejected": [
+        {
+          "seed": 260924081,
+          "why": "crumbling reads less clearly; no surviving teal light"
+        }
+      ],
+      "sha256": "cffdc9f654d28b599a420432eac6266a6b7b4bd0101f1fb5cae385e0bf417d72"
+    },
+    {
+      "id": "memory-leak",
+      "name": "Memory Leak",
+      "set": "curse",
+      "effect": "Unplayable. When you draw it, lose 1 energy.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924090,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A cracked rectangular brass memory module seated upright in a dark socket. Thick glowing amber liquid light seeps out through the crack, runs down its side and drips into a spreading pool on the bench below, while the module's own lights dim. Energy draining away; the cracked module and the amber leak in the center. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass, corroded rusted iron and stained ivory plates. Deep indigo-black shadows, cold sickly light: rust, dead green and a dim red warning glow, only a trace of warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/memory-leak.webp",
+      "candidates": [
+        260924090,
+        260924091
+      ],
+      "rejected": [
+        {
+          "seed": 260924091,
+          "why": "leak hidden in the socket, module reads as a plain plate"
+        }
+      ],
+      "sha256": "56aaebccdcbbc14ac2a70547306e7c86d2b2da9d76bfcc2aa178151e0bffe12b"
+    },
+    {
+      "id": "branch-line",
+      "name": "Branch Line",
+      "set": "architect",
+      "effect": "Link two devices. If this adds a channel, draw 1.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924100,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A thick brass-sheathed optical cable runs toward the viewer across a dark cathedral table and splits at a brass Y-coupler into two glowing teal-cyan branches, one arcing away to a small ivory relay tower on the left, the other to a second relay tower on the right. The fork and the two new branches dominate the picture. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal-cyan and warm gold, a faint cool cyan accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/branch-line.webp",
+      "candidates": [
+        260924100,
+        260924101
+      ],
+      "rejected": [
+        {
+          "seed": 260924101,
+          "why": "the incoming line is already a teal bundle; the split into two reads less clearly"
+        }
+      ],
+      "sha256": "30ee553fd276158b5fd12b11457cbec33cf6022cfeaa7d2fcea868633cad3c6b"
+    },
+    {
+      "id": "patch-panel",
+      "name": "Patch Panel",
+      "set": "architect",
+      "effect": "Link two devices. Your next link card this turn costs 0.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924111,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A worn ivory patch panel with rows of round brass sockets set into a dark brass frame. Several neatly plugged teal-cyan patch cords loop between the sockets; a gloved hand pushes one fresh glowing cord into a socket while a second cord hangs ready beside it. Orderly, quick wiring; unmarked sockets. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal-cyan and warm gold, a faint cool cyan accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/patch-panel.webp",
+      "candidates": [
+        260924110,
+        260924111
+      ],
+      "rejected": [
+        {
+          "seed": 260924110,
+          "why": "faint pseudo-lettering on the base below the panel"
+        }
+      ],
+      "sha256": "f084fffa6ee902b05954fcb7f95c380539b8576dd4a4916b56657a47e67aee26"
+    },
+    {
+      "id": "redundant-paths",
+      "name": "Redundant Paths",
+      "set": "architect",
+      "effect": "Gain 2 block per live channel.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924120,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. Four parallel glowing teal-cyan optical conduits run side by side between two ivory pylons across a dark cathedral floor; together their light rises into one translucent shimmering shield wall standing in front of them, and a red hostile spark shatters against it. Parallel paths becoming protection. The whole scene reads as one bold, simple shape even at thumbnail size. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal-cyan and warm gold, a faint cool cyan accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/redundant-paths.webp",
+      "candidates": [
+        260924120,
+        260924121
+      ],
+      "rejected": [
+        {
+          "seed": 260924121,
+          "why": "conduits barely visible; reads as a glass slab"
+        }
+      ],
+      "sha256": "fce29019c7684b8f660dffcf3d0fc0341d0bd48d9827a5e1ee97b205d1ffc4f9"
+    },
+    {
+      "id": "standby-router",
+      "name": "Standby Router",
+      "set": "architect",
+      "effect": "Deploy a router linked to its nearest device.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924131,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A compact spare ivory-and-brass router hangs from a brass chain hoist and is being lowered from the cathedral rafters toward an empty brass socket on a dark table. One teal-cyan cable is already attached to it and trails down to a nearby device on the table. The hanging router is centered. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal-cyan and warm gold, a faint cool cyan accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/standby-router.webp",
+      "candidates": [
+        260924130,
+        260924131
+      ],
+      "rejected": [
+        {
+          "seed": 260924130,
+          "why": "router small and tilted, socket unclear"
+        }
+      ],
+      "sha256": "92a839c57fee58f0aa0acdceb23c4902b4d87da127659033e931ee11486f6294"
+    },
+    {
+      "id": "peering-session",
+      "name": "Peering Session",
+      "set": "architect",
+      "effect": "Daemon. Whenever you add a channel, gain 3 block.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924143,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. Two tall headless brass relay pylons with antenna spires and no faces stand on opposite sides of a gap in a ruined cathedral. From each pylon an articulated mechanical brass arm reaches across, and the two brass hands clasp in a firm handshake in the middle of the picture; a bridge of teal-cyan light runs along the joined arms from pylon to pylon, with a faint protective shimmer. Machines, not people: no heads, no faces. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal-cyan and warm gold, a faint cool cyan accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/peering-session.webp",
+      "candidates": [
+        260924140,
+        260924141,
+        260924142,
+        260924143
+      ],
+      "rejected": [
+        {
+          "seed": 260924140,
+          "why": "skull-faced humanoid robots instead of relay towers"
+        },
+        {
+          "seed": 260924141,
+          "why": "humanoid automatons with heads"
+        },
+        {
+          "seed": 260924142,
+          "why": "handshake small between thin towers"
+        }
+      ],
+      "sha256": "99f3a270e33aa8fd204e9d0b27a45a584e48aedd10a5b3abd55c603e6a04983f"
+    },
+    {
+      "id": "fabric-controller",
+      "name": "Fabric Controller",
+      "set": "architect",
+      "effect": "Daemon. Every channel beyond the first deals +2 more.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924150,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A great brass mechanical loom with chipped ivory frames weaves many parallel teal-cyan threads of light at once; shuttles fly, and a glowing woven fabric of light spills from the loom toward the viewer. Grand, orchestrated machinery. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal-cyan and warm gold, a faint cool cyan accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/fabric-controller.webp",
+      "candidates": [
+        260924150,
+        260924151
+      ],
+      "rejected": [
+        {
+          "seed": 260924151,
+          "why": "loom further away, fabric less luminous"
+        }
+      ],
+      "sha256": "d9da6145064a8d4e6016381851221313d6fb020b61ee859d62b92b2a3fc7d205"
+    },
+    {
+      "id": "trunk-line",
+      "name": "Trunk Line",
+      "set": "architect",
+      "effect": "+1 damage this turn per device on your primary route.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924163,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. One thick armored brass trunk cable glowing teal-cyan and gold runs straight away from the viewer and threads through the center of a line of five ring-shaped ivory-and-brass network devices, like beads on a string, each ring lit where the glowing trunk passes through it. The single glowing trunk through the row of devices is the unmistakable focus. Low close perspective; the cable and the nearest devices are large, the line recedes into the distance. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal-cyan and warm gold, a faint cool cyan accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/trunk-line.webp",
+      "candidates": [
+        260924160,
+        260924161,
+        260924162,
+        260924163
+      ],
+      "rejected": [
+        {
+          "seed": 260924160,
+          "why": "no trunk cable; devices sit on pews"
+        },
+        {
+          "seed": 260924161,
+          "why": "no trunk cable through the devices"
+        },
+        {
+          "seed": 260924162,
+          "why": "trunk seen end-on; rings read as wheels"
+        }
+      ],
+      "sha256": "d3e9afa23869cc6d4877387ced4a2e9b215f30844b6d15fae5cf6d964f903743"
+    },
+    {
+      "id": "splice",
+      "name": "Splice",
+      "set": "architect",
+      "effect": "Deploy a switch into the longest cable of your primary route.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924171,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. Close view of a brass splicing clamp closing around a severed thick optical cable; the two cut ends are joined onto a small new ivory switch block seated in the middle, and teal-cyan light flows again from one end through the switch to the other. Clamp and switch in the center. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal-cyan and warm gold, a faint cool cyan accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/splice.webp",
+      "candidates": [
+        260924170,
+        260924171
+      ],
+      "rejected": [
+        {
+          "seed": 260924170,
+          "why": "pseudo-lettering on the ivory switch block"
+        }
+      ],
+      "sha256": "7c9f7b2c3b72e4db0ed1fc1372cacb80899e933e80f3675f2dece14900eee670"
+    },
+    {
+      "id": "traceroute",
+      "name": "Traceroute",
+      "set": "architect",
+      "effect": "Draw 1. +1 damage this turn per switch on your primary route.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924180,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A line of small brass waypoint lanterns on posts crosses a dark cathedral floor in a zigzag. A bright teal-cyan packet of light hops from lantern to lantern in glowing arcs; every lantern it has reached is lit, the ones ahead still dark. The hopping path of light reads clearly. The whole scene reads as one bold, simple shape even at thumbnail size. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal-cyan and warm gold, a faint cool cyan accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/traceroute.webp",
+      "candidates": [
+        260924180,
+        260924181
+      ],
+      "rejected": [
+        {
+          "seed": 260924181,
+          "why": "path is a streak, the hop-by-hop arcs of 260924180 read better"
+        }
+      ],
+      "sha256": "647c80440070d06381de23ad1eb80ef468b1e2adb02c7ef73457a97292f0b8af"
+    },
+    {
+      "id": "deep-buffers",
+      "name": "Deep Buffers",
+      "set": "architect",
+      "effect": "Daemon. Switches on your primary route deal +1 more.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924191,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. Three stacked brass switch modules in a vertical column, each with a deep circular well sunk into its top that glows teal-cyan far down inside, packets of light queued in the depths. The stack stands centered on a dark cathedral bench. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal-cyan and warm gold, a faint cool cyan accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/deep-buffers.webp",
+      "candidates": [
+        260924190,
+        260924191
+      ],
+      "rejected": [
+        {
+          "seed": 260924190,
+          "why": "stack small in frame, wells hard to see at card size"
+        }
+      ],
+      "sha256": "28b7c32dcebb2144470dfa6c348b2c19445e5a9e6f229cd6419023986e76b34c"
+    },
+    {
+      "id": "line-rate",
+      "name": "Line Rate",
+      "set": "architect",
+      "effect": "Overclock every router and compress every switch on your primary route. Exhaust.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924200,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A straight route of five ivory-and-brass devices linked in one line across a dark cathedral bridge, all blazing gold from end to end as a single brilliant gold surge races through them, heat shimmer and sparks. Full speed, overclocked. The whole scene reads as one bold, simple shape even at thumbnail size. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal-cyan and warm gold, a faint cool cyan accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/line-rate.webp",
+      "candidates": [
+        260924200,
+        260924201
+      ],
+      "rejected": [
+        {
+          "seed": 260924201,
+          "why": "route small and distant"
+        }
+      ],
+      "sha256": "3a5fd4c8fac1e789f9dbbc8967e7a744252cc943e34d41e8a25b6d7ee27ffe7f"
+    },
+    {
+      "id": "carrier-grade",
+      "name": "Carrier Grade",
+      "set": "architect",
+      "effect": "Daemon. Your primary route deals +1 per device on it.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924211,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A massive cathedral backbone: a colossal line of great brass relay devices mounted along a nave-like spine that stretches into the distance, joined by one thick cable carrying a single brilliant gold signal down its entire length. Monumental scale. The whole scene reads as one bold, simple shape even at thumbnail size. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal-cyan and warm gold, a faint cool cyan accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/carrier-grade.webp",
+      "candidates": [
+        260924210,
+        260924211
+      ],
+      "rejected": [
+        {
+          "seed": 260924210,
+          "why": "pagoda-like mass, signal less dominant"
+        }
+      ],
+      "sha256": "e1d1c425bafae8308d037d4de3b0ef55e645e35a63c3efd830b449b7a84305ec"
+    },
+    {
+      "id": "rack-and-stack",
+      "name": "Rack and Stack",
+      "set": "architect",
+      "effect": "Deploy a switch. Your next hardware card this turn costs 1 less.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924220,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A technician's brass sliding frame with rails and rollers guides a small ivory switch module into an open slot of a brass equipment rack; a second module already waits on the frame ready to follow. Efficient installation. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal-cyan and warm gold, a faint cool cyan accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/rack-and-stack.webp",
+      "candidates": [
+        260924220,
+        260924221
+      ],
+      "rejected": [
+        {
+          "seed": 260924221,
+          "why": "modules on a sled, no rack slot"
+        }
+      ],
+      "sha256": "0528a09efd2a10cbc2c105068ecd41b12e33d7b107839fc942a4ea77a9cf2d62"
+    },
+    {
+      "id": "blueprint",
+      "name": "Blueprint",
+      "set": "architect",
+      "effect": "Draw 2. Hardware drawn this way costs 1 less this turn.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924231,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. An ivory blueprint sheet unrolled across a brass drafting table, covered only in drawn pale teal-cyan outline sketches of network devices joined by lines, with no writing at all; brass weights hold its corners and a brass compass and a small ivory router model rest on it under warm lamp light. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal-cyan and warm gold, a faint cool cyan accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/blueprint.webp",
+      "candidates": [
+        260924230,
+        260924231
+      ],
+      "rejected": [
+        {
+          "seed": 260924230,
+          "why": "sheet angled away; network lines read less clearly"
+        }
+      ],
+      "sha256": "421b853361b77d2e422137d99401b85446199218e7a7305c3e440c176084096c"
+    },
+    {
+      "id": "provisioning-script",
+      "name": "Provisioning Script",
+      "set": "architect",
+      "effect": "Daemon. Whenever you deploy a device, gain 2 block.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924240,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A long punched ivory tape feeds into a small brass automaton with articulated arms, which is assembling a small ivory router on a dark bench; around the just-finished router a faint protective teal-cyan shield shimmer forms. Automation guided by the punched tape. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal-cyan and warm gold, a faint cool cyan accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/provisioning-script.webp",
+      "candidates": [
+        260924240,
+        260924241
+      ],
+      "rejected": [
+        {
+          "seed": 260924241,
+          "why": "crowded; router and shield overlap the tape machine"
+        }
+      ],
+      "sha256": "98285ffce9b704e67d7f898ade76124ce2a9983ecccb08c3951b2a7238c06244"
+    },
+    {
+      "id": "zero-touch",
+      "name": "Zero-Touch Provisioning",
+      "set": "architect",
+      "effect": "Daemon. Whenever you deploy a device, draw 1.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924251,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. Small ivory-and-brass network devices assemble themselves in midair above an empty brass socket in a ruined cathedral: plates, ports and casings drift together, guided by threads of teal-cyan light; no hands, no tools. Self-assembly. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal-cyan and warm gold, a faint cool cyan accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/zero-touch.webp",
+      "candidates": [
+        260924250,
+        260924251
+      ],
+      "rejected": [
+        {
+          "seed": 260924250,
+          "why": "loose flat plates, no device taking shape"
+        }
+      ],
+      "sha256": "b14adbe836e8619138cfd9958d7180fcabfd96ec962c98f983f919f3b661666d"
+    },
+    {
+      "id": "datacenter",
+      "name": "Datacenter",
+      "set": "architect",
+      "effect": "Daemon. Every cluster deals +3 more.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924260,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A dense glowing hall of tall brass-and-ivory equipment racks in tight rows, packed into one band across a vast dark cathedral floor, teal-cyan light glowing between them and cables overhead. The whole scene reads as one bold, simple shape even at thumbnail size. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal-cyan and warm gold, a faint cool cyan accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/datacenter.webp",
+      "candidates": [
+        260924260,
+        260924261
+      ],
+      "rejected": [
+        {
+          "seed": 260924261,
+          "why": "a flat wall of cabinets, less of a glowing hall"
+        }
+      ],
+      "sha256": "d573cb1aec2ba4f149050994c68785e998433f5a06a4db98f7b3ab01eeb57573"
+    },
+    {
+      "id": "brace",
+      "name": "Brace",
+      "set": "warden",
+      "effect": "Gain 5 block. Next turn, gain 3 block.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924271,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A cloaked warden seen from behind braces a great round brass tower shield with both arms against a storm of red sparks and debris blowing from the right; feet planted wide, the shield rim glowing amber. Endurance. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained warm amber and gold light with only a little teal, a faint warm amber accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/brace.webp",
+      "candidates": [
+        260924270,
+        260924271
+      ],
+      "rejected": [
+        {
+          "seed": 260924270,
+          "why": "figure off-centre, shield smaller"
+        }
+      ],
+      "sha256": "19d38711dc281b821801a105117b1eb4e5c3698ec9b0a9bf5c80660d26b46b70"
+    },
+    {
+      "id": "pushback",
+      "name": "Pushback",
+      "set": "warden",
+      "effect": "Gain 4 block. Add 2 to your backpressure.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924283,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. Side view of a heavy brass hydraulic piston ram whose broad flat round face drives forward from the left into a crashing wave of red static and crackling interference; the red wave splashes and recoils backward off the piston face in a spray of red sparks, while the amber pressure chamber behind the ram glows as it compresses. The piston face meeting and repelling the red wave is the center of the picture. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained warm amber and gold light with only a little teal, a faint warm amber accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/pushback.webp",
+      "candidates": [
+        260924280,
+        260924281,
+        260924282,
+        260924283
+      ],
+      "rejected": [
+        {
+          "seed": 260924280,
+          "why": "no red wave being pushed back"
+        },
+        {
+          "seed": 260924281,
+          "why": "charged chamber only; no wave pushed back"
+        },
+        {
+          "seed": 260924282,
+          "why": "wave hits the side of the housing; less clear than 260924283"
+        }
+      ],
+      "sha256": "4d03609de640d6fbbbb9a5a1cb9662de4463fd51bf946ca85048dc8d82573c80"
+    },
+    {
+      "id": "stand-firm",
+      "name": "Stand Firm",
+      "set": "warden",
+      "effect": "Gain 11 block.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924290,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A lone massive iron-and-brass bulwark wall section stands unbroken in a collapsing cathedral hall, masonry and debris falling on every side, amber light in its embrasures. Immovable. The whole scene reads as one bold, simple shape even at thumbnail size. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained warm amber and gold light with only a little teal, a faint warm amber accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/stand-firm.webp",
+      "candidates": [
+        260924290,
+        260924291
+      ],
+      "rejected": [
+        {
+          "seed": 260924291,
+          "why": "cross-like emblem on the wall; reads as a chapel"
+        }
+      ],
+      "sha256": "bf6f14e4c07145e4920a8ca84acc5f13809193e640cf3d0f087b7a5de7050ffe"
+    },
+    {
+      "id": "vent",
+      "name": "Vent",
+      "set": "warden",
+      "effect": "Gain block equal to your backpressure.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924300,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A round brass pressure chamber with its valves thrown open vents jets of glowing gold steam that curl upward and around into a shimmering amber protective veil. The chamber and the gold steam in the center. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained warm amber and gold light with only a little teal, a faint warm amber accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/vent.webp",
+      "candidates": [
+        260924300,
+        260924301
+      ],
+      "rejected": [
+        {
+          "seed": 260924301,
+          "why": "steam leaves off to the side; chamber less central"
+        }
+      ],
+      "sha256": "17bb89a28c089dd55c90509760ee476be63b8550ea3611a6fcd14394f0fd5610"
+    },
+    {
+      "id": "double-shift",
+      "name": "Double Shift",
+      "set": "warden",
+      "effect": "Harden once, without using your console. Draw 1.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924312,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. Two tall identical brass-framed hourglasses filled with glowing amber sand stand side by side on the lintel of a small fortified guard post in a ruined cathedral; beneath them a pair of gloved hands tighten a heavy brass reinforcing plate onto a firewall gate, a warm amber lamp lit over the post. Two shifts of watch, one act of hardening. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained warm amber and gold light with only a little teal, a faint warm amber accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/double-shift.webp",
+      "candidates": [
+        260924310,
+        260924311,
+        260924312,
+        260924313
+      ],
+      "rejected": [
+        {
+          "seed": 260924310,
+          "why": "Roman numerals on both clock faces (text)"
+        },
+        {
+          "seed": 260924311,
+          "why": "Roman numerals on both clock faces (text)"
+        },
+        {
+          "seed": 260924313,
+          "why": "hourglasses cropped at the top; hands crowd the post"
+        }
+      ],
+      "sha256": "b1ed3c847626730a2b10fa62d133b5414e06b9222feefea8469da69f38360e91"
+    },
+    {
+      "id": "entrench",
+      "name": "Entrench",
+      "set": "warden",
+      "effect": "Double your block.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924321,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A brass fortification tower sinks thick twisting brass roots deep into the cracked cathedral floor, stone plates splitting around it; its amber shield doubles into two concentric glowing rings. Dug in. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained warm amber and gold light with only a little teal, a faint warm amber accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/entrench.webp",
+      "candidates": [
+        260924320,
+        260924321
+      ],
+      "rejected": [
+        {
+          "seed": 260924320,
+          "why": "roots less dominant, a doorway in the tower base"
+        }
+      ],
+      "sha256": "0e28b223cac4b682dfe8dda99ff23f07f98eafb470fcb4558e1f375d750bf3d6"
+    },
+    {
+      "id": "persistent-state",
+      "name": "Persistent State",
+      "set": "warden",
+      "effect": "Daemon. Your block no longer expires after the enemy phase.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924330,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. Inside a round brass vault whose massive door is locked wide open, a stack of glowing amber shield plates rests preserved on an ivory pedestal, their light undimmed while dust drifts in the dark hall outside. Nothing fades. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained warm amber and gold light with only a little teal, a faint warm amber accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/persistent-state.webp",
+      "candidates": [
+        260924330,
+        260924331
+      ],
+      "rejected": [
+        {
+          "seed": 260924331,
+          "why": "plates crowded in the vault mouth"
+        }
+      ],
+      "sha256": "cb7078529176aa44a5abea9ca308aeaeb76dc4a1de01ea51de8807d739c1229e"
+    },
+    {
+      "id": "flow-control",
+      "name": "Flow Control",
+      "set": "warden",
+      "effect": "Daemon. Backpressure stores all the damage your shield prevents, not half.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924341,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A tall brass sluice gate in a stone channel holds back a glowing amber torrent; the pent-up light rises high behind the gate, pressure gauges strain, and only a thin controlled stream escapes through a small valve. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained warm amber and gold light with only a little teal, a faint warm amber accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/flow-control.webp",
+      "candidates": [
+        260924340,
+        260924341
+      ],
+      "rejected": [
+        {
+          "seed": 260924340,
+          "why": "gate reads as a balustrade; no controlled stream"
+        }
+      ],
+      "sha256": "37ac179d05b6e68bb8f0cdfd7c751ec469e5f8f7204953f1582c549463053c41"
+    },
+    {
+      "id": "acl-gate",
+      "name": "ACL Gate",
+      "set": "warden",
+      "effect": "Deploy a firewall linked to its nearest device.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924351,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A compact portcullis firewall gatehouse of brass and ivory with its iron grille lowered; beside it an ivory plate with neat rows of punched holes, and one glowing amber cable running from the gate to a small nearby router. No writing. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained warm amber and gold light with only a little teal, a faint warm amber accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/acl-gate.webp",
+      "candidates": [
+        260924350,
+        260924351
+      ],
+      "rejected": [
+        {
+          "seed": 260924350,
+          "why": "gate tilted and fallen; cable hard to follow"
+        }
+      ],
+      "sha256": "1e8956a16fd9f63a81ea74d2cc4ad4293bb0c7d6660b4f64d43e6c4478059860"
+    },
+    {
+      "id": "perimeter",
+      "name": "Perimeter",
+      "set": "warden",
+      "effect": "+2 damage this turn per online firewall.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924360,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. Seen from slightly above, a ring of small brass firewall towers encircles a dark platform; every tower fires a hard amber searchlight beam outward into the dark, the beams striking distant hostile shapes. The whole scene reads as one bold, simple shape even at thumbnail size. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained warm amber and gold light with only a little teal, a faint warm amber accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/perimeter.webp",
+      "candidates": [
+        260924360,
+        260924361
+      ],
+      "rejected": [
+        {
+          "seed": 260924361,
+          "why": "fewer towers, beams partly cropped"
+        }
+      ],
+      "sha256": "fea246af10256a8aa843d764b1031ae60761124f3aa02ee08fe71af7a983e597"
+    },
+    {
+      "id": "defense-in-depth",
+      "name": "Defense in Depth",
+      "set": "warden",
+      "effect": "Daemon. Each online firewall blocks 1 more per attack.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924371,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. Three layered concentric brass walls, each ring crested with amber force light, surround a glowing ivory core at the center, seen from above at an angle. Defense in layers. The whole scene reads as one bold, simple shape even at thumbnail size. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained warm amber and gold light with only a little teal, a faint warm amber accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/defense-in-depth.webp",
+      "candidates": [
+        260924370,
+        260924371
+      ],
+      "rejected": [
+        {
+          "seed": 260924370,
+          "why": "green band and cold core; less of the Warden's amber"
+        }
+      ],
+      "sha256": "8e519efcbb483268a39dd794908dbdae1bcb71c7e4a993d8395f8239a4aeeaec"
+    },
+    {
+      "id": "tripwire",
+      "name": "Tripwire",
+      "set": "warden",
+      "effect": "Armed. When a hostile strikes: it takes 5.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924381,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A taut glowing amber wire stretched low across a dark cathedral doorway, anchored to two small brass trigger boxes; a hostile mechanical claw has just touched the wire and sparks leap back up at it. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained warm amber and gold light with only a little teal, a faint warm amber accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/tripwire.webp",
+      "candidates": [
+        260924380,
+        260924381
+      ],
+      "rejected": [
+        {
+          "seed": 260924380,
+          "why": "wire slack and small in the frame"
+        }
+      ],
+      "sha256": "cf8f7bca2bb0228edf4b595efd79f8f2d9d8975e7c7a9a11d95eec24a8462fc0"
+    },
+    {
+      "id": "policy-engine",
+      "name": "Policy Engine",
+      "set": "warden",
+      "effect": "Daemon. You can arm 1 more protocol.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924391,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A boxy brass rule engine of gears and drums with a stack of ivory punch cards feeding into its intake, the punched holes glowing amber as they pass; three armed brass spring traps are mounted on its front, the third one newly added. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained warm amber and gold light with only a little teal, a faint warm amber accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/policy-engine.webp",
+      "candidates": [
+        260924390,
+        260924391
+      ],
+      "rejected": [
+        {
+          "seed": 260924390,
+          "why": "cards lie on top of a box rather than feeding in"
+        }
+      ],
+      "sha256": "740f1ba4667eff73cae79301aca0a9cf5a5bedd7a001c070a8b1593ba4399b0a"
+    },
+    {
+      "id": "rearm",
+      "name": "Rearm",
+      "set": "warden",
+      "effect": "Return your last discarded protocol to hand. It costs 0 this turn.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924402,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A sprung brass mechanical trap with heavy toothed jaws lies on a dark stone floor; a jointed brass mechanical hand pulls the jaws wide open again until they lock with a flash of amber light at the trigger plate, the coiled spring compressed, ready to fire again. The open trap and the resetting hand fill the center. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained warm amber and gold light with only a little teal, a faint warm amber accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/rearm.webp",
+      "candidates": [
+        260924400,
+        260924401,
+        260924402,
+        260924403
+      ],
+      "rejected": [
+        {
+          "seed": 260924400,
+          "why": "only a robot hand; no trap"
+        },
+        {
+          "seed": 260924401,
+          "why": "only a robot hand; no trap"
+        },
+        {
+          "seed": 260924403,
+          "why": "reads as a crocodile-jawed robot arm"
+        }
+      ],
+      "sha256": "1dac655d50d28f3969b9db16e86a7b0388c811db3ecbdb5f522bcb650bc5c177"
+    },
+    {
+      "id": "incident-response",
+      "name": "Incident Response",
+      "set": "warden",
+      "effect": "Daemon. Whenever a protocol fires, the hostile that set it off takes 3.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924410,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A red alarm beacon spins above a cathedral doorway, washing it in red light, and a responder silhouette in a heavy coat steps into the doorway with a brass lantern raised, its amber beam striking a retreating hostile machine. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained warm amber and gold light with only a little teal, a faint warm amber accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/incident-response.webp",
+      "candidates": [
+        260924410,
+        260924411
+      ],
+      "rejected": [
+        {
+          "seed": 260924411,
+          "why": "no hostile for the response to strike"
+        }
+      ],
+      "sha256": "875b3f85e91f2c61347e7b4e2c714fd2e1d23dd46e828ddae9a69116e64f8047"
+    },
+    {
+      "id": "null-route",
+      "name": "Null Route",
+      "set": "warden",
+      "effect": "Armed. When a hostile breaches: cancel the breach.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924420,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A glowing route of light across a dark stone floor ends abruptly in a round black void framed by a brass ring; the incoming red hostile surge pours into the blackness and vanishes, swallowed whole. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained warm amber and gold light with only a little teal, a faint warm amber accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/null-route.webp",
+      "candidates": [
+        260924420,
+        260924421
+      ],
+      "rejected": [
+        {
+          "seed": 260924421,
+          "why": "empty hole; no route running into it"
+        }
+      ],
+      "sha256": "ddc304beb87d5fdbc5f842daa6a87073c226dcd65c4a24240d6089cd3a71633c"
+    },
+    {
+      "id": "jitter-buffer",
+      "name": "Jitter Buffer",
+      "set": "ghost",
+      "effect": "Add 3 to your buffer. Draw 1.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924430,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A row of vertical glass tubes mounted in a brass rack, each holding a trembling glowing violet-teal packet of light hovering at a slightly different height with a faint vibration blur; one new packet is entering the last tube. Queued and held. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained pale violet-teal glow and a little warm gold, a faint pale violet-teal accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/jitter-buffer.webp",
+      "candidates": [
+        260924430,
+        260924431
+      ],
+      "rejected": [
+        {
+          "seed": 260924431,
+          "why": "flame-like glow, no discrete packets"
+        }
+      ],
+      "sha256": "eddb089c13135cf4c06037f8215093de3812cc313d5bd290be6ccd904b70d213"
+    },
+    {
+      "id": "hold-queue",
+      "name": "Hold Queue",
+      "set": "ghost",
+      "effect": "Gain 4 block. If you are buffering, add 4 to your buffer.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924441,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A hooded cloaked figure in shadow holds up a brass lantern filled with swirling stored pale violet-teal light; the lantern glow wraps around the figure like a shield. Quiet, patient. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained pale violet-teal glow and a little warm gold, a faint pale violet-teal accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/hold-queue.webp",
+      "candidates": [
+        260924440,
+        260924441
+      ],
+      "rejected": [
+        {
+          "seed": 260924440,
+          "why": "lantern smaller; figure dominates"
+        }
+      ],
+      "sha256": "5e94ecee0cd5ab153cd2521bc9e3d4b44140569f573592ad3067ffa3e0ecde4e"
+    },
+    {
+      "id": "flush",
+      "name": "Flush",
+      "set": "ghost",
+      "effect": "Needs a buffer. +4 damage this turn.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924450,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A brass sluice drain in a stone floor bursts open, its hatch flung aside, and a powerful rush of stored violet-teal light blasts out in a jet toward the right. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained pale violet-teal glow and a little warm gold, a faint pale violet-teal accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/flush.webp",
+      "candidates": [
+        260924450,
+        260924451
+      ],
+      "rejected": [
+        {
+          "seed": 260924451,
+          "why": "odd boot-shaped machine, no drain"
+        }
+      ],
+      "sha256": "77d19862d62b13ddd568a4f141f9bb6b6c81fcf6cf6b25efefcb57e28113a5a5"
+    },
+    {
+      "id": "trickle",
+      "name": "Trickle",
+      "set": "ghost",
+      "effect": "Daemon. At the start of your turn, add 2 to your buffer.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924460,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A slow drip of luminous violet-teal light falls drop by drop from a brass pipe tap into a round brass reservoir bowl, which is slowly filling and glowing brighter. Calm and patient. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained pale violet-teal glow and a little warm gold, a faint pale violet-teal accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/trickle.webp",
+      "candidates": [
+        260924460,
+        260924461
+      ],
+      "rejected": [
+        {
+          "seed": 260924461,
+          "why": "further away; teal rather than the Ghost violet-teal"
+        }
+      ],
+      "sha256": "165a9639eafb8dbd446d56333f988f6089da3a97efcd404b571b15e133183aff"
+    },
+    {
+      "id": "deep-queue",
+      "name": "Deep Queue",
+      "set": "ghost",
+      "effect": "Daemon. Buffering stores x3 instead of x2.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924471,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A heavy brass lid tilted open above a bottomless circular well of densely packed glowing violet-teal light, layered rings of light going down endlessly into the depth. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained pale violet-teal glow and a little warm gold, a faint pale violet-teal accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/deep-queue.webp",
+      "candidates": [
+        260924470,
+        260924471
+      ],
+      "rejected": [
+        {
+          "seed": 260924470,
+          "why": "lid cropped; plain teal well"
+        }
+      ],
+      "sha256": "85a6bae37ce0cfcf5fbde063c7d537781abb72e6d646ca0007da613c0ca6a646"
+    },
+    {
+      "id": "exfiltrate",
+      "name": "Exfiltrate",
+      "set": "ghost",
+      "effect": "Retain. Deal your buffer to your target now, ignoring armor. Exhaust.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924481,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A cloaked thief slips out through a round brass vault door that stands ajar, trailing a long bright stream of violet-teal light from the vault behind them into the dark, fleeing to the right. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained pale violet-teal glow and a little warm gold, a faint pale violet-teal accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/exfiltrate.webp",
+      "candidates": [
+        260924480,
+        260924481
+      ],
+      "rejected": [
+        {
+          "seed": 260924480,
+          "why": "figure dark on dark at card size"
+        }
+      ],
+      "sha256": "94804d6127d3605988fa6bd8cbad8f4b19768f3a2c0173016df7a96e9b1cf87c"
+    },
+    {
+      "id": "spoof",
+      "name": "Spoof",
+      "set": "ghost",
+      "effect": "Gain 3 block. The next jam or cut this enemy phase misses.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924492,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A floating featureless oval mirror-mask of brass and crackling violet-teal static hangs in the dark; its mirrored face shows a false glowing image of a small ivory router. A hostile brass cutter blade slashes at the reflection and passes through empty air, sparks on nothing, while the real ivory router stands safe and untouched behind the mask. No human face, no eyes, no nose. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained pale violet-teal glow and a little warm gold, a faint pale violet-teal accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/spoof.webp",
+      "candidates": [
+        260924490,
+        260924491,
+        260924492,
+        260924493
+      ],
+      "rejected": [
+        {
+          "seed": 260924490,
+          "why": "a human ceramic face mask; no false device, no miss"
+        },
+        {
+          "seed": 260924491,
+          "why": "ceramic face mask; no false device or miss"
+        },
+        {
+          "seed": 260924493,
+          "why": "blade barely visible; mirror just frames a device"
+        }
+      ],
+      "sha256": "71f56b9b5abbc1b8e4c2515353cf10b08b414d736302dd6f398d2dc67dcf41a2"
+    },
+    {
+      "id": "decoy-swarm",
+      "name": "Decoy Swarm",
+      "set": "ghost",
+      "effect": "Deploy 2 phantoms off every route. Exhaust.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924503,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A dozen small translucent boxy router devices made of pale violet-teal light, little cube-shaped machines with tiny port lights, burst outward from one brass socket in every direction like startled moths, each leaving a faint light trail; red hostile probes lunge in from the edges and snap at empty air between them. Device shapes, not birds, not people. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained pale violet-teal glow and a little warm gold, a faint pale violet-teal accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/decoy-swarm.webp",
+      "candidates": [
+        260924500,
+        260924501,
+        260924502,
+        260924503
+      ],
+      "rejected": [
+        {
+          "seed": 260924500,
+          "why": "humanoid ghosts, not devices"
+        },
+        {
+          "seed": 260924501,
+          "why": "translucent birds rather than devices"
+        },
+        {
+          "seed": 260924502,
+          "why": "cubes sit on a sphere; little sense of scattering"
+        }
+      ],
+      "sha256": "b89d5d4e0b1c4fe0fef143d7722e4108d754ba93f8ae7d46a05b865c8a38fb51"
+    },
+    {
+      "id": "ghost-protocol",
+      "name": "Ghost Protocol",
+      "set": "ghost",
+      "effect": "The first strike or breach this enemy phase deals 0. Exhaust.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924515,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. An empty hooded cloak made of translucent pale violet-teal light hangs upright in the air with no body inside, the dark machinery behind visible through it. A long red energy lance thrusts in from the right and passes straight through the middle of the empty cloak and out the left side without resistance, no wound, no sparks, the red energy fading harmlessly beyond. The lance passing through the ghostly cloak is the center of the picture. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained pale violet-teal glow and a little warm gold, a faint pale violet-teal accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/ghost-protocol.webp",
+      "candidates": [
+        260924510,
+        260924511,
+        260924512,
+        260924513,
+        260924514,
+        260924515
+      ],
+      "rejected": [
+        {
+          "seed": 260924510,
+          "why": "no strike at all"
+        },
+        {
+          "seed": 260924511,
+          "why": "the spear hits the solid figure with sparks; reads as a wound, not a miss"
+        },
+        {
+          "seed": 260924512,
+          "why": "translucent anatomical figure; no spear"
+        },
+        {
+          "seed": 260924513,
+          "why": "skeletal figure; no spear"
+        },
+        {
+          "seed": 260924514,
+          "why": "cloak nearly opaque; the lance seems to pin it"
+        }
+      ],
+      "sha256": "cb59a6658b15df044e2096af423bd116cc917663bb5731bafc95b48cf75962e4"
+    },
+    {
+      "id": "obfuscation",
+      "name": "Obfuscation",
+      "set": "ghost",
+      "effect": "Daemon. The first jam or cut each enemy phase misses.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924520,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. An ivory relay tower is wrapped in a shifting shell of scrambled fragments, broken tiles of pale violet-teal static and mirrored shards orbiting and rearranging around it so its true shape is hard to see; a hostile red cutter swings at it and misses. No letters or symbols. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained pale violet-teal glow and a little warm gold, a faint pale violet-teal accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/obfuscation.webp",
+      "candidates": [
+        260924520,
+        260924521
+      ],
+      "rejected": [
+        {
+          "seed": 260924521,
+          "why": "chaotic scatter; tower shape lost entirely"
+        }
+      ],
+      "sha256": "4ab694d2c90b92b7dca16c1c6b4ffeec38e256d1bc4de26e7f7df36330d3c4ce"
+    },
+    {
+      "id": "fork-bomb",
+      "name": "Fork Bomb",
+      "set": "ghost",
+      "effect": "Add 3 Payloads to your hand.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924530,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. One glowing violet-teal process orb above a brass pedestal splits into a swarm of identical small copies, each copy splitting again, bursting outward in a branching cascade of light. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained pale violet-teal glow and a little warm gold, a faint pale violet-teal accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/fork-bomb.webp",
+      "candidates": [
+        260924530,
+        260924531
+      ],
+      "rejected": [
+        {
+          "seed": 260924531,
+          "why": "copies drift off to one side; no branching"
+        }
+      ],
+      "sha256": "cc747d52a94958a6e4b630f7a47645dde8a4e53d25d832e137e8246eebc41e53"
+    },
+    {
+      "id": "shell-access",
+      "name": "Shell Access",
+      "set": "ghost",
+      "effect": "Gain 4 block. Add a Payload to your hand.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924540,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. The heavy lid of a dark iron terminal box creaks open under a gloved hand, revealing in the blackness inside one single glowing violet-teal block of light, pulsing like a waiting cursor. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained pale violet-teal glow and a little warm gold, a faint pale violet-teal accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/shell-access.webp",
+      "candidates": [
+        260924540,
+        260924541
+      ],
+      "rejected": [
+        {
+          "seed": 260924541,
+          "why": "glow tiny inside a big box"
+        }
+      ],
+      "sha256": "14fcdc85558bbe1195ab94234b9637a6d6992c3e3bec35719943ee274eca3c4c"
+    },
+    {
+      "id": "side-channel",
+      "name": "Side Channel",
+      "set": "ghost",
+      "effect": "+1 damage this turn per card you played this turn.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924552,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A sharp diagonal ray of pale violet-teal light spills out through a narrow jagged crack in a massive sealed brass-and-stone vault wall and cuts across a dusty dark chamber, lighting the drifting dust and pooling as a bright spot on the floor. The crack and the escaping ray are the focus. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained pale violet-teal glow and a little warm gold, a faint pale violet-teal accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/side-channel.webp",
+      "candidates": [
+        260924550,
+        260924551,
+        260924552,
+        260924553
+      ],
+      "rejected": [
+        {
+          "seed": 260924550,
+          "why": "beam off-centre and faint"
+        },
+        {
+          "seed": 260924551,
+          "why": "vertical crack only, no ray; weak at card size"
+        },
+        {
+          "seed": 260924553,
+          "why": "the crack became a broad breach; not a thin leak"
+        }
+      ],
+      "sha256": "b2e0bb006014e3dfd16950e543d49a4936ca41c629bf1d66fc874b064c43a99a"
+    },
+    {
+      "id": "payload",
+      "name": "Payload",
+      "set": "ghost",
+      "effect": "+2 damage this turn. Exhaust.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924561,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A single sharp crystalline shard of densely packed violet-teal light hovers above a dark brass cradle, glowing intensely, tiny sparks around its point. Simple, compact, dangerous. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained pale violet-teal glow and a little warm gold, a faint pale violet-teal accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/payload.webp",
+      "candidates": [
+        260924560,
+        260924561
+      ],
+      "rejected": [
+        {
+          "seed": 260924560,
+          "why": "teal-green shard, less of the Ghost violet"
+        }
+      ],
+      "sha256": "19fd1b2c78dcebb6d754e09c10a21b00eedb937dd3d9a76cc9c6b6dabb8727b9"
+    },
+    {
+      "id": "exploit-kit",
+      "name": "Exploit Kit",
+      "set": "ghost",
+      "effect": "Daemon. Payloads deal +1 more.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924573,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A worn leather tool roll unrolled on a dark bench holds a neat row of slender brass lockpicks and probes; the tip of every pick glows brightly violet-teal like a small flame of light, the glowing tips the brightest thing in the picture, and one pick is lifted slightly out of its pocket. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained pale violet-teal glow and a little warm gold, a faint pale violet-teal accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/exploit-kit.webp",
+      "candidates": [
+        260924570,
+        260924571,
+        260924572,
+        260924573
+      ],
+      "rejected": [
+        {
+          "seed": 260924571,
+          "why": "dark roll; the tips barely glow"
+        },
+        {
+          "seed": 260924570,
+          "why": "only one faintly glowing pick"
+        },
+        {
+          "seed": 260924572,
+          "why": "tips do not glow"
+        }
+      ],
+      "sha256": "74639554eda9a26222d4c7ab35f4e2d1f8267a886ebb71a38e4c61a5e30c18a3"
+    },
+    {
+      "id": "botnet",
+      "name": "Botnet",
+      "set": "ghost",
+      "effect": "Daemon. At the start of your turn, add a Payload to your hand.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924581,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A web of many small hijacked violet-teal lights spreads across a dark ruined relay structure, each tiny light a captured device, thin glowing threads connecting them all to one central point. The whole scene reads as one bold, simple shape even at thumbnail size. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained pale violet-teal glow and a little warm gold, a faint pale violet-teal accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/botnet.webp",
+      "candidates": [
+        260924580,
+        260924581
+      ],
+      "rejected": [
+        {
+          "seed": 260924580,
+          "why": "a spider web with few lights"
+        }
+      ],
+      "sha256": "1ffa8d59571b314ca6bc3fe77ffa02c46cd83c8cc08cd24507080ae275d50acb"
+    },
+    {
+      "id": "cover-tracks",
+      "name": "Cover Tracks",
+      "set": "ghost",
+      "effect": "Daemon. Whenever a card exhausts, gain 1 block.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924593,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A dark-gloved hand holding a brass-handled brush sweeps grey ash over a trail of brightly glowing violet-teal footprints crossing a dark stone floor; the footprints nearest the brush are already half covered and fading, the ones further back still glow clearly. The glowing trail and the sweeping brush are the center of the picture. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained pale violet-teal glow and a little warm gold, a faint pale violet-teal accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/cover-tracks.webp",
+      "candidates": [
+        260924590,
+        260924591,
+        260924592,
+        260924593
+      ],
+      "rejected": [
+        {
+          "seed": 260924591,
+          "why": "footprints hidden under the ash; trail unclear"
+        },
+        {
+          "seed": 260924590,
+          "why": "bare hand; footprints faint at card size"
+        },
+        {
+          "seed": 260924592,
+          "why": "footprints behind the brush still glow; nothing covered"
+        }
+      ],
+      "sha256": "47ca0b935cd757f088780314b1e37dcba659ff1b71fa728fd16e74802ec69384"
+    },
+    {
+      "id": "man-in-the-middle",
+      "name": "Man-in-the-Middle",
+      "set": "ghost",
+      "effect": "This turn, every card you play adds 2 to your buffer. Exhaust.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924602,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. Two tall glowing relay towers stand left and right; a bright horizontal beam of violet-teal light runs from one tower toward the other. In the middle a cloaked figure stands inside the beam and catches it in raised hands, splitting it: a thinner beam continues onward to the far tower while a second stream bends down into a brass vessel at the figure feet. The interception point is the center of the picture. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained pale violet-teal glow and a little warm gold, a faint pale violet-teal accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/man-in-the-middle.webp",
+      "candidates": [
+        260924600,
+        260924601,
+        260924602,
+        260924603
+      ],
+      "rejected": [
+        {
+          "seed": 260924601,
+          "why": "one tower; the light falls into a pot, no interception"
+        },
+        {
+          "seed": 260924600,
+          "why": "light falls vertically into a pot; no interception between the towers"
+        },
+        {
+          "seed": 260924603,
+          "why": "figure small; the beam passes over its head"
+        }
+      ],
+      "sha256": "c79ad8a22a9fe926662b2b71f017b187638e87051bc4eed091ada53acb2e6994"
+    },
+    {
+      "id": "hardening-guide",
+      "name": "Hardening Guide",
+      "set": "warden",
+      "effect": "Daemon. Harden gains 3 more block.",
+      "engine": "local-krea-2-turbo",
+      "seed": 260924610,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A heavy open manual bound in worn brass corners and dark leather lies on a guard-post desk, lit by a warm brass oil lamp. Its two open ivory pages carry only drawn fortification diagrams in faded amber ink: concentric walls, a shield outline and a small firewall tower, with no writing, no letters and no numbers anywhere. A brass reinforcing plate and a wrench rest beside the book. Close three-quarter view; the main subject is large and fills the middle of the picture. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained warm amber and gold light with only a little teal, a faint warm amber accent; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/hardening-guide.webp",
+      "candidates": [
+        260924610,
+        260924611
+      ],
+      "rejected": [
+        {
+          "seed": 260924611,
+          "why": "plainer diagrams; no wrench or plate, lamp off to the side"
+        }
+      ],
+      "sha256": "ea781bbbedeb0fac866ab2cc512923af49ab2d243709cd57d53b901492f07862"
+    }
+  ]
+}

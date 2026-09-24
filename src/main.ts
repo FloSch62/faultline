@@ -93,7 +93,7 @@ void loadAllModels();
 const faultKey = (state: RunState) => `${state.faultNodes.join(",")}|${state.faultLinks.join(",")}`;
 const installationPoints = (state: RunState) => state.installations.reduce((sum, item) => sum + item.integrity, 0);
 /** Controls whose hover deserves a whisper; icon buttons and toolbars stay silent. */
-const HOVER_CUES = ".game-card:not(.drag-ghost), .route-room:not([disabled]), .archetype, .relic-option, [data-forge], .transmit-button, .console-button, .title-menu button, .gold-button, .field-seal.targetable, .lesson-card, button.port-row, .hostile-intent[data-port]";
+const HOVER_CUES = ".game-card:not(.drag-ghost), .route-room:not([disabled]), .archetype, .relic-option, [data-forge], .transmit-button, .console-button, .title-menu button, .gold-button, .field-seal.targetable, .lesson-card, button.port-row, .hostile-plate[data-plate]";
 let expedition: Expedition | null = null;
 let records: RunRecord[] = [];
 try {
@@ -922,37 +922,65 @@ function focusPort(port: Port) {
   playAction(() => setFocus(run, port), "aim");
 }
 let intentMarkup = "";
-/** The intent badges (hostile-cards.ts): content on render, position on every drawn frame. */
+/** The rail's plates (hostile-cards.ts): content on render, position on every drawn frame. */
 function renderIntents(forecast: ReturnType<typeof combatPreview> | null) {
   const layer = document.getElementById("intent-layer");
   if (!layer) return;
-  // Without a table (WebGL unavailable) there is nothing to hang them on: the plates carry the intents.
-  const markup = world && forecast && view === "run" && run.phase === "battle" ? hostileCards.intentBadges(run, forecast, { armed: null }) : "";
+  // Without a table (WebGL unavailable) there are no portraits to hang plates under: the HUD reads.
+  const markup = world && forecast && view === "run" && run.phase === "battle" ? hostileCards.intentBadges(run, forecast) : "";
   if (markup !== intentMarkup) {
     intentMarkup = markup;
     layer.innerHTML = markup;
   }
+  measureRail();
   placeIntents();
 }
-/** Hangs each badge over its rail plate (the table moves with the camera and the frame). Positions
+/** The rail's frame for the table (client pixels): the span between the side plates, the header's
+ * items the portraits stay clear of, and the plates' size (the tallest plate is reserved under every
+ * portrait, so all feet stand on one line). */
+function measureRail() {
+  const layer = document.getElementById("intent-layer");
+  if (!world || !layer || !root.classList.contains("is-battle")) return;
+  const scale = interfaceScale(), canvas = $("#world").getBoundingClientRect(), box = root.getBoundingClientRect();
+  const rect = (selector: string) => Array.from(document.querySelectorAll<HTMLElement>(selector)).map(el => el.getBoundingClientRect()).filter(item => item.width && item.height);
+  const left = Math.max(canvas.left, box.left, ...rect(".is-battle .battle-left, .is-practice #lesson-layer .training-panel").map(item => item.right)) + 10 * scale;
+  const right = Math.min(canvas.right, box.right, ...rect(".is-battle .battle-right").map(item => item.left)) - 10 * scale;
+  // The leader's plate is the widest; the side plates are narrower, so escorts stand nearer the
+  // middle, clear of the header's items. Both shrink together on a narrow rail.
+  const short = root.getBoundingClientRect().height / scale <= 760;
+  const gap = 7 * scale, fit = Math.min(1, (right - left - gap * 4) / ((short ? 200 + 2 * 170 : 216 + 2 * 182) * scale));
+  const width = Math.round((short ? 200 : 216) * scale * fit), side = Math.round((short ? 170 : 182) * scale * fit);
+  layer.style.setProperty("--plate", `${(width / scale).toFixed(1)}px`);
+  layer.style.setProperty("--plate-side", `${(side / scale).toFixed(1)}px`);
+  const plates = Array.from(layer.querySelectorAll<HTMLElement>(".hostile-plate"));
+  const height = Math.max(58 * scale, ...plates.map(plate => plate.getBoundingClientRect().height));
+  world.setRailFrame({
+    left, right, top: Math.max(canvas.top, box.top) + 6 * scale,
+    obstacles: rect(".game-header .run-stats, .game-header .header-controls, .is-battle .encounter-heading")
+      .map(item => ({ left: item.left, top: item.top, right: item.right, bottom: item.bottom })),
+    plate: { width, side, height: Math.ceil(height), gap },
+  });
+}
+addEventListener("resize", () => { measureRail(); placeIntents(); });
+// The plates' type may land after the first render: measure their height again once it has.
+void document.fonts?.ready.then(() => { measureRail(); placeIntents(); });
+/** Hangs each plate under its portrait (the table moves with the camera and the frame). Positions
  * are client pixels, the layer lives inside #app's interface zoom. */
 function placeIntents() {
   const layer = document.getElementById("intent-layer");
   if (!layer?.firstElementChild || !world) return;
   const scale = interfaceScale(), origin = root.getBoundingClientRect();
   let shown = false;
-  for (const badge of Array.from(layer.children) as HTMLElement[]) {
-    const port = (badge.dataset.port ?? badge.dataset.arrival) as Port;
-    const at = world.portAnchor(port, !!badge.dataset.arrival);
-    if (badge.hidden && at) shown = true;
-    badge.hidden = !at;
+  for (const plate of Array.from(layer.children) as HTMLElement[]) {
+    const port = (plate.dataset.plate ?? plate.dataset.arrival) as Port;
+    const at = world.portAnchor(port, !!plate.dataset.arrival);
+    if (plate.hidden && at) shown = true;
+    plate.hidden = !at;
     if (!at) continue;
     const place = `translate(${((at.x - origin.left) / scale).toFixed(1)}px, ${((at.y - origin.top) / scale).toFixed(1)}px)`;
-    if (badge.dataset.place !== place) { badge.dataset.place = place; badge.style.transform = `${place} translate(-50%, -100%)`; }
-    const width = `${Math.round(at.width / scale)}px`;
-    if (badge.style.getPropertyValue("--plate") !== width) badge.style.setProperty("--plate", width);
+    if (plate.dataset.place !== place) { plate.dataset.place = place; plate.style.transform = `${place} translateX(-50%)`; }
   }
-  // Badges wait for their plates (a hostile's entrance): a lesson spotlight that fell back to the
+  // Plates wait for their portraits (a hostile's entrance): a lesson spotlight that fell back to the
   // port strip moves onto them as soon as they stand.
   if (shown && practice) spotlightLesson();
 }
@@ -1016,6 +1044,8 @@ function worldView() {
 }
 // Browser tests reach the table's click targets without the canvas (dev server only).
 if (testHooks) (globalThis as { __faultlineHud?: unknown }).__faultlineHud = { selectPort: clickHostile, clickHostile, selectInstallation, focusPort, selectNode: onNode };
+// …and the rail's portraits: each painted box on screen (client pixels) as drawn this frame.
+if (testHooks) (globalThis as { __faultlineRail?: unknown }).__faultlineRail = { portrait: (port: Port) => world?.portraitRect(port) ?? null };
 /** Forget selections that no longer point at anything (a fallen hostile, a scrubbed installation). */
 function settleHud() {
   if (view !== "run" || run.phase !== "battle") { hud.port = hud.installation = null; hud.demolition = false; return; }
@@ -1389,7 +1419,7 @@ function transmit() {
         number.style.marginLeft = `${-number.offsetWidth / 2}px`;
       },
       render: rebuild => render(rebuild),
-      showPortHit: battleUi.showPortHit,
+      showPortHit: (port, hp, maxHp) => { battleUi.showPortHit(port, hp, maxHp); hostileCards.showPlateHit(port, hp, maxHp); },
       data: (key, value) => { if (value === null) delete root.dataset[key]; else root.dataset[key] = value; },
       shake: () => {
         root.classList.remove("shake");
@@ -1632,9 +1662,9 @@ document.addEventListener("click", (event) => {
     sound.effect("select");
     return;
   }
-  // The far rail: a hostile's badge or strip row targets it.
+  // The far rail: a hostile's plate or strip row targets it.
   if (!dialog.open) {
-    const hostile = target.closest<HTMLElement>(".hostile-intent[data-port], .port-row[data-port]")?.dataset.port as Port | undefined;
+    const hostile = (target.closest<HTMLElement>(".hostile-plate[data-plate]")?.dataset.plate ?? target.closest<HTMLElement>(".port-row[data-port]")?.dataset.port) as Port | undefined;
     if (hostile) { clickHostile(hostile); return; }
     const demolishId = target.closest<HTMLElement>("[data-demolish]")?.dataset.demolish;
     if (demolishId) { selectInstallation(demolishId); return; }
@@ -2286,7 +2316,8 @@ function onScreen(el: Element): el is HTMLElement {
 /** Cut the dimmer's hole around the lit controls (their joint box). */
 function placeSpotlight(hole: HTMLElement, lit: readonly HTMLElement[]) {
   const scale = interfaceScale(), origin = root.getBoundingClientRect();
-  const boxes = lit.map(el => el.getBoundingClientRect());
+  // A hostile's next move lights its whole plate (name and health with it).
+  const boxes = lit.map(el => (el.closest("#intent-layer .hostile-plate") ?? el).getBoundingClientRect());
   const rect = {
     left: Math.min(...boxes.map(box => box.left)), top: Math.min(...boxes.map(box => box.top)),
     right: Math.max(...boxes.map(box => box.right)), bottom: Math.max(...boxes.map(box => box.bottom)),

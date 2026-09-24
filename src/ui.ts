@@ -1,6 +1,9 @@
-import { CARDS, isUpgraded } from "./core/cards.ts";
-import { costFor } from "./core/run.ts";
+import { CARDS, isUpgraded, type CardDefinition } from "./core/cards.ts";
+import { ARCHETYPES } from "./core/expedition.ts";
 import type { BaseCardId, CardId, RunState } from "./core/types.ts";
+import {
+  HOUSE_COLORS, HOUSE_EDGES, HOUSE_NAMES, KEYWORDS, artFallback, cardHouse, cardKeywords, costNote, keywordTip, ownerWords, playsLeft,
+} from "./card-marks.ts";
 export const asset = (path: string) => `${import.meta.env.BASE_URL}${path}`;
 export const esc = (s: unknown) =>
   String(s).replace(
@@ -176,9 +179,23 @@ export function artStyle(id: string) {
   return atlasStyle(art[0], art[1]);
 }
 
-const ARCHETYPE_MARK: Record<string, string> = { architect: "Architect", warden: "Warden", ghost: "Ghost" };
 /** Type lines are set in the label face's small caps: "HOST BRIDGE" reads "Host Bridge". */
 const typeWords = (text: string) => text.toLowerCase().replace(/\b\w/g, ch => ch.toUpperCase()).replace(/\bQos\b/, "QoS");
+/** The type line: the card's kind word, then its keyword markers from the flags, each with its
+ * glossary tooltip ("Buffer ◆ Retain ◆ Exhaust", "Daemon", "Curse · Unplayable ◆ Innate"). */
+function typeLine(c: CardDefinition): string {
+  const clutter = !!(c.junk || c.curse);
+  const word = clutter ? `${c.curse ? "Curse" : "Junk"}` : c.target === "daemon" ? "Daemon" : typeWords(c.subtitle.split(" / ").at(-1)!);
+  const lead = clutter
+    ? `<span class="type-word" data-tooltip="${esc(c.curse ? keywordTip("curse") : "Junk: encounter clutter a hostile shuffled in. It never enters your deck.")}">${word}</span><span class="type-word is-sub">${c.unplayable ? "Unplayable" : "Delete it"}</span>`
+    : c.target === "daemon"
+      ? `<span class="type-word is-daemon" data-tooltip="${esc(keywordTip("daemon"))}">${word}</span>`
+      : `<span class="type-word">${esc(word)}</span>`;
+  const marks = cardKeywords(c).filter(kw => KEYWORDS[kw].name !== word).map(kw => `<span class="card-keyword kw-${kw}" data-keyword="${kw}" data-tooltip="${esc(keywordTip(kw))}">${KEYWORDS[kw].name}</span>`).join("");
+  return `${lead}${marks}`;
+}
+/** Screen-reader words for the same marks. */
+const keywordWords = (c: CardDefinition) => [c.target === "daemon" ? "Daemon" : "", ...cardKeywords(c).map(kw => KEYWORDS[kw].name)].filter(Boolean).join(", ");
 export function cardMarkup(
   id: CardId,
   index = 0,
@@ -188,17 +205,27 @@ export function cardMarkup(
 ) {
   const c = CARDS[id];
   const inHand = variant === "hand" && !!run;
-  const cost = inHand ? costFor(run!, index) : c.cost;
+  const note = inHand ? costNote(run!, index) : null;
+  const cost = note ? note.cost : c.cost;
   const central = inHand ? index - (run!.hand.length - 1) / 2 : 0;
   const junk = !!(c.junk || c.curse);
   const upgradedCard = isUpgraded(id);
-  const blocked = inHand && (c.unplayable || cost > run!.energy);
+  // Kernel Panic: with no plays left this turn, every card in hand is blocked.
+  const limit = inHand ? playsLeft(run!) : null;
+  const blocked = inHand && (c.unplayable || cost > run!.energy || limit?.left === 0);
   const kind = c.protocol ? "protocol" : junk ? "junk" : c.target;
-  const type = junk
-    ? `${c.curse ? "Curse" : "Junk"} · ${c.unplayable ? "Unplayable" : "Delete it"}`
-    : `${typeWords(c.subtitle.split(" / ").at(-1)!)}${c.protocol ? " · Armed" : ""}${c.exhaust ? " · Exhaust" : ""}`;
-  const rarity = c.rarity === "special" ? (c.curse ? "Curse" : "Junk") : typeWords(c.rarity);
-  const label = `${c.name}, ${c.unplayable ? "unplayable" : `${cost} energy`}. ${c.rules}`;
+  const house = cardHouse(c);
+  const rarity = c.rarity === "special" ? (c.curse ? "Curse" : c.token ? "Token" : "Junk") : typeWords(c.rarity);
+  const moved = note?.direction ? note : null;
+  const costTip = moved ? `Costs ${moved.cost} this turn (printed ${moved.printed}). ${moved.reasons.join(". ")}.` : "";
+  const label = `${c.name}, ${ownerWords(c)}, ${c.unplayable ? "unplayable" : `${cost} energy${moved ? `, printed ${moved.printed}` : ""}`}. ${keywordWords(c) ? `${keywordWords(c)}. ` : ""}${c.rules}`;
+  // The owner at a glance, in every view: the frame is lit in the keeper's colour (CSS, from house-*);
+  // the footer names the keeper outside the hand (where its right end holds the hotkey).
+  const footRight = variant === "hand" ? `<kbd>${index === 9 ? "0" : index + 1}</kbd>` : c.archetype ? `<span class="keeper-word">${HOUSE_NAMES[house]}</span>` : c.token ? '<span class="keeper-word">This encounter</span>' : "";
+  // Kernel Panic in hand: its limit stamped over the art ("2 plays left").
+  const panic = inHand && limit && limit.by === c.name ? `<span class="card-limit${limit.left === 0 ? " is-spent" : ""}" data-tooltip="${esc(`${limit.by} is in your hand: at most ${limit.limit} card plays this turn. ${limit.left} left.`)}"><b>${limit.left}</b><small>${limit.left === 1 ? "play left" : "plays left"}</small></span>` : "";
+  const classes = ["game-card", `rarity-${c.rarity}`, `kind-${kind}`, `house-${house}`, upgradedCard ? "upgraded" : "", junk ? "junk-card" : "", c.curse ? "curse-card" : "", c.token ? "token-card" : "",
+    selected ? "selected" : "", blocked ? "unplayable" : "", moved ? `cost-${moved.direction}` : ""].filter(Boolean).join(" ");
   // --name-len lets the nameplate shrink a long name to fit instead of wrapping it.
-  return `<button class="game-card rarity-${c.rarity} kind-${kind} ${upgradedCard ? "upgraded" : ""} ${junk ? "junk-card" : ""} ${c.curse ? "curse-card" : ""} ${selected ? "selected" : ""} ${blocked ? "unplayable" : ""}" data-${variant}="${variant === "hand" ? index : id}" data-card-id="${id}" style="${artStyle(id)};--card-color:${c.color};--angle:${Math.max(-10, Math.min(10, central * 3))}deg;--lift:${Math.min(15, Math.abs(central) * 5)}px;--order:${index};--name-len:${Math.max(10, c.name.length)}" aria-label="${esc(label)}"><span class="card-image"></span><span class="card-etch"></span><span class="card-cost ${c.unplayable ? "no-cost" : ""}">${c.unplayable ? icon("close", 14) : cost}</span>${upgradedCard ? '<span class="card-upgrade-mark" aria-hidden="true">+</span>' : ""}<span class="card-heading"><span class="card-name">${esc(c.name)}</span></span><span class="card-copy"><span class="card-type">${type}</span><span class="card-rule">${esc(c.rules)}</span></span><span class="card-footer"><span>${rarity}</span><span class="card-gem" aria-hidden="true"></span><span>${variant === "hand" ? `<kbd>${index === 9 ? "0" : index + 1}</kbd>` : c.archetype ? ARCHETYPE_MARK[c.archetype] : ""}</span></span></button>`;
+  return `<button class="${classes}" data-${variant}="${variant === "hand" ? index : id}" data-card-id="${id}" style="${artStyle(id)};--card-fallback:${artFallback(c)};--card-color:${c.color};--house:${HOUSE_COLORS[house]};--house-edge:${HOUSE_EDGES[house]};--angle:${Math.max(-10, Math.min(10, central * 3))}deg;--lift:${Math.min(15, Math.abs(central) * 5)}px;--order:${index};--name-len:${Math.max(10, c.name.length)}" aria-label="${esc(label)}"><span class="card-image"></span><span class="card-etch"></span><span class="card-cost ${c.unplayable ? "no-cost" : ""}${moved ? ` is-${moved.direction}` : ""}"${costTip ? ` data-tooltip="${esc(costTip)}"` : ""}>${c.unplayable ? icon("close", 14) : cost}${moved ? `<s class="cost-printed" aria-hidden="true">${moved.printed}</s>` : ""}</span>${upgradedCard ? '<span class="card-upgrade-mark" aria-hidden="true">+</span>' : ""}${panic}<span class="card-heading"><span class="card-name">${esc(c.name)}</span></span><span class="card-copy"><span class="card-type">${typeLine(c)}</span><span class="card-rule">${esc(c.rules)}</span></span><span class="card-footer" data-tooltip="${esc(`${ownerWords(c)} · ${rarity}`)}"><span>${rarity}</span><span class="card-gem" aria-hidden="true"></span><span>${footRight}</span></span></button>`;
 }

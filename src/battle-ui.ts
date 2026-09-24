@@ -3,8 +3,9 @@
  * the same pure forecast (`combatPreview`) that resolves the turn. */
 import { DESIGNATIONS, ENEMIES, SIGNALS, designationRule } from "./core/enemies.ts";
 import { STAGES } from "./core/stages.ts";
-import { CARDS, RELICS, RULES, type ProtocolTrigger } from "./core/cards.ts";
+import { CARDS, ENERGY_RELICS, RELICS, RULES, type ProtocolTrigger } from "./core/cards.ts";
 import { ARCHETYPES } from "./core/expedition.ts";
+import { addBreakBonus } from "./core/ascension.ts";
 import {
   combatPreview,
   consoleState,
@@ -24,6 +25,12 @@ import {
   ZONES,
   zoneDescription,
   zoneForNode,
+  protocolLimit,
+  runningDaemons,
+  daemonLabel,
+  turnEnergyBase,
+  turnDrawBase,
+  bufferMultiplierOf,
   type CombatPreview,
   type HostileForecast,
   type Intent,
@@ -35,6 +42,8 @@ import { channelCss } from "./channel-palette.ts";
 import { relicEmblem } from "./screens.ts";
 import { designationGlyph } from "./tutorial/icons.ts";
 import { levelRule } from "./core/combat/intent.ts";
+import { backpressureRatio, bufferMultiplier } from "./core/combat/resolve.ts";
+import { daemonLine, houseSigil, cardHouse, HOUSE_COLORS, keywordTip } from "./card-marks.ts";
 
 /** What the player is looking at on the far rail and the table front. Reading only:
  * none of it changes a number (the target lives in RunState). */
@@ -94,6 +103,10 @@ const GLYPHS: Record<string, string> = {
   crate: '<rect x="3" y="5" width="18" height="15" rx="1"/><path d="M3 9.5h18M3 15.5h18M7 9.5l10 6M9.5 7.2h5"/>',
   signal: '<path d="M12 21v-6"/><circle cx="12" cy="12" r="2.2"/><path d="M8.2 8.2a5.4 5.4 0 0 0 0 7.6m7.6 0a5.4 5.4 0 0 0 0-7.6M5.4 5.4a9.3 9.3 0 0 0 0 13.2m13.2 0a9.3 9.3 0 0 0 0-13.2"/>',
   wrench: '<path d="M13.4 10.6 4.3 19.7a1.6 1.6 0 0 0 2.3 2.3l9.1-9.1"/><path d="M13.4 10.6a4.8 4.8 0 0 1 6-6.5l-3 3 .4 2.6 2.6.4 3-3a4.8 4.8 0 0 1-6.7 6"/>',
+  // v5: a veil an attack passes through (dodges and misses), a running process (daemons), a curse's seal.
+  veil: '<path d="M5.5 21V10.5a6.5 6.5 0 0 1 13 0V21l-2.2-1.8-2.1 1.8-2.2-1.8-2.2 1.8-2.1-1.8Z" stroke-dasharray="2.2 1.8"/><path d="M2 12h20"/>',
+  daemon: '<circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.4m0 12.2v2.4M3.5 12h2.4m12.2 0h2.4M6 6l1.7 1.7m8.6 8.6L18 18M6 18l1.7-1.7m8.6-8.6L18 6"/>',
+  seal: '<circle cx="12" cy="12" r="8.5"/><path d="m9.2 4.2 2.3 4.6-3.2 2.4 3.4 4.4-1.2 4.2"/>',
 };
 /** A plate glyph (falls back to the shared icon set). */
 export function glyph(name: string, size = 16): string {
@@ -138,16 +151,34 @@ function breakAhead(r: RunState, p: CombatPreview, guardian: Enemy): number {
   if (own !== null && own !== undefined) return own;
   return (ENEMIES[guardian.id].boss?.breakDamage ?? p.breakDamage ?? 0) + standingAdds(r, p).length * addBonus(r);
 }
-const addBonus = (r: RunState) => r.ascension >= 10 ? RULES.addBreakBonusLate : RULES.addBreakBonus;
+const addBonus = (r: RunState) => addBreakBonus(r.ascension);
 /** Adds alive after this transmission (a lethal delivery fells them before the ultimate). */
 const standingAdds = (r: RunState, p: CombatPreview) => r.enemies.filter(add => add.role === "add" && add.hp > 0
   && !(p.ports[add.port]?.uid === add.uid && p.ports[add.port]?.lethal && !p.buffering));
 /** A breakdown leaves wreckage unless the device was a rack or a phantom (the forecast says which). */
 export const leavesWreck = (p: CombatPreview, nodeId: string) => p.breakdowns.some(record => record.nodeId === nodeId && record.wreck);
+/** v5: what a hostile's action meets this phase beyond shields: a dodged strike (Ghost Protocol), a
+ * cancelled attack (Null Route), jams and cuts that miss (Spoof, Obfuscation). One sentence each. */
+export function evasionLines(p: CombatPreview, h: HostileForecast | undefined): string[] {
+  if (!h?.intent) return [];
+  const lines: string[] = [];
+  const kind = h.intent.kind === "breach" ? "breach" : "strike";
+  if (h.dodged) lines.push(`${h.dodged}: its ${kind} deals 0.`);
+  if (h.nullified) lines.push(`${h.nullified} cancels its ${kind}: it deals 0${h.field || h.installs.length || h.junk ? "; its riders still land" : ""}.`);
+  for (const miss of p.evasions.filter(item => item.kind === "miss" && item.by === h.uid))
+    lines.push(`${miss.source}: its ${miss.target?.includes("::") ? "cut" : "jam"}${miss.target ? ` on ${pretty(miss.target)}` : ""} misses.`);
+  return lines;
+}
+/** Integrity the cards left in hand take at the end of the turn (Backdoor): not a hostile's doing. */
+export const handLoss = (p: CombatPreview) => p.handEffects.reduce((sum, effect) => sum + effect.integrity, 0);
+const isHandTerm = (p: CombatPreview, label: string) => p.handEffects.some(effect => label.startsWith(effect.name));
 /** What the forecast enemy action will do to your network, in one or two sentences. */
 export function intentCopy(r: RunState, p: CombatPreview): string {
   const intent = p.intent!;
   const enemy = leaderOf(r)!;
+  const h = p.hostiles.find(item => item.uid === enemy.uid);
+  const evasions = evasionLines(p, h);
+  const raw = Math.max(0, p.incomingRaw - handLoss(p));
   if (p.lethal) return "Your transmission defeats it before it can act.";
   if (p.enemyDefeatedByTraps) return "Your traps finish it as it moves. Its action never lands.";
   if (p.interrupted) return `Ultimate interrupted. Existing fields still resolve. Exposed next turn: armor bypassed, +${RULES.exposedBonus} damage.`;
@@ -163,18 +194,21 @@ export function intentCopy(r: RunState, p: CombatPreview): string {
   } else if (target && intent.kind === "jam") {
     const decoy = r.topology.nodes.find(n => n.id === target)?.role === "honeypot";
     parts.push(decoy ? `Jams ${pretty(target)} — your honeypot takes it.` : `Jams ${pretty(target)} for one turn.`);
-  } else if (["jam", "sever"].includes(intent.kind)) parts.push(p.protocolTriggers.length ? "Your protocol cancels the disruption." : "No exposed device or cable to disrupt.");
+  } else if (["jam", "sever"].includes(intent.kind) && !h?.missed) parts.push(p.protocolTriggers.length ? "Your protocol cancels the disruption." : "No exposed device or cable to disrupt.");
+  parts.push(...evasions);
   for (const planted of p.installTargets) parts.push(planted.boosts ? `Reinforces ${pretty(planted.boosts)} (+1 integrity): the table is full.`
     : planted.destroyed ? `Plants ${aName(planted.kind)} your honeypot destroys on arrival.`
       : `Plants ${aName(planted.kind)} in ${zoneForNode(planted).toUpperCase()}${planted.kind === "tap" ? ` (−${RULES.malwarePenalty} damage until scrubbed)` : ""}.`);
   for (const worn of p.wear) parts.push(worn.breaks ? `Breaks ${pretty(worn.nodeId)}${leavesWreck(p, worn.nodeId) ? " · wreckage remains" : ""}.` : `Wears ${pretty(worn.nodeId)} to condition ${worn.to}.`);
   if (p.zoneThreat) parts.push(`${FIELD_RULES[p.zoneThreat.kind].name} in ${p.zoneThreat.zone.toUpperCase()} for ${p.zoneThreat.turns} turns, starting next turn.`);
   if (p.junk) parts.push(`Shuffles ${p.junk.count} ${CARDS[p.junk.card].name} into your draw pile.`);
-  // Damage that is not the attack itself (fields, a Worm in hand, exposed cables) is named.
-  const extra = p.incomingTerms.filter(term => term.amount > 0 && term.label !== intent.label);
+  // Damage that is not the attack itself (fields, a Worm in hand, exposed cables) is named; a
+  // curse in your hand (Backdoor) is yours, not the hostile's, and the player plate names it.
+  const extra = p.incomingTerms.filter(term => term.amount > 0 && term.label !== intent.label && !isHandTerm(p, term.label));
   const sources = extra.length ? ` (${extra.map(term => `${term.label} +${term.amount}`).join(", ")})` : "";
-  if (intent.kind === "strike" || intent.kind === "breach" || (p.incomingRaw && (extra.length || !parts.length)))
-    parts.push(`${p.incomingRaw} damage after your transmission${sources}.`);
+  const evaded = !!(h?.dodged || h?.nullified) && !raw;
+  if (!evaded && (intent.kind === "strike" || intent.kind === "breach" || (raw && (extra.length || !parts.length))))
+    parts.push(`${raw} damage after your transmission${sources}.`);
   return parts.join(" ") || "It gathers itself.";
 }
 
@@ -199,8 +233,9 @@ export function hostileCopy(r: RunState, p: CombatPreview, h: HostileForecast): 
   const isPot = (id: string) => r.topology.nodes.find(n => n.id === id)?.role === "honeypot";
   for (const cut of h.cuts) parts.push(cut.split("::").some(isPot) ? `Cuts ${pretty(cut)} — your honeypot draws the blade.` : `Cuts ${pretty(cut)} for one turn.`);
   for (const jam of h.jams) parts.push(isPot(jam) ? `Jams ${pretty(jam)} — your honeypot takes it.` : `Jams ${pretty(jam)} for one turn.`);
-  if ((intent.kind === "jam" || intent.kind === "sever") && !h.cuts.length && !h.jams.length)
+  if ((intent.kind === "jam" || intent.kind === "sever") && !h.cuts.length && !h.jams.length && !h.missed)
     parts.push(h.cancelled ? "Your protocol cancels the disruption." : h.absorbed ? "Your Phantom Node absorbs the disruption." : "No exposed device or cable to disrupt.");
+  parts.push(...evasionLines(p, h));
   if (h.overload) {
     const worn = p.wear.find(item => (item.nodeId === h.overload || item.sheltered === h.overload) && item.source !== INSTALLATION_NAMES.spike);
     parts.push(worn?.breaks ? `Overloads ${pretty(worn.nodeId)}: it breaks${leavesWreck(p, worn.nodeId) ? " · wreckage remains" : ""}.` : worn ? `Overloads ${pretty(worn.nodeId)}: condition ${worn.from} → ${worn.to}.` : `Overloads ${pretty(h.overload)}.`);
@@ -217,7 +252,8 @@ export function hostileCopy(r: RunState, p: CombatPreview, h: HostileForecast): 
   if (h.heal) parts.push(`Restores ${h.heal} health after acting.`);
   const extra = h.terms.filter(term => term.amount > 0 && term.label !== intent.label);
   const sources = extra.length ? ` (${extra.map(term => `${term.label} +${term.amount}`).join(", ")})` : "";
-  if (intent.kind === "strike" || intent.kind === "breach" || (h.raw && (extra.length || !parts.length)))
+  const evaded = !!(h.dodged || h.nullified) && !h.raw;
+  if (!evaded && (intent.kind === "strike" || intent.kind === "breach" || (h.raw && (extra.length || !parts.length))))
     parts.push(`${h.raw} damage after your transmission${sources}.`);
   return parts.join(" ") || "It gathers itself.";
 }
@@ -256,6 +292,8 @@ function medallionNumber(intent: Intent, h: HostileForecast | undefined, fallbac
   if (intent.kind === "sever" && cuts > 1) return `CUT ×${cuts}`;
   if (intent.kind === "charge") return "CHARGE";
   if (intent.kind === "dormant") return "—";
+  // A dodged or cancelled attack lands nothing: its number reads 0 (the caption names why).
+  if ((h?.dodged || h?.nullified) && (intent.kind === "strike" || intent.kind === "breach")) return String(fallback);
   return fallback ? String(fallback) : "";
 }
 /** Plate name of an intent: the ultimate's own name, the planted kind, or the generic name. */
@@ -287,12 +325,12 @@ function portRow(r: RunState, p: CombatPreview, enemy: Enemy, h: HostileForecast
   const act = state === "dormant" ? `<span class="row-state is-dormant">rests</span>`
     : state === "cancelled" ? `<span class="row-state is-cancelled">${h?.interrupted && !lethal ? "Broken" : "Falls"}</span>`
       : state === "skipped" ? `<span class="row-state is-dormant">skips</span>`
-        : `<span class="row-intent kind-${intentKind(intent)}">${intentGlyph(intent, 15)}<b>${esc(number)}</b></span>`;
+        : `<span class="row-intent kind-${intentKind(intent)}${h?.dodged || h?.nullified ? " is-evaded" : ""}">${intentGlyph(intent, 15)}<b>${esc(number)}</b></span>`;
   const level = grows(enemy) && (h?.escalation ?? 0) > 0 ? `<i class="row-level" aria-hidden="true">${[1, 2, 3].map(n => `<i class="${n <= (h?.escalation ?? 0) ? "on" : ""}"></i>`).join("")}</i>` : "";
   const ribbon = (enemy.designations ?? []).length ? `<i class="row-ribbon" aria-hidden="true">${enemy.designationHidden ? designationGlyph("unknown", 12) : (enemy.designations ?? []).map(id => designationGlyph(id, 12, DESIGNATIONS[id].kind)).join("")}</i>` : "";
   const spite = state === "spiteful" ? `<i class="row-spite" aria-hidden="true">acts anyway</i>` : "";
   const what = state === "dormant" ? "rests this phase, acts next phase" : state === "cancelled" ? (h?.interrupted && !lethal ? "its ultimate is broken" : "falls before it acts") : state === "skipped" ? "skips this action"
-    : `${intentNameFor(enemy, intent)}${intent.kind === "strike" || intent.kind === "breach" ? ` ${h?.raw ?? intent.amount}` : ""}${state === "spiteful" ? ", Spiteful: acts anyway" : ""}`;
+    : `${intentNameFor(enemy, intent)}${intent.kind === "strike" || intent.kind === "breach" ? ` ${h?.raw ?? intent.amount}` : ""}${h?.dodged ? `, dodged by ${h.dodged}` : h?.nullified ? `, cancelled by ${h.nullified}` : ""}${h?.missed ? `, ${h.missed} missed` : ""}${state === "spiteful" ? ", Spiteful: acts anyway" : ""}`;
   const verb = isTarget ? "Your target: the" : "Target the";
   const label = `${verb} ${PORT_NAME[enemy.port].toLowerCase()} port, ${title(enemy.name)}, ${enemy.hp} of ${enemy.maxHp} integrity${loss ? `, takes ${loss}${lethal ? ", lethal" : ""}` : ""}${port?.overflowIn ? ` including ${port.overflowIn} overflow` : ""}. ${what}.${enemy.crate ? " Carries a crate." : ""}`;
   // The target's port stud turns into the lit brass crest.
@@ -361,7 +399,14 @@ function extrasMarkup(r: RunState, p: CombatPreview, enemy: Enemy, h: HostileFor
   const traps = pack ? (h?.trapDamage ?? 0) + (h?.scorched ?? 0) : p.enemyDamage;
   if (traps) lines.push(`<span class="hazard-caption is-trap">${icon("trap", 13)} TRAPS · ${pack ? "IT TAKES" : "ENEMY TAKES"} ${traps}${!pack && p.enemyDefeatedByTraps ? " · LETHAL" : ""}</span>`);
   const triggers = pack ? p.protocolTriggers.filter(t => !t.target || t.target === enemy.uid) : p.protocolTriggers;
-  if (triggers.length) lines.push(`<span class="hazard-caption is-counter">${icon("trigger", 13)} COUNTERED · ${esc(triggers.map(t => t.name).join(" + "))}</span>`);
+  // Protocol retaliation (Incident Response) rides on the protocol it answers: "Tripwire + Incident Response 3".
+  if (triggers.length) lines.push(`<span class="hazard-caption is-counter" data-tooltip="${esc(triggers.map(t => `${t.name}: ${t.effect}`).join(" "))}">${icon("trigger", 13)} COUNTERED · ${esc(triggers.map(t => `${t.name}${(t.retaliation ?? []).map(term => ` + ${term.label} ${term.amount}`).join("")}`).join(" + "))}</span>`);
+  // v5 evasions: a dodge, a cancelled attack, jams and cuts that miss.
+  const own = h ?? p.hostiles.find(item => item.uid === enemy.uid);
+  if (own?.dodged) lines.push(`<span class="hazard-caption is-evasion" data-tooltip="${esc(`${own.dodged}: its ${own.intent?.kind === "breach" ? "breach" : "strike"} deals 0 this phase.`)}">${glyph("veil", 13)} DODGED · ${esc(own.dodged.toUpperCase())}</span>`);
+  if (own?.nullified) lines.push(`<span class="hazard-caption is-evasion" data-tooltip="${esc(`${own.nullified} cancels its ${own.intent?.kind === "breach" ? "breach" : "strike"}: it deals 0. Riders still resolve.`)}">${icon("protocol", 13)} CANCELLED · ${esc(own.nullified.toUpperCase())}</span>`);
+  const misses = own ? p.evasions.filter(item => item.kind === "miss" && item.by === own.uid) : [];
+  if (misses.length) lines.push(`<span class="hazard-caption is-evasion" data-tooltip="${esc(misses.map(item => `${item.source}: the ${item.target?.includes("::") ? "cut" : "jam"}${item.target ? ` on ${pretty(item.target)}` : ""} misses.`).join(" "))}">${glyph("veil", 13)} ${misses.length > 1 ? `${misses.length} MISS` : "MISSES"} · ${esc([...new Set(misses.map(item => item.source))].join(" + ").toUpperCase())}</span>`);
   if (pack) {
     if (h?.field) lines.push(`<span class="hazard-caption">${icon("field", 13)} ${FIELD_RULES[h.field.kind].name.toUpperCase()} · ${h.field.zone.toUpperCase()}</span>`);
   } else if (p.hazardZone) lines.push(`<span class="hazard-caption" ${intent?.field ? 'data-combined-intent="true"' : ""}>${icon("field", 13)} ${p.zoneThreat ? `${FIELD_RULES[p.zoneThreat.kind].name.toUpperCase()} · ` : ""}${p.hazardZone.toUpperCase()}</span>`);
@@ -433,15 +478,16 @@ function enemyPlate(r: RunState, p: CombatPreview, v: BattleView, stage: (typeof
   const defeated = pack ? h?.state === "cancelled" && (!h.interrupted || !!port?.lethal) : p.lethal || p.enemyDefeatedByTraps;
   const broken = pack ? !!h?.interrupted && !defeated : p.interrupted && !defeated;
   const cancelled = defeated || broken;
-  const raw = pack ? h?.raw ?? 0 : p.incomingRaw;
+  const raw = pack ? h?.raw ?? 0 : Math.max(0, p.incomingRaw - handLoss(p));
   const number = defeated ? "CANCELLED" : broken ? "BROKEN" : medallionNumber(intent, h, raw);
+  const evaded = !cancelled && (h?.dodged ? "dodged" : h?.nullified ? "cancelled" : "");
   const warning = levelWarning(r, h);
   const copy = pack && h ? hostileCopy(r, p, h) : intentCopy(r, p);
   const states = `${intent.label.startsWith("ENRAGED") ? '<b class="enrage-warning">Enraged</b>' : ""}${intent.pressure ? `<span class="pressure-warning">Pressure +${intent.pressure}</span>` : ""}${escalationGauge(r, enemy, h)}`;
   const dormant = h?.state === "dormant";
   const medallion = dormant
     ? `<div class="intent-medallion intent-dormant is-small"><span class="intent-emblem">${icon("next", 20)}</span><strong><small>Rests · acts next phase</small></strong></div>`
-    : `<div class="intent-medallion intent-${intent.kind}${intent.install ? ` install-${intent.install}` : ""} ${cancelled ? "lethal" : ""}${h?.state === "spiteful" ? " is-spiteful" : ""}" data-tooltip="${esc(`${intentName}: ${copy}${warning ? ` ${warning}` : ""}`)}"><span class="intent-emblem">${intentGlyph(intent, 30)}</span><strong>${esc(number)}<small>${esc(intentName)}</small></strong></div>`;
+    : `<div class="intent-medallion intent-${intent.kind}${intent.install ? ` install-${intent.install}` : ""} ${cancelled ? "lethal" : ""}${h?.state === "spiteful" ? " is-spiteful" : ""}${evaded ? " is-evaded" : ""}" data-tooltip="${esc(`${intentName}: ${copy}${warning ? ` ${warning}` : ""}`)}"><span class="intent-emblem">${intentGlyph(intent, 30)}</span><strong>${esc(number)}<small>${esc(intentName)}${evaded ? ` · ${evaded}` : ""}</small></strong></div>`;
   const description = `<p class="intent-description" data-tooltip="${esc(`${copy}${warning ? ` ${warning}` : ""}`)}">${esc(copy)}${warning ? ` <span class="escalation-next">${esc(warning)}</span>` : ""}</p>`;
   const guardian = pack ? living.find(item => ENEMIES[item.id].boss) : undefined;
   const guardianIntent = guardian ? p.hostiles.find(item => item.uid === guardian.uid)?.intent ?? intentFor(r, guardian) : null;
@@ -528,6 +574,7 @@ export function installationEffectLine(r: RunState, p: CombatPreview, item: Inst
   if (!effect || effect.effect === "idle")
     return item.kind === "breaker" ? `Armed: counts down from ${item.countdown ?? RULES.breakerCountdown} starting with the next hostile action.` : `Acts from the next hostile action (reach ${reach}).`;
   const target = effect.target ? pretty(effect.target) : null;
+  if (effect.effect === "jam" && effect.missed) return `Its jam${target ? ` on ${target}` : ""} misses: ${effect.missed}.`;
   if (effect.effect === "jam") return effect.decoyed ? `Its jam goes to your honeypot ${target}, which bites back.` : effect.cancelled ? "Port Security cancels its jam." : effect.absorbed ? "Your Phantom Node absorbs its jam." : target ? `Jams ${target} at the next enemy action.` : `Nothing unprotected within ${reach}.`;
   if (effect.effect === "wear") {
     const worn = p.wear.find(record => record.source === INSTALLATION_NAMES.spike && (record.nodeId === effect.target || record.sheltered === effect.target));
@@ -570,12 +617,12 @@ function engineFor(r: RunState, p: CombatPreview): Engine {
     const state = p.buffering ? `Storing +${p.bufferGain} this turn.` : r.buffer ? `This transmission releases +${p.bufferRelease}.` : "The buffer is empty.";
     return {
       label: risk ? "AT RISK" : "Buffer", value: String(r.buffer), state: risk ? "at-risk" : p.buffering || r.buffer ? "is-active" : "",
-      tip: `Buffer: ${r.buffer} stored. ${state} Buffering stores a transmission ×${RULES.bufferMultiplier}; the next normal transmission releases it all. No live route at the start of a turn loses the whole buffer.${risk ? " Warning: the forecast enemy action leaves you without a live route." : ""}`,
+      tip: `Buffer: ${r.buffer} stored. ${state} Buffering stores a transmission ×${bufferMultiplierOf(r)}${bufferMultiplier(r).label ? ` (${bufferMultiplier(r).label})` : ""}; the next normal transmission releases it all. No live route at the start of a turn loses the whole buffer.${risk ? " Warning: the forecast enemy action leaves you without a live route." : ""}`,
     };
   }
   if (r.archetype === "warden") return {
     label: "Pressure", value: String(r.backpressure), state: r.backpressure || p.backpressureGain ? "is-active" : "",
-    tip: `Backpressure: ${Math.round(RULES.backpressureRatio * 100)}% of the damage your shield prevents is stored and added to your next transmission. ${r.backpressure} rides this transmission; +${p.backpressureGain} will be stored after this enemy action.`,
+    tip: `Backpressure: ${Math.round(backpressureRatio(r).value * 100)}% of the damage your shield prevents${backpressureRatio(r).label ? ` (${backpressureRatio(r).label})` : ""} is stored and added to your next transmission. ${r.backpressure} rides this transmission; +${p.backpressureGain} will be stored after this enemy action.`,
   };
   const bandwidth = bandwidthInfo(r, p.channels);
   return {
@@ -588,7 +635,7 @@ function consoleMarkup(r: RunState, p: CombatPreview, v: BattleView): string {
   const c = consoleState(r), engine = engineFor(r, p);
   const brief = c.id === "patch" ? (v.consoleTargeting ? (v.source ? "Pick the second device" : "Pick the first device") : "Connect two devices")
     : c.id === "harden" ? `+${hardenBlock(r)} block now`
-    : c.active ? `Storing +${p.bufferGain}` : `Store this turn ×${RULES.bufferMultiplier}`;
+    : c.active ? `Storing +${p.bufferGain}` : `Store this turn ×${bufferMultiplierOf(r)}`;
   const state = v.consoleTargeting ? "targeting" : c.active ? "active" : c.usable ? "ready" : c.uses >= c.limit ? "spent" : "blocked";
   const status = state === "targeting" ? "Select" : state === "active" ? "On" : state === "spent" ? "Used" : state === "blocked" ? "No energy" : c.limit > 1 ? `${c.limit - c.uses} left` : "Ready";
   const glyph = c.id === "patch" ? "link" : c.id === "harden" ? "shield" : "buffer";
@@ -603,13 +650,33 @@ function consoleMarkup(r: RunState, p: CombatPreview, v: BattleView): string {
 }
 
 function protocolDock(r: RunState, p: CombatPreview): string {
-  const slots = Array.from({ length: RULES.maxProtocols }, (_, i) => {
+  const limit = protocolLimit(r);
+  const slots = Array.from({ length: limit }, (_, i) => {
     const id = r.protocols[i];
     if (!id) return `<span class="protocol-slot empty" aria-label="Empty protocol slot"><i>${icon("protocol", 15)}</i><small>Protocol slot<br><span>Arm a protocol card</span></small></span>`;
     const c = CARDS[id], trigger = p.protocolTriggers.find(t => t.card === id);
-    return `<button class="protocol-slot armed ${trigger ? "will-trigger" : ""}" data-card-id="${id}" data-tooltip="${esc(`${c.name}: ${c.rules}${trigger ? ` — fires this turn: ${trigger.effect}` : ""}`)}" aria-label="${esc(`${c.name}, armed. ${trigger ? `Will fire this turn: ${trigger.effect}` : `Waits for ${TRIGGER_WORDS[c.protocol!]}`}`)}"><i>${icon(TRIGGER_ICONS[c.protocol!] ?? "protocol", 15)}</i><span><strong>${esc(c.name)}</strong><small>${trigger ? `${icon("trigger", 10)} Fires · ${esc(trigger.effect)}` : `Armed · waits for ${TRIGGER_WORDS[c.protocol!]}`}</small></span></button>`;
+    // What firing does, shortest first: the protocol's own answer, then any retaliation daemon.
+    const fires = trigger ? `${trigger.effect.replace(/\s+[^.]*: it takes \d+\./g, "")}${(trigger.retaliation ?? []).map(term => ` ${term.label} +${term.amount}.`).join("")}` : "";
+    return `<button class="protocol-slot armed ${trigger ? "will-trigger" : ""}" data-card-id="${id}" data-tooltip="${esc(`${c.name}: ${c.rules}${trigger ? ` Fires this turn: ${trigger.effect}` : ""}`)}" aria-label="${esc(`${c.name}, armed. ${trigger ? `Will fire this turn: ${trigger.effect}` : `Waits for ${TRIGGER_WORDS[c.protocol!]}`}`)}"><i>${icon(TRIGGER_ICONS[c.protocol!] ?? "protocol", 15)}</i><span><strong>${esc(c.name)}</strong><small>${trigger ? `${icon("trigger", 10)} Fires · ${esc(fires)}` : `Armed · waits for ${TRIGGER_WORDS[c.protocol!]}`}</small></span></button>`;
   }).join("");
-  return `<section class="protocol-dock ${p.protocolTriggers.length ? "has-trigger" : ""}" aria-label="Armed protocols, ${r.protocols.length} of ${RULES.maxProtocols}"><div class="protocol-slots">${slots}</div></section>`;
+  return `<section class="protocol-dock ${p.protocolTriggers.length ? "has-trigger" : ""}" aria-label="Armed protocols, ${r.protocols.length} of ${limit}" style="--slots:${limit}"><div class="protocol-slots${limit > 2 ? " is-wide" : ""}">${slots}</div></section>`;
+}
+
+/** The daemon strip (v5): every process running this encounter as an engraved plate beside the
+ * protocol dock: its name, ×N for stacked copies, its effect, the full text in the tooltip. Empty:
+ * nothing at all. Plates are buttons so Tab reaches them like the protocol slots. */
+export function daemonStrip(r: RunState): string {
+  const running = runningDaemons(r);
+  if (!running.length) return "";
+  const plates = running.map(daemon => {
+    const c = daemon.card, line = daemonLine(c);
+    const copies = daemon.count > 1 ? ` ${daemon.count} copies run: each adds its effect.` : "";
+    const tip = `${daemonLabel(daemon)}: ${line}${copies}${c.detail ? ` ${c.detail}` : ""}`;
+    return `<button class="daemon-plate${daemon.count > 1 ? " is-stacked" : ""}" data-card-id="${daemon.id}" data-daemon="${daemon.id}" style="--house:${HOUSE_COLORS[cardHouse(c)]}" data-tooltip="${esc(tip)}" aria-label="${esc(`Daemon running: ${tip}`)}"><i class="daemon-glyph">${glyph("daemon", 15)}</i><span class="daemon-copy"><strong><span>${esc(c.name)}</span>${daemon.count > 1 ? `<b class="daemon-count">×${daemon.count}</b>` : ""}</strong><small>${esc(line)}</small></span></button>`;
+  }).join("");
+  // Up to two plates read in full; four fold to one effect line; more become name tokens.
+  const count = running.length, size = count <= 2 ? "full" : count <= 4 ? "half" : "token";
+  return `<section class="daemon-strip is-${size}" data-count="${count}" aria-label="${esc(`Running daemons, ${count}: ${running.map(daemonLabel).join(", ")}. ${keywordTip("daemon")}`)}">${plates}</section>`;
 }
 
 function ledgerMarkup(r: RunState, p: CombatPreview, v: BattleView): string {
@@ -642,13 +709,64 @@ function ledgerMarkup(r: RunState, p: CombatPreview, v: BattleView): string {
   const repair = repairCost(r), worn = r.topology.nodes.filter(isWorn);
   if (worn.length) chips.push(`<span class="ledger-chip is-wear" data-tooltip="${esc(`Worn devices break at condition 0 with their cables and leave wreckage. Repair one point for ${repair} energy each (R).`)}">${glyph("cracked", 13)} Worn${worn.map(n => `<button class="is-worn" data-repair="${n.id}" aria-label="${esc(`Repair ${n.id.toUpperCase()}, ${repair} energy, condition ${conditionOf(n)} of ${maxConditionOf(n)}`)}" ${r.energy < repair ? "disabled" : ""}>${esc(pretty(n.id))}<i class="tag-pips">${conditionPips(n)}</i></button>`).join("")}<em><b>${repair}</b>${icon("bolt", 12)}</em></span>`);
   if (r.terrain) chips.push(`<span class="ledger-chip is-terrain" data-tooltip="${esc(`${r.terrain.name}: ${r.terrain.description}`)}">${icon("terrain", 13)} ${esc(r.terrain.name)}</span>`);
-  const base = RULES.handDraw;
-  chips.push(`<span class="ledger-chip is-next" data-tooltip="${esc(`Next turn after the forecast enemy action: ${p.nextTurn.energy} energy and ${p.nextTurn.draw} cards. Online PoE Injectors add energy; online Cache Servers add draws. A cut or jam can take them offline first.`)}">${icon("next", 13)} Next · <b>${p.nextTurn.energy}</b>${icon("bolt", 12)} · <b>${p.nextTurn.draw}</b> card${p.nextTurn.draw === 1 ? "" : "s"}${p.nextTurn.draw > base ? `<i class="ledger-rise" aria-label="more than usual">${icon("rise", 12)}</i>` : ""}</span>`);
+  const next = nextTurnParts(r, p);
+  const tip = `Next turn, after the forecast enemy action: ${next.energy.total} energy (${next.energy.parts.join(", ")}); ${plural(next.draw.total, "card")} (${next.draw.parts.join(", ")})${next.block.total ? `; ${next.block.total} block (${next.block.parts.join(", ")})` : ""}. A cut or jam can take a PoE Injector or Cache Server offline first.`;
+  chips.push(`<span class="ledger-chip is-next" tabindex="0" data-tooltip="${esc(tip)}" aria-label="${esc(tip)}">${icon("next", 13)} Next · <b>${next.energy.total}</b>${icon("bolt", 12)}${next.energy.total > next.energy.base ? `<i class="ledger-rise" aria-label="above your turn base">${icon("rise", 12)}</i>` : ""} · <b>${next.draw.total}</b> card${next.draw.total === 1 ? "" : "s"}${next.draw.total > next.draw.base ? `<i class="ledger-rise" aria-label="more than usual">${icon("rise", 12)}</i>` : ""}${next.block.total ? ` · <b>${next.block.total}</b>${icon("shield", 12)}<i class="ledger-rise" aria-label="block ready">${icon("rise", 12)}</i>` : ""}</span>`);
   return `<div class="network-status network-ledger" aria-label="Network status">${chips.join("")}</div>`;
 }
 
+/** Next turn's energy, draw and block with their sources (the forecast's totals, split into the
+ * parts the run state can name). */
+export function nextTurnParts(r: RunState, p: CombatPreview) {
+  const base = turnEnergyBase(r), reserve = r.reserveEnergy ?? 0;
+  const cell = r.relics.includes("reserve-cell") ? Math.min(2, r.energy) : 0;
+  const injectors = Math.max(0, p.nextTurn.energy - base - reserve - cell);
+  const energy = [`base ${base}`, reserve ? `next-turn energy +${reserve}` : "", cell ? `${RELICS["reserve-cell"].name} +${cell}` : "", injectors ? `PoE Injector${injectors === 1 ? "" : "s"} online +${injectors}` : ""].filter(Boolean);
+  const drawBase = turnDrawBase(r), gained = r.nextTurn?.draw ?? 0;
+  const devices = Math.max(0, p.nextTurn.draw - drawBase - gained);
+  const draw = [`${drawBase} per turn`, gained ? `next-turn draw +${gained}` : "", devices ? `${r.relics.includes("fanout") ? "Cache Servers and Fanout" : `Cache Server${devices === 1 ? "" : "s"} online`} +${devices}` : ""].filter(Boolean);
+  const grounded = r.relics.includes("grounded-core") ? 1 : 0, carried = p.blockCarried?.amount ?? 0, nextBlock = r.nextTurn?.block ?? 0;
+  const block = [nextBlock ? `next-turn block +${nextBlock}` : "", carried ? `${p.blockCarried!.by} keeps ${carried}` : "", grounded ? `${RELICS["grounded-core"].name} +1` : ""].filter(Boolean);
+  return {
+    energy: { total: p.nextTurn.energy, base, parts: energy },
+    draw: { total: p.nextTurn.draw, base: drawBase, parts: draw },
+    block: { total: p.nextTurn.block ?? 0, parts: block },
+  };
+}
+
+/** Curses left in hand at the end of the turn (Backdoor, Bitrot), in the player plate: each one a
+ * cold line under the survival forecast, as the forecast resolves them. */
+function handOmens(p: CombatPreview): string {
+  if (!p.handEffects.length) return "";
+  return `<div class="hand-omens">${p.handEffects.map(effect => {
+    const what = [effect.integrity ? `−${effect.integrity} integrity` : "", effect.wear.length ? `wears ${effect.wear.map(pretty).join(", ")}` : ""].filter(Boolean).join(" · ") || "no effect this turn";
+    const tip = `${effect.name}${effect.count > 1 ? ` ×${effect.count}` : ""} in your hand at the end of your turn: ${what}${effect.integrity ? " (unblockable)" : ""}. Play around it or remove it at a Sanctuary or Market.`;
+    return `<span class="hand-omen" tabindex="0" data-tooltip="${esc(tip)}" aria-label="${esc(tip)}">${glyph("seal", 12)}<b>${esc(effect.name)}${effect.count > 1 ? ` ×${effect.count}` : ""}</b><span>${esc(what)}</span></span>`;
+  }).join("")}</div>`;
+}
+
+/** The energy orb (v5): current / base, the base being the relic-derived turn base; temporary energy
+ * above it rises as a lit marker. The tooltip names every source. */
+function energyOrb(r: RunState, p: CombatPreview): string {
+  const base = turnEnergyBase(r), rise = r.energy - base;
+  const relics = ENERGY_RELICS.filter(id => r.relics.includes(id));
+  const capped = RULES.baseEnergy + relics.length > base;
+  const injectors = r.topology.nodes.filter(node => node.role === "power" && p.online.includes(node.id)).length;
+  const next = nextTurnParts(r, p);
+  const tip = [
+    `Energy: ${r.energy} of ${base}${rise > 0 ? `, ${rise} above your turn base` : ""}.`,
+    `Turn base ${base}: ${RULES.baseEnergy} energy${relics.map(id => ` + ${RELICS[id].name} 1`).join("")}${capped ? ` (relics raise the base to ${RULES.relicEnergyCap} at most)` : ""}.`,
+    rise > 0 ? "Above the base: PoE Injectors online, next-turn energy and cards, never capped." : "",
+    injectors ? `${injectors} PoE Injector${injectors === 1 ? "" : "s"} online: +${injectors} at the start of your turn.` : "",
+    `Next turn: ${next.energy.total} (${next.energy.parts.join(", ")}).`,
+  ].filter(Boolean).join(" ");
+  return `<div class="energy-orb${rise > 0 ? " is-risen" : ""}${r.energy === 0 ? " is-spent" : ""}" tabindex="0" role="img" aria-label="${esc(`${r.energy} of ${base} energy available. ${tip}`)}" data-tooltip="${esc(tip)}"><strong>${r.energy}</strong><em class="energy-base" aria-hidden="true">/${base}</em><span>Energy</span>${rise > 0 ? `<i class="energy-rise" aria-hidden="true">${icon("rise", 11)}+${rise}</i>` : ""}</div>`;
+}
+
+/** The field seals, and at their right end (above the protocol dock) the running daemons. */
 function fieldStrip(r: RunState, p: CombatPreview, targeting: boolean): string {
-  return `<div class="field-strip" aria-label="Battlefield bands">${ZONES.map((zone: Zone) => {
+  const daemons = daemonStrip(r);
+  return `<div class="field-strip${daemons ? " has-daemons" : ""}" aria-label="Battlefield bands${daemons ? " and running daemons" : ""}">${ZONES.map((zone: Zone) => {
     const effects = r.zoneEffects.filter(effect => effect.zone === zone);
     const threatened = p.hazardZone === zone;
     const inBand = r.topology.nodes.filter(n => !n.fixed && zoneForNode(n) === zone);
@@ -658,7 +776,7 @@ function fieldStrip(r: RunState, p: CombatPreview, targeting: boolean): string {
     const anchored = installed.some(m => m.kind === "anchor");
     const description = `${zoneDescription(r, zone)}${cluster ? `. Cluster: +${RULES.clusterDamage} damage` : ""}${installed.length ? `. ${installed.map(m => `${INSTALLATION_NAMES[m.kind]} ${integrityPips(m)}`).join(", ")}` : ""}${anchored ? ". Anchored: hostile fields here do not tick down" : ""}${threatened ? ". Enemy targets this band next." : ""}`;
     return `<button class="field-seal ${effects.some(effect => FIELD_RULES[effect.kind].hostile) ? "corrupted" : effects.length ? "empowered" : ""} ${threatened ? "threatened" : ""} ${cluster ? "clustered" : ""} ${targeting ? "targetable" : ""}" data-field-zone="${zone}" data-tooltip="${esc(description)}" aria-label="${zone} band: ${esc(description)}"><span class="field-name">${icon("field", 16)} ${zone.toUpperCase()} ${threatened ? `<i class="threat-mark">${icon("warning", 15)}</i>` : ""}${cluster ? `<i class="cluster-mark">Cluster +${RULES.clusterDamage}</i>` : ""}</span><span class="field-effects">${effects.length ? effects.map(effect => `<span class="${FIELD_RULES[effect.kind].hostile ? "hostile-field" : "allied-field"}">${FIELD_RULES[effect.kind].name} <b>${effect.permanent ? "∞" : anchored && FIELD_RULES[effect.kind].hostile ? `<i class="anchor-mark" aria-label="anchored: it does not tick down">${glyph("anchor", 12)}</i>` : `${effect.turns}t`}</b></span>`).join("") : `<span>${threatened ? "Threat inbound" : "Clear ground"}</span>`}</span><span class="band-meta">${inBand.length ? `${online}/${inBand.length} online` : "empty"}${installed.length ? ` · <span class="band-installs" aria-label="${installed.length} installation${installed.length === 1 ? "" : "s"}">${glyph(installed.length === 1 ? installed[0].kind : "malware", 11)} ${installed.length}</span>` : ""}</span></button>`;
-  }).join("")}</div>`;
+  }).join("")}${daemons}</div>`;
 }
 
 /** The battle HUD in two parts, so keyboard focus follows the design's order (13.8): `hud` (plates,
@@ -691,8 +809,9 @@ export function battleMarkup(r: RunState, v: BattleView): { hud: string; foot: s
       <div class="vital-heading"><span>${icon("heart", 15)} Integrity</span><strong>${r.integrity}<small> / ${r.maxIntegrity}</small></strong></div>
       <div class="vital-bar player-health" role="meter" aria-label="Your integrity" aria-valuenow="${r.integrity}" aria-valuemin="0" aria-valuemax="${r.maxIntegrity}"><i style="width:${r.integrity / r.maxIntegrity * 100}%"></i>${p.incoming ? `<span class="health-risk" style="left:${Math.max(0, r.integrity - p.incoming) / r.maxIntegrity * 100}%;width:${Math.min(r.integrity, p.incoming) / r.maxIntegrity * 100}%"></span>` : ""}</div>
       <div class="survival-forecast forecast-net ${p.incoming ? "danger" : "safe"}"><b>${p.incoming}</b> ${p.incoming ? "integrity at risk" : p.lethal || p.enemyDefeatedByTraps ? "retaliation · finishing blow" : "integrity lost · protected"}</div>
+      ${handOmens(p)}
       <div class="player-resources">
-        <div class="shield-resource" tabindex="0" data-tooltip="Available shield: ${esc(p.shieldTerms.map(t => `${t.label} +${t.amount}`).join("; ") || "Play defense cards, keep a firewall online or route through protected fields.")}">${icon("shield", 22)}<strong>${p.shield}</strong><span>Shield</span></div>
+        <div class="shield-resource" tabindex="0" data-tooltip="Available shield: ${esc(`${p.shieldTerms.map(t => `${t.label} +${t.amount}`).join("; ") || "Play defense cards, keep a firewall online or route through protected fields."}${p.blockCarried?.amount ? `. ${p.blockCarried.by} keeps ${p.blockCarried.amount} block past the enemy phase` : ""}`)}">${icon("shield", 22)}<strong>${p.shield}</strong><span>Shield</span></div>
         <div class="signal-readout ${p.packetDamage ? "online" : ""}" tabindex="0" data-tooltip="${esc(p.damageTerms.map(t => `${t.label} ${t.amount >= 0 ? "+" : ""}${t.amount}`).join("; ") || "No live route yet.")}">${icon("sword", 22)}<strong>${p.packetDamage}<small>signal damage</small></strong><span>Damage</span></div>
         <div class="burst-resource" tabindex="0" data-tooltip="Extra transmission damage from cards this turn. Burst expires after your turn.">${icon("bolt", 22)}<strong>+${r.packetBoost}</strong><span>Burst</span></div>
       </div>
@@ -711,7 +830,7 @@ export function battleMarkup(r: RunState, v: BattleView): { hud: string; foot: s
   const foot = `
     <div class="battle-bottom battle-shade" aria-hidden="true"></div>
     <div class="battle-bottom battle-controls">
-      <div class="energy-orb" aria-label="${r.energy} energy available" data-tooltip="${esc(`${r.energy} energy now. Next turn: ${p.nextTurn.energy}.`)}"><strong>${r.energy}</strong><span>Energy</span></div>
+      ${energyOrb(r, p)}
       <div class="draw-piles">${([["draw-pile", r.drawPile.length, "Draw"], ["discard-pile", r.discardPile.length, "Discard"], ["exhaust-pile", r.exhaustPile.length, "Exhaust"]] as const).map(([action, count, label]) => `<button data-action="${action}" class="${action}" data-tooltip="${label === "Exhaust" ? "Exhausted cards return next encounter" : `Inspect your ${label.toLowerCase()} pile`}">${icon("deck", 18)}<span>${count}<small>${label}</small></span></button>`).join("")}<button data-action="prepare" class="prepared-pile ${r.preparedCard ? "occupied" : ""}" aria-label="${r.preparedCard ? `Prepared: ${esc(CARDS[r.preparedCard].name)}` : "Prepare a card for next turn"}" data-tooltip="${r.preparedCard ? `${esc(CARDS[r.preparedCard].name)} is held for next turn` : "Hold one card for next turn, replacing one draw · P"}" ${v.busy ? "disabled" : ""}>${icon("battery", 18)}<span>${r.preparedCard ? "1" : "+"}<small>${r.preparedCard ? "Ready" : "Prepare"}</small></span></button></div>
       <div class="target-hint ${v.selected !== null || v.consoleTargeting ? "active" : ""}">${esc(hint)}${v.selected !== null || v.consoleTargeting ? '<button data-action="cancel">Cancel <kbd>Esc</kbd></button>' : `<span class="hint-keys"><span><kbd>1</kbd>–<kbd>0</kbd> Play</span><span><kbd>C</kbd> Console</span><span>${icon("mouse", 14)} Inspect</span></span>`}</div>
       <button class="transmit-button ${shownDamage ? "ready" : ""} ${buffering ? "buffering" : ""} ${v.busy ? "transmitting" : ""}${dialNote ? " has-note" : ""}${finishing ? " is-finishing" : ""}" data-action="transmit" aria-label="${buffering ? `Store · ${p.bufferGain} into the buffer · End turn` : `Transmit · ${p.packetDamage} damage${dialNote ? ` · ${dialNote}` : ""} · End turn`}" ${v.busy ? "disabled" : ""}><span class="transmit-dial" aria-hidden="true"></span><span class="transmit-power" aria-hidden="true"><strong>${v.busy ? "· · ·" : buffering ? `+${p.bufferGain}` : p.packetDamage}</strong><small>${v.busy ? "sending" : buffering ? "to buffer" : "damage"}</small></span><span class="transmit-label">${v.busy ? "Transmitting" : buffering ? "Store" : "Transmit"}${dialNote ? `<small class="transmit-note">${esc(dialNote)}</small>` : ""}</span><span class="transmit-shortcut">End turn <kbd>Space</kbd></span></button>

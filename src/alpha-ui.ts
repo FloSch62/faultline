@@ -7,19 +7,22 @@ import { ARCHETYPES } from "./core/expedition.ts";
 import { enemyStory } from "./story.ts";
 import {
   combatPreview, consoleState, FIELD_RULES, INSTALLATION_NAMES, PORTS, conditionOf, intentFor, isWorn, leaderOf, maxConditionOf,
-  repairCost, scrubCost, zoneForNode,
+  repairCost, scrubCost, zoneForNode, runningDaemons, daemonLabel,
   type CombatPreview, type CombatTerm, type HostileForecast, type InstallForecast, type PortForecast,
 } from "./core/run.ts";
 import { hostileLabel } from "./core/combat/board.ts";
+import { backpressureRatio, bufferMultiplier } from "./core/combat/resolve.ts";
+import { addBreakBonus } from "./core/ascension.ts";
 import { frayedLinks } from "./core/terrain.ts";
 import { linkKey } from "./core/graph.ts";
 import type {
   CardId, DesignationId, Enemy, HostileRole, Installation, InstallationKind, MessageOption, NetworkNode, Port, RelicId, RunState,
 } from "./core/types.ts";
 import { asset, cardMarkup, esc, icon } from "./ui.ts";
-import { INTENT_ICONS, INTENT_NAMES } from "./battle-ui.ts";
+import { INTENT_ICONS, INTENT_NAMES, nextTurnParts } from "./battle-ui.ts";
 import { hostilePortrait, relicEmblem, sicon } from "./screens.ts";
 import { designationMark } from "./tutorial/icons.ts";
+import { HOUSE_COLORS, KEYWORDS, cardHouse, cardKeywords, daemonLine, houseSigil, ownerWords, type CardHouse, type KeywordId } from "./card-marks.ts";
 import { channelCss } from "./channel-palette.ts";
 
 /* The field journal: every dialog body a player reads during an expedition.
@@ -73,14 +76,19 @@ export function glyph(name: string, size = 18) {
 
 /* ------------------------------------------------------------------ prepare */
 
-const costGem = (id: CardId) => `<span class="prepare-cost">${CARDS[id].unplayable ? icon("close", 14) : CARDS[id].cost}</span>`;
+/** A list row's cost gem, ringed in the owner's frame colour for a keeper card (the owner shows in every view). */
+const costGem = (id: CardId) => {
+  const c = CARDS[id];
+  const owner = c.archetype ? ` is-owned" style="--house:${HOUSE_COLORS[c.archetype]}" data-tooltip="${esc(ownerWords(c))}` : "";
+  return `<span class="prepare-cost${owner}">${c.unplayable ? icon("close", 14) : c.cost}${c.archetype ? `<span class="visually-hidden"> energy, ${esc(ownerWords(c))}.</span>` : ""}</span>`;
+};
 export function prepareMarkup(run: RunState) {
   const ready = run.preparedCard, full = run.hand.length >= RULES.handLimit;
   const body = ready
     ? `<div class="prepared-summary inlay"><span class="lit-stone"></span><span class="journal-label">Held for next turn</span><div class="prepare-row is-held">${costGem(ready)}<span><strong>${esc(CARDS[ready].name)}</strong><small>${esc(CARDS[ready].rules)}</small></span></div><button class="plate-button" data-action="release-prepared" ${full ? "disabled" : ""}>Return to hand</button>${full ? '<p class="journal-note">Your hand is full. Play a card first.</p>' : ""}</div>`
     : `<div class="prepare-options">${run.hand.map((id, index) => {
       const junk = CARDS[id].junk || CARDS[id].curse;
-      return `<button class="prepare-row inlay${junk ? " is-junk" : ""}" data-prepare-card="${index}" ${junk ? "disabled" : ""}>${costGem(id)}<span><strong>${esc(CARDS[id].name)}</strong><small>${junk ? "Junk cannot be prepared." : esc(CARDS[id].rules)}</small></span></button>`;
+      return `<button class="prepare-row inlay${junk ? " is-junk" : ""}" data-prepare-card="${index}" ${junk ? "disabled" : ""}>${costGem(id)}<span><strong>${esc(CARDS[id].name)}</strong><small>${junk ? (CARDS[id].curse ? "Curses cannot be prepared." : "Junk cannot be prepared.") : esc(CARDS[id].rules)}</small></span></button>`;
     }).join("") || '<p class="empty-pile">Your hand is empty.</p>'}</div>`;
   return `${head("Prepare a Card", "Hold one card for next turn at no energy cost. It replaces one normal draw.")}${body}<p class="journal-note">Keep a burst for an ultimate, a protocol for a known cut, a shield for a heavy strike.</p><div class="journal-actions"><button class="plate-button" data-action="close">Back</button></div>`;
 }
@@ -89,7 +97,10 @@ export function prepareMarkup(run: RunState) {
 
 const term = (label: string, amount: number | string, extra = "") =>
   `<div class="calculation-term${typeof amount === "number" && amount < 0 ? " is-negative" : ""}${extra}"><span>${label}</span><i></i><b>${typeof amount === "number" ? signed(amount) : amount}</b></div>`;
-const terms = (items: readonly CombatTerm[]) => items.map(t => term(esc(t.label), t.amount)).join("");
+/** Terms a running daemon added carry its process mark (the resolver labels them "<Daemon> · …"). */
+let daemonNames: string[] = [];
+const isDaemonTerm = (label: string) => daemonNames.some(name => label === name || label.startsWith(`${name} `) || label.includes(` · ${name}`) || label.includes(`(${name})`));
+const terms = (items: readonly CombatTerm[]) => items.map(t => term(esc(t.label), t.amount, isDaemonTerm(t.label) ? " is-daemon" : "")).join("");
 const ledgerHead = (glyphMarkup: string, title: string) => `<h3><span class="ledger-sigil">${glyphMarkup}</span>${title}</h3>`;
 function routeTrace(path: string[], label: string, primary: boolean, tail = "") {
   return `<p class="route-trace ${primary ? "is-primary" : "is-secondary"}"><b>${label}</b>${path.map(id => `<span class="route-node">${pretty(id)}</span>`).join('<i aria-hidden="true"></i>')}${tail}</p>`;
@@ -188,7 +199,7 @@ function frontMarkup(run: RunState, p: CombatPreview) {
     const target = effect.target ? pretty(effect.target) : "";
     const tail = effect.destroyed ? " · destroyed in the act" : "";
     switch (effect.effect) {
-      case "jam": return !effect.target ? "reaches no device"
+      case "jam": return effect.missed ? `its jam on ${target} misses (${esc(effect.missed)})` : !effect.target ? "reaches no device"
         : effect.decoyed ? `your honeypot ${target} decoys its jam and bites${tail}`
           : effect.absorbed ? `jams ${target}: the phantom absorbs it`
             : effect.cancelled ? `Port Security cancels its jam on ${target}${tail}` : `jams ${target}`;
@@ -228,15 +239,37 @@ function frontMarkup(run: RunState, p: CombatPreview) {
   return `<section class="ledger front-ledger">${ledgerHead(icon("malware", 17), "The Table Front")}<div class="front-columns"><div><h4 class="ledger-sub">Installations</h4>${left.length ? `<ul class="front-list is-installations">${left.join("")}</ul>` : '<p class="ledger-note">None stands, and none is planted this phase.</p>'}${p.reclaim ? `<p class="protocol-note">${icon("shield", 15)}<span>Reclaim: <b>+${p.reclaim}</b> shield joins the pool this phase.</span></p>` : ""}</div><div><h4 class="ledger-sub">Your devices</h4>${right.length ? `<ul class="front-list">${right.join("")}</ul>` : '<p class="ledger-note">Every device is intact.</p>'}</div></div></section>`;
 }
 
+/** v5 · the phase's evasions (dodges, misses), the curses acting from your hand, and the daemons running. */
+function evasionMarkup(run: RunState, p: CombatPreview) {
+  const rows = p.evasions.map(item => {
+    const who = hostileAt(run, item.by) ? nameOf(run, item.by) : named(INSTALLATION_NAMES[run.installations.find(entry => entry.id === item.by)?.kind ?? "jammer"] ?? item.by);
+    return item.kind === "dodge"
+      ? `<p class="protocol-note is-evasion">${icon("shield", 15)}<span><b>${esc(item.source)}</b>: ${who}'s ${esc(p.hostiles.find(h => h.uid === item.by)?.intent?.kind ?? "attack")} deals 0.</span></p>`
+      : `<p class="protocol-note is-evasion">${icon("link", 15)}<span><b>${esc(item.source)}</b>: ${who}'s ${item.target?.includes("::") ? "cut" : "jam"}${item.target ? ` on ${pretty(item.target)}` : ""} misses.</span></p>`;
+  });
+  const nulls = p.hostiles.filter(h => h.nullified).map(h => `<p class="protocol-note is-evasion">${icon("protocol", 15)}<span><b>${esc(h.nullified!)}</b>: ${nameOf(run, h.uid)}'s ${esc(h.intent?.kind ?? "attack")} is cancelled; its riders still resolve.</span></p>`);
+  return [...rows, ...nulls].join("");
+}
+function handEffectsMarkup(p: CombatPreview) {
+  if (!p.handEffects.length) return "";
+  return `<h4 class="ledger-sub">Curses in your hand at the end of the turn</h4>${p.handEffects.map(effect => `<p class="danger-note is-omen">${icon("warning", 15)}<span><b>${esc(effect.name)}${effect.count > 1 ? ` ×${effect.count}` : ""}</b>: ${[effect.integrity ? `−${effect.integrity} integrity, unblockable` : "", effect.wear.length ? `wears ${effect.wear.map(pretty).join(", ")} in the table-front step` : ""].filter(Boolean).join("; ") || "no effect this turn"}.</span></p>`).join("")}`;
+}
+function daemonsMarkup(run: RunState) {
+  const running = runningDaemons(run);
+  if (!running.length) return "";
+  return `<section class="ledger daemon-ledger">${ledgerHead(icon("console", 17), "Running Daemons")}<ul class="front-list">${running.map(daemon => `<li class="front-row"><span class="front-name">${esc(daemon.card.name)}${daemon.count > 1 ? ` <b class="daemon-count">×${daemon.count}</b>` : ""}</span><i></i><span class="front-value">running</span><small>${esc(daemonLine(daemon.card))}</small></li>`).join("")}</ul><p class="ledger-note">Daemons run until the encounter ends; copies stack. Their terms in this forecast carry the process mark.</p></section>`;
+}
+
 export function combatDetailsMarkup(run: RunState) {
   const p = combatPreview(run), c = consoleState(run);
+  daemonNames = runningDaemons(run).flatMap(daemon => [daemonLabel(daemon), daemon.card.name]);
   const pack = p.hostiles.length > 1;
   const engineName = run.archetype === "ghost" ? "Buffer" : run.archetype === "warden" ? "Backpressure" : "Bandwidth";
   const perChannel = run.relics.includes("parallel-core") ? RULES.parallelCorePerChannel : RULES.bandwidthPerChannel;
   const engine = run.archetype === "ghost"
-    ? `${term("Buffer stored", run.buffer)}${p.buffering ? term(`Buffering this turn (×${RULES.bufferMultiplier})`, p.bufferGain) : p.bufferRelease ? term("Released this turn", p.bufferRelease) : ""}${p.bufferAtRisk && (run.buffer || p.buffering) ? `<p class="danger-note">${icon("warning", 15)} After this enemy action you would have no live route: the buffer would be lost at the start of your turn.</p>` : ""}`
+    ? `${term("Buffer stored", run.buffer)}${p.buffering ? term(`Buffering this turn (×${bufferMultiplier(run).value}${bufferMultiplier(run).label ? ` · ${esc(bufferMultiplier(run).label!)}` : ""})`, p.bufferGain) : p.bufferRelease ? term("Released this turn", p.bufferRelease) : ""}${p.bufferAtRisk && (run.buffer || p.buffering) ? `<p class="danger-note">${icon("warning", 15)} After this enemy action you would have no live route: the buffer would be lost at the start of your turn.</p>` : ""}`
     : run.archetype === "warden"
-      ? `${term("Backpressure in this transmission", run.backpressure)}${term(`Stored for next turn (${Math.round(RULES.backpressureRatio * 100)}% of prevented)`, p.backpressureGain)}`
+      ? `${term("Backpressure in this transmission", run.backpressure)}${term(`Stored for next turn (${Math.round(backpressureRatio(run).value * 100)}% of prevented${backpressureRatio(run).label ? ` · ${esc(backpressureRatio(run).label!)}` : ""})`, p.backpressureGain)}`
       : `${term("Live routes", String(p.routeCount))}${term("Channels (routes through one device count once)", String(p.channels))}`;
   const spite = p.hostiles.some(hostile => hostile.state === "spiteful");
   const outcome = p.lethal && spite ? `Your transmission defeats ${pack ? "every hostile" : "the hostile"}, but a Spiteful action resolves anyway.`
@@ -265,13 +298,21 @@ export function combatDetailsMarkup(run: RunState) {
     : `${term("Incoming before shields", String(p.incomingRaw))}${p.incomingTerms.length ? `<div class="incoming-sources">${terms(p.incomingTerms)}</div>` : ""}${terms(p.shieldTerms)}`;
   return `${head("Forecast", sub)}
     <div class="calculation-grid"><section class="ledger">${ledgerHead(icon("bolt", 17), "Signal Damage")}${terms(p.damageTerms)}${!p.signalPath.length ? '<p class="ledger-note">No live ALPHA → router → OMEGA route. Route bonuses cannot activate.</p>' : ""}<div class="calculation-total"><span>${p.buffering ? "Stored in the buffer" : pack ? "Damage to hostiles" : "Damage to hostile"}</span><strong>${p.buffering ? `+${p.bufferGain}` : p.packetDamage}</strong></div>${p.enemyDamage ? term("Traps during the enemy phase", p.enemyDamage, " trap-term") : ""}<h4 class="ledger-sub">Deliveries</h4>${deliveriesMarkup(run, p)}<p class="ledger-note">Your <b>primary route</b> is the strongest live route; only its devices add route damage. Every device carries one channel: routes through the same device are one <b>channel</b>. Every other channel delivers +${perChannel} bandwidth. Every channel lands on your <b>target</b> as one packet, so its armor is paid once; what a kill does not need <b>overflows</b> to the next hostile.</p></section>
-    <section class="ledger">${ledgerHead(icon("shield", 17), "Defenses")}${defenses}${term("Total prevented", String(Math.min(p.incomingRaw, p.shield)))}<div class="calculation-total ${p.incoming ? "danger" : "safe"}"><span>Integrity lost</span><strong>${p.incoming}</strong></div>${p.protocolTriggers.map(t => `<p class="protocol-note">${icon("trigger", 15)} <span><b>${esc(t.name)}</b> fires: ${esc(t.effect)}</span></p>`).join("")}<p class="ledger-note">${outcome}</p></section></div>
+    <section class="ledger">${ledgerHead(icon("shield", 17), "Defenses")}${defenses}${term("Total prevented", String(Math.min(p.incomingRaw, p.shield)))}<div class="calculation-total ${p.incoming ? "danger" : "safe"}"><span>Integrity lost</span><strong>${p.incoming}</strong></div>${p.protocolTriggers.map(t => `<p class="protocol-note">${icon("trigger", 15)} <span><b>${esc(t.name)}</b> fires: ${esc(t.effect)}</span></p>`).join("")}${evasionMarkup(run, p)}${handEffectsMarkup(p)}${p.blockCarried?.amount ? `<p class="protocol-note">${icon("shield", 15)}<span><b>${esc(p.blockCarried.by)}</b>: ${p.blockCarried.amount} block survives the enemy phase.</span></p>` : ""}<p class="ledger-note">${outcome}</p></section></div>
+    ${daemonsMarkup(run)}
     ${frontMarkup(run, p)}
     <div class="calculation-grid v3-grid"><section class="ledger">${ledgerHead(icon("console", 17), esc(c.name === engineName ? c.name : `${c.name} · ${engineName}`))}${engine}<p class="ledger-note">${esc(c.rules)}</p></section>
-    <section class="ledger">${ledgerHead(icon("next", 17), "Next Turn")}${term("Energy", String(p.nextTurn.energy))}${term("Cards drawn", String(p.nextTurn.draw))}${run.installations.length ? `<p class="danger-note">${icon("malware", 15)} <span>${run.installations.length} installation${run.installations.length === 1 ? "" : "s"} on the table. Scrub for ${scrubCost(run)} energy per integrity point.</span></p>` : ""}${p.clusters.length ? `<p class="protocol-note">${icon("cluster", 15)} <span>Clusters: ${p.clusters.map(band).join(", ")} (+${RULES.clusterDamage} each).</span></p>` : ""}<p class="ledger-note">Evaluated on the table as the enemy phase leaves it: a jam, a cut or a breakdown can take a PoE Injector or Cache Server offline before your turn starts.</p></section></div>
+    <section class="ledger">${ledgerHead(icon("next", 17), "Next Turn")}${nextTurnTerms(run, p)}${run.installations.length ? `<p class="danger-note">${icon("malware", 15)} <span>${run.installations.length} installation${run.installations.length === 1 ? "" : "s"} on the table. Scrub for ${scrubCost(run)} energy per integrity point.</span></p>` : ""}${p.clusters.length ? `<p class="protocol-note">${icon("cluster", 15)} <span>Clusters: ${p.clusters.map(band).join(", ")} (+${RULES.clusterDamage} each).</span></p>` : ""}<p class="ledger-note">Evaluated on the table as the enemy phase leaves it: a jam, a cut or a breakdown can take a PoE Injector or Cache Server offline before your turn starts.</p></section></div>
     <div class="trait-explanation inlay"><h4>${icon("eye", 16)} ${pack ? "Hostile Traits" : "Hostile Trait"}</h4>${traits}${threat}</div>
     <ol class="turn-sequence" aria-label="Order of resolution"><li><b>1</b>Your signal, per port</li><li><b>2</b>Traps &amp; quarantine</li><li><b>3</b>Hostiles act in port order</li><li><b>4</b>Installations act</li><li><b>5</b>Recharge &amp; draw</li></ol>
     <div class="journal-actions"><button class="plate-button" data-action="close">Back</button></div>`;
+}
+
+/** Next turn's energy, draw and block, each with its sources. */
+function nextTurnTerms(run: RunState, p: CombatPreview) {
+  const next = nextTurnParts(run, p);
+  const row = (label: string, total: number, parts: string[]) => `${term(label, String(total))}${parts.length > 1 ? `<p class="term-parts">${esc(parts.join(" · "))}</p>` : ""}`;
+  return `${row("Energy", next.energy.total, next.energy.parts)}${row("Cards drawn", next.draw.total, next.draw.parts)}${next.block.total ? row("Block", next.block.total, next.block.parts) : ""}`;
 }
 
 /* ------------------------------------------------------------------ offers: messages and crate cards */
@@ -308,8 +349,29 @@ export function offerDialogMarkup(run: RunState): string {
 
 const TARGET_COPY: Record<string, string> = {
   ground: "Free table socket", link: "Two devices", node: "A valid device", instant: "Immediate",
-  zone: "North, Center or South", protocol: "Armed until it fires", junk: "Clutter · delete or endure",
+  zone: "North, Center or South", protocol: "Armed until it fires", daemon: "Starts a process", junk: "Clutter · delete or endure",
 };
+/** The inspect view's glossary: every keyword and kind the card carries, from its flags. */
+function keywordRows(c: (typeof CARDS)[CardId]): string {
+  const ids: KeywordId[] = [
+    ...(c.target === "daemon" ? ["daemon" as const] : []),
+    ...(c.curse ? ["curse" as const] : []),
+    ...(c.unplayable ? ["unplayable" as const] : []),
+    ...cardKeywords(c),
+  ];
+  if (!ids.length) return "";
+  return `<dl class="inspect-keywords">${ids.map(id => `<div class="kw-${id}"><dt>${KEYWORDS[id].name}</dt><dd>${esc(KEYWORDS[id].rule)}</dd></div>`).join("")}</dl>`;
+}
+/** A card without its own insight reads its kind's. */
+function insightFor(id: CardId): string {
+  const c = CARDS[id], own = CARD_INSIGHTS[baseCard(id)];
+  if (own) return own;
+  if (c.curse) return "A curse: it clogs your draws for as long as it stays. A Sanctuary or a Market removes it, even when your deck is at its floor.";
+  if (c.token) return "Made for this encounter only. Play it while it is in your hand: it exhausts and never enters your deck.";
+  if (c.target === "daemon") return "A daemon pays off the longer the encounter runs: start it early. It keeps running after a reshuffle and stacks with its copies.";
+  if (c.protocol) return "Arm it the turn before the matching hostile action; the forecast counts it as soon as it is armed.";
+  return "Hardware stays for the encounter. Temporary shield and burst expire after transmission.";
+}
 const rarityName = (id: CardId) => CARDS[id].rarity === "special" ? (CARDS[id].curse ? "Curse" : "Junk") : CARDS[id].rarity[0].toUpperCase() + CARDS[id].rarity.slice(1);
 const fact = (label: string, value: string | number) => `<div><dt>${label}</dt><i></i><dd>${value}</dd></div>`;
 /** `from` is the library the player came from; Back returns there. */
@@ -317,9 +379,11 @@ export function inspectMarkup(id: CardId, run: RunState, from: LibraryMode | nul
   const c = CARDS[id], base = baseCard(id);
   const other = canUpgrade(id) ? upgraded(id) : isUpgraded(id) ? base : null;
   const owned = run.deck.filter(x => x === id).length;
-  const kind = [rarityName(id), named(c.subtitle.split(" / ").at(-1) ?? ""), c.archetype ? `${esc(ARCHETYPES[c.archetype].name)} only` : ""].filter(Boolean).join(" · ");
-  const after = c.protocol ? "Armed · discard when it fires" : c.junk ? "Removed after the encounter" : c.curse ? "Stays in your deck" : c.exhaust ? "Exhaust until next encounter" : "Discard, then reshuffle";
-  return `<div class="card-inspect"><div class="inspect-card">${cardMarkup(id, 0, "collection")}</div><section class="inspect-body"><header class="inspect-head"><h2>${esc(c.name)}</h2><p class="inspect-kind">${kind}</p></header><p class="inspect-rules">${esc(c.rules)}</p><dl class="inspect-facts">${fact("Energy", c.unplayable ? "Unplayable" : c.cost)}${fact("Target", TARGET_COPY[c.target] ?? esc(c.target))}${fact("After playing", after)}${from === "collection" ? "" : fact("In your deck", owned)}</dl>${other ? `<div class="upgrade-compare inlay ${isUpgraded(id) ? "is-base" : ""}"><span class="journal-label">${isUpgraded(id) ? "Before the upgrade" : "Upgraded"}</span><div class="prepare-row">${costGem(other)}<span><strong>${esc(CARDS[other].name)}</strong><small>${esc(CARDS[other].rules)}</small></span></div></div>` : ""}<div class="synergy-note"><span class="journal-label">Synergy</span><p>${esc(CARD_INSIGHTS[base] ?? "Hardware stays for the encounter. Temporary shield and burst expire after transmission.")}</p></div><div class="journal-actions"><button class="plate-button" data-action="${from ? "inspect-back" : "close"}">Back</button></div></section></div>`;
+  const house = cardHouse(c);
+  const kind = [rarityName(id), c.target === "daemon" ? "Daemon" : named(c.subtitle.split(" / ").at(-1) ?? ""), c.archetype ? `${esc(ARCHETYPES[c.archetype].name)} only` : c.curse || c.junk || c.token ? "" : "Colorless"].filter(Boolean).join(" · ");
+  const after = c.protocol ? "Armed · discard when it fires" : c.target === "daemon" ? "Runs until the encounter ends" : c.token ? "Exhausts · never enters your deck" : c.junk ? "Removed after the encounter" : c.curse ? "Stays in your deck" : c.exhaust ? "Exhaust until next encounter" : c.retain ? "Discard · Retain keeps it in hand" : "Discard, then reshuffle";
+  const detail = c.detail ? `<div class="inspect-detail inlay"><span class="journal-label">Details</span><p>${esc(c.detail)}</p></div>` : "";
+  return `<div class="card-inspect house-${house}"><div class="inspect-card">${cardMarkup(id, 0, "collection")}</div><section class="inspect-body"><header class="inspect-head"><h2>${esc(c.name)}</h2><p class="inspect-kind">${kind}</p></header><p class="inspect-rules">${esc(c.rules)}</p>${keywordRows(c)}${detail}<dl class="inspect-facts">${fact("Energy", c.unplayable ? "Unplayable" : c.cost)}${fact("Target", c.curse ? "None · it cannot be played" : TARGET_COPY[c.target] ?? esc(c.target))}${fact("After playing", after)}${from === "collection" ? "" : fact("In your deck", owned)}</dl>${other ? `<div class="upgrade-compare inlay ${isUpgraded(id) ? "is-base" : ""}"><span class="journal-label">${isUpgraded(id) ? "Before the upgrade" : "Upgraded"}</span><div class="prepare-row">${costGem(other)}<span><strong>${esc(CARDS[other].name)}</strong><small>${esc(CARDS[other].rules)}</small></span></div></div>` : ""}<div class="synergy-note"><span class="journal-label">Synergy</span><p>${esc(insightFor(id))}</p></div><div class="journal-actions"><button class="plate-button" data-action="${from ? "inspect-back" : "close"}">Back</button></div></section></div>`;
 }
 
 /* ------------------------------------------------------------------ card library */
@@ -338,7 +402,7 @@ export function libraryMarkup(run: RunState, mode: LibraryMode, rarity = "all", 
   const matches = (id: CardId) => rarity === "all" || (rarity === "upgraded" ? isUpgraded(id) : CARDS[id].rarity === rarity);
   const entries = [...counts].filter(([id]) => matches(id) && `${CARDS[id].name} ${CARDS[id].rules} ${CARDS[id].subtitle}`.toLowerCase().includes(query.toLowerCase())).sort(([a], [b]) => CARDS[a].name.localeCompare(CARDS[b].name));
   const sub = {
-    collection: `${plural(BASE_CARD_IDS.length, "card")}, each with an upgraded (+) form`,
+    collection: `${plural(BASE_CARD_IDS.length, "card")} by keeper, most with an upgraded (+) form`,
     deck: plural(pile.length, "card"),
     loadout: `${esc(ARCHETYPES[run.archetype].name)} · ${plural(pile.length, "card")}`,
     "draw-pile": `${plural(pile.length, "card")} · draw order hidden`,
@@ -349,9 +413,30 @@ export function libraryMarkup(run: RunState, mode: LibraryMode, rarity = "all", 
     ? `<div class="archive-toolbar"><div class="game-tabs archive-tabs" role="group" aria-label="Filter cards">${FILTERS.map(([r, name]) => `<button data-rarity="${r}" class="${rarity === r ? "active" : ""}" aria-pressed="${rarity === r}">${name}</button>`).join("")}</div><div class="archive-find">${glyph("search", 16)}<input class="archive-search game-field" type="search" aria-label="Search cards" placeholder="Search" spellcheck="false" autocomplete="off" value="${esc(query)}"/></div></div>`
     : "";
   const empty = pile.length ? "No cards match." : "Empty.";
-  return `${head(LIBRARY_TITLES[mode], sub)}${toolbar}
-    <div class="collection-grid">${entries.map(([id, n], i) => `<div class="collection-entry${n > 1 ? " is-stacked" : ""}">${cardMarkup(id, i, "collection")}${n > 1 && mode !== "collection" ? `<span class="pile-count" aria-label="${n} copies">×${n}</span>` : ""}</div>`).join("") || `<p class="empty-pile">${empty}</p>`}</div>`;
+  const tile = ([id, n]: [CardId, number], i: number) => `<div class="collection-entry${n > 1 ? " is-stacked" : ""}">${cardMarkup(id, i, "collection")}${n > 1 && mode !== "collection" ? `<span class="pile-count" aria-label="${n} copies">×${n}</span>` : ""}</div>`;
+  if (mode !== "collection" || !entries.length)
+    return `${head(LIBRARY_TITLES[mode], sub)}${toolbar}<div class="collection-body"><div class="collection-grid">${entries.map(tile).join("") || `<p class="empty-pile">${empty}</p>`}</div></div>`;
+  // The archive (v5) lists every card by house: each keeper's cards, the shared colorless pool,
+  // then the curses and the encounter clutter. Within a house: rarity, then name.
+  const sections = ARCHIVE_HOUSES.map(({ houses, title }) => {
+    const own = entries.filter(([id]) => houses.includes(cardHouse(CARDS[id])))
+      .sort(([a], [b]) => RARITY_ORDER.indexOf(CARDS[a].rarity) - RARITY_ORDER.indexOf(CARDS[b].rarity) || CARDS[a].name.localeCompare(CARDS[b].name));
+    if (!own.length) return "";
+    const house = houses[0];
+    return `<section class="archive-house house-${house}" style="--house:${HOUSE_COLOR_OF(house)}" aria-label="${esc(`${title}, ${own.length} card${own.length === 1 ? "" : "s"}`)}"><h3 class="archive-house-head"><i class="house-seal" aria-hidden="true">${houseSigil(house, 22)}</i><span>${esc(title)}</span><b>${own.length}</b></h3><div class="collection-grid">${own.map(tile).join("")}</div></section>`;
+  }).join("");
+  return `${head(LIBRARY_TITLES[mode], sub)}${toolbar}<div class="collection-body is-sectioned">${sections}</div>`;
 }
+const RARITY_ORDER = ["basic", "common", "uncommon", "rare", "legendary", "special"];
+const ARCHIVE_HOUSES: { houses: CardHouse[]; title: string }[] = [
+  { houses: ["architect"], title: "The Architect" },
+  { houses: ["warden"], title: "The Warden" },
+  { houses: ["ghost"], title: "The Ghost" },
+  { houses: ["colorless"], title: "Colorless" },
+  { houses: ["curse"], title: "Curses" },
+  { houses: ["junk", "token"], title: "Junk & Tokens" },
+];
+const HOUSE_COLOR_OF = (house: CardHouse) => HOUSE_COLORS[house];
 
 /* ------------------------------------------------------------------ relics and the combat log */
 
@@ -455,7 +540,7 @@ function escalationMarkup(run: RunState, enemy: Enemy, forecast: HostileForecast
 function addsMarkup(run: RunState, guardian: Enemy) {
   const adds = Object.values(ENEMIES).filter(definition => definition.addOf === guardian.id);
   if (!adds.length) return "";
-  const bonus = run.ascension >= 10 ? R.addBreakBonusLate : R.addBreakBonus;
+  const bonus = addBreakBonus(run.ascension);
   return `<section class="journal-section"><h3 class="journal-head">Its Adds</h3><p class="dossier-counter">Its charge raises two at the outer ports. They act every phase, carry no crate and never escalate; each one alive when the ultimate resolves adds ${bonus} to the break.</p><div class="dossier-adds">${adds.map(add => `<div class="dossier-add inlay">${hostilePortrait(add.id, "dossier-portrait")}<span class="dossier-add-copy"><strong>${named(add.name)}</strong><span class="dossier-role">Add · health <b>${addHealth(run, add.id)}</b></span><span>${add.pattern.map(step => named(step.label)).join(" → ")}</span><small>${esc(add.trait)}</small></span></div>`).join("")}</div></section>`;
 }
 /** One rail row: port, portrait, name, role and cadence, trait, designations, crate, health. */
@@ -566,7 +651,7 @@ function installationTile(run: RunState, item: Installation, p: CombatPreview) {
   const owner = run.enemies.find(enemy => enemy.uid === item.owner);
   const next = p.destroyed.some(record => record.id === item.id) ? "Destroyed during the coming phase."
     : !effect ? ""
-      : effect.effect === "jam" ? (effect.target ? `Next phase: jams ${pretty(effect.target)}${effect.decoyed ? " (your honeypot decoys it)" : effect.absorbed ? " (the phantom absorbs it)" : effect.cancelled ? " (Port Security cancels it)" : ""}.` : "Next phase: reaches no device.")
+      : effect.effect === "jam" ? (effect.target ? `Next phase: jams ${pretty(effect.target)}${effect.missed ? ` (it misses: ${effect.missed})` : effect.decoyed ? " (your honeypot decoys it)" : effect.absorbed ? " (the phantom absorbs it)" : effect.cancelled ? " (Port Security cancels it)" : ""}.` : "Next phase: reaches no device.")
         : effect.effect === "wear" ? `Next phase: wears ${pretty(effect.target ?? "")}.`
           : effect.effect === "tick" ? `Next phase: counts down to ${effect.countdown}.`
             : effect.effect === "detonate" ? "Next phase: detonates." : effect.effect === "idle" ? "Not active until the next hostile action."

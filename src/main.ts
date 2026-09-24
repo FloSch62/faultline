@@ -64,6 +64,8 @@ import {
   isBlocked,
   cableFrays,
   laysArmoredCable,
+  playDaemon,
+  bufferMultiplierOf,
   type ActionResult,
   type CombatPreview,
   type TurnResult,
@@ -83,6 +85,8 @@ import * as alpha from "./alpha-ui.ts";
 import * as training from "./tutorial.ts";
 import { loadPreferences, storePreferences } from "./preferences.ts";
 import type { DevTools } from "./dev/panel.ts";
+// v5 · Three Energy: card marks, the daemon strip and the v5 screens, over every earlier sheet.
+import "./three-energy.css";
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) =>
   document.querySelector<T>(selector)!;
@@ -393,7 +397,7 @@ function render(rebuild = true) {
   $("#battle-foot").innerHTML = hudMarkup?.foot ?? "";
   if (battle) { fitEnemyPlate(); fitLedger(); }
   const signature = battle
-    ? `${run.currentRoom}|${run.turn}|${run.energy}|${run.firstFiberPlayed}|${run.hand.join(",")}`
+    ? `${run.currentRoom}|${run.turn}|${run.energy}|${run.firstFiberPlayed}|${run.hand.join(",")}|${run.cardsPlayed}|${run.hand.map((_, i) => costFor(run, i)).join(",")}`
     : "";
   // Leaving a battle must clear the DOM even when practice reset the cache key.
   $("#hand-zone").hidden = !battle;
@@ -845,6 +849,11 @@ function chooseCard(index: number) {
     playAction(() => playJunk(run, index), "scrub", id);
     return;
   }
+  // A daemon starts at once: it joins the daemon strip for the rest of the encounter.
+  if (c.target === "daemon") {
+    if (playAction(() => playDaemon(run, index), "protocol", id)) toast(`${c.name} is running for the rest of this encounter.`);
+    return;
+  }
   selected = selected === index ? null : index;
   source = null;
   selectedNode = null;
@@ -870,7 +879,7 @@ function activateConsole() {
   const wasBuffering = run.buffering;
   if (playAction(() => useConsole(run), "console")) {
     if (state.id === "harden") sound.effect("block", { delay: .12 });
-    if (state.id === "buffer") toast(wasBuffering ? "Buffer cancelled. This turn transmits normally." : `Buffering: this transmission is stored ×${RULES.bufferMultiplier}. Transmit to store it.`);
+    if (state.id === "buffer") toast(wasBuffering ? "Buffer cancelled. This turn transmits normally." : `Buffering: this transmission is stored ×${bufferMultiplierOf(run)}. Transmit to store it.`);
   }
 }
 function scrub(id: string) {
@@ -1840,7 +1849,7 @@ document.addEventListener("input", (event) => {
     libraryQuery = input.value;
     const holder = document.createElement("div");
     holder.innerHTML = alpha.libraryMarkup(libraryRun ?? run, libraryMode, libraryRarity, libraryQuery);
-    $("#dialog-content .collection-grid").replaceWith(holder.querySelector(".collection-grid")!);
+    $("#dialog-content .collection-body").replaceWith(holder.querySelector(".collection-body")!);
     return;
   }
   if (input.dataset.preference) {

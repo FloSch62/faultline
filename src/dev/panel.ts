@@ -5,6 +5,7 @@ import { ARCHETYPES, parseExpedition, type Expedition } from "../core/expedition
 import { canLink, linkKey } from "../core/graph.ts";
 import { grantVictory } from "../core/meta.ts";
 import { STAGES } from "../core/stages.ts";
+import { MAX_ASCENSION } from "../core/ascension.ts";
 import type { CardId, RelicId, RunState } from "../core/types.ts";
 import type { TurnResult } from "../core/run.ts";
 import { esc } from "../ui.ts";
@@ -124,7 +125,7 @@ export function mountDevTools(api: PlaygroundApi): DevTools {
       <label>Stage<select id="dev-stage">${STAGES.map((stage, i) => option(i, `${stage.numeral} · ${stage.name}`)).join("")}</select></label>
       <div class="dev-grid"><label>Sector<select id="dev-floor">${Array.from({ length: 7 }, (_, i) => option(i, `Sector ${i + 1}`)).join("")}</select></label><label>Room<select id="dev-room">${["battle", "elite", "boss", "shop", "forge", "cache", "event"].map(type => option(type, { forge: "Sanctuary", cache: "Supply cache", event: "Unknown signal" }[type] ?? type.toUpperCase())).join("")}</select></label></div>
       <label>Keeper<select id="dev-archetype">${Object.entries(ARCHETYPES).map(([id, a]) => option(id, a.name)).join("")}</select></label>
-      <div class="dev-grid"><label>Ascension<select id="dev-ascension">${Array.from({ length: 11 }, (_, i) => option(i, i)).join("")}</select></label><label>Seed<input id="dev-seed" type="number" min="0" max="4294967295" step="1" value="${DEFAULT_SETUP.seed}"></label></div>
+      <div class="dev-grid"><label>Ascension<select id="dev-ascension">${Array.from({ length: MAX_ASCENSION + 1 }, (_, i) => option(i, i)).join("")}</select></label><label>Seed<input id="dev-seed" type="number" min="0" max="4294967295" step="1" value="${DEFAULT_SETUP.seed}"></label></div>
       <label>Enemy<select id="dev-enemy">${option("", "Seeded encounter / stage guardian")}${enemies.map(([id, enemy]) => option(id, enemy.name)).join("")}</select></label>
       <div class="dev-grid"><label>First escort<select id="dev-escort-a">${option("", "None")}${escorts.map(([id, enemy]) => option(id, enemy.name)).join("")}</select></label><label>Second escort<select id="dev-escort-b">${option("", "None")}${escorts.map(([id, enemy]) => option(id, enemy.name)).join("")}</select></label></div>
       <p class="dev-note">Escorts apply to a chosen enemy in battle or elite rooms. Guardians summon their own adds. A seeded encounter uses the stage's full encounter rules.</p>
@@ -274,7 +275,7 @@ export function mountDevTools(api: PlaygroundApi): DevTools {
       if (action === "encounter") {
         const setup: EncounterSetup = {
           stage: number("stage", 0, 2), floor: number("floor", 0, 6), type: value("room") as EncounterSetup["type"],
-          archetype: value("archetype") as EncounterSetup["archetype"], ascension: number("ascension", 0, 10), seed: number("seed", 0, 0xffffffff),
+          archetype: value("archetype") as EncounterSetup["archetype"], ascension: number("ascension", 0, MAX_ASCENSION), seed: number("seed", 0, 0xffffffff),
           enemy: value("enemy"), escorts: [value("escort-a"), value("escort-b")].filter(Boolean), terrain: checked("terrain"), keepLoadout: checked("keep-loadout"),
         };
         scenarioId = "";

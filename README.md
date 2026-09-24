@@ -26,6 +26,7 @@ npm run build       # Type checking and production build in dist/
 npm run preview     # Serve the production build
 npm test            # Deterministic game rules, cards, lessons and the Handbook
 npm run balance -- 500 # Reproducible seeded balance probe
+npm run tables -- --write # Regenerate the design document's card and rule tables
 npx playwright install chromium
 npm run test:e2e    # Actual browser gameplay, desktop layout and audio playback
 npm run test:smoke  # A quick @smoke subset of the browser suite

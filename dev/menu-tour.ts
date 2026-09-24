@@ -4,6 +4,7 @@
 import { chromium, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { newExpedition, type Expedition } from "../src/core/expedition.ts";
+import { makeEnemy } from "../src/core/encounter.ts";
 import { chooseRoom } from "../src/core/run.ts";
 import { ENEMIES } from "../src/core/enemies.ts";
 import { EVENTS } from "../src/core/events.ts";
@@ -20,8 +21,9 @@ await mkdir(out, { recursive: true });
 function battleSave(enemy = "leech", boss = false): Expedition {
   const e = newExpedition("architect", 924);
   chooseRoom(e.run, "0-1");
-  const d = ENEMIES[enemy];
-  e.run.enemy = { id: enemy, name: d.name, title: d.title, color: d.color, hp: 34, maxHp: 40, turn: 0 };
+  e.run.enemies = [{ ...makeEnemy(enemy, "h1", "centre", "single", 40), hp: 34 }];
+  e.run.focus = "centre";
+  void ENEMIES;
   e.run.bossIntroSeen = !boss;
   e.run.topology.nodes.push(
     { id: "router1", role: "router", x: 0, z: 0 },
@@ -45,7 +47,7 @@ function crowdedSave(): Expedition {
   const e = battleSave();
   e.run.hand = ["deep-inspection", "resonance-field", "bastion", "guard+", "failover-policy", "packet-loss", "cve", "worm", "ecmp"] as typeof e.run.hand;
   e.run.protocols = ["rate-limiter"] as typeof e.run.protocols;
-  e.run.malware = [{ id: "m1", x: -5, z: -3.2 }];
+  e.run.installations = [{ id: "tap1", kind: "tap", x: -5, z: -3.2, integrity: 1, activeFrom: 0, owner: "h1" }];
   e.run.zoneEffects = [{ zone: "center", kind: "resonance", turns: 3 }, { zone: "north", kind: "suppression", turns: 2 }];
   e.run.packetBoost = 3;
   e.run.turn = 2;
@@ -139,10 +141,10 @@ const shots: Shot[] = [
   { name: "11b-battle-crowded", save: crowdedSave(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(4200); await page.mouse.move(5, 300); await page.waitForTimeout(300); } },
   { name: "11c-battle-selected", save: crowdedSave(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(1400); await page.mouse.move(5, 300); await page.keyboard.press("2"); await page.waitForTimeout(500); } },
   { name: "11d-battle-console", save: battleSave(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(1400); await page.mouse.move(5, 300); await page.keyboard.press("c"); await page.waitForTimeout(500); } },
-  { name: "11e-battle-guardian", save: (() => { const e = battleSave("regent"); e.run.enemy!.hp = 60; e.run.enemy!.maxHp = 80; return e; })(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(4200); await page.mouse.move(5, 300); await page.waitForTimeout(300); } },
+  { name: "11e-battle-guardian", save: (() => { const e = battleSave("regent"); e.run.enemies[0].hp = 60; e.run.enemies[0].maxHp = 80; return e; })(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(4200); await page.mouse.move(5, 300); await page.waitForTimeout(300); } },
   { name: "11f-battle-toast", save: crowdedSave(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(1400); await page.mouse.move(5, 300); await page.keyboard.press("6"); await page.waitForTimeout(400); } },
-  { name: "11g-battle-ultimate", save: (() => { const e = battleSave("regent"); e.run.enemy!.hp = 38; e.run.enemy!.maxHp = 80; e.run.enemy!.turn = 5; return e; })(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(4200); await page.mouse.move(5, 300); await page.waitForTimeout(300); } },
-  { name: "11h-battle-charge", save: (() => { const e = battleSave("regent"); e.run.enemy!.hp = 38; e.run.enemy!.maxHp = 80; e.run.enemy!.turn = 4; return e; })(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(4200); await page.mouse.move(5, 300); await page.waitForTimeout(300); } },
+  { name: "11g-battle-ultimate", save: (() => { const e = battleSave("regent"); e.run.enemies[0].hp = 38; e.run.enemies[0].maxHp = 80; e.run.enemies[0].turn = 5; return e; })(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(4200); await page.mouse.move(5, 300); await page.waitForTimeout(300); } },
+  { name: "11h-battle-charge", save: (() => { const e = battleSave("regent"); e.run.enemies[0].hp = 38; e.run.enemies[0].maxHp = 80; e.run.enemies[0].turn = 4; return e; })(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(4200); await page.mouse.move(5, 300); await page.waitForTimeout(300); } },
   { name: "12-battle-settings", save: battleSave(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(1400); await page.keyboard.press("Escape"); await page.waitForTimeout(500); } },
   { name: "13-combat-details", save: battleSave(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(1400); await dialog("combat-details")(page); } },
   { name: "14-devices", save: battleSave(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(1400); await dialog("devices")(page); } },
@@ -170,7 +172,7 @@ const shots: Shot[] = [
   { name: "35-loadout", save: null, go: async page => { await dialog("new")(page); await dialog("loadout")(page); } },
   { name: "36-prepared", save: (() => { const e = battleSave(); e.run.preparedCard = "pulse"; return e; })(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(1400); await page.keyboard.press("p"); await page.waitForTimeout(500); } },
   { name: "37-dossier-guardian", save: battleSave("regent"), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(1400); await dialog("enemy-dossier")(page); } },
-  { name: "38-devices-malware", save: (() => { const e = battleSave("wraith"); e.run.malware = [{ id: "malware1", x: 2, z: -2.4 }]; e.run.topology.links.push({ a: "firewall3", b: "omega", armored: true }); return e; })(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(1400); await dialog("devices")(page); } },
+  { name: "38-devices-malware", save: (() => { const e = battleSave("wraith"); e.run.installations = [{ id: "tap1", kind: "tap", x: 2, z: -2.4, integrity: 1, activeFrom: 0, owner: "h1" }]; e.run.topology.links.push({ a: "firewall3", b: "omega", armored: true }); return e; })(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(1400); await dialog("devices")(page); } },
   { name: "39-archive-scrolled", save: null, go: async page => { await dialog("collection")(page); await page.locator("dialog .dialog-surface").evaluate(el => { el.scrollTop = 900; }); await page.waitForTimeout(300); } },
   { name: "41-tooltip-low", save: battleSave(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(1400); await page.locator('[data-action="discard-pile"]').hover(); await page.waitForTimeout(600); } },
   { name: "40-forecast-scrolled", save: battleSave(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(1400); await dialog("combat-details")(page); await page.locator("dialog .dialog-surface").evaluate(el => { el.scrollTop = 10000; }); await page.waitForTimeout(300); } },
@@ -192,10 +194,10 @@ const shots: Shot[] = [
   { name: "72-boss-relic", save: (() => { const e = roomSave("cache"); e.run.phase = "relic"; e.run.relicRewards = ["spanning-tree", "anycast", "bgp-hijack"] as RelicId[]; return e; })(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(900); await page.locator("[data-relic]").nth(1).hover(); await page.waitForTimeout(300); } },
   { name: "73-map-mid", save: midMap(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(900); await page.locator(".route-room.available").first().hover(); await page.waitForTimeout(500); } },
   { name: "74-market-picker", save: roomSave("shop"), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(900); await page.locator('[data-screen="shop-remove"]').click(); await page.waitForTimeout(600); } },
-  { name: "75-elite-reward", save: (() => { const e = roomSave("elite"); e.run.phase = "reward"; e.run.cardRewards = ["router", "fiber", "guard"]; e.run.creditsEarned = 33; e.run.enemy = null; return e; })(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(900); } },
+  { name: "75-elite-reward", save: (() => { const e = roomSave("elite"); e.run.phase = "reward"; e.run.cardRewards = ["router", "fiber", "guard"]; e.run.creditsEarned = 33; e.run.enemies = []; return e; })(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(900); } },
   { name: "76-market-hover", save: roomSave("shop"), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(900); await page.locator('[data-screen="buy-card"]').nth(1).hover(); await page.waitForTimeout(400); } },
   { name: "77-market-sold", save: (() => { const e = roomSave("shop"); e.run.shop!.cards[1].sold = true; e.run.shop!.relics[0].sold = true; e.run.shop!.removed = true; e.run.credits = 45; return e; })(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(900); } },
-  { name: "78-guardian-reward", save: (() => { const e = midMap(0, 6); e.run.currentRoom = e.run.map.find(room => room.type === "boss")!.id; e.run.enemy = { id: "regent", name: "THE IRON REGENT", title: "", color: 0, hp: 0, maxHp: 67, turn: 0 }; e.run.phase = "reward"; e.run.cardRewards = ["router", "fiber", "guard"]; e.run.creditsEarned = 50; return e; })(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(900); } },
+  { name: "78-guardian-reward", save: (() => { const e = midMap(0, 6); e.run.currentRoom = e.run.map.find(room => room.type === "boss")!.id; e.run.enemies = [{ ...makeEnemy("regent", "h1", "centre", "single", 67), hp: 0 }]; e.run.phase = "reward"; e.run.cardRewards = ["router", "fiber", "guard"]; e.run.creditsEarned = 50; return e; })(), go: async page => { await page.locator('[data-action="continue"]').click(); await page.waitForTimeout(900); } },
 ];
 
 const browser = await chromium.launch({ args: ["--no-sandbox", "--enable-unsafe-swiftshader"] });

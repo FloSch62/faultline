@@ -12,6 +12,7 @@ export const RULES = {
   relocateCost: 1,
   scrubCost: 1,
   maxProtocols: 2,
+  /** v3 malware cap; v4 uses maxInstallations. Kept until the engine migrates. */
   maxMalware: 3,
   // Route damage (primary route)
   baseRouteDamage: 5,
@@ -48,6 +49,12 @@ export const RULES = {
   watchdogShield: 5,
   hardenShield: 2,
   hardenPerFirewall: 1,
+  /** v4 · M4 design addition, PENDING THE USER'S APPROVAL (docs/balance-v4.json, CONTRACT §7):
+   * Harden also gains this much block per living hostile beyond the first, like Quorum, ... */
+  hardenPerHostile: 1,
+  /** ... and this much more per living guardian add. With one hostile and no adds Harden is
+   * unchanged (the single-hostile invariant). 0 and 0 restore the design's Harden. */
+  hardenPerAdd: 1,
   // Traps
   honeypotDamage: 3,
   honeynetBonus: 2,
@@ -67,6 +74,155 @@ export const RULES = {
   // Fields
   alliedFieldTurns: 3,
   hostileFieldTurns: 2,
+
+  // ------------------------------------------------ v4 · Under Quarantine
+  // Every value below is a design constant from Proposal 4 (design.html §11.1).
+  // The phase flags turn a whole layer off for the balance probe's A/B runs:
+  //   packRate: [0, 0, 0] · maxInstallations: 0 with deviceCondition: 99 ·
+  //   escalationStart: 99 (levels and the guardians' charge at half health) ·
+  //   designationRate: [0, 0, 0] with reinforcementRate
+  //   and signalRate [0, 0, 0] and crateEmptyShare: 1 · addBreakBonus: 0 (also raises no adds).
+  // Packs and ports
+  /** Share of normal rooms holding a pack, per stage (stage I from the third floor). */
+  packRate: [0.25, 0.40, 0.55],
+  /** Zero-based floor from which stage I rolls escort duos. */
+  packFromFloor: 2,
+  /** Share of stage III packs that are trios. */
+  trioShare: 0.40,
+  /** A pack's summed health is this multiple of the room's single-hostile health. */
+  packHealthScale: 1.15,
+  packShares: { duo: [0.575, 0.575], pair: [0.75, 0.40], trio: [0.63, 0.26, 0.26] },
+  /** Reinforcement health: 0.40 × in a single's room, 0.26 × beside a leader and escort. */
+  reinforcementShares: { single: 0.40, pair: 0.26 },
+  /** Threat budget: packs ≤ 1.3 × the stage's average single threat; reinforced fights ≤ 1.45 ×. */
+  threatBudget: 1.3,
+  reinforcedThreatBudget: 1.45,
+  /** Each add alive when the ultimate resolves raises the break threshold (ascension 10: +1).
+   * Balance v4 (docs/balance-v4.json): 3 → 4; the breaking keepers interrupted 76–84 % of ultimates. */
+  addBreakBonus: 4,
+  // The table front
+  maxInstallations: 4,
+  /** Adjacency radius for every reach effect: Jammers, Spikes, charges, racks, quarantine, bites. */
+  reach: 2.0,
+  /** Reach sockets: twelve compass points at the first radius, then the second. */
+  reachRings: [1.6, 2.0],
+  deviceCondition: 2,
+  salvageCondition: 1,
+  repairCost: 1,
+  /** Scrub cost per integrity point while a Quarantine Drone lives. */
+  quarantineScrubCost: 2,
+  breakerCountdown: 2,
+  quarantineDamage: 1,
+  sentryQuarantine: 2,
+  /** Integrity an installation loses when planted within reach of a cabled Honeypot. */
+  honeypotBite: 1,
+  reclaimShield: 2,
+  /** Sentry Firewall: extra shield when its quarantine destroys an installation. */
+  sentryReclaimBonus: 2,
+  rackCondition: 3,
+  wreckCap: 6,
+  // Escalation (disruption levels on the leader's own action counter)
+  escalationStart: 4,
+  escalationEvery: 3,
+  escalationStartLate: 3,
+  escalationEveryLate: 2,
+  // Designations and surprises
+  designationRate: [0.20, 0.35, 0.50],
+  designationFromFloor: 2,
+  hiddenShare: [0.30, 0.40, 0.50],
+  reinforcementRate: [0, 0.15, 0.25],
+  reinforcementCount: 2,
+  eliteReinforcementCount: 3,
+  signalRate: [0, 0.10, 0.15],
+  signalTurn: 3,
+  /** Crate contents: salvage 30 %, credits 25 %, encounter card 20 %, empty 25 %. */
+  crateWeights: { salvage: 0.30, credits: 0.25, card: 0.20, empty: 0.25 },
+  crateEmptyShare: 0.25,
+  /** Share of non-empty crates that also carry an undelivered message. */
+  crateMessageShare: 0.25,
+  /** Balance v4: crates, fallback, messages, pack and designation credits were cut so a run earns
+   * +8–10 % over v3 (the probe measured +21 % at the design values: crate salvage falls back to
+   * credits far more often than 11.4 assumed, because the last body usually carries it). */
+  crateCredits: [3, 6],
+  crateFallbackCredits: 3,
+  messageCredits: 6,
+  messageRestore: 2,
+  // Credits
+  packCredits: 2,
+  designationCredits: 1,
+  reinforcementCredits: 3,
+  // Designation numbers
+  hardenedHealth: 0.20,
+  hardenedStrike: 1,
+  armoredPlating: 2,
+  hungryHeal: 2,
+  // Escort and add numbers
+  wardPlating: 2,
+  choirAddPlating: 3,
+  lastEchoBonus: 3,
+  riggedSpikeIntegrity: 3,
+  // Relics
+  roundRobinDamage: 2,
+  scorchedEarthDamage: 4,
+
+  // ---- v4 keys added by the content agent (card, relic, trait and plate text read them;
+  // the engine resolves them). Additive: nothing above was renamed.
+  /** Integrity an installation arrives with, before bites, Rigging and ascension 9. */
+  installationIntegrity: { tap: 1, jammer: 2, spike: 2, anchor: 3, breaker: 1 },
+  /** Hard ceiling for any installation's integrity (full-cap overflow, Rigging, ascension 9). */
+  maxInstallationIntegrity: 3,
+  /** Hot Patch, Fast Reroute, Link Recovery and Harden restore this much condition on the most worn device. */
+  faultClearRepair: 1,
+  /** Redundant PSU: the device's maximum condition for this battle. */
+  psuCondition: 3,
+  /** Escort traits. */
+  swarmBonus: 1,
+  uplinkBonus: 1,
+  webHeal: 1,
+  /** Splicer's twin cut: cables severed while a leader lives. */
+  twinCut: 2,
+  /** New leaders. */
+  foremanSpikeBonus: 1,
+  nestHeal: 1,
+  nestStrikeBonus: 1,
+  demolitionArmedBonus: 2,
+  blightAnchorBonus: 1,
+  /** Blackout Core: enraged Total Blackout wears every primary-route device by this much. */
+  blackoutWear: 1,
+  /** Guardian adds: health before ascension 6 (A6 × 1.15 like the guardian). */
+  addHealth: { "gate-warden": 8, chorister: 10, "quarantine-drone": 14 },
+  /** Ascension 10: each living add raises the break threshold by this much instead. */
+  addBreakBonusLate: 5,
+  /** Stoked: escalation levels arrive this many actions sooner (stage III: the late value). */
+  stokedAdvance: 1,
+  stokedAdvanceLate: 2,
+  /** Signals: RELAY FLICKER and INTERFERENCE fields last this many turns. */
+  signalFieldTurns: 2,
+  /** Ascension 9 adds this share to every stage's pack rate. */
+  packRateAscensionBonus: 0.15,
+  /** v4 ascension riders (section 10.4), tuned by the ascension pass (docs/balance-v4.json: A10 was
+   * 2 / 4 / 4 %, v3's band is 5–9 %): ascension 6 — adds' integrity multiple (design 1.15 → 1), and
+   * the wear Close the Gates / Stolen Voice add; */
+  ascensionAddHealth: 1,
+  ascensionRiderWear: 1,
+  /** ascension 7 — the chance an elite carries a second designation (design 1 → 0.5); ascension 10 —
+   * the share of a normal room's designation chance that rolls a second (1 → 0.5); */
+  eliteSecondDesignation: 0.5,
+  normalSecondDesignation: 0.5,
+  /** ascension 9 — extra integrity every installation arrives with (design 1 → 0); ascension 10 —
+   * Breaker Charges a guardian's charge plants beside the primary router (0 or 1). */
+  ascensionInstallationIntegrity: 0,
+  ascensionChargeBreaker: 1,
+  /** Signal in the Static: the empowered fight's health multiple. */
+  eventHealthScale: 1.4,
+  /** Undelivered message: Reinforce raises maximum integrity by this much. */
+  messageMaxIntegrity: 1,
+  /** Relics. */
+  ingressFilterReduce: 1,
+  priorityQueueBonus: 1,
+  reinforcedFrameCondition: 1,
+  stormControlDamage: 1,
+  scorchedEarthCondition: 1,
 } as const;
 
 export type CardRarity = "basic" | "common" | "uncommon" | "rare" | "legendary" | "special";
@@ -92,6 +248,21 @@ export interface CardValues {
   perChannel?: number;
   perFirewall?: number;
   minimum?: number;
+  // ---- v4 (content): the engine implements each card by base id and reads these numbers.
+  /** Broadcast Storm, Packet Storm: added to every living port's packet this turn. */
+  everyPort?: number;
+  /** Flood Fill: added to every living port's packet per live channel this turn. */
+  perChannelEveryPort?: number;
+  /** Traffic Shaping, Demolition Charge: added to the focus port's packet this turn. */
+  focusBonus?: number;
+  /** Quorum: extra block for every other living hostile on the field. */
+  perHostile?: number;
+  /** Bulkhead: every online firewall blocks this much more against each attack this enemy phase. */
+  firewallBonus?: number;
+  /** Phantom Node: disruptions or installations it absorbs before it fades. */
+  absorbs?: number;
+  /** Rapid Redeploy: cost reduction this turn for the recovered hardware card. */
+  discount?: number;
 }
 
 export interface CardDefinition {
@@ -132,6 +303,8 @@ type BaseDefinition = Omit<CardDefinition, "id" | "base" | "upgraded" | "values"
 };
 
 const R = RULES;
+/** Reach radius as printed on cards and plates ("2.0"). */
+const REACH = R.reach.toFixed(1);
 const BASE: Record<BaseCardId, BaseDefinition> = {
   // ---------------------------------------------------------------- fields
   "resonance-field": {
@@ -146,9 +319,9 @@ const BASE: Record<BaseCardId, BaseDefinition> = {
   },
   "purge-field": {
     name: "Purge Field", subtitle: "FIELD / CLEANSE", cost: 0, rarity: "common", target: "zone", art: "program", color: "#d1eee2", exhaust: true,
-    rules: "Cleanse a band: remove hostile fields, jams and malware in it. Draw 1. Exhaust.",
+    rules: "Cleanse a band: destroy its installations, hostile fields and jams (an Anchor takes the whole purge). Draw 1. Exhaust.",
     values: { draw: 1 },
-    upgrade: { rules: "Cleanse a band: remove hostile fields, jams and malware in it. Draw 2. Exhaust.", values: { draw: 2 } },
+    upgrade: { rules: "Cleanse a band: destroy its installations, hostile fields and jams (an Anchor takes the whole purge). Draw 2. Exhaust.", values: { draw: 2 } },
   },
   "null-field": {
     name: "Null Field", subtitle: "FIELD / DAMPEN", cost: 1, rarity: "uncommon", target: "zone", art: "defense", color: "#b5a6e1",
@@ -173,8 +346,8 @@ const BASE: Record<BaseCardId, BaseDefinition> = {
   },
   honeypot: {
     name: "Honeypot", subtitle: "HARDWARE / DECEPTION", cost: 1, rarity: "common", target: "ground", role: "honeypot", art: "defense", color: "#f3a35f",
-    rules: `Place a decoy. While cabled, jams and cuts hit it first; each one deals ${R.honeypotDamage} to the attacker. Works offline.`,
-    upgrade: { cost: 0, rules: `Place a decoy. While cabled, jams and cuts hit it first; each one deals ${R.honeypotDamage} to the attacker. Works offline.` },
+    rules: `Place a decoy. Cabled, it takes each action's jam, cut or overload and deals ${R.honeypotDamage}. Installations within ${REACH} lose ${R.honeypotBite}. Works offline.`,
+    upgrade: { cost: 0, rules: `Place a decoy. Cabled, it takes each action's jam, cut or overload and deals ${R.honeypotDamage}. Installations within ${REACH} lose ${R.honeypotBite}. Works offline.` },
   },
   "cache-server": {
     name: "Cache Server", subtitle: "HARDWARE / STORAGE", cost: 2, rarity: "uncommon", target: "ground", role: "cache", art: "hardware", color: "#8fc8ff",
@@ -281,8 +454,8 @@ const BASE: Record<BaseCardId, BaseDefinition> = {
   // ---------------------------------------------------------------- instants
   patch: {
     name: "Hot Patch", subtitle: "SYSTEM / REPAIR", cost: 1, rarity: "basic", target: "instant", art: "program", color: "#7ceebc",
-    rules: "Clear the active jam and cut cable. Draw 1.", values: { draw: 1 },
-    upgrade: { rules: "Clear the active jam and cut cable. Draw 2.", values: { draw: 2 } },
+    rules: `Clear every active jam and cut cable. Restore ${R.faultClearRepair} condition on your most worn device. Draw 1.`, values: { draw: 1 },
+    upgrade: { rules: `Clear every active jam and cut cable. Restore ${R.faultClearRepair} condition on your most worn device. Draw 2.`, values: { draw: 2 } },
   },
   surge: {
     name: "Power Surge", subtitle: "SYSTEM / ENERGY", cost: 0, rarity: "uncommon", target: "instant", art: "program", color: "#ffd278", exhaust: true,
@@ -311,8 +484,8 @@ const BASE: Record<BaseCardId, BaseDefinition> = {
   },
   reroute: {
     name: "Fast Reroute", subtitle: "UNCOMMON / REPAIR", cost: 0, rarity: "uncommon", target: "instant", art: "program", color: "#79e7c3", exhaust: true,
-    rules: "Clear the active jam and cut cable. Gain 2 block. Draw 1. Exhaust.", values: { block: 2, draw: 1 },
-    upgrade: { rules: "Clear the active jam and cut cable. Gain 4 block. Draw 1. Exhaust.", values: { block: 4, draw: 1 } },
+    rules: `Clear every active jam and cut cable. Restore ${R.faultClearRepair} condition on your most worn device. Gain 2 block. Draw 1. Exhaust.`, values: { block: 2, draw: 1 },
+    upgrade: { rules: `Clear every active jam and cut cable. Restore ${R.faultClearRepair} condition on your most worn device. Gain 4 block. Draw 1. Exhaust.`, values: { block: 4, draw: 1 } },
   },
   barrier: {
     name: "Aegis Protocol", subtitle: "UNCOMMON / DEFENSE", cost: 2, rarity: "uncommon", target: "instant", art: "defense", color: "#c3beff",
@@ -351,8 +524,8 @@ const BASE: Record<BaseCardId, BaseDefinition> = {
   },
   protocol: {
     name: "Link Recovery", subtitle: "COMMON / REPAIR", cost: 1, rarity: "common", target: "instant", art: "defense", color: "#91bacf",
-    rules: "Clear the active jam and cut cable. Gain 3 block.", values: { block: 3 },
-    upgrade: { rules: "Clear the active jam and cut cable. Gain 6 block.", values: { block: 6 } },
+    rules: `Clear every active jam and cut cable. Restore ${R.faultClearRepair} condition on your most worn device. Gain 3 block.`, values: { block: 3 },
+    upgrade: { rules: `Clear every active jam and cut cable. Restore ${R.faultClearRepair} condition on your most worn device. Gain 6 block.`, values: { block: 6 } },
   },
   inspect: {
     name: "Clab Inspect", subtitle: "CONTAINERLAB / OBSERVABILITY", cost: 0, rarity: "common", target: "instant", art: "program", color: "#93d1d6", exhaust: true,
@@ -402,33 +575,33 @@ const BASE: Record<BaseCardId, BaseDefinition> = {
   // ---------------------------------------------------------------- protocols
   "failover-policy": {
     name: "Failover Policy", subtitle: "PROTOCOL / RESILIENCE", cost: 1, rarity: "common", target: "protocol", protocol: "sever", art: "defense", color: "#7fd9c0", keyword: "ARMED",
-    rules: "Arm. When a cable would be cut: cancel the cut and gain 3 shield for that enemy action.", values: { shield: 3 },
-    upgrade: { rules: "Arm. When a cable would be cut: cancel the cut and gain 6 shield for that enemy action.", values: { shield: 6 } },
+    rules: "Arm. When a hostile action would cut a cable: cancel all of that action's cuts and gain 3 shield for that action.", values: { shield: 3 },
+    upgrade: { rules: "Arm. When a hostile action would cut a cable: cancel all of that action's cuts and gain 6 shield for that action.", values: { shield: 6 } },
   },
   "port-security": {
     name: "Port Security", subtitle: "PROTOCOL / ACCESS", cost: 1, rarity: "uncommon", target: "protocol", protocol: "jam", art: "defense", color: "#9fc3ff", keyword: "ARMED",
-    rules: "Arm. When a device would be jammed: cancel the jam; the attacker takes 4.", values: { damage: 4 },
-    upgrade: { rules: "Arm. When a device would be jammed: cancel the jam; the attacker takes 7.", values: { damage: 7 } },
+    rules: "Arm. When a hostile action would jam a device: cancel all of that action's jams; the attacker takes 4.", values: { damage: 4 },
+    upgrade: { rules: "Arm. When a hostile action would jam a device: cancel all of that action's jams; the attacker takes 7.", values: { damage: 7 } },
   },
   "rate-limiter": {
     name: "Rate Limiter", subtitle: "PROTOCOL / QOS", cost: 1, rarity: "common", target: "protocol", protocol: "strike", art: "defense", color: "#8fe3ea", keyword: "ARMED",
-    rules: "Arm. When the enemy strikes: gain 5 shield for that action.", values: { reduce: 5 },
-    upgrade: { rules: "Arm. When the enemy strikes: gain 8 shield for that action.", values: { reduce: 8 } },
+    rules: "Arm. When a hostile strikes: gain 5 shield for that action.", values: { reduce: 5 },
+    upgrade: { rules: "Arm. When a hostile strikes: gain 8 shield for that action.", values: { reduce: 8 } },
   },
   "ips-signature": {
     name: "IPS Signature", subtitle: "PROTOCOL / INTRUSION", cost: 2, rarity: "uncommon", target: "protocol", protocol: "breach", art: "defense", color: "#ffb38a", keyword: "ARMED",
-    rules: "Arm. When the enemy breaches: gain 6 shield for that action.", values: { reduce: 6 },
-    upgrade: { cost: 1, rules: "Arm. When the enemy breaches: gain 6 shield for that action." },
+    rules: "Arm. When a hostile breaches: gain 6 shield for that action.", values: { reduce: 6 },
+    upgrade: { cost: 1, rules: "Arm. When a hostile breaches: gain 6 shield for that action." },
   },
   "quarantine-rule": {
     name: "Quarantine Rule", subtitle: "PROTOCOL / CONTAINMENT", cost: 1, rarity: "uncommon", target: "protocol", protocol: "field", art: "program", color: "#c9e79a", keyword: "ARMED",
-    rules: "Arm. When the enemy casts a hostile field: cancel the field.",
-    upgrade: { cost: 0, rules: "Arm. When the enemy casts a hostile field: cancel the field." },
+    rules: "Arm. When a hostile casts a field: cancel the field.",
+    upgrade: { cost: 0, rules: "Arm. When a hostile casts a field: cancel the field." },
   },
   tarpit: {
     name: "Tarpit", subtitle: "PROTOCOL / DECEPTION", cost: 1, rarity: "rare", target: "protocol", protocol: "ultimate", art: "program", color: "#d59bff", keyword: "ARMED",
-    rules: "Arm. When the enemy charges or unleashes an ultimate: it takes 8.", values: { damage: 8 },
-    upgrade: { rules: "Arm. When the enemy charges or unleashes an ultimate: it takes 12.", values: { damage: 12 } },
+    rules: "Arm. When a guardian charges or unleashes an ultimate: it takes 8.", values: { damage: 8 },
+    upgrade: { rules: "Arm. When a guardian charges or unleashes an ultimate: it takes 12.", values: { damage: 12 } },
   },
   // ---------------------------------------------------------------- junk & curses
   "packet-loss": {
@@ -437,11 +610,84 @@ const BASE: Record<BaseCardId, BaseDefinition> = {
   },
   worm: {
     name: "Worm", subtitle: "JUNK / MALWARE", cost: 1, rarity: "special", target: "junk", art: "program", color: "#b0506b", junk: true,
-    rules: `Pay 1 to delete it. If it is in your hand when you transmit, the enemy action deals ${R.wormDamage} extra damage.`,
+    rules: `Pay 1 to delete it. If it is in your hand when you transmit, the enemy phase's first attack deals ${R.wormDamage} extra damage.`,
   },
   cve: {
     name: "CVE", subtitle: "CURSE / VULNERABILITY", cost: 0, rarity: "special", target: "junk", art: "program", color: "#8a4a5c", curse: true, unplayable: true,
     rules: "Unplayable. A permanent vulnerability. Remove it at a Sanctuary or Market.",
+  },
+  // ---------------------------------------------------------------- v4 · packs and ports
+  // Behaviour is keyed by base id in the engine; every number it needs is in `values`.
+  "broadcast-storm": {
+    name: "Broadcast Storm", subtitle: "SIGNAL / BROADCAST", cost: 1, rarity: "uncommon", target: "instant", art: "program", color: "#6fd8e8",
+    rules: "Your transmission deals +2 to every port this turn.", values: { everyPort: 2 },
+    upgrade: { rules: "Your transmission deals +3 to every port this turn.", values: { everyPort: 3 } },
+  },
+  "traffic-shaping": {
+    name: "Traffic Shaping", subtitle: "QOS / SHAPING", cost: 0, rarity: "common", target: "instant", art: "program", color: "#8fd0b8", exhaust: true,
+    rules: "Every delivery goes to the focus this turn; the focus packet deals +1. Draw 1. Exhaust.", values: { focusBonus: 1, draw: 1 },
+    upgrade: { rules: "Every delivery goes to the focus this turn; the focus packet deals +3. Draw 1. Exhaust.", values: { focusBonus: 3, draw: 1 } },
+  },
+  "flood-fill": {
+    name: "Flood Fill", subtitle: "ARCHITECT / FLOOD", cost: 1, rarity: "uncommon", target: "instant", art: "program", color: "#e8b562", archetype: "architect",
+    rules: "Needs a live route. +1 damage per live channel to every port.", values: { perChannelEveryPort: 1 },
+    upgrade: { rules: "Needs a live route. +2 damage per live channel to every port.", values: { perChannelEveryPort: 2 } },
+  },
+  bulkhead: {
+    name: "Bulkhead", subtitle: "WARDEN / BULKHEAD", cost: 1, rarity: "uncommon", target: "instant", art: "defense", color: "#d9a86a", archetype: "warden",
+    rules: "Gain 3 block. This enemy phase every online firewall blocks 1 more against each attack.", values: { block: 3, firewallBonus: 1 },
+    upgrade: { rules: "Gain 5 block. This enemy phase every online firewall blocks 1 more against each attack.", values: { block: 5, firewallBonus: 1 } },
+  },
+  spearhead: {
+    name: "Spearhead", subtitle: "GHOST / SPEARHEAD", cost: 1, rarity: "uncommon", target: "instant", art: "program", color: "#7cc9e6", archetype: "ghost",
+    rules: "Your buffer release this turn ignores armor and plating.",
+    upgrade: { cost: 0, rules: "Your buffer release this turn ignores armor and plating." },
+  },
+  "packet-storm": {
+    name: "Packet Storm", subtitle: "RARE / OFFENSE", cost: 2, rarity: "rare", target: "instant", art: "program", color: "#5fb9e0", exhaust: true,
+    rules: "Your transmission deals +5 to every port this turn. Exhaust.", values: { everyPort: 5 },
+    upgrade: { rules: "Your transmission deals +7 to every port this turn. Exhaust.", values: { everyPort: 7 } },
+  },
+  quorum: {
+    name: "Quorum", subtitle: "COMMON / CONSENSUS", cost: 1, rarity: "common", target: "instant", art: "defense", color: "#e6c27e",
+    rules: "Gain 3 block, +2 for every other hostile on the field. Draw 1.", values: { block: 3, perHostile: 2, draw: 1 },
+    upgrade: { rules: "Gain 5 block, +3 for every other hostile on the field. Draw 1.", values: { block: 5, perHostile: 3, draw: 1 } },
+  },
+  // ---------------------------------------------------------------- v4 · the table front
+  "server-rack": {
+    name: "Server Rack", subtitle: "HARDWARE / CHASSIS", cost: 2, rarity: "uncommon", target: "ground", role: "rack", art: "hardware", color: "#b5cf7a",
+    rules: `Place an uncabled rack: overloads, Spikes and blasts within ${REACH} wear it instead. Condition ${R.rackCondition}, no wreckage. Gain 3 block.`, values: { block: 3 },
+    upgrade: { cost: 1, rules: `Place an uncabled rack: overloads, Spikes and blasts within ${REACH} wear it instead. Condition ${R.rackCondition}, no wreckage. Gain 3 block.` },
+  },
+  "redundant-psu": {
+    name: "Redundant PSU", subtitle: "SYSTEM / POWER", cost: 1, rarity: "common", target: "node", art: "hardware", color: "#e3c170", exhaust: true,
+    rules: `Restore a device to full condition and raise its maximum condition to ${R.psuCondition} this battle. Gain 2 block. Exhaust.`, values: { block: 2 },
+    upgrade: { cost: 0, rules: `Restore a device to full condition and raise its maximum condition to ${R.psuCondition} this battle. Gain 2 block. Exhaust.` },
+  },
+  "sentry-firewall": {
+    name: "Sentry Firewall", subtitle: "WARDEN / SECURITY", cost: 2, rarity: "uncommon", target: "ground", role: "firewall", art: "defense", color: "#f0a870", archetype: "warden",
+    rules: `Place a firewall (online: blocks ${R.firewallBreachBlock} breach / ${R.firewallStrikeBlock} strike). Its quarantine deals ${R.sentryQuarantine}, not ${R.quarantineDamage}; each installation it destroys: +${R.sentryReclaimBonus} shield.`,
+    upgrade: { rules: `Place a jam-protected firewall. Online, its quarantine deals ${R.sentryQuarantine}, not ${R.quarantineDamage}; each installation it destroys grants +${R.sentryReclaimBonus} shield.` },
+  },
+  "demolition-charge": {
+    name: "Demolition Charge", subtitle: "COMMON / DEMOLITION", cost: 1, rarity: "common", target: "instant", art: "program", color: "#e98a6a", exhaust: true,
+    rules: "Your focus packet deals +2 this turn. If an installation stands, destroy one of your choice. Exhaust.", values: { focusBonus: 2 },
+    upgrade: { rules: "Your focus packet deals +4 this turn. If an installation stands, destroy one of your choice. Exhaust.", values: { focusBonus: 4 } },
+  },
+  "field-repair": {
+    name: "Field Repair", subtitle: "COMMON / MAINTENANCE", cost: 0, rarity: "common", target: "instant", art: "defense", color: "#9fd6a4", exhaust: true,
+    rules: "Restore every device to full condition. Gain 2 block. Exhaust.", values: { block: 2 },
+    upgrade: { rules: "Restore every device to full condition. Gain 4 block. Draw 1. Exhaust.", values: { block: 4, draw: 1 } },
+  },
+  "rapid-redeploy": {
+    name: "Rapid Redeploy", subtitle: "ARCHITECT / REDEPLOY", cost: 1, rarity: "uncommon", target: "instant", art: "hardware", color: "#7fd3c4", archetype: "architect", exhaust: true,
+    rules: "Put a hardware card from your discard pile into your hand; it costs 1 less this turn. Exhaust.", values: { recover: 1, discount: 1 },
+    upgrade: { rules: "Put a hardware card from your discard pile into your hand; it costs 1 less this turn. Draw 1. Exhaust.", values: { recover: 1, discount: 1, draw: 1 } },
+  },
+  "phantom-node": {
+    name: "Phantom Node", subtitle: "GHOST / DECOY", cost: 0, rarity: "uncommon", target: "ground", role: "phantom", art: "hardware", color: "#7ef5e6", archetype: "ghost", exhaust: true,
+    rules: "Place a phantom off every route. It absorbs the next jam, cut, overload or installation, then fades. Exhaust.", values: { absorbs: 1 },
+    upgrade: { rules: "Place a phantom off every route. It absorbs the next two jams, cuts, overloads or installations, then fades. Exhaust.", values: { absorbs: 2 } },
   },
 };
 
@@ -540,4 +786,14 @@ export const RELICS: Record<RelicId, RelicDefinition> = {
   "bgp-hijack": { name: "BGP Hijack", subtitle: "BOSS · STOLEN ROUTES", tier: "boss", color: "#ff8a8a", rules: `+${R.bgpHijackDamage} damage every transmission. Enemy strikes and breaches deal +${R.bgpHijackEnemyBonus}.` },
   "sdn-controller": { name: "SDN Controller", subtitle: "BOSS · CONTROL PLANE", tier: "boss", color: "#7ef0c4", rules: "Patch Cable and Harden can be used twice per turn (Buffer stays once). Start each battle with 1 less energy." },
   "zero-trust": { name: "Zero Trust", subtitle: "BOSS · VERIFY ALL", tier: "boss", color: "#ffd98a", rules: "Firewalls block double. Cable cards and Patch Cable cost 1 more." },
+  // v4 common relics
+  "round-robin": { name: "Round Robin", subtitle: "SCHEDULER", tier: "common", color: "#9fd4e8", rules: `At the start of each battle every hostile takes ${R.roundRobinDamage} damage (reinforcements on arrival).` },
+  "ingress-filter": { name: "Ingress Filter", subtitle: "EDGE FILTER", tier: "common", color: "#c7b8e6", rules: `Every strike and breach against you deals ${R.ingressFilterReduce} less.` },
+  "priority-queue": { name: "Priority Queue", subtitle: "QOS MODULE", tier: "common", color: "#f2c77e", rules: `Your primary delivery deals +${R.priorityQueueBonus} against the hostile with the least remaining health.` },
+  "reinforced-frame": { name: "Reinforced Frame", subtitle: "CHASSIS KIT", tier: "common", color: "#c9b38c", rules: `Every device you deploy has ${R.reinforcedFrameCondition} more condition (${R.deviceCondition + R.reinforcedFrameCondition}; salvage and crate hardware ${R.salvageCondition + R.reinforcedFrameCondition}).` },
+  "field-engineer": { name: "Field Engineer", subtitle: "FIELD KIT", tier: "common", color: "#a9d99a", rules: "The first repair each turn costs 0." },
+  "bill-of-lading": { name: "Bill of Lading", subtitle: "CARGO MANIFEST", tier: "common", color: "#e0c48f", rules: "Crates are never empty (the empty share becomes credits) and undelivered messages offer three choices." },
+  // v4 boss relics
+  "storm-control": { name: "Storm Control", subtitle: "BOSS · RATE LIMITS", tier: "boss", color: "#8fc3ff", rules: `+1 energy every turn. Every hostile jam or cut that lands also deals ${R.stormControlDamage} damage to you.` },
+  "scorched-earth": { name: "Scorched Earth", subtitle: "BOSS · NO SURRENDER", tier: "boss", color: "#ff9b72", rules: `Whenever one of your actions or devices destroys an installation, its planter takes ${R.scorchedEarthDamage} (the focus if the planter is dead). Your devices deploy with ${R.scorchedEarthCondition} less condition.` },
 };

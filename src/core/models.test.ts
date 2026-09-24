@@ -6,8 +6,8 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import type { NetworkNode, Role } from "./types.ts";
 
 // The device-model contract from blender/README.md, checked on the committed GLBs.
-const ROLES: Role[] = ["client", "router", "switch", "firewall", "honeypot", "cache", "power", "balancer"];
-const FLAGS = new Set<keyof NetworkNode>(["fixed", "shielded", "upgraded", "amplified", "configured", "salvage", "stateful"]);
+const ROLES: Role[] = ["client", "router", "switch", "firewall", "honeypot", "cache", "power", "balancer", "rack", "phantom"];
+const FLAGS = new Set<keyof NetworkNode>(["fixed", "shielded", "upgraded", "amplified", "configured", "salvage", "stateful", "sentry"]);
 
 async function load(role: Role) {
   const bytes = readFileSync(new URL(`../../public/models/${role}.glb`, import.meta.url));

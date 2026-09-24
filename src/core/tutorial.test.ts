@@ -3,12 +3,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  combatPreview, endTurn, playGround, playInstant, playJunk, playLink, playProtocol, playZone,
-  prepareCard, relocateNode, scrubMalware, signalPaths, useConsole, type TurnResult,
+  aimChannel, combatPreview, endTurn, isWorn, livingEnemies, playGround, playInstant, playJunk, playLink, playProtocol, playZone,
+  prepareCard, relocateNode, repairNode, scrubInstallation, setFocus, signalPaths, useConsole, zoneForNode, type TurnResult,
 } from "./run.ts";
-import { CARDS } from "./cards.ts";
-import type { CardId, RunState } from "./types.ts";
-import { LESSONS, createLessonRun, lessonGuard, lessonProgress, nextLesson, type LessonAction, type LessonId, type LessonProgress } from "../tutorial/lessons.ts";
+import { CARDS, RULES } from "./cards.ts";
+import { ENEMIES } from "./enemies.ts";
+import type { CardId, Port, RunState, Zone } from "./types.ts";
+import {
+  LESSONS, createLessonRun, lessonById, lessonGuard, lessonProgress, nextLesson,
+  type LessonAction, type LessonId, type LessonProgress, type LessonView,
+} from "../tutorial/lessons.ts";
 
 type Result = { ok: boolean; message: string };
 
@@ -34,16 +38,18 @@ function cable(run: RunState, a: string, b: string, card = "fiber") {
 
 class Session {
   readonly id: LessonId;
-  readonly run: RunState;
+  run: RunState;
   progress: LessonProgress;
   last?: TurnResult;
+  /** The interface state a lesson reads: the selected port and acknowledged reading steps. */
+  view: LessonView = { port: null, read: [] };
   constructor(id: LessonId) {
     this.id = id;
     this.run = createLessonRun(id);
-    this.progress = lessonProgress(id, this.run);
+    this.progress = lessonProgress(id, this.run, undefined, undefined, this.view);
   }
   update() {
-    this.progress = lessonProgress(this.id, this.run, this.last, this.progress);
+    this.progress = lessonProgress(this.id, this.run, this.last, this.progress, this.view);
     return this.progress;
   }
   transmit() {
@@ -59,7 +65,7 @@ test("every battle lesson builds a legal, clean training board", () => {
   for (const lesson of LESSONS.filter(item => item.kind === "battle")) {
     const run = createLessonRun(lesson.id);
     assert.equal(run.phase, "battle", lesson.id);
-    assert.ok(run.enemy && run.enemy.hp > 0, lesson.id);
+    assert.ok(run.enemies[0] && run.enemies[0].hp > 0, lesson.id);
     assert.equal(run.terrain, null, `${lesson.id}: no random terrain`);
     for (const card of [...run.hand, ...run.drawPile]) assert.ok(CARDS[card as CardId], `${lesson.id}: unknown card ${card}`);
     const ids = run.topology.nodes.map(node => node.id);
@@ -84,6 +90,9 @@ test("lesson setups announce the intended enemy action", () => {
   assert.equal(kind("traps"), "jam");
   assert.equal(kind("console-ghost"), "strike");
   assert.equal(kind("danger"), "charge");
+  assert.equal(kind("aim-signal"), "strike", "the Leech strikes, fed by the Drone's uplink");
+  assert.equal(kind("clear-ground"), "install", "the Nest hatches its next Jammer");
+  assert.equal(kind("wardens"), "charge", "the Regent's charge turn");
 });
 
 test("01 · first signal: router, two cables, transmit", () => {
@@ -127,7 +136,7 @@ test("03 · reroute: without the policy, the second channel survives and Hot Pat
   cable(s.run, router, "omega");
   s.transmit();
   assert.ok(s.done("survive"));
-  assert.ok(s.run.faultLink, "the cut landed");
+  assert.ok(s.run.faultLinks.length, "the cut landed");
   assert.equal(s.done("restore"), false);
   ok(playInstant(s.run, index(s.run, "patch")), "hot patch");
   assert.ok(s.update().complete);
@@ -142,7 +151,7 @@ test("04 · online devices: firewall online anywhere, then a cache server", () =
   assert.ok(before.shieldTerms.some(term => /firewall/i.test(term.label)), "firewall counted against the breach");
   s.transmit();
   assert.ok(s.done("transmit"));
-  if (s.run.faultLink || s.run.faultNode) ok(playInstant(s.run, index(s.run, "patch")), "patch the cut");
+  if (s.run.faultLinks.length || s.run.faultNodes.length) ok(playInstant(s.run, index(s.run, "patch")), "patch the cut");
   const cache = place(s.run, "cache-server", -2.6, 2.6);
   cable(s.run, "alpha", cache);
   cable(s.run, cache, "router1");
@@ -228,7 +237,7 @@ test("07 · ghost console: buffer, protect the line, stack, flush", () => {
 
 test("08 · danger: scrub, delete the worm, prepare, interrupt the ultimate", () => {
   const s = new Session("danger");
-  ok(scrubMalware(s.run, "malware1"), "scrub");
+  ok(scrubInstallation(s.run, "tap1"), "scrub");
   assert.ok(s.done("scrub"));
   ok(playJunk(s.run, index(s.run, "worm")), "delete worm");
   assert.ok(s.done("worm"));
@@ -249,7 +258,7 @@ test("08 · danger: scrub, delete the worm, prepare, interrupt the ultimate", ()
 
 test("08 · danger: bracing the ultimate is the other valid answer", () => {
   const s = new Session("danger");
-  ok(scrubMalware(s.run, "malware1"), "scrub");
+  ok(scrubInstallation(s.run, "tap1"), "scrub");
   ok(playJunk(s.run, index(s.run, "worm")), "delete worm");
   ok(prepareCard(s.run, index(s.run, "zero-day")), "prepare");
   s.update();
@@ -362,5 +371,279 @@ test("progress is sticky and the menu order chains lessons", () => {
   assert.ok(s.done("cover"));
   assert.equal(nextLesson("first-signal")?.id, "read-the-enemy");
   assert.equal(nextLesson("console-architect")?.id, "danger", "console variants share chapter 7");
-  assert.equal(nextLesson("expedition"), undefined);
+  assert.equal(nextLesson("danger")?.id, "expedition");
+  assert.equal(nextLesson("expedition")?.id, "aim-signal", "the table-front drills follow the guide");
+  assert.equal(nextLesson("aim-signal")?.id, "clear-ground");
+  assert.equal(nextLesson("clear-ground")?.id, "wardens");
+  assert.equal(nextLesson("wardens"), undefined);
+  assert.deepEqual(["aim-signal", "clear-ground", "wardens"].map(id => lessonById(id)?.chapter), [10, 11, 12]);
+  assert.deepEqual(LESSONS.slice(-3).map(lesson => lesson.id), ["aim-signal", "clear-ground", "wardens"], "menu order");
+});
+
+// ---------------------------------------------------------------------------
+// The table-front drills (chapters 10–12): packs, installations, the charge turn with adds.
+
+const bandwidth = (run: RunState) => combatPreview(run).deliveries.filter(item => !item.primary);
+const burstOf = (card: string) => CARDS[card as CardId].values.burst ?? 0;
+
+test("10 · aim the signal: select, aim channel 2 at the Drone, transmit; focus the next Drone, overflow", () => {
+  const s = new Session("aim-signal");
+  const drone = s.run.enemies.find(enemy => enemy.id === "relay-drone")!;
+  assert.equal(drone.port, "left");
+  assert.equal(s.run.enemies.find(enemy => enemy.port === "centre")?.id, "leech");
+  assert.equal(s.run.focus, "centre", "rule 15: the leader is the default focus");
+  const start = combatPreview(s.run);
+  assert.equal(start.deliveries.length, 2, "two channels, two deliveries");
+  assert.ok(start.deliveries.every(item => item.port === "centre"), "both land on the focus");
+  const leech = () => combatPreview(s.run).hostiles.find(item => item.id === "leech")!;
+  assert.ok(leech().terms.some(term => /uplink/i.test(term.label)), "the Drone feeds the Leech's strike");
+  const fed = leech().raw;
+  assert.equal(s.progress.focus, '.port-row[data-port="left"]');
+
+  // Step 1 is reading: the HUD's selection completes it.
+  s.view.port = "centre";
+  assert.equal(s.done("select"), false, "another port is not the step");
+  s.view.port = "left";
+  assert.ok(s.done("select"));
+  s.view.port = null;
+  assert.ok(s.done("select"), "a met selection step stays met");
+
+  const second = start.deliveries[1];
+  assert.match(s.progress.focus, new RegExp(`data-aim="${second.channelKey.replace("|", "\\|")}"\\]\\[data-aim-port="left"`), "the spotlight is channel 2's L stud");
+  ok(aimChannel(s.run, second.channelKey, "left"), "aim channel 2");
+  assert.ok(s.done("aim"));
+  const aimed = combatPreview(s.run);
+  assert.equal(aimed.ports.left?.lethal, true, "channel 2 alone kills the Drone");
+  assert.equal(aimed.ports.left?.packet, drone.hp);
+  assert.equal(aimed.ports.centre?.packet, start.deliveries[0].amount, "the primary stays on the Leech");
+  assert.equal(leech().raw, fed - RULES.uplinkBonus, "the uplink is gone with the Drone");
+  assert.equal(aimed.arrivals?.enemyId, "relay-drone", "a second Drone is announced");
+
+  s.transmit();
+  assert.ok(s.done("strike"));
+  assert.ok(s.last!.deaths.length || !s.run.enemies.some(enemy => enemy.uid === drone.uid && enemy.hp > 0), "the first Drone fell");
+  const next = s.run.enemies.find(enemy => enemy.id === "relay-drone" && enemy.hp > 0)!;
+  assert.ok(next && next.uid !== drone.uid, "the reinforcement arrived");
+  assert.equal(next.port, "left", "it takes the emptied left port");
+  assert.equal(s.run.focus, "centre");
+  assert.equal(s.done("focus"), false);
+  assert.ok(combatPreview(s.run).ports.left!.packet < next.hp, "channel 2 alone no longer kills");
+  assert.match(s.progress.focus, /data-focus-port="left"\] \|\| \.port-row\[data-port="left"\]/);
+
+  ok(setFocus(s.run, "left"), "focus the new Drone");
+  assert.ok(s.done("focus"));
+  const focused = combatPreview(s.run).ports.left!;
+  assert.ok(focused.lethal && focused.overflowOut > 0 && focused.overflowTo === "centre", "the surplus overflows into the Leech");
+  assert.ok(s.transmit().complete);
+  assert.equal(livingEnemies(s.run).length, 1, "only the Leech stands");
+});
+
+test("11 · clear the ground: scrub twice, repair ahead of the telegraphed breakdown, purge the band", () => {
+  const s = new Session("clear-ground");
+  const jammer = s.run.installations.find(item => item.kind === "jammer")!;
+  const spike = s.run.installations.find(item => item.kind === "spike")!;
+  const router = () => s.run.topology.nodes.find(node => node.id === "router1")!;
+  assert.equal(signalPaths(s.run).length, 1, "one route");
+  assert.ok(isWorn(router()), "the router is worn");
+  assert.equal(combatPreview(s.run).intent?.install, "jammer", "the Nest hatches a Jammer next");
+  // The telegraphed breakdown: the forecast names it a turn ahead.
+  const start = combatPreview(s.run);
+  assert.ok(start.wear.some(item => item.nodeId === "router1" && item.breaks), "the Spike would break the worn router");
+  assert.ok(start.installationEffects.some(item => item.id === jammer.id && item.effect === "jam" && item.target === "router1"), "the Jammer jams the router");
+  assert.match(s.progress.focus, /\.ledger-chip\.is-installation\[data-scrub="jammer1"\]/, "the spotlight is the Jammer's ledger tag");
+
+  ok(scrubInstallation(s.run, jammer.id), "scrub 1");
+  assert.ok(s.done("scrub1"));
+  assert.equal(s.done("scrub2"), false);
+  ok(scrubInstallation(s.run, jammer.id), "scrub 2");
+  assert.ok(s.done("scrub2"));
+  assert.equal(s.run.installations.some(item => item.kind === "jammer"), false, "destroyed at 0");
+  assert.ok((s.run.reclaim ?? 0) >= RULES.reclaimShield, "Reclaim shield");
+  assert.match(s.progress.focus, /\[data-repair="router1"\]/, "the spotlight is the Repair plate");
+  assert.match(s.progress.detail, /breaks ROUTER1/, "the coach quotes the breakdown line");
+
+  ok(repairNode(s.run, "router1"), "repair");
+  assert.ok(s.done("repair"));
+  assert.equal(combatPreview(s.run).breakdowns.length, 0, "repaired: no breakdown this phase");
+  s.transmit();
+  assert.ok(s.done("transmit"));
+  assert.ok(s.run.topology.nodes.some(node => node.id === "router1"), "the router stands");
+  assert.equal(signalPaths(s.run).length, 1, "and carries the signal: nothing jammed it");
+
+  const second = s.run.installations.find(item => item.kind === "jammer")!;
+  assert.ok(second, "the second Jammer landed");
+  const band = zoneForNode(second);
+  assert.equal(zoneForNode(spike), band, "the Spike shares its band: one purge answers both");
+  const threat = combatPreview(s.run);
+  assert.ok(threat.wear.some(item => item.nodeId === "router1" && item.breaks), "worn again: the forecast warns of the breakdown");
+  assert.ok(s.progress.coach.includes(band.toUpperCase()));
+  ok(playZone(s.run, index(s.run, "purge-field"), band), "purge");
+  assert.equal(s.run.installations.length, 0, "the band is clear");
+  assert.ok(s.update().complete);
+  assert.equal(combatPreview(s.run).breakdowns.length, 0);
+});
+
+test("12 · the crown and its wardens: read, aim both bandwidth channels, prepare, break Crownfall", () => {
+  const s = new Session("wardens");
+  const regent = s.run.enemies.find(enemy => enemy.id === "regent")!;
+  const adds = () => s.run.enemies.filter(enemy => enemy.role === "add" && enemy.hp > 0);
+  const base = ENEMIES.regent.boss!.breakDamage, bonus = RULES.addBreakBonus;
+  assert.equal(regent.port, "centre");
+  assert.deepEqual(adds().map(add => [add.id, add.port]), [["gate-warden", "left"], ["gate-warden", "right"]], "two Gate Wardens at the outer ports");
+  const start = combatPreview(s.run);
+  assert.equal(start.intent?.kind, "charge");
+  assert.ok(start.hostiles.filter(item => item.id === "gate-warden").every(item => item.state === "dormant"), "rising: they act from the ultimate");
+  assert.equal(start.deliveries.length, 3, "three channels");
+  assert.ok(s.run.topology.nodes.some(node => node.role === "balancer") && start.online.some(id => id.startsWith("balancer")), "a Load Balancer online");
+  const total = start.deliveries.reduce((sum, item) => sum + item.amount, 0);
+  const burst = burstOf("pulse");
+  // The drill's arithmetic: both Wardens alive, not even the burst breaks; one down, it does.
+  assert.ok(total + burst < base + 2 * bonus, "with both Wardens the break is out of reach");
+  assert.ok(total < base + bonus && total + burst >= base + bonus, "one Warden down: the prepared burst is the difference");
+
+  assert.ok(s.progress.reading, "step 1 is a reading step");
+  assert.equal(s.progress.focus.split("||")[0].trim(), ".boss-window");
+  assert.ok(s.progress.detail.includes(String(base + 2 * bonus)), "the coach reads the threshold with both adds");
+  assert.deepEqual(s.progress.meter, { base, bonus, adds: 2, standing: 2, packet: total, add: "Warden" }, "and draws it");
+  s.view.read = ["read"];
+  assert.ok(s.done("read"));
+  assert.equal(s.progress.reading, false);
+
+  for (const item of bandwidth(s.run)) ok(aimChannel(s.run, item.channelKey, "left"), `aim channel ${item.index + 1}`);
+  assert.ok(s.done("aim"));
+  const aimed = combatPreview(s.run);
+  assert.equal(aimed.ports.left?.lethal, true, "both bandwidth deliveries kill the left Warden");
+  ok(prepareCard(s.run, index(s.run, "pulse")), "prepare Packet Burst");
+  assert.ok(s.done("prepare"));
+  assert.ok(s.progress.coach.includes(String(base + bonus)), "the coach names the lower threshold");
+  s.transmit();
+  assert.ok(s.done("charge"));
+  assert.equal(adds().length, 1, "the left Warden fell");
+  const ultimate = combatPreview(s.run);
+  assert.ok(ultimate.intent?.ultimate, "Crownfall comes now");
+  assert.equal(ultimate.ports.centre?.breakThreshold, base + bonus, "the threshold fell with the Warden");
+  assert.ok(ultimate.deliveries.every(item => item.port === "centre"), "aims at the fallen port return to the focus");
+  assert.equal(ultimate.ports.centre?.breaks, false, "without the burst it lands");
+  ok(playInstant(s.run, index(s.run, "pulse")), "the prepared burst");
+  assert.equal(combatPreview(s.run).ports.centre?.breaks, true);
+  assert.ok(s.transmit().complete);
+  assert.ok(s.last!.interrupted);
+  assert.equal(s.last!.integrityDamage, 0);
+});
+
+/** Every move a player could try on a drill board right now. */
+function candidates(run: RunState): LessonAction[] {
+  const preview = combatPreview(run);
+  const actions: LessonAction[] = [{ kind: "transmit" }];
+  for (const card of new Set(run.hand)) actions.push({ kind: "card", card }, { kind: "prepare", card });
+  const ports: (Port | null)[] = ["left", "centre", "right", null];
+  for (const item of preview.deliveries) for (const port of ports) actions.push({ kind: "aim", key: item.channelKey, port });
+  for (const enemy of livingEnemies(run)) actions.push({ kind: "focus", port: enemy.port });
+  for (const item of run.installations) actions.push({ kind: "scrub", installation: item.id });
+  for (const node of run.topology.nodes.filter(node => !node.fixed)) actions.push({ kind: "repair", node: node.id });
+  const zones: Zone[] = ["north", "center", "south"];
+  for (const card of new Set(run.hand.filter(card => CARDS[card].target === "zone"))) for (const zone of zones) actions.push({ kind: "zone", card, zone });
+  const device = run.topology.nodes.find(node => !node.fixed)!;
+  actions.push({ kind: "link", card: "fiber", a: "alpha", b: device.id }, { kind: "link", a: "alpha", b: device.id });
+  actions.push({ kind: "ground", card: "router", zone: "center" }, { kind: "move", node: device.id, zone: "south" });
+  return actions;
+}
+const describe = (action: LessonAction) => JSON.stringify(action);
+/** At every step, exactly the step's own moves pass the rails. */
+function railsHold(s: Session, allowed: (action: LessonAction) => boolean) {
+  const progress = s.update();
+  const step = progress.goals[progress.current]?.id;
+  for (const action of candidates(s.run)) {
+    const objection = lessonGuard(s.id, s.run, progress, action);
+    if (allowed(action)) assert.equal(objection, null, `${s.id} · ${step}: ${describe(action)} should be playable`);
+    else assert.ok(objection && objection.length > 10, `${s.id} · ${step}: ${describe(action)} must be blocked`);
+  }
+}
+
+test("training rails: the aim drill plays only the current step's move", () => {
+  const s = new Session("aim-signal");
+  railsHold(s, () => false);
+  s.view.port = "left";
+  const key = bandwidth(s.run)[0].channelKey;
+  railsHold(s, action => action.kind === "aim" && action.key === key && action.port === "left");
+  ok(aimChannel(s.run, key, "left"), "aim");
+  railsHold(s, action => action.kind === "transmit");
+  s.transmit();
+  railsHold(s, action => action.kind === "focus" && action.port === "left");
+  ok(setFocus(s.run, "left"), "focus");
+  railsHold(s, action => action.kind === "transmit");
+});
+
+test("training rails: the table-front drill plays only the current step's move", () => {
+  const s = new Session("clear-ground");
+  const scrubJammer = (action: LessonAction) => action.kind === "scrub" && action.installation === "jammer1";
+  railsHold(s, scrubJammer);
+  ok(scrubInstallation(s.run, "jammer1"), "scrub");
+  railsHold(s, scrubJammer);
+  ok(scrubInstallation(s.run, "jammer1"), "scrub");
+  railsHold(s, action => action.kind === "repair" && action.node === "router1");
+  ok(repairNode(s.run, "router1"), "repair");
+  railsHold(s, action => action.kind === "transmit");
+  s.transmit();
+  const band = zoneForNode(s.run.installations.find(item => item.kind === "jammer")!);
+  railsHold(s, action => (action.kind === "card" && action.card === "purge-field") || (action.kind === "zone" && action.card === "purge-field" && action.zone === band));
+});
+
+test("training rails: the wardens drill plays only the current step's move", () => {
+  const s = new Session("wardens");
+  railsHold(s, () => false);
+  s.view.read = ["read"];
+  const keys = bandwidth(s.run).map(item => item.channelKey);
+  railsHold(s, action => action.kind === "aim" && keys.includes(action.key) && action.port === "left");
+  ok(aimChannel(s.run, keys[0], "left"), "aim one");
+  railsHold(s, action => action.kind === "aim" && keys.includes(action.key) && action.port === "left");
+  ok(aimChannel(s.run, keys[1], "left"), "aim both");
+  railsHold(s, action => action.kind === "prepare" && CARDS[action.card].base === "pulse");
+  ok(prepareCard(s.run, index(s.run, "pulse")), "prepare");
+  railsHold(s, action => action.kind === "transmit");
+  s.transmit();
+  railsHold(s, action => action.kind === "card" && CARDS[action.card].base === "pulse");
+  ok(playInstant(s.run, index(s.run, "pulse")), "burst");
+  railsHold(s, action => action.kind === "transmit");
+});
+
+test("training rails: undo (Z) reopens a drill step instead of stranding it", () => {
+  const s = new Session("aim-signal");
+  s.view.port = "left";
+  const key = bandwidth(s.run)[0].channelKey;
+  const before = structuredClone(s.run);
+  ok(aimChannel(s.run, key, "left"), "aim");
+  assert.ok(s.done("aim"));
+  s.run = before;
+  assert.equal(s.done("aim"), false, "the undone aim reopens its step");
+  assert.ok(s.done("select"), "a reading step stays met");
+  assert.ok(guard(s, { kind: "transmit" }), "and the transmission waits for it again");
+
+  const w = new Session("wardens");
+  w.view.read = ["read"];
+  for (const item of bandwidth(w.run)) ok(aimChannel(w.run, item.channelKey, "left"), "aim");
+  ok(prepareCard(w.run, index(w.run, "pulse")), "prepare");
+  assert.ok(w.done("prepare"));
+  w.run.hand.push(w.run.preparedCard!);
+  w.run.preparedCard = null;
+  assert.equal(w.done("prepare"), false, "a released card reopens the prepare step");
+  assert.ok(guard(w, { kind: "transmit" }), "Crownfall is not faced without the burst");
+});
+
+test("training rails: the drills keep their escapes — shield at lethal, transmit once the goal is met", () => {
+  const s = new Session("aim-signal");
+  assert.ok(guard(s, { kind: "card", card: "guard" }), "shield waits outside its step");
+  s.run.integrity = 1;
+  assert.ok(combatPreview(s.run).incoming >= 1);
+  assert.equal(guard(s, { kind: "card", card: "guard" }), null, "unless the hit would end the drill");
+  const w = new Session("wardens");
+  w.view.read = ["read"];
+  for (const item of bandwidth(w.run)) ok(aimChannel(w.run, item.channelKey, "left"), "aim");
+  ok(prepareCard(w.run, index(w.run, "pulse")), "prepare");
+  w.transmit();
+  ok(playInstant(w.run, index(w.run, "pulse")), "burst");
+  assert.equal(guard(w, { kind: "transmit" }), null, "the break is forecast: Transmit is free");
+  const c = new Session("clear-ground");
+  c.run.energy = 0;
+  assert.equal(guard(c, { kind: "transmit" }), null, "no energy left to scrub: the drill moves on");
 });

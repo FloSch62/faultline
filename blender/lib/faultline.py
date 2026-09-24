@@ -1,8 +1,13 @@
-"""Shared building blocks for FAULTLINE device models.
+"""Shared building blocks for FAULTLINE models: devices, installations and props.
 
 Units are game units. Blender is Z-up; the glTF export turns the model Y-up and
 Blender's -Y becomes three.js +Z, the side that faces the table camera. Build
-every device facing -Y.
+every body facing -Y.
+
+Three families share the materials, hooks and export:
+  device        origin at the plinth base, body from PLINTH_TOP (the plinth is built in code)
+  installation  origin at the table surface, no plinth (hostile permanents: tap, jammer, ...)
+  prop          origin at the table surface, no plinth (crate, message fragment)
 
 The contract with src/three/models.ts lives in blender/README.md.
 """
@@ -26,6 +31,22 @@ MAX_ORBIT = 0.9
 # The device label hovers at 2.86.
 MAX_TOP = 2.45
 
+# Per-family envelope (world space, metres) and budget. A script may raise its own ceiling with a
+# module-level MAX_TOP (client, power, tap) or lower it (breaker), and loosen a budget key with a
+# module-level BUDGET dict (documented in its docstring).
+ENVELOPES = {
+    "device": {"bottom": PLINTH_TOP - 0.2, "top": MAX_TOP, "radius": MAX_RADIUS, "orbit": MAX_ORBIT},
+    # Installations stand on the table (z 0) beside devices >= 1.55 away; their label floats at 2.3.
+    "installation": {"bottom": 0.0, "top": 1.9, "radius": 0.6, "orbit": 0.75},
+    # Props: small table objects without a label (World.ts labels the crate).
+    "prop": {"bottom": 0.0, "top": 1.2, "radius": 0.5, "orbit": 0.5},
+}
+BUDGETS = {
+    "device": {"triangles": 6000, "draw_calls": 20, "bytes": 250 * 1024},
+    "installation": {"triangles": 3000, "draw_calls": 8, "bytes": 120 * 1024},
+    "prop": {"triangles": 1500, "draw_calls": 4, "bytes": 60 * 1024},
+}
+
 # Preview-only copy of COLORS in src/three/devices.ts. The game recolours every
 # role_* material at runtime, so these values only affect Blender renders.
 ROLE_COLORS = {
@@ -37,6 +58,17 @@ ROLE_COLORS = {
     "cache": 0x7FB0F2,
     "power": 0xF4D25C,
     "balancer": 0xB69CFF,
+    "rack": 0xB5CF7A,
+    "phantom": 0x7EF5E6,
+    # Installations: the colour of the hostiles that plant them (World.ts passes the same palette).
+    "tap": 0xFF3F8E,
+    "jammer": 0x87B5FF,
+    "spike": 0xE49B72,
+    "anchor": 0xBBA0E8,
+    "breaker": 0xFF777E,
+    # Props carry no role colour; their role_* accents (if any) preview in brass.
+    "crate": 0xE0B872,
+    "fragment": 0xE0B872,
 }
 
 # Lit materials: (base colour, metallic, roughness, emission colour, emission strength).
@@ -53,7 +85,7 @@ LIT = {
     "glass_smoke": (0x1A2226, 0.2, 0.12, 0x000000, 0.0),
 }
 
-# Unlit materials become THREE.MeshBasicMaterial. Value: (colour, opacity).
+# Unlit materials become THREE.MeshBasicMaterial. Value: (colour, opacity[, double_sided]).
 GLOW = {
     "glow_teal": (0x62FCE3, 1.0),
     "glow_teal_deep": (0x1F98AC, 1.0),
@@ -63,12 +95,19 @@ GLOW = {
     "glow_white": (0xFFF4DE, 1.0),
     "glow_green": (0x71F0C8, 1.0),
     "glow_gold": (0xFFD28A, 1.0),
+    # Installations and props.
+    "glow_uplink": (0x9D5BFF, 0.35, True),  # the Tap's uplink funnel (today's MALWARE_ACCENT), double-sided
+    "glow_band": (0xF2E4C4, 1.0),  # ivory hazard bands
+    "glow_cap": (0xFF4B4B, 0.9),  # red glass (the Breaker Charge's cap)
+    "glow_inner": (0xFFB15C, 1.0),  # amber light inside the crate
+    "glow_ribbon": (0xFFE0A6, 0.7, True),  # the message fragment's pale amber ribbon, double-sided
 }
 
 # Unlit wireframes (THREE.MeshBasicMaterial with wireframe: true). Value: (colour, opacity).
 WIRE = {
     "wire_gold": (0xFFD6A4, 0.3),
     "wire_white": (0xE8F4FF, 0.5),
+    "wire_chain": (0xE2BE82, 0.95),  # brass chain links drawn as line art (see lines())
 }
 
 # Role-tinted materials: the runtime swaps in the role colour.
@@ -135,7 +174,8 @@ def material(name, role="router"):
     if name in LIT:
         return lit(name, *LIT[name])
     if name in GLOW:
-        return unlit(name, *GLOW[name])
+        color, opacity, *sided = GLOW[name]
+        return unlit(name, color, opacity, double_sided=bool(sided and sided[0]))
     if name in WIRE:
         return unlit(name, *WIRE[name])
     if name == "role_luminous":
@@ -330,6 +370,112 @@ def sphere(name, radius, location, mat, segments=24, rings=16):
     return finish(from_bmesh(name, bm, mat, location), 0, smooth=True, angle=89, weighted=False)
 
 
+def lines(name, segments, mat, location=(0, 0, 0), offset=0.003):
+    """Line art for wire_* / role_wire materials. three.js draws every triangle edge of a
+    wireframe material, so a quad would show its diagonal; here each segment (a, b) becomes one
+    sliver triangle that reads as a single clean line. Use it for cages, chains and outlines."""
+    bm = bmesh.new()
+    up = Vector((0, 0, 1))
+    for a, b in segments:
+        a, b = Vector(a), Vector(b)
+        side = (b - a).cross(up)
+        if side.length < 1e-6:
+            side = (b - a).cross(Vector((1, 0, 0)))
+        side.normalize()
+        bm.faces.new((bm.verts.new(a), bm.verts.new(b), bm.verts.new((a + b) / 2 + side * offset)))
+    return finish(from_bmesh(name, bm, mat, location), 0, smooth=False)
+
+
+def loop(points, closed=True):
+    """Consecutive (a, b) segments along a polyline, for lines()."""
+    points = [tuple(p) for p in points]
+    pairs = list(zip(points, points[1:]))
+    return pairs + [(points[-1], points[0])] if closed else pairs
+
+
+def _frames(points):
+    """Parallel-transport frames (tangent, normal) along a polyline: no sudden twists."""
+    points = [Vector(p) for p in points]
+    count = len(points)
+    tangents = [(points[min(i + 1, count - 1)] - points[max(i - 1, 0)]).normalized() for i in range(count)]
+    normal = tangents[0].cross(Vector((0, 0, 1)))
+    if normal.length < 1e-6:
+        normal = tangents[0].cross(Vector((1, 0, 0)))
+    normal.normalize()
+    frames = []
+    for i, tangent in enumerate(tangents):
+        if i:
+            normal = tangents[i - 1].rotation_difference(tangent) @ normal
+            normal = (normal - tangent * normal.dot(tangent)).normalized()
+        frames.append((points[i], tangent, normal))
+    return frames
+
+
+def sweep(name, points, radius, mat, sides=6, caps=True, radii=None, bevel=0.0):
+    """A tube of `sides` along a polyline (a cable, a fuse coil, a bent strut). `radii` tapers it."""
+    bm = bmesh.new()
+    rings = []
+    for i, (point, tangent, normal) in enumerate(_frames(points)):
+        binormal = tangent.cross(normal)
+        r = radii[i] if radii else radius
+        rings.append([bm.verts.new(point + (normal * math.cos(a) + binormal * math.sin(a)) * r)
+                      for a in (math.tau * k / sides for k in range(sides))])
+    for ring_a, ring_b in zip(rings, rings[1:]):
+        for k in range(sides):
+            bm.faces.new((ring_a[k], ring_a[(k + 1) % sides], ring_b[(k + 1) % sides], ring_b[k]))
+    if caps:
+        bm.faces.new(list(reversed(rings[0])))
+        bm.faces.new(rings[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    return finish(from_bmesh(name, bm, mat), bevel, smooth=True, angle=60, weighted=False)
+
+
+def strip(name, points, widths, mat, twist=0.0, location=(0, 0, 0)):
+    """A flat ribbon along a polyline (use a double-sided material). `widths` per point (or one
+    number); `twist` turns the ribbon about its path by that many radians from start to end."""
+    bm = bmesh.new()
+    frames = _frames(points)
+    pairs = []
+    for i, (point, tangent, normal) in enumerate(frames):
+        width = widths[i] if isinstance(widths, (list, tuple)) else widths
+        angle = twist * i / max(1, len(frames) - 1)
+        across = Matrix.Rotation(angle, 3, tangent) @ normal
+        pairs.append((bm.verts.new(point - across * width / 2), bm.verts.new(point + across * width / 2)))
+    for (a0, a1), (b0, b1) in zip(pairs, pairs[1:]):
+        bm.faces.new((a0, a1, b1, b0))
+    return finish(from_bmesh(name, bm, mat, location), 0, smooth=True, angle=80, weighted=False)
+
+
+def tetrahedron(name, radius, location, mat, rotation=(0, 0, 0)):
+    bm = bmesh.new()
+    verts = [bm.verts.new(Vector(v).normalized() * radius) for v in ((1, 1, 1), (1, -1, -1), (-1, 1, -1), (-1, -1, 1))]
+    for face in ((0, 1, 2), (0, 3, 1), (0, 2, 3), (1, 3, 2)):
+        bm.faces.new([verts[i] for i in face])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    return finish(from_bmesh(name, bm, mat, location, rotation), 0, smooth=False)
+
+
+def dome(name, radius, height, z, mat, xy=(0, 0), segments=20, rings=6, cap=True):
+    """A spherical cap standing on z with its rim at `radius` and its crown `height` above it."""
+    bm = bmesh.new()
+    rows = []
+    for k in range(rings):
+        t = k / rings * math.pi / 2
+        r, h = math.cos(t) * radius, math.sin(t) * height
+        rows.append([bm.verts.new((math.cos(a) * r, math.sin(a) * r, h)) for a in (math.tau * i / segments for i in range(segments))])
+    top = bm.verts.new((0, 0, height))
+    for row_a, row_b in zip(rows, rows[1:]):
+        for i in range(segments):
+            j = (i + 1) % segments
+            bm.faces.new((row_a[i], row_a[j], row_b[j], row_b[i]))
+    for i in range(segments):
+        bm.faces.new((rows[-1][i], rows[-1][(i + 1) % segments], top))
+    if cap:
+        bm.faces.new(list(reversed(rows[0])))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    return finish(from_bmesh(name, bm, mat, (xy[0], xy[1], z)), 0, smooth=True, angle=60, weighted=False)
+
+
 def polar(count, radius, start=-math.pi / 2):
     """(x, y, angle) around the axis; the first item sits on -Y (the camera side)."""
     for i in range(count):
@@ -360,6 +506,13 @@ def variant(obj, flag):
     return obj
 
 
+def part(obj, name):
+    """A named moving part that World.ts drives itself (the crate's lid). Like a hooked part it is
+    never merged into the static body and keeps identity rotation; its origin is the pivot."""
+    obj["part"] = name
+    return obj
+
+
 def parent(child, holder):
     """Parent while keeping the child's world transform."""
     # New objects have a stale matrix_world until the view layer re-evaluates.
@@ -368,6 +521,22 @@ def parent(child, holder):
     child.parent = holder
     child.matrix_world = world
     return child
+
+
+def transform(objects, matrix):
+    """Move already-built parts together by a world-space matrix (e.g. tilt a whole dish)."""
+    bpy.context.view_layer.update()
+    for obj in objects:
+        obj.matrix_world = matrix @ obj.matrix_world
+    return objects
+
+
+def rest_on(obj, z=0.0):
+    """Lift or drop a part so its lowest vertex touches `z` (a chip lying on the table)."""
+    bpy.context.view_layer.update()
+    lowest = min((obj.matrix_world @ v.co).z for v in obj.data.vertices)
+    obj.location.z += z - lowest
+    return obj
 
 
 def empty(name, location=(0, 0, 0)):
@@ -386,14 +555,14 @@ def bake_hook_transforms():
     """Hooked parts animate by adding to rotation.x/y/z in three.js, so they must start
     with identity rotation and unit scale: bake both into the mesh."""
     for obj in list(device_collection().all_objects):
-        if "hook" not in obj:
+        if "hook" not in obj and "part" not in obj:
             continue
         if obj.type == "MESH" and not obj.children:
             obj.data.transform(Matrix.LocRotScale(None, obj.rotation_euler, obj.scale))
             obj.rotation_euler = (0, 0, 0)
             obj.scale = (1, 1, 1)
         elif any(abs(v) > 1e-6 for v in obj.rotation_euler) or any(abs(v - 1) > 1e-6 for v in obj.scale):
-            raise ValueError(f"{obj.name}: a hooked holder with children needs identity rotation and scale")
+            raise ValueError(f"{obj.name}: a hooked (or part) holder with children needs identity rotation and scale")
 
 
 def _lineage(obj):
@@ -403,7 +572,7 @@ def _lineage(obj):
 
 
 def _is_static(obj):
-    if any("hook" in node or "variant" in node for node in _lineage(obj)):
+    if any("hook" in node or "variant" in node or "part" in node for node in _lineage(obj)):
         return False
     return obj.type == "MESH" and not obj.children
 
@@ -469,16 +638,34 @@ def stats():
     return {"triangles": triangles, "draw_calls": draws}
 
 
-def check_bounds(role, max_top=MAX_TOP):
-    """Report geometry that leaves the device envelope (evaluated vertices, world space)."""
+def part_triangles():
+    """Triangles per object (before consolidation), largest first: where to trim a model."""
+    bpy.context.view_layer.update()
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    counts = []
+    for obj in device_collection().all_objects:
+        if obj.type != "MESH":
+            continue
+        evaluated = obj.evaluated_get(depsgraph)
+        mesh = evaluated.to_mesh()
+        mesh.calc_loop_triangles()
+        counts.append((obj.name, len(mesh.loop_triangles)))
+        evaluated.to_mesh_clear()
+    return sorted(counts, key=lambda item: -item[1])
+
+
+def check_bounds(role, max_top=MAX_TOP, family="device"):
+    """Report geometry that leaves the family's envelope (evaluated vertices, world space).
+    Moving parts (hooked, or a named part) may reach the orbit radius."""
+    envelope = ENVELOPES[family]
     problems = []
     bpy.context.view_layer.update()
     depsgraph = bpy.context.evaluated_depsgraph_get()
     for obj in device_collection().all_objects:
         if obj.type != "MESH":
             continue
-        orbit = any("hook" in node for node in _lineage(obj))
-        limit = MAX_ORBIT if orbit else MAX_RADIUS
+        orbit = any("hook" in node or "part" in node for node in _lineage(obj))
+        limit = envelope["orbit"] if orbit else envelope["radius"]
         evaluated = obj.evaluated_get(depsgraph)
         mesh = evaluated.to_mesh()
         radius = top = 0.0
@@ -490,8 +677,18 @@ def check_bounds(role, max_top=MAX_TOP):
         evaluated.to_mesh_clear()
         if radius > limit + 0.01:
             problems.append(f"{obj.name}: radius {radius:.3f} > {limit}")
-        if top > max_top + 0.01 or bottom < PLINTH_TOP - 0.2:
-            problems.append(f"{obj.name}: z {bottom:.2f}..{top:.2f} outside {PLINTH_TOP - 0.2}..{max_top}")
+        if top > max_top + 0.01 or bottom < envelope["bottom"] - 0.01:
+            problems.append(f"{obj.name}: z {bottom:.2f}..{top:.2f} outside {envelope['bottom']:g}..{max_top:g}")
+    return problems
+
+
+def check_budget(report, family="device", overrides=None):
+    """Report a model over its family's triangle, draw-call or byte budget (bytes only once exported)."""
+    budget = {**BUDGETS[family], **(overrides or {})}
+    problems = []
+    for key in ("triangles", "draw_calls", "bytes"):
+        if key in report and report[key] > budget[key]:
+            problems.append(f"{key.replace('_', ' ')} {report[key]} > budget {budget[key]}")
     return problems
 
 
@@ -584,13 +781,20 @@ def _canonical_triangle_order(filepath):
 # Preview render (never exported)
 
 
-def _preview_plinth(role, collection):
+def _preview_plinth(role, collection, plinth=True):
     """Stand-in for the code-built plinth so renders show the device in context."""
     def add(obj):
         device_collection().objects.unlink(obj)
         collection.objects.link(obj)
         return obj
 
+    table = bpy.data.materials.new("preview_table")
+    bsdf = _principled(table)
+    bsdf.inputs["Base Color"].default_value = rgba(0x1E3033)
+    bsdf.inputs["Roughness"].default_value = 0.6
+    add(cylinder("preview_table", 3.5, 0.5, 0.64, table, sides=48))
+    if not plinth:
+        return
     dark, trim = material("metal_dark", role), material("metal_brass", role)
     add(cylinder("preview_base", 0.87, 0.64, 0.86, dark, sides=10, r_top=0.79))
     add(cylinder("preview_trim", 0.68, 0.87, 0.95, trim, sides=10, r_top=0.65))
@@ -600,19 +804,39 @@ def _preview_plinth(role, collection):
     bsdf.inputs["Emission Strength"].default_value = 2.0
     bsdf.inputs["Base Color"].default_value = (0, 0, 0, 1)
     add(torus("preview_skirt", 0.81, 0.028, (0, 0, 0.78), skirt, minor_segments=6))
+
+
+def _preview_table(role, collection):
+    """Installations and props stand straight on the table (z 0)."""
     table = bpy.data.materials.new("preview_table")
     bsdf = _principled(table)
     bsdf.inputs["Base Color"].default_value = rgba(0x1E3033)
     bsdf.inputs["Roughness"].default_value = 0.6
-    add(cylinder("preview_table", 3.5, 0.5, 0.64, table, sides=48))
+    obj = cylinder("preview_table", 3.5, -0.14, 0.0, table, sides=48)
+    device_collection().objects.unlink(obj)
+    collection.objects.link(obj)
 
 
-def render_preview(filepath, role, size=720, distance=4.3, elevation=34, azimuth=0, target_z=1.5):
+# Camera distance and look-at height per family (devices keep the original framing).
+PREVIEW_FRAMING = {"device": (4.3, 1.5), "installation": (4.4, 0.95), "prop": (2.8, 0.45)}
+
+
+def render_preview(filepath, role, size=720, distance=None, elevation=34, azimuth=0, target_z=None, family="device",
+                   plinth=True):
     """Eevee render from the table camera's angle (from +Z in three.js = -Y here)."""
+    distance = distance or PREVIEW_FRAMING[family][0]
+    target_z = PREVIEW_FRAMING[family][1] if target_z is None else target_z
     preview = bpy.data.collections.new("preview")
     bpy.context.scene.collection.children.link(preview)
-    _preview_plinth(role, preview)
+    if family != "device":
+        _preview_table(role, preview)
+    else:
+        # A device without a plinth (the phantom) still floats over the table top.
+        _preview_plinth(role, preview, plinth)
     for obj in device_collection().all_objects:
+        # Once per object: a second preview angle must not wireframe the wireframe.
+        if "preview_wire" in obj.modifiers:
+            continue
         if obj.type == "MESH" and obj.data.materials and obj.data.materials[0].name.startswith(("wire", "role_wire")):
             wires = obj.modifiers.new("preview_wire", "WIREFRAME")
             wires.thickness = 0.005

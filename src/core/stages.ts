@@ -25,8 +25,9 @@ export const STAGES = [
     description: "Beyond the gate, voices ring through glass routes that no longer lead anywhere. The Hollow Choir turns every answered signal into another layer of silence.",
     fragment: "One voice is an echo. Many voices can break the glass.",
     chapters: ["The Singing Wires", "Prismatic Crossroads", "The Bellmaker's Refuge", "Choirs of Static", "A Thousand Reflections", "The Quiet Vestry", "The Hollow Choir"],
-    encounters: ["storm", "widow", "marshal", "choir", "weaver"],
-    elites: ["marshal", "widow", "colossus"],
+    // v4: Static Nest joins the normals, Scrap Foreman the elites.
+    encounters: ["storm", "widow", "marshal", "choir", "weaver", "nest"],
+    elites: ["marshal", "widow", "colossus", "foreman"],
   },
   {
     name: "The Blackout Heart", numeral: "III", boss: "core", bossHp: 132,
@@ -39,8 +40,9 @@ export const STAGES = [
     description: "The last messages are still waiting behind the quarantine shell. Cross the failing backbone and show its keeper that a safe route finally exists.",
     fragment: "Retained. Not delivered. Not discarded.",
     chapters: ["The Dead Backbone", "Redline Crossing", "The Keeper's Drawer", "Beyond the Firewall", "The Undelivered", "The Last Safe Port", "The Blackout Core"],
-    encounters: ["colossus", "reaver", "serpent", "marshal", "choir", "weaver", "moth", "widow"],
-    elites: ["reaver", "colossus", "sentinel"],
+    // v4: Static Nest and Root Blight join the normals; Scrap Foreman and the Demolition Engine the elites.
+    encounters: ["colossus", "reaver", "serpent", "marshal", "choir", "weaver", "moth", "widow", "nest", "blight"],
+    elites: ["reaver", "colossus", "sentinel", "foreman", "demolition"],
   },
 ] as const;
 

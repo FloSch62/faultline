@@ -1,11 +1,11 @@
 /** Unknown signals: short encounters between fights. Every choice states its
  * trade-off; seeded results are rolled when the event opens and named up front. */
-import { CARDS, RELICS, canUpgrade, upgraded, baseCard } from "./cards.ts";
-import { ENEMIES } from "./enemies.ts";
+import { CARDS, RELICS, RULES, canUpgrade, upgraded, baseCard } from "./cards.ts";
+import { DESIGNATIONS, hostileName } from "./enemies.ts";
 import { STAGES } from "./stages.ts";
 import { beginBattle } from "./run.ts";
 import { random, shuffle } from "./util.ts";
-import { encounterHealth } from "./map.ts";
+import { eventRoom, roomScout } from "./encounter.ts";
 import { creditMultiplier, priceMultiplier } from "./ascension.ts";
 import { rollCard, rollRelics, upgradableIndices, SALVAGE_MIN_INTEGRITY, type Rarity } from "./meta.ts";
 import type { CardId, EventState, RelicId, RunState } from "./types.ts";
@@ -63,6 +63,25 @@ export function transformCard(run: RunState, index: number): { from: CardId; to:
 }
 
 const DEVICE_CARDS: CardId[] = ["honeypot", "cache-server", "poe-injector", "load-balancer"];
+
+/** Signal in the Static: the fight the event would start, rolled like the stage's
+ * normals (packs and designations) from the seed. Null outside an event room. */
+function staticFight(run: RunState, state: EventState) {
+  const room = run.map.find(item => item.id === run.currentRoom);
+  const enemyId = state.enemyId ?? STAGES[run.stage].encounters[0];
+  return room ? eventRoom(run, room, enemyId) : null;
+}
+/** "Static Nest and a Tap Spinner" / "a hidden-designated Coil Serpent" — what answers. */
+function staticFoes(run: RunState, state: EventState): string {
+  const room = staticFight(run, state);
+  if (!room) return "the hostile";
+  const scout = roomScout({ ...run, currentRoom: null }, room);
+  const names = scout.members.map(hostileName);
+  const pack = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0] ?? "the hostile";
+  const ribbon = scout.hidden ? " (unknown designation)"
+    : scout.designations.length ? ` (${scout.designations.map(id => DESIGNATIONS[id].ribbon).join(", ")})` : "";
+  return `${pack}${ribbon}`;
+}
 
 // ---------------------------------------------------------------- events
 
@@ -244,13 +263,13 @@ export const EVENTS: Record<string, EventDefinition> = {
     choices: [
       {
         label: "Answer it",
-        detail: (run, s) => `Fight ${s.enemyId ? ENEMIES[s.enemyId].name : "the hostile"} with 40% more integrity. Victory: ${credits(run, 40)} credits and a rare card choice.`,
+        detail: (run, s) => `Fight ${staticFoes(run, s)} with ${Math.round((RULES.eventHealthScale - 1) * 100)}% more integrity. Victory: ${credits(run, 40)} credits and a rare card choice.`,
         resolve: (run, s) => {
-          const room = run.map.find(item => item.id === run.currentRoom)!;
-          const enemyId = s.enemyId ?? STAGES[run.stage].encounters[0];
-          beginBattle(run, { ...room, enemyId });
-          if (run.enemy) run.enemy.hp = run.enemy.maxHp = Math.round(encounterHealth(run.stage, { ...room, type: "battle" }, run.ascension) * 1.4);
-          return `${ENEMIES[enemyId].name} tears free of the static.`;
+          const fight = staticFight(run, s)!;
+          const names = [fight.enemyId, ...(fight.pack ?? [])].filter((id): id is string => !!id).map(hostileName);
+          // encounterHealth scales "event" rooms by RULES.eventHealthScale; planEncounter shares it out.
+          beginBattle(run, fight);
+          return names.length > 1 ? `${names.join(" and ")} tear free of the static.` : `${names[0]} tears free of the static.`;
         },
       },
       leave("Let it rage and go around.", "You leave it shouting at no one."),

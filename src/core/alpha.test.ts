@@ -22,8 +22,8 @@ function battle(): RunState {
   const run = createRun(812);
   run.phase = "map";
   chooseRoom(run, "0-1");
-  run.enemy!.hp = run.enemy!.maxHp = 100;
-  run.enemy!.id = "leech";
+  run.enemies[0].hp = run.enemies[0].maxHp = 100;
+  run.enemies[0].id = "leech";
   run.energy = 20;
   run.hand = ["containerlab"];
   playInstant(run, 0);
@@ -34,9 +34,9 @@ function cast(run: RunState, card: CardId) {
   return playInstant(run, 0);
 }
 
-test("v3 collection: 61 base cards, an upgrade for every non-junk card, 21 tiered relics", () => {
+test("v4 collection: 75 base cards, an upgrade for every non-junk card, 29 tiered relics", () => {
   const bases = Object.values(CARDS).filter(card => !card.upgraded);
-  assert.equal(bases.length, 61);
+  assert.equal(bases.length, 75);
   for (const card of bases) {
     const plus = CARDS[`${card.id}+` as CardId];
     if (card.junk || card.curse) { assert.equal(plus, undefined, card.id); continue; }
@@ -44,8 +44,8 @@ test("v3 collection: 61 base cards, an upgrade for every non-junk card, 21 tiere
     assert.equal(plus.base, card.id);
     assert.ok(plus.cost < card.cost || plus.rules !== card.rules, `${card.id}+ improves`);
   }
-  assert.equal(Object.keys(RELICS).length, 21);
-  assert.equal(Object.values(RELICS).filter(relic => relic.tier === "boss").length, 6);
+  assert.equal(Object.keys(RELICS).length, 29);
+  assert.equal(Object.values(RELICS).filter(relic => relic.tier === "boss").length, 8);
   assert.ok(Object.values(CARDS).every((card) => card.cost >= 0 && card.rules.length > 20));
 });
 
@@ -143,7 +143,7 @@ test("hand limit leaves undrawn cards in the draw pile", () => {
 
 test("boosts cannot deal damage without a route and expire after the turn", () => {
   const r = battle();
-  r.faultNode = "router1";
+  r.faultNodes = ["router1"];
   cast(r, "zero-day");
   assert.equal(combatPreview(r).packetDamage, 0);
   endTurn(r);
@@ -152,12 +152,12 @@ test("boosts cannot deal damage without a route and expire after the turn", () =
 
 test("forecast names exactly the cable the enemy severs", () => {
   const r = battle();
-  r.enemy!.id = "wraith";
+  r.enemies[0].id = "wraith";
   const preview = combatPreview(r);
   assert.equal(preview.faultTarget, "alpha::router1");
   assert.equal(preview.intent!.target, preview.faultTarget);
   endTurn(r);
-  assert.equal(r.faultLink, preview.faultTarget);
+  assert.equal(r.faultLinks[0], preview.faultTarget);
 });
 
 test("armored fibers and jam protection make disruption fail without hidden damage", () => {
@@ -165,11 +165,11 @@ test("armored fibers and jam protection make disruption fail without hidden dama
   r.topology.links.forEach((link) => {
     link.armored = true;
   });
-  r.enemy!.id = "wraith";
+  r.enemies[0].id = "wraith";
   assert.equal(combatPreview(r).faultTarget, null);
   assert.equal(endTurn(r).integrityDamage, 0);
-  r.enemy!.id = "storm";
-  r.enemy!.turn = 0;
+  r.enemies[0].id = "storm";
+  r.enemies[0].turn = 0;
   r.topology.nodes.find((node) => node.id === "router1")!.shielded = true;
   assert.equal(combatPreview(r).faultTarget, null);
   assert.equal(endTurn(r).integrityDamage, 0);
@@ -181,18 +181,18 @@ test("Shield Array is spent only when at least one damage reaches it", () => {
   cast(r, "guard");
   endTurn(r);
   assert.equal(r.shieldArrayUsed, false);
-  r.enemy!.turn = 9;
-  assert.equal(combatPreview(r).incomingRaw, 5);
+  r.enemies[0].turn = 9; // the tenth action: pressure 3, escalation level 3 (+1)
+  assert.equal(combatPreview(r).incomingRaw, 6);
   assert.equal(combatPreview(r).shield, 2);
-  assert.equal(combatPreview(r).incoming, 3);
+  assert.equal(combatPreview(r).incoming, 4);
   endTurn(r);
   assert.equal(r.shieldArrayUsed, true);
 });
 
 test("lethal packet damage cancels damage and disruption before temporary resources expire", () => {
   const r = battle();
-  r.enemy!.hp = 7;
-  r.enemy!.id = "wraith";
+  r.enemies[0].hp = 7;
+  r.enemies[0].id = "wraith";
   const preview = combatPreview(r);
   assert.equal(preview.lethal, true);
   assert.equal(preview.incoming, 0);
@@ -200,21 +200,27 @@ test("lethal packet damage cancels damage and disruption before temporary resour
   assert.equal(preview.intent!.target, undefined);
   const result = endTurn(r);
   assert.equal(result.defeated, true);
-  assert.equal(r.faultLink, null);
+  assert.deepEqual(r.faultLinks, []);
 });
 
 test("pressure and the boss half-health phase have deterministic telegraphs", () => {
   const r = battle();
-  r.enemy!.turn = 6;
-  assert.equal(intentFor(r)!.amount, 4);
-  assert.equal(intentFor(r)!.pressure, 2);
-  r.enemy!.id = "core";
-  r.enemy!.turn = 1;
-  r.enemy!.hp = 50;
-  assert.equal(intentFor(r)!.amount, 6); // breach 4 + enraged 2
-  assert.match(intentFor(r)!.label, /ENRAGED/);
-  r.enemy!.turn = 2;
-  assert.equal(intentFor(r)!.amount, 1); // enraged jams chip 1
+  r.enemies[0].turn = 6;
+  assert.equal(intentFor(r, r.enemies[0]).amount, 4);
+  assert.equal(intentFor(r, r.enemies[0]).pressure, 2);
+  r.enemies[0].id = "core";
+  r.enemies[0].turn = 1;
+  r.enemies[0].hp = 50;
+  // v4: a wounded guardian charges on its next action (section 6.2) …
+  assert.equal(intentFor(r, r.enemies[0]).kind, "charge");
+  assert.ok(intentFor(r, r.enemies[0]).early);
+  assert.ok(intentFor(r, r.enemies[0], 1).ultimate, "… and unleashes on the one after");
+  // … once per fight; enraged, its attacks and faults then grow.
+  r.enemies[0].chargedEarly = true;
+  assert.equal(intentFor(r, r.enemies[0]).amount, 6); // breach 4 + enraged 2
+  assert.match(intentFor(r, r.enemies[0]).label, /ENRAGED/);
+  r.enemies[0].turn = 2;
+  assert.equal(intentFor(r, r.enemies[0]).amount, 1); // enraged jams chip 1
 });
 
 test("capacitor and Reserve Cell recharge only next turn; Grounded Core renews block", () => {
@@ -231,11 +237,11 @@ test("capacitor and Reserve Cell recharge only next turn; Grounded Core renews b
 
 test("repair, recovery and redundancy cards apply their documented effects", () => {
   const r = battle();
-  r.faultNode = "router1";
-  r.faultLink = "alpha::router1";
+  r.faultNodes = ["router1"];
+  r.faultLinks = ["alpha::router1"];
   cast(r, "protocol");
-  assert.equal(r.faultNode, null);
-  assert.equal(r.faultLink, null);
+  assert.deepEqual(r.faultNodes, []);
+  assert.deepEqual(r.faultLinks, []);
   assert.equal(r.block, 3);
   r.discardPile = ["duplex", "guard", "fiber"];
   cast(r, "salvage");
@@ -296,7 +302,7 @@ test("reward rolls exclude basics, stay unique, and guarantee an elite rare", ()
     const r = battle();
     r.rng = seed;
     r.currentRoom = r.map.find(room => room.floor === 3 && room.type === "elite")!.id;
-    r.enemy!.hp = 1;
+    r.enemies[0].hp = 1;
     endTurn(r);
     assert.equal(r.cardRewards.length, 3);
     assert.equal(new Set(r.cardRewards).size, 3);
@@ -325,16 +331,18 @@ test("forge removal consumes the room and protects opening route essentials", ()
 
 test("crossing the boss phase threshold never rewrites the already displayed intent", () => {
   const r = battle();
-  r.enemy!.id = "core";
-  r.enemy!.maxHp = 100;
-  r.enemy!.hp = 51;
-  r.enemy!.turn = 1;
+  r.enemies[0].id = "core";
+  r.enemies[0].maxHp = 100;
+  r.enemies[0].hp = 51;
+  r.enemies[0].turn = 1;
   const preview = combatPreview(r);
   assert.equal(preview.incomingRaw, 4);
   assert.doesNotMatch(preview.intent!.label, /ENRAGED/);
   assert.equal(endTurn(r).integrityDamage, 4);
-  assert.match(intentFor(r)!.label, /ENRAGED/);
-  assert.equal(intentFor(r)!.amount, 1);
+  // Crossing half health changes the next intent: the wounded Core charges early.
+  const next = intentFor(r, r.enemies[0]);
+  assert.match(next.label, /ENRAGED · WOUNDED · EVENT HORIZON/);
+  assert.equal(next.kind, "charge");
 });
 
 test("dense fourteen-device routing stays complete and every term reconciles", () => {

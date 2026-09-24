@@ -11,9 +11,9 @@ export interface Animated {
   flickers: { material: THREE.MeshBasicMaterial | THREE.LineBasicMaterial | THREE.SpriteMaterial; base: number; speed: number; phase: number }[];
   bobbers: { object: THREE.Object3D; base: number; amount: number; speed: number; phase: number }[];
 }
-export type PropGroup = THREE.Group & { userData: Animated & { kind: "debris" | "malware" | "ghost"; id?: string } };
+export type PropGroup = THREE.Group & { userData: Animated & { kind: "debris" | "malware" | "ghost" | "installation" | "prop"; id?: string } };
 
-function prop(kind: PropGroup["userData"]["kind"], x: number, z: number): PropGroup {
+export function prop(kind: PropGroup["userData"]["kind"], x: number, z: number): PropGroup {
   const group = new THREE.Group() as PropGroup;
   group.position.set(x, -0.42, z);
   group.userData = { kind, spinners: [], flickers: [], bobbers: [] };
@@ -59,13 +59,37 @@ function beamTexture() {
   return fadeBeam;
 }
 
-/** Wreckage blocking a socket: a toppled rack, a split router husk, shards and a live stub. */
-export function buildDebris(x: number, z: number, seed: number): PropGroup {
+let tint: THREE.CanvasTexture | null = null;
+/** A soft white radial decal, tinted by its material: a fresh wreck's role-coloured scorch. */
+export function tintTexture() {
+  return tint ??= shared(radialTexture([[0, "rgba(255,255,255,.9)"], [.35, "rgba(255,255,255,.45)"], [.75, "rgba(255,255,255,.12)"], [1, "rgba(0,0,0,0)"]], 6, 5));
+}
+
+/** Wreckage blocking a socket: a toppled rack, a split router husk, shards and a live stub.
+ * A fresh wreck (a breakdown or a detonation this encounter) burns brighter, and its scorch is
+ * tinted in the broken device's role colour for the rest of the encounter. */
+export function buildDebris(x: number, z: number, seed: number, fresh?: { color: number | null }): PropGroup {
   const group = prop("debris", x, z);
   let s = (seed * 2654435761) >>> 0 || 1;
   const rand = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
   group.rotation.y = rand() * Math.PI * 2;
   group.add(decal(scorchTexture(), 2.3, TABLE_Y + 0.012, 0.85));
+  if (fresh) {
+    const scorch = decal(tintTexture(), 2.0, TABLE_Y + 0.016, 0.34, true);
+    (scorch.material as THREE.MeshBasicMaterial).color.setHex(fresh.color ?? 0xff7a3a);
+    group.add(scorch);
+    group.userData.flickers.push({ material: scorch.material as THREE.MeshBasicMaterial, base: 0.34, speed: 1.3, phase: rand() * 6 });
+    // Live embers still glowing in the fresh wreck.
+    for (let i = 0; i < 4; i++) {
+      const ember = glow(i % 2 ? 0xffb066 : 0xff7a3a, 0.95);
+      ember.transparent = true;
+      const mote = new THREE.Mesh(new THREE.SphereGeometry(0.045 + rand() * 0.035, 8, 6), ember);
+      const angle = rand() * Math.PI * 2, distance = 0.2 + rand() * 0.55;
+      mote.position.set(Math.cos(angle) * distance, TABLE_Y + 0.05 + rand() * 0.12, Math.sin(angle) * distance);
+      group.add(mote);
+      group.userData.flickers.push({ material: ember, base: 1, speed: 6 + rand() * 9, phase: rand() * 6 });
+    }
+  }
   const hull = mat(0x2d2a27, 0x1a0d06, 0.05);
   hull.roughness = 0.8;
   const rust = mat(0x5e3b25, 0x2e1407, 0.08);
@@ -111,9 +135,9 @@ export function buildDebris(x: number, z: number, seed: number): PropGroup {
   );
   const cable = new THREE.Mesh(new THREE.TubeGeometry(curve, 16, 0.035, 6, false), mat(0x2a3b46, 0x5b2a18, 0.2));
   group.add(cable);
-  const sparkMaterial = glow(0xffc27a, 1);
+  const sparkMaterial = glow(fresh ? 0xffe0a0 : 0xffc27a, 1);
   sparkMaterial.transparent = true;
-  const spark = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), sparkMaterial);
+  const spark = new THREE.Mesh(new THREE.SphereGeometry(fresh ? 0.085 : 0.06, 8, 6), sparkMaterial);
   spark.position.copy(curve.getPoint(1));
   group.add(spark);
   group.userData.flickers.push({ material: sparkMaterial, base: 1, speed: 13 + rand() * 6, phase: rand() * 6 });
@@ -133,6 +157,43 @@ function stellated(radius: number, material: THREE.Material): THREE.Group {
   core.traverse(child => { if (child instanceof THREE.Mesh) child.castShadow = true; });
   return core;
 }
+
+/** The Siphon Tap's code body: a stellated core, a heart, orbiting shards and an uplink beam
+ * (the fallback until the Blender body loads, and the v3 malware prop). */
+export function addTapBody(group: PropGroup, x: number) {
+  const pedestal = cylinder(0.34, 0.5, 0.18, 7, mat(0x1d0a16, MALWARE_COLOR, 0.25), TABLE_Y + 0.09);
+  group.add(pedestal);
+  const shell = mat(0x1a0612, MALWARE_COLOR, 0.95);
+  shell.roughness = 0.25;
+  shell.metalness = 0.8;
+  shell.clearcoat = 1;
+  const core = stellated(0.36, shell);
+  core.position.y = 1.38;
+  group.add(core);
+  group.userData.spinners.push({ object: core, speed: 1.1, axis: "y" });
+  group.userData.bobbers.push({ object: core, base: 1.38, amount: 0.08, speed: 2.2, phase: x });
+  const heart = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 10), glow(0xffb3d6, 1));
+  heart.position.y = 1.38;
+  group.add(heart);
+  group.userData.bobbers.push({ object: heart, base: 1.38, amount: 0.08, speed: 2.2, phase: x });
+  const orbit = new THREE.Group();
+  orbit.position.y = 1.38;
+  for (let i = 0; i < 5; i++) {
+    const shard = new THREE.Mesh(new THREE.TetrahedronGeometry(0.07), glow(i % 2 ? MALWARE_ACCENT : MALWARE_COLOR, 1));
+    const angle = (i / 5) * Math.PI * 2;
+    shard.position.set(Math.cos(angle) * 0.62, Math.sin(angle * 2) * 0.12, Math.sin(angle) * 0.62);
+    orbit.add(shard);
+  }
+  group.add(orbit);
+  group.userData.spinners.push({ object: orbit, speed: -1.6, axis: "y" });
+  const beamMaterial = glow(MALWARE_ACCENT, 0.35);
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.07, 1.6, 6, 1, true), beamMaterial);
+  beam.position.y = 2.2;
+  group.add(beam);
+  group.userData.flickers.push({ material: beamMaterial, base: 0.45, speed: 11, phase: 1.3 });
+}
+
+export { stellated, infectionTexture, beamTexture };
 
 /** Hostile code planted on the table. Pulsing, spiked and unmistakably not yours. */
 export function buildMalware(x: number, z: number, id: string, label: THREE.Sprite): { group: PropGroup; hit: THREE.Mesh } {

@@ -1,18 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ENEMIES } from "./enemies.ts";
+import { ENEMIES, PACKS } from "./enemies.ts";
 import { RULES } from "./cards.ts";
 import { STAGES } from "./stages.ts";
 import { newExpedition, parseExpedition } from "./expedition.ts";
 import { createMap, reachableRooms } from "./map.ts";
-import { chooseRoom, chooseCardReward, chooseRelic, combatPreview, endTurn, intentFor } from "./run.ts";
+import { chooseRoom, chooseCardReward, chooseRelic, combatPreview, endTurn, intentFor, leaderOf } from "./run.ts";
+import { makeEnemy } from "./encounter.ts";
 import { MusicRotation, sceneTrack } from "./music.ts";
 
 function encounter(id: string, turn = 0) {
   const r = newExpedition("architect", 922).run;
   chooseRoom(r, "0-1");
-  const { name, title, color } = ENEMIES[id];
-  r.enemy = { id, name, title, color, hp: 100, maxHp: 100, turn };
+  r.enemies = [makeEnemy(id, "h1", "centre", "single", 100, { turn })];
   r.integrity = r.maxIntegrity = 100;
   r.topology.nodes.push({ id: "router1", role: "router", x: 0, z: 0 });
   r.topology.links.push({ a: "alpha", b: "router1" }, { a: "router1", b: "omega" });
@@ -26,10 +26,10 @@ test("three stage guardians preserve the deck and relics, reset routes, heal, an
   for (let stage = 0; stage < 3; stage++) {
     r.floor = 6; r.lastRoom = "5-1";
     assert.ok(chooseRoom(r, "6-1").ok);
-    assert.equal(r.enemy!.id, STAGES[stage].boss);
+    assert.equal(r.enemies[0].id, STAGES[stage].boss);
     assert.equal(r.bossIntroSeen, false);
     r.bossIntroSeen = true;
-    r.enemy!.hp = 1;
+    r.enemies[0].hp = 1;
     r.topology.nodes.push({ id: "router1", role: "router", x: 0, z: 0 });
     r.topology.links.push({ a: "alpha", b: "router1" }, { a: "router1", b: "omega" });
     assert.equal(endTurn(r).defeated, true);
@@ -53,7 +53,7 @@ test("three stage guardians preserve the deck and relics, reset routes, heal, an
   }
 });
 
-test("each stage has a distinct route map and its complete encounter pool is reachable", () => {
+test("each stage has a distinct route map and its complete encounter pool (plus pack leaders) is reachable", () => {
   assert.notDeepEqual(createMap(0), createMap(1));
   assert.notDeepEqual(createMap(1), createMap(2));
   for (let stage = 0; stage < 3; stage++) {
@@ -61,26 +61,31 @@ test("each stage has a distinct route map and its complete encounter pool is rea
     for (let seed = 1; seed <= 100; seed++) {
       const r = newExpedition("architect", Math.imul(seed, 0x9e3779b1) >>> 0).run;
       r.stage = stage; r.map = createMap(stage, r.seed);
-      chooseRoom(r, "0-1"); seen.add(r.enemy!.id);
+      chooseRoom(r, "0-1"); seen.add(leaderOf(r)!.id);
     }
-    assert.deepEqual([...seen].sort(), [...STAGES[stage].encounters].sort());
+    // v4: a pack room's centre is its template's leader (stage II packs include a Packet Leech).
+    const leaders = PACKS.filter(pack => pack.stage === stage && pack.room === "battle" && pack.leader).map(pack => pack.leader!);
+    assert.deepEqual([...seen].sort(), [...new Set([...STAGES[stage].encounters, ...leaders])].sort());
   }
 });
 
-test("all 16 enemies have playable patterns and forecast exactly the damage, fields, and faults resolved", () => {
-  assert.equal(Object.keys(ENEMIES).length, 16);
+test("all 30 hostiles have playable patterns and forecast exactly the damage, fields, faults and wear resolved", () => {
+  assert.equal(Object.keys(ENEMIES).length, 30);
   for (const [id, definition] of Object.entries(ENEMIES)) {
     for (let turn = 0; turn < definition.pattern.length * 2; turn++) {
       const r = encounter(id, turn), p = combatPreview(r);
-      assert.equal(intentFor(r)!.kind, definition.pattern[turn % definition.pattern.length].kind);
-      const hp = r.enemy!.hp, integrity = r.integrity;
+      assert.equal(intentFor(r, r.enemies[0]).kind, definition.pattern[turn % definition.pattern.length].kind);
+      const hp = r.enemies[0].hp, integrity = r.integrity;
       const result = endTurn(r);
       assert.equal(result.packetDamage, p.packetDamage, id);
-      assert.equal(r.enemy!.hp, hp - p.packetDamage + p.enemyHealing, id);
+      assert.equal(r.enemies[0].hp, hp - p.packetDamage + p.enemyHealing, id);
       assert.equal(integrity - r.integrity, p.incoming, id);
-      assert.equal(r.faultNode, p.intent?.kind === "jam" ? p.faultTarget : null, id);
-      assert.equal(r.faultLink, p.intent?.kind === "sever" ? p.faultTarget : null, id);
+      // Escalation level 2 jams and cuts twice: every landing target is forecast.
+      assert.deepEqual(r.faultNodes, p.hostiles[0].jams, id);
+      assert.deepEqual(r.faultLinks, p.hostiles[0].cuts, id);
       if (p.zoneThreat) assert.deepEqual(r.zoneEffects, [p.zoneThreat], id);
+      assert.deepEqual(result.forecast.wear, p.wear, id);
+      assert.deepEqual(r.installations.map(item => ({ x: item.x, z: item.z })), p.installTargets.filter(item => !item.destroyed).map(item => ({ x: item.x, z: item.z })), id);
     }
   }
 });
@@ -129,11 +134,11 @@ test("Choirs alternate fields, Moth announces its jam band, Weaver punishes dens
 test("new enraged enemies change the next intent without retroactively strengthening this one", () => {
   for (const id of ["reaver", "regent", "cantor"]) {
     const r = encounter(id, id === "cantor" ? 3 : 0);
-    r.enemy!.hp = 51; r.packetBoost = 5;
+    r.enemies[0].hp = 51; r.packetBoost = 5;
     const p = combatPreview(r);
     assert.ok(!p.intent!.label.includes("ENRAGED"));
     assert.equal(endTurn(r).integrityDamage, p.incoming);
-    assert.ok(intentFor(r)!.label.includes("ENRAGED"));
+    assert.ok(intentFor(r, r.enemies[0]).label.includes("ENRAGED"));
   }
 });
 

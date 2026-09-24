@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 // Every test also fails on any page or console error (see helpers.ts).
 import { expect, test } from "./helpers.ts";
 import { newExpedition } from "../src/core/expedition.ts";
+import { makeEnemy } from "../src/core/encounter.ts";
 import { chooseRoom } from "../src/core/run.ts";
 import { RELICS } from "../src/core/cards.ts";
 import type { RelicId } from "../src/core/types.ts";
@@ -10,7 +11,7 @@ const storage="faultline-expedition-v2";
 async function start(page: Page, relics=false) {
   const e=newExpedition("architect",292),r=e.run;
   chooseRoom(r,"0-1");
-  r.enemy={id:"prophet",name:"RUST PROPHET",title:"Corrupts the ground beneath you",hp:100,maxHp:100,turn:0,color:0xe49b72};
+  r.enemies=[makeEnemy("prophet","h1","centre","single",100)];r.focus="centre";
   r.topology.nodes.push({id:"router1",role:"router",x:0,z:0});
   r.topology.links.push({a:"alpha",b:"router1"},{a:"router1",b:"omega"});
   r.hand=["resonance-field","purge-field","aegis-field","null-field","guard","fiber"];

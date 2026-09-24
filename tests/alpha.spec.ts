@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 // Every test also fails on any page or console error (see helpers.ts).
 import { expect, test } from "./helpers.ts";
 import { newExpedition, type Expedition } from "../src/core/expedition.ts";
+import { makeEnemy } from "../src/core/encounter.ts";
 import { BASE_CARD_IDS, CARDS, RULES, canUpgrade } from "../src/core/cards.ts";
 import { ENEMIES } from "../src/core/enemies.ts";
 import { chooseRoom, combatPreview, playInstant } from "../src/core/run.ts";
@@ -16,7 +17,7 @@ function fixture(): Expedition {
   const run = expedition.run;
   run.terrain = null;
   run.zoneEffects = [];
-  run.malware = [];
+  run.installations = [];
   run.topology.nodes = run.topology.nodes.filter((node) => node.fixed);
   run.topology.links = [];
   return expedition;
@@ -271,9 +272,9 @@ test("damage and shield calculations predict the actual transmission", async ({
 }) => {
   const expedition = fixture();
   expedition.run.hand = ["router", "fiber", "fiber", "guard", "pulse"];
-  expedition.run.enemy!.hp = expedition.run.enemy!.maxHp = 100;
-  expedition.run.enemy!.id = "leech";
-  expedition.run.enemy!.turn = 0;
+  expedition.run.enemies[0].hp = expedition.run.enemies[0].maxHp = 100;
+  expedition.run.enemies[0].id = "leech";
+  expedition.run.enemies[0].turn = 0;
   await installSave(page, expedition);
   await page.locator('[data-action="continue"]').click();
   await choose(page, "router");
@@ -310,7 +311,7 @@ test("damage and shield calculations predict the actual transmission", async ({
     timeout: 15_000,
   });
   const after = JSON.parse((await saved(page))!);
-  expect(after.run.enemy.hp).toBe(before.run.enemy.hp - damage);
+  expect(after.run.enemies[0].hp).toBe(before.run.enemies[0].hp - damage);
   expect(after.run.integrity).toBe(before.run.integrity - incoming);
   expect(after.run.block).toBe(0);
 });
@@ -369,9 +370,9 @@ test("separated circuits defend even when a central route is first, and relocati
     run.topology.links.push({ a: "alpha", b: id }, { a: id, b: "omega" });
   }
   run.nextNodeId = 4;
-  run.enemy!.id = "leech";
-  run.enemy!.hp = run.enemy!.maxHp = 100;
-  run.enemy!.turn = 0;
+  run.enemies[0].id = "leech";
+  run.enemies[0].hp = run.enemies[0].maxHp = 100;
+  run.enemies[0].turn = 0;
   await installSave(page, expedition);
   await page.locator('[data-action="continue"]').click();
   await expect(page.locator(".forecast-net b")).toHaveText("0");
@@ -411,10 +412,10 @@ test("Sentinel armor is explained and routing through a firewall visibly bypasse
   );
   run.nextNodeId = 2;
   run.hand = ["firewall", "fiber", "fiber"];
-  run.enemy!.id = "sentinel";
-  run.enemy!.name = ENEMIES.sentinel.name;
-  run.enemy!.hp = run.enemy!.maxHp = 100;
-  run.enemy!.turn = 0;
+  run.enemies[0].id = "sentinel";
+  run.enemies[0].name = ENEMIES.sentinel.name;
+  run.enemies[0].hp = run.enemies[0].maxHp = 100;
+  run.enemies[0].turn = 0;
   await installSave(page, expedition);
   await page.locator('[data-action="continue"]').click();
   const plating = ENEMIES.sentinel.armor!.amount;
@@ -461,9 +462,9 @@ test("Wireshark captures the active route, draws, boosts its transmission, and e
   run.nextNodeId = 4;
   run.hand = ["wireshark"];
   run.drawPile = ["guard", "pulse", "patch"];
-  run.enemy!.id = "leech";
-  run.enemy!.hp = run.enemy!.maxHp = 100;
-  run.enemy!.turn = 0;
+  run.enemies[0].id = "leech";
+  run.enemies[0].hp = run.enemies[0].maxHp = 100;
+  run.enemies[0].turn = 0;
   const before = combatPreview(run).packetDamage;
   const captured = structuredClone(run);
   expect(playInstant(captured, 0).ok).toBe(true);
@@ -491,7 +492,7 @@ test("Wireshark captures the active route, draws, boosts its transmission, and e
     timeout: 15_000,
   });
   const resolved = JSON.parse((await saved(page))!).run;
-  expect(resolved.enemy.hp).toBe(100 - after);
+  expect(resolved.enemies[0].hp).toBe(100 - after);
   expect(resolved.packetBoost).toBe(0);
   expect(resolved.hand).not.toContain("wireshark");
 });
@@ -590,15 +591,8 @@ test("the Core's final reward completes the story and records victory exactly on
     { a: "router1", b: "omega" },
   );
   run.nextNodeId = 2;
-  run.enemy = {
-    id: "core",
-    name: "BLACKOUT CORE",
-    title: "The sealed relay",
-    hp: 5,
-    maxHp: 80,
-    turn: 7,
-    color: 0xff0000,
-  };
+  run.enemies = [{ ...makeEnemy("core", "h1", "centre", "single", 80, { turn: 7, title: "The sealed relay" }), hp: 5 }];
+  run.focus = "centre";
   await installSave(page, expedition);
   await page.locator('[data-action="continue"]').click();
   await expect(page.locator(".forecast-net b")).toHaveText("0");
@@ -653,17 +647,20 @@ test("a physical device drag cancelled by blur never spends energy or commits it
   const x = bounds!.x + bounds!.width / 2;
   let hitY: number | null = null;
   // Ask the live battlefield's hit testing to find the centered router. This avoids
-  // reproducing Three.js projection math or depending on a fixed camera pixel.
+  // reproducing Three.js projection math or depending on a fixed camera pixel. v4: the far
+  // rail's sprites are clickable too (they select a port), so scan from the table's front edge
+  // upward: the router is the first pointer target below the rail; aim at its middle.
+  let lowest: number | null = null;
   for (
-    let y = bounds!.y + bounds!.height * 0.35;
-    y < bounds!.y + bounds!.height * 0.6;
-    y += 8
+    let y = bounds!.y + bounds!.height * 0.6;
+    y > bounds!.y + bounds!.height * 0.35;
+    y -= 6
   ) {
     await page.mouse.move(x, y);
-    if (
-      await canvas.evaluate((element) => element.dataset.cursor === "pointer")
-    ) {
-      hitY = y;
+    const pointer = await canvas.evaluate((element) => element.dataset.cursor === "pointer");
+    if (pointer && lowest === null) lowest = y;
+    if (lowest !== null && (!pointer || lowest - y >= 48)) {
+      hitY = (lowest + y) / 2;
       break;
     }
   }
@@ -673,6 +670,12 @@ test("a physical device drag cancelled by blur never spends energy or commits it
   ).not.toBeNull();
   await page.mouse.click(x, hitY!);
   await expect(page.locator('[data-relocate-zone="north"]')).toBeVisible();
+  // The device plate now stands in the dock above the seals and may cover the router's foot:
+  // grab it where the table (not the dock) still answers with the pointer.
+  for (let y = hitY!; y > bounds!.y + bounds!.height * 0.3; y -= 6) {
+    await page.mouse.move(x, y);
+    if (await canvas.evaluate((element) => element.dataset.cursor === "pointer")) { hitY = y; break; }
+  }
   const before = await saved(page);
   await page.mouse.move(x, hitY!);
   await page.mouse.down();

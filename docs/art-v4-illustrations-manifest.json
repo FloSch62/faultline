@@ -1,0 +1,72 @@
+{
+  "description": "FAULTLINE v4 illustrations at 1536 x 1024, painted exactly like a card (Switch crop at 0.8, resolution-dependent shift) but kept out of the card manifest so the card review does not treat them as cards. Same runtime and model revisions as the v3 card and stage passes. Rendered with scripts/generate_stage_art.py --manifest <this file>; postprocess 'cutout' entries go through scripts/compose_sheet.py (design 14.3).",
+  "local": {
+    "model": "Krea-2-Turbo",
+    "diffusionModel": "krea2_turbo_fp8_scaled.safetensors",
+    "textEncoder": "qwen3vl_4b_fp8_scaled.safetensors",
+    "vae": "qwen_image_vae.safetensors",
+    "width": 1536,
+    "height": 1024,
+    "steps": 8,
+    "cfg": 1,
+    "sampler": "euler",
+    "scheduler": "simple",
+    "modelSource": "https://huggingface.co/Comfy-Org/Krea-2",
+    "modelRevision": "eb1eddd3983a54678545a9b2c178c5853b30f7be",
+    "runtime": "ComfyUI",
+    "runtimeRevision": "b5cc8830279eae909a59de030af1e50761c36751",
+    "styleReference": {
+      "lora": "krea2_style_reference.safetensors",
+      "strength": 0.8
+    }
+  },
+  "images": [
+    {
+      "id": "message-fragment",
+      "name": "Message fragment",
+      "effect": "Message choice dialog and Handbook: a cracked capsule with an undelivered ribbon; lower third dark and empty for the option plates.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923312,
+      "reference": "docs/art-refs/card-anchor.png",
+      "referenceStrength": 0.8,
+      "postprocess": null,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A small brass message capsule lying cracked open on a dark workbench inside a ruined orbital cathedral, seen from slightly above, a strip of luminous pale amber ribbon of undelivered text unrolling from it in a gentle curve, the ribbon glowing with only faint abstract light marks and no legible characters, the Blackout Core's crimson metal seal lying broken in two pieces beside it. The capsule, ribbon and seal sit in the upper two thirds of the picture; the lower third is an empty band of deep shadowed dark bench with nothing on it. Quiet, secret, a message that was never meant to arrive. Chipped brass, cracked ivory, dark cables, warm amber light on dark metal. Rich layered oil-paint brushwork, softly broken painted edges, muted colours, deep indigo shadow. No photography, smooth studio-product rendering, text, labels, border or interface. The ribbon itself glows softly with warm amber light from within and lights the bench around it; the broken seal is deep crimson red enamel split in two halves. No paper, no pages, nothing written anywhere.",
+      "file": "public/art/message-fragment.png",
+      "sha256": "c25cedd8e1450b73d09b00593139569fbc316a34881957e445320649b5656ef0",
+      "promptAddendum": "The ribbon itself glows softly with warm amber light from within and lights the bench around it; the broken seal is deep crimson red enamel split in two halves. No paper, no pages, nothing written anywhere.",
+      "candidate": "artifacts/v4-illustrations-04/message-fragment@240923312.png",
+      "rejected": [
+        {
+          "seed": 240923302,
+          "why": "verbatim prompt: a paper sheet with text-like lines top right; brass (not red) seal; ribbon not luminous"
+        },
+        {
+          "seeds": [
+            240923306,
+            240923307,
+            240923308
+          ],
+          "why": "brass seal, no glow; 240923307 and 240923308 show pseudo-writing"
+        },
+        {
+          "seeds": [
+            240923302,
+            240923309,
+            240923310
+          ],
+          "note": "with addendum",
+          "why": "302 keeps the text-covered paper sheet, 309 seal not broken and no glow, 310 pseudo-writing on the ribbon"
+        },
+        {
+          "seeds": [
+            240923311,
+            240923313,
+            240923314
+          ],
+          "why": "311 seal intact, 313 ribbon hangs into the lower third reserved for the option plates, 314 writing on the ribbon"
+        }
+      ],
+      "referenceSha256": "57421017ba1144d899ba2872c27e41bef2a34cb82bdba6c6cd8fe873a64db414"
+    }
+  ]
+}

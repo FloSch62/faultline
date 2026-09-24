@@ -222,3 +222,32 @@ were single-answer taxes, and the run layer offered no upgrades, market or event
   target pre-v3 selectors and bot actions and must be updated.
 - Human sessions must confirm comprehension of channels, online devices and
   protocols, and whether the new systems stay readable at a glance.
+
+## v4 · Under Quarantine
+
+### Why
+
+v3 made the network the player's army, but the enemy still stood alone at the far
+rail and never touched the table: every transmission had one destination, and the
+ground belonged to the player. v4 gives the quarantine numbers, ground and a clock,
+and adds surprises that never break the exact forecast.
+
+### What changed
+
+- **Packs and ports.** Up to three hostiles (leader, escorts, guardian adds) at three
+  ports; every channel is a delivery the player aims; per-port armor and overflow.
+  A single undesignated hostile that never installs or overloads is numerically v3.
+- **The table front.** Malware became the Siphon Tap, one of five installations with
+  integrity; devices have condition and can break into wreckage; repair, scrub,
+  firewall quarantine, honeypot bites and Reclaim answer.
+- **Escalation**, **designations** and **surprises** (reinforcements, crates,
+  undelivered messages, signals); four new leaders, seven escorts, three add types,
+  fourteen cards and eight relics.
+- **Save version 4.** Version 3 expeditions now migrate in memory (the v3 section's
+  "older expeditions are not continued" applies only to saves before version 3).
+
+The rules, the interface contract and the balance targets are in
+[game-design.md](game-design.md); probe results in [balance-v4.json](balance-v4.json)
+(tactical bots at ascension 0, 600 seeds: Architect 36 %, Warden 36 %, Ghost 30 %; the
+Warden reaches the band only with a Harden addition that is pending approval). Every
+layer can be switched off by its `RULES` flag for A/B probes (game design, "Phase flags").

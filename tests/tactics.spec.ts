@@ -2,14 +2,16 @@ import type { Page } from "@playwright/test";
 // Every test also fails on any page or console error (see helpers.ts).
 import { expect, test } from "./helpers.ts";
 import { newExpedition, type Expedition } from "../src/core/expedition.ts";
+import { makeEnemy } from "../src/core/encounter.ts";
 import { chooseRoom, combatPreview } from "../src/core/run.ts";
 import { ENEMIES } from "../src/core/enemies.ts";
 
 const storage = "faultline-expedition-v2";
 function fixture(id = "core", turn = 4) {
-  const e = newExpedition("architect", 924), r = e.run, d = ENEMIES[id];
+  const e = newExpedition("architect", 924), r = e.run;
   chooseRoom(r, "0-1");
-  r.enemy = { id, name: d.name, title: d.title, color: d.color, hp: 90, maxHp: 100, turn };
+  r.enemies = [{ ...makeEnemy(id, "h1", "centre", "single", 100, { turn }), hp: 90 }];
+  r.focus = "centre";
   r.integrity = r.maxIntegrity = 40;
   r.topology.nodes.push({ id: "router1", role: "router", x: 0, z: 0, upgraded: true, configured: true });
   r.topology.links.push({ a: "alpha", b: "router1", boosted: true }, { a: "router1", b: "omega", boosted: true });
@@ -75,7 +77,7 @@ test("charge telegraphs the next ultimate, a prepared burst breaks it, and expos
   await page.locator('[data-action="transmit"]').click();
   await expect(page.locator("#world")).toHaveAttribute("data-enemy-state", "break");
   await expect(page.locator(".boss-window")).toContainText("EXPOSED THIS TURN");
-  expect((await saved(page)).enemy.exposed).toBe(true);
+  expect((await saved(page)).enemies[0].exposed).toBe(true);
   expect((await saved(page)).integrity).toBe(40);
   await page.locator('[data-action="transmit"]').click();
   // This transmission also crosses half health: wait for packet, enemy action
@@ -83,7 +85,7 @@ test("charge telegraphs the next ultimate, a prepared burst breaks it, and expos
   await expect(page.locator('[data-action="transmit"]')).toBeEnabled({ timeout: 15_000 });
   await expect(page.locator(".round-banner")).toContainText("TURN 08");
   await expect(page.locator(".boss-window")).toHaveCount(0);
-  expect((await saved(page)).enemy.exposed).toBeUndefined();
+  expect((await saved(page)).enemies[0].exposed).toBeUndefined();
 });
 
 for (const id of ["regent", "cantor", "core"]) {

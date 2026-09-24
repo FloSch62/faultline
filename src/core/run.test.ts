@@ -41,23 +41,23 @@ test("opening hand gives a router and two cables so the first route is buildable
   assert.deepEqual(paths(run.topology)[0], ["alpha", "router1", "omega"]);
   const turn = endTurn(run);
   assert.equal(turn.packetDamage >= 5, true);
-  assert.equal(run.enemy!.hp < run.enemy!.maxHp, true);
+  assert.equal(run.enemies[0].hp < run.enemies[0].maxHp, true);
 });
 
 test("enemy intent is visible and a severed cable blocks the next signal", () => {
   const run = firstBattle();
-  run.enemy!.id = "wraith";
-  run.enemy!.hp = 30;
-  run.enemy!.maxHp = 30;
+  run.enemies[0].id = "wraith";
+  run.enemies[0].hp = 30;
+  run.enemies[0].maxHp = 30;
   run.topology.nodes.push({ id: "router1", role: "router", x: 0, z: 0 });
   run.topology.links.push(
     { a: "alpha", b: "router1" },
     { a: "router1", b: "omega" },
   );
-  assert.equal(intentFor(run)?.kind, "sever");
+  assert.equal(intentFor(run, run.enemies[0]).kind, "sever");
   const turn = endTurn(run);
   assert.equal(turn.packetDamage, 5);
-  assert.ok(run.faultLink);
+  assert.equal(run.faultLinks.length, 1);
   const next = endTurn(run);
   assert.equal(next.packetDamage, 0);
 });
@@ -75,7 +75,7 @@ test("two independent router routes survive a node outage", () => {
     { a: "router2", b: "omega" },
   );
   assert.equal(combatPreview(run).channels, 2);
-  run.faultNode = "router1";
+  run.faultNodes = ["router1"];
   assert.deepEqual(paths(run.topology, new Set(["router1"]))[0], [
     "alpha",
     "router2",
@@ -129,17 +129,17 @@ test("Hot Swap discounts only the first fiber, and Hot Patch restores a severed 
   assert.equal(playLink(run, 0, "router1", "omega").ok, true);
   assert.equal(run.energy, 5);
   assert.equal(costFor(run, 0), 1);
-  run.faultLink = "alpha::router1";
+  run.faultLinks = ["alpha::router1"];
   assert.equal(playInstant(run, run.hand.indexOf("patch")).ok, true);
-  assert.equal(run.faultLink, null);
+  assert.deepEqual(run.faultLinks, []);
   assert.equal(run.hand.includes("router"), true);
 });
 
 test("firewall and Shield Array mitigate a telegraphed breach", () => {
   const run = firstBattle();
-  run.enemy!.id = "sentinel";
-  run.enemy!.hp = 30;
-  run.enemy!.maxHp = 30;
+  run.enemies[0].id = "sentinel";
+  run.enemies[0].hp = 30;
+  run.enemies[0].maxHp = 30;
   run.relics.push("shield-array");
   run.topology.nodes.push(
     { id: "router1", role: "router", x: -1, z: 0 },
@@ -150,7 +150,7 @@ test("firewall and Shield Array mitigate a telegraphed breach", () => {
     { a: "router1", b: "firewall1" },
     { a: "firewall1", b: "omega" },
   );
-  assert.equal(intentFor(run)?.kind, "breach");
+  assert.equal(intentFor(run, run.enemies[0]).kind, "breach");
   const turn = endTurn(run);
   // v3: firewalls defend while online anywhere; they no longer add damage.
   assert.equal(turn.packetDamage, 5);
@@ -230,7 +230,7 @@ test("Clabernetes preserves overclock and links, shields both routers, and survi
   );
   assert.equal(combatPreview(run).channels, 2);
   assert.equal(damageFromPath(run, signalPaths(run)[0]), 7 + RULES.bandwidthPerChannel);
-  run.faultLink = "alpha::router1";
+  run.faultLinks = ["alpha::router1"];
   assert.deepEqual(signalPaths(run), [["alpha", "router2", "omega"]]);
   assert.equal(damageFromPath(run, signalPaths(run)[0]), 7);
   const yaml = topologyYaml(run.topology, "Replicated lab");

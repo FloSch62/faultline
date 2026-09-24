@@ -5,11 +5,20 @@ export function linkKey(a: string, b: string): string {
   return [a, b].sort().join("::");
 }
 
+/** Stable identity of a channel for delivery aims: its inner device ids (terminals
+ * excluded), sorted and joined by "|". It survives re-enumeration while the channel's
+ * device set exists; a channel that changes its devices is a new channel. */
+export function channelKey(path: readonly string[]): string {
+  return path.filter((id) => id !== "alpha" && id !== "omega").sort().join("|");
+}
+
+/** Server Racks and Phantom Nodes stand on the table but never take a cable. */
+export const cableable = (node: Pick<NetworkNode, "role">) => node.role !== "rack" && node.role !== "phantom";
+
 export function canLink(topology: Topology, a: string, b: string): boolean {
+  const from = topology.nodes.find((node) => node.id === a), to = topology.nodes.find((node) => node.id === b);
   return (
-    a !== b &&
-    topology.nodes.some((node) => node.id === a) &&
-    topology.nodes.some((node) => node.id === b) &&
+    a !== b && !!from && !!to && cableable(from) && cableable(to) &&
     !topology.links.some((link) => linkKey(link.a, link.b) === linkKey(a, b))
   );
 }
@@ -241,7 +250,7 @@ export function initialTopology(): Topology {
 
 export function liveLinks(
   topology: Topology,
-  faultLink: string | null,
+  faultLinks: readonly string[],
 ): NetworkLink[] {
-  return topology.links.filter((link) => linkKey(link.a, link.b) !== faultLink);
+  return topology.links.filter((link) => !faultLinks.includes(linkKey(link.a, link.b)));
 }

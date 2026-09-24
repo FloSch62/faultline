@@ -2,7 +2,7 @@
 
 **A Containerlab odyssey. Every connection matters.**
 
-A desktop deckbuilding roguelike set in a ruined orbital relay. Build a living network on a 3D table: every independent channel adds bandwidth, every device works while it is reachable, and every enemy is trying to cut it apart. Carry your deck through a branching expedition to the Blackout Core.
+A desktop deckbuilding roguelike set in a ruined orbital relay. Build a living network on a 3D table: every independent channel adds bandwidth and becomes a delivery you aim, every device works while it is reachable, and the quarantine comes in packs, builds on your table and grows with every action it takes. Carry your deck through a branching expedition to the Blackout Core.
 
 **[Play in your browser](https://flosch62.github.io/faultline/)** · [Contributing](CONTRIBUTING.md) · [MIT license](LICENSE)
 
@@ -29,29 +29,33 @@ npm run balance -- 500 # Reproducible seeded balance probe
 npx playwright install chromium
 npm run test:e2e    # Actual browser gameplay, desktop layout and audio playback
 npm run test:smoke  # A quick @smoke subset of the browser suite
-npm run models      # Rebuild the device models from blender/ (needs Blender 4.2+)
+npm run models      # Rebuild the device, installation and prop models from blender/ (needs Blender 4.2+)
 ```
 
 Playing requires no API keys, GPU music model, Containerlab daemon, or external asset service. All artwork, device models, fonts and playable music are bundled. Hardware-accelerated WebGL is recommended. Desktop is the primary target. The game defaults to 110% interface scale while browser zoom stays at 100%; compact windows scroll instead of cropping essential controls.
 
 ## Inside the game
 
-- **The network is your army.** Every live ALPHA → router → OMEGA route counts. Routes that share no device form **channels**, and every channel beyond the first adds bandwidth. Devices work while they are **online** on any live route: firewalls block from any branch and stack, Cache Servers draw, PoE Injectors add energy, Load Balancers multiply bandwidth, and a cabled **Honeypot** lures jams and cuts and bites back. A cut cable takes everything behind it offline, so redundancy protects your engine.
-- **Three keepers, three engines.** The Architect goes wide with Hot Swap and the **Patch Cable** console. The Warden fortifies with **Harden** and **Backpressure**: shield that stops damage turns into damage. The Ghost **buffers** a transmission for double and releases it in one spike, unless a cut leaves no live route and the packets are lost. Each has archetype-only cards.
+- **The network is your army.** Every live ALPHA → router → OMEGA route counts. Routes that share no device form **channels**, and every channel beyond the first adds bandwidth. Devices work while they are **online** on any live route: firewalls block from any branch, stack and quarantine hostile installations beside them, Cache Servers draw, PoE Injectors add energy, Load Balancers multiply bandwidth, and a cabled **Honeypot** lures jams, cuts and overloads and bites back. A cut cable takes everything behind it offline, so redundancy protects your engine.
+- **Packs and ports.** Up to three hostiles hold the far rail: a leader and its escorts, a swarm duo, or a guardian raising adds. Every channel is a **delivery** you aim at a port; deliveries to one port merge before armor, and damage beyond a hostile's health overflows to the next. Escorts act on alternate phases and couple to their leader (twin cuts, uplinks, plating links, a last echo), so kill order is a decision. Against a single hostile nothing changes.
+- **The table front.** Hostiles plant **installations** on your table: Siphon Taps, Jammers beside your router, Spikes that wear devices down, Anchors that pin a field, Breaker Charges that count down in plain sight. Devices have **condition** and can break for the encounter, leaving wreckage. Scrub, repair, Purge Field, firewall quarantine, honeypot bites, Server Racks and Phantom Nodes answer; every destroyed installation returns shield (Reclaim).
+- **Escalation.** A leader's disruption grows in three visible levels (longer jams and frayed cables, double faults, planted installations), sooner in the last stage. Guardians charge on their fifth action or as soon as they are wounded, and raise two adds that each raise the break threshold while they live.
+- **Designations and surprises.** Ten one-line designations (Nesting, Armored, Stoked, Shedding, Hardened, Rigged, Hungry, Spiteful, Laden, Salvaged) vary the leaders; some hide behind interference until the entrance. Reinforcements are announced actions ahead, escorts carry sealed crates (salvage, credits, a card for the encounter), Laden hostiles drop undelivered messages with named choices, and rare signals are named a turn before they fire. Nothing is rolled against you after the forecast.
+- **Three keepers, three engines.** The Architect goes wide with Hot Swap and the **Patch Cable** console. The Warden fortifies with **Harden** and **Backpressure**: shield that stops damage turns into damage, returned to every hostile that attacked. The Ghost **buffers** a transmission for double and releases it in one aimed spike, unless a cut or a breakdown leaves no live route and the packets are lost. Each has archetype-only cards.
 - **Protocols** arm face down and fire on the enemy's matching action: Failover Policy, Port Security, Rate Limiter, IPS Signature, Quarantine Rule and Tarpit. Every forecast shows which will trigger.
-- **Bands matter.** Crowd three online devices into one band for a cluster, or split routers North and South for separated-circuit shield. Fields, corrosion, suppression, band jams and malware make you decide where to build. Every battle starts on its own terrain: wreckage, salvage hardware, crystal veins or interference.
-- Three seven-sector stages with seeded, scouted route maps, **16 hostiles**, elites, sanctuaries, a **market**, **Unknown-signal events** and three guardians: the Iron Regent, the Hollow Choir and the Blackout Core, with charge turns announcing **Crownfall, Requiem and Total Blackout**. Deal the break threshold on the ultimate turn to interrupt and expose them, or brace.
-- Enemies ask questions with more than one answer: graded armor that falls with every extra channel, plating that an online firewall ignores, Lockdown jams that hunt firewalls, siphon taps, junk cards and malware to scrub.
-- **61 cards, 58 with an upgraded `+` version**, and **21 relics** including six **boss relics** that bend the rules at a price. Credits buy cards, relics, removals and upgrades; sanctuaries repair, upgrade, remove or salvage; twelve events trade integrity, credits and cards.
+- **Bands matter.** Crowd three online devices into one band for a cluster, or split routers North and South for separated-circuit shield. Fields, corrosion, suppression, band jams, installations and their reach rings make you decide where to build. Every battle starts on its own terrain: wreckage, salvage hardware, crystal veins or interference.
+- Three seven-sector stages with seeded route maps that scout packs and designations, **20 hostiles, 7 escorts and 3 guardian adds**, elites, sanctuaries, a **market**, **Unknown-signal events** and three guardians: the Iron Regent, the Hollow Choir and the Blackout Core, with charge turns announcing **Crownfall, Requiem and Total Blackout**. Deal the break threshold on the ultimate turn to interrupt and expose them, or brace.
+- Enemies ask questions with more than one answer: graded armor that falls with every extra channel, plating that an online firewall ignores, Lockdown jams that hunt firewalls, overloads that wear devices, installations to scrub or quarantine, junk cards and a Spiteful action that resolves even at lethal.
+- **75 cards, 72 with an upgraded `+` version**, and **29 relics** including eight **boss relics** that bend the rules at a price. Credits buy cards, relics, removals and upgrades; sanctuaries repair, upgrade, remove or salvage; twelve events trade integrity, credits and cards.
 - **Ascension 0–10** per archetype, unlocked by winning.
-- Exact, pure forecasts: every damage, shield and trap term is listed, and resolution uses the same numbers.
-- **Field Training**: 11 short interactive lessons (routes, reading intents, rerouting, online devices, zones, traps, each console, danger and guardians, the expedition) plus an illustrated **Handbook** with a Danger Playbook. Lessons never touch your expedition.
-- Larger, more threatening painted hostiles with anticipation, lunges, embers and guardian presence; distinct device models; gold primary route and cyan channels; offline, salvage, wreckage and malware states on the table.
-- **44 material sound cues with 75 stereo masters** from six CC0 Kenney packs, loudness-matched: card Foley, metal, glass, signal and layered combat impacts, each tied to one game moment. **Nine original instrumental tracks.**
-- Local autosave (version 3; pre-v3 expeditions are not continued), a shared UTC daily seed, local run records, undo, card inspection, keyboard play and reduced motion.
+- Exact, pure forecasts: every delivery, per-port packet, damage, shield, trap, installation effect, wear point and arrival is listed before you commit, and resolution uses the same numbers.
+- **Field Training**: 14 short interactive lessons in 12 chapters (routes, reading intents, rerouting, online devices, zones, traps, each console, danger and guardians, the expedition, and three hard-railed v4 drills: aiming deliveries at a pack, clearing the table front, and breaking a guardian through its adds) plus an illustrated **Handbook** of 16 chapters, including Packs & Ports, The Table Front, Escalation & Designations, Crates, Messages & Signals and a Danger Playbook. Lessons never touch your expedition.
+- Larger, more threatening painted hostiles with anticipation, lunges, embers and guardian presence, and painted escorts, adds and new leaders; distinct device models, including the Server Rack, the Phantom Node and the Sentry Firewall's searchlight; modelled installations, crates and message fragments; gold primary route and cyan channels with packet glyphs aimed at their ports; offline, worn, salvage and wreckage states on the table.
+- **58 material sound cues with 98 stereo masters** from six CC0 Kenney packs, loudness-matched: card Foley, metal, glass, signal and layered combat impacts, each tied to one game moment. **Nine original instrumental tracks.**
+- Local autosave (version 4; version 3 expeditions migrate, older ones are not continued), a shared UTC daily seed, local run records, undo, card inspection, keyboard play and reduced motion.
 - A Containerlab topology exporter. Combat is a browser simulation; exported labs need suitable images and real device configuration before they can route traffic.
 
-Read the [complete implemented game design](docs/game-design.md), [story and world](docs/narrative.md), and the [v3 balance probe](docs/balance-v3.json). Simulated win rates are regression probes; human playtesting remains necessary to tune difficulty and enjoyment.
+Read the [complete implemented game design](docs/game-design.md), [story and world](docs/narrative.md), the [v4 balance probe](docs/balance-v4.json) and the [v3 baseline](docs/balance-v3.json). The v4 probe's tactical bots win 36 % (Architect), 36 % (Warden) and 30 % (Ghost) at ascension 0 over 600 seeds each. Simulated win rates are regression probes; human playtesting remains necessary to tune difficulty and enjoyment.
 
 ### Discover the signature cards
 
@@ -80,7 +84,12 @@ These are discoveries, **not starter cards**. Opening hands provide a router and
 | Apply a field | Play a field card, then click a band on the table or its field seal |
 | Console command | Console control in the command dock, or C (Patch Cable then asks for two devices) |
 | Arm a protocol | Play the protocol card; it waits face down and fires on the matching enemy action |
-| Scrub malware | Click the malware node on the table; costs 1 energy |
+| Select a hostile | Click its rail plate, sprite or port row; Tab to a port row, then Enter |
+| Set the focus | The crest button on a port row, or F (with no port selected, F cycles the focus) |
+| Aim a delivery | Click a port stud (L · C · R) in the Deliveries ledger, or drag the channel's packet glyph to a hostile; [ and ] select a delivery, T cycles its port. Free and undoable |
+| Repair a worn device | Click the device, then Repair; or R (the selected device, else the most worn); 1 energy per condition point |
+| Scrub an installation | Click the installation, then Scrub; or S (the selected one, else the most dangerous); 1 energy per integrity point |
+| Answer a message or crate | Click a choice, or press 1–3; it opens before your next hand |
 | Delete a Worm | Play it for 1 energy before you transmit |
 | Browse a large hand | Hand arrows or horizontal scrolling; 1–0 still selects any card |
 | Transmit / end turn | Brass dial, Space or Enter; focused buttons retain normal keyboard behavior |
@@ -88,21 +97,21 @@ These are discoveries, **not starter cards**. Opening hands provide a router and
 | Undo before transmitting | Z |
 | Cancel selection / settings | Escape |
 
-Faults last one player turn. Hot Patch clears them immediately; a second channel keeps you transmitting through them. Energy returns to five plus reserves and online PoE Injectors, and the hand is redrawn after each transmission (plus online Cache Servers). Temporary shield and burst expire; hardware remains until the encounter ends. Exhausted cards return next encounter. Integrity, credits and your deck carry between sectors.
+Faults last one player turn (an escalated jam two). Hot Patch clears every active fault at once and repairs your most worn device; a second channel keeps you transmitting through them. Energy returns to five plus reserves and online PoE Injectors, and the hand is redrawn after each transmission (plus online Cache Servers). Temporary shield and burst expire; hardware remains until the encounter ends. Exhausted cards return next encounter. Integrity, credits and your deck carry between sectors.
 
-Fields belong to the ground: moving hardware changes which effects apply immediately. Each band holds one allied and one hostile field, plus any terrain field; another allied field replaces yours. Corrosion adds 2 incoming damage while any deployed hardware occupies its band. Suppression removes 3 damage when your primary route crosses its band. Fixed ALPHA/OMEGA terminals do not activate fields. Purge Field removes hostile fields, device jams and malware in the chosen band, preserves allied fields, draws one card and exhausts.
+Fields belong to the ground: moving hardware changes which effects apply immediately. Each band holds one allied and one hostile field, plus any terrain or signal field; another allied field replaces yours, and a second hostile caster replaces the first. An Anchor stops its band's hostile fields from ticking down. Corrosion adds 2 incoming damage while any deployed hardware occupies its band. Suppression removes 3 damage when your primary route crosses its band. Fixed ALPHA/OMEGA terminals do not activate fields. Purge Field destroys every installation in the chosen band and removes hostile fields and device jams there (an Anchor takes the whole purge alone), preserves allied fields, draws one card and exhausts.
 
 ## Project guide
 
-- `src/core/` — deterministic rules: `cards.ts` (`RULES`, cards, upgrades, relics), `run.ts` (combat and forecast), `graph.ts` (routes and channels), `terrain.ts`, `enemies.ts`, `meta.ts` (rooms, rewards, market, sanctuary), `events.ts`, `ascension.ts`, `map.ts`, `expedition.ts` (archetypes and save validation) and YAML export.
-- `src/three/` — table, device models (`models.ts` loads the Blender bodies), terrain props, cables, painted enemies, lighting and packet animation.
-- `blender/` — one Python script per device role that builds its body in Blender and exports `public/models/<role>.glb`; see the [device model contract](blender/README.md).
-- `src/ui.ts`, `src/alpha-ui.ts`, `src/screens.ts` and their stylesheets — illustrated cards, the battle HUD, inspection and every expedition screen.
+- `src/core/` — deterministic rules: `cards.ts` (`RULES`, cards, upgrades, relics), `run.ts` (the public combat API and forecast), `combat/` (the one resolver behind forecast and resolution: board, network, intents and escalation, surprises), `graph.ts` (routes and channels), `terrain.ts`, `enemies.ts` (hostiles, escorts, adds, designations, pack templates, signals, message options), `encounter.ts` (pack plans, crates, reinforcements, messages), `meta.ts` (rooms, rewards, market, sanctuary), `events.ts`, `ascension.ts`, `map.ts`, `expedition.ts` (archetypes, save validation and the v3 migration) and YAML export.
+- `src/three/` — table, device, installation and prop models (`models.ts` loads the Blender bodies), the three-port rail and its plates (`plates.ts`), the table front (`front.ts`), terrain props, cables, painted enemies, lighting and packet animation; `src/battle-playback.ts` choreographs a transmission port by port.
+- `blender/` — one Python script per model in three families (devices, installations, props) that builds its body in Blender and exports `public/models/`; see the [model contract](blender/README.md).
+- `src/ui.ts`, `src/battle-ui.ts`, `src/alpha-ui.ts`, `src/screens.ts` and their stylesheets — illustrated cards, the battle HUD (port strip, deliveries ledger, escalation gauge, repair and scrub plates), inspection, journals (Details, Devices, the message dialog) and every expedition screen.
 - `src/tutorial.ts`, `src/tutorial/` — Field Training lessons and the illustrated Handbook.
 - `src/story.ts` — chapters, enemy motivations, sanctuary discoveries and endings.
 - `src/main.ts` — input, view transitions, targeting, undo and autosave.
-- `src/audio.ts`, `src/audio-effects.ts` — music playback, crossfades, sampled effects, voice priority and combat ducking. The CUE GUIDE in `audio-effects.ts` lists exactly when each of the 44 cues plays.
-- `public/art/` — finished game artwork; [original art direction](docs/art-prompts.md) and [fieldcraft artwork prompts](docs/art-polish-prompts.md), and [expedition artwork prompts](docs/art-expedition-prompts.md).
+- `src/audio.ts`, `src/audio-effects.ts` — music playback, crossfades, sampled effects, voice priority and combat ducking. The CUE GUIDE in `audio-effects.ts` lists exactly when each of the 58 cues plays.
+- `public/art/` — finished game artwork; [original art direction](docs/art-prompts.md) and [fieldcraft artwork prompts](docs/art-polish-prompts.md), and [expedition artwork prompts](docs/art-expedition-prompts.md). The v4 escort, leader and add sheets, the warning plate and the message and crate illustrations are recorded in `docs/art-v4-bodies-manifest.json`, `docs/art-v4-plates-manifest.json` and `docs/art-v4-illustrations-manifest.json` (the fourteen v4 cards in `docs/art-v3-manifest.json`); `uv run scripts/compose_sheet.py` cuts the painted bodies out of their backdrop and rebuilds any sheet from its manifest.
 - `public/audio/` — fifteen instrumental Ogg masters, including exploration and combat themes for each stage, and the material effects bank.
 - `soundtrack/` — one folder per song in `tracks/`, alongside `effects/` and `licenses/`. Scores, generation metadata and provenance are tracked; large recordings and intermediate arrays remain local and ignored by Git.
 - [Soundtrack production](soundtrack/README.md) and [effects production](soundtrack/effects/README.md) — source material, licenses and reproduction steps.
@@ -129,4 +138,4 @@ Artwork was created with OpenAI image generation and local Krea 2 Turbo. The sou
 
 ![Battle layout with active fields](docs/screenshots/battle.png)
 
-The presentation fixture above displays all nine relics to exercise the crowded layout. [View the Copper Market](docs/screenshots/market.png). The [validation notes](docs/polish-validation.md) record the tested sizes and balance scenarios. To reproduce the layout audit against the dev server: `FAULTLINE_ORIGIN=http://127.0.0.1:5174 node --experimental-strip-types scripts/audit-layout.mjs`.
+The presentation fixture above displays all nine relics to exercise the crowded layout. [View the Copper Market](docs/screenshots/market.png) or [a guardian fight](docs/screenshots/guardian.png). These screenshots predate Under Quarantine: they show a single hostile at the centre port, without the port strip, deliveries or installations. The [validation notes](docs/polish-validation.md) record the tested sizes and balance scenarios. To reproduce the layout audit against the dev server: `FAULTLINE_ORIGIN=http://127.0.0.1:5174 node --experimental-strip-types scripts/audit-layout.mjs`.

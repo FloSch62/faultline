@@ -25,8 +25,8 @@ async function startBattle(
       if (!e.run.deck.includes(card)) e.run.deck.push(card);
   }
   if (options.drawPile) e.run.drawPile = options.drawPile;
-  if (options.enemyHp) e.run.enemy!.hp = e.run.enemy!.maxHp = options.enemyHp;
-  if (options.enemyId) e.run.enemy!.id = options.enemyId;
+  if (options.enemyHp) e.run.enemies[0].hp = e.run.enemies[0].maxHp = options.enemyHp;
+  if (options.enemyId) e.run.enemies[0].id = options.enemyId;
   await page.addInitScript(
     ({ key, value }) => localStorage.setItem(key, value),
     { key, value: JSON.stringify(e) },

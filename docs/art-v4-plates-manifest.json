@@ -1,0 +1,55 @@
+{
+  "description": "FAULTLINE v4 interface plates at 1024 x 512, referenced to readout-frame.png, cut out with scripts/compose_sheet.py (design 14.6). Same runtime and model revisions as the v3 card and stage passes. Rendered with scripts/generate_stage_art.py --manifest <this file>; postprocess 'cutout' entries go through scripts/compose_sheet.py (design 14.3).",
+  "local": {
+    "model": "Krea-2-Turbo",
+    "diffusionModel": "krea2_turbo_fp8_scaled.safetensors",
+    "textEncoder": "qwen3vl_4b_fp8_scaled.safetensors",
+    "vae": "qwen_image_vae.safetensors",
+    "width": 1024,
+    "height": 512,
+    "steps": 8,
+    "cfg": 1,
+    "sampler": "euler",
+    "scheduler": "simple",
+    "modelSource": "https://huggingface.co/Comfy-Org/Krea-2",
+    "modelRevision": "eb1eddd3983a54678545a9b2c178c5853b30f7be",
+    "runtime": "ComfyUI",
+    "runtimeRevision": "b5cc8830279eae909a59de030af1e50761c36751",
+    "styleReference": {
+      "lora": "krea2_style_reference.safetensors",
+      "strength": 0.5
+    }
+  },
+  "images": [
+    {
+      "id": "warning-plate",
+      "name": "Reinforcement warning plate",
+      "effect": "Wide brass plaque with a red lamp at each end and an empty obsidian centre for HTML text.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923305,
+      "reference": "public/art/readout-frame.png",
+      "referenceStrength": 0.5,
+      "postprocess": "cutout",
+      "output": "public/art/ui/warning-plate.webp",
+      "prompt": "Use case: stylized-concept. Asset: finished painted UI plate for a premium dark sci-fi fantasy card game. One wide horizontal rectangular warning plaque, width to height ratio 2:1, perfectly front-facing orthographic. A beautiful heavy antique brass frame with worn engraved edges and tiny geometric filigree in its corners, one round red glass warning lamp set into each short end of the frame, glowing a restrained ember red. Dark brushed obsidian and midnight indigo enamel on the large blank interior, matching the fine mechanical details of an abandoned gothic orbital cathedral. Restrained, aged, elegant, premium, tactile hand-painted realism. The center must be EMPTY and VERY DARK, an even charcoal indigo, and occupies at least 75 percent of the width, ready for readable game information later. No divisions or internal decorations. The plaque sits alone on a flat uniform very dark charcoal backdrop with no cast shadow, ready to be cut out. NO words, NO letters, NO numbers. The plaque fills 94 percent of the image width. Landscape composition, finely detailed worn metal, no bulky armor, no bright glowing neon.",
+      "file": "artifacts/v4-plates-02/warning-plate@240923305.png",
+      "sha256": "f07cd6e646ff06eff67484ca6e594c6cbdcd8ad11215095f922a9d3a723deefc",
+      "rejected": [
+        {
+          "seed": 240923301,
+          "why": "plaque 3.2:1 with a plain thin rim; 240923305 is closer to 2:1 and carries the readout-frame corner filigree"
+        },
+        {
+          "seeds": [
+            240923303,
+            240923304
+          ],
+          "why": "long thin 3.4:1 plaques, plain rims"
+        }
+      ],
+      "outputSha256": "be6445dcc56f5725c423dbed659477ff1c699035e32221867a518960c93abe92",
+      "cutout": "uv run scripts/compose_sheet.py --manifest docs/art-v4-plates-manifest.json --asset warning-plate --canvas 1024x512 --fill 0.98 --fill-holes --format webp --output artifacts/v4-plates-cut-03",
+      "referenceSha256": "a2cbeb5e0a356c5fa6ab94dcdb57b072565ce314ca2c58d7695e8c9221c0faaa"
+    }
+  ]
+}

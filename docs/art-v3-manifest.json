@@ -278,6 +278,240 @@
       "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A precise hinged brass cable-splicing instrument clamps two severed optical cable ends into one straight aligned glowing connection. Beside the splice, attached to the same compact ivory network port, tangled red interference filaments dissolve into harmless specks and the status lens returns to blue-teal. A subtle protective pale blue halo around the repaired joint. Strong close-up connector-and-repair silhouette, both clean signal and restored continuity, no cathedral force-wall scene. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates. Deep indigo-black shadows, restrained luminous teal and warm gold; detailed ruined orbital-cathedral machinery and drifting debris in the background. Dramatic shadow masses and expressive painted light, strong central silhouette readable at card size. The environment and subject form one imaginative card-art composition. Landscape full-bleed illustration with essential subjects centered. No photography, smooth studio-product rendering, text, labels, border or interface.",
       "file": "public/art/cards/protocol.png",
       "sha256": "b5d070f6dddf23e739c837d4bc94ad7c2bd5f8b160c7c2a250ecc64bf04faa30"
+    },
+    {
+      "id": "broadcast-storm",
+      "name": "Broadcast Storm",
+      "effect": "Your transmission deals +2 to every port this turn.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923231,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A cluster of three ancient brass broadcast horns mounted on one weathered gyroscope inside a ruined orbital cathedral, each horn hurling a bright teal packet of light toward a different distant shape in the dark, three straight beams diverging from one source. Chipped brass, cracked ivory fittings, dark cables coiled at the base, amber dust in the air. Rich layered oil-paint brushwork, softly broken painted edges, muted colours, dramatic shadow masses with three teal highlights. One clear composition: one source, three destinations. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/broadcast-storm.png",
+      "sha256": "9710259daba058145c7a4bacd078a8cd35287a96993f563310c11ba5c0ccd33c",
+      "candidate": "artifacts/v4-cards-04/broadcast-storm.png",
+      "rejected": [
+        {
+          "seed": 240923201,
+          "why": "four horns and beams, not one source and three destinations"
+        },
+        {
+          "seed": 240923221,
+          "why": "painted aged-canvas border along the edges (frame)"
+        }
+      ]
+    },
+    {
+      "id": "traffic-shaping",
+      "name": "Traffic Shaping",
+      "effect": "Every delivery goes to the focus this turn; the focus packet deals +1. Draw 1.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923236,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A heavy brass valve manifold on a broken pipe gallery inside a ruined orbital cathedral: four glowing teal streams enter from the left through separate pipes, brass wheel valves turn them, and one single thick bright stream leaves to the right through a wide gate, the other outlets dark and closed. An engineer's gloved hand rests on the last valve. Worn brass, verdigris, cracked gauges, warm amber light. Rich layered oil-paint brushwork, softly broken painted edges, muted colours, dramatic shadow. No photography, smooth studio-product rendering, text, labels, border or interface. The four glowing streams run INTO the manifold from the left through closed pipes; nothing pours out below; a single wide gate on the right releases the one merged bright stream.",
+      "file": "public/art/cards/traffic-shaping.png",
+      "sha256": "f148a04872bb70611656c7d5a3f92536e3bc78686328d0e8e346c1623c2c9af5",
+      "promptAddendum": "The four glowing streams run INTO the manifold from the left through closed pipes; nothing pours out below; a single wide gate on the right releases the one merged bright stream.",
+      "candidate": "artifacts/v4-cards-05/traffic-shaping.png",
+      "rejected": [
+        {
+          "seeds": [
+            240923202,
+            240923222,
+            240923228,
+            240923232
+          ],
+          "why": "verbatim prompt: the streams pour out of the manifold (reads as splitting, not shaping into one channel)"
+        },
+        {
+          "seed": 240923239,
+          "why": "with addendum: streams still pour down"
+        }
+      ]
+    },
+    {
+      "id": "flood-fill",
+      "name": "Flood Fill",
+      "effect": "+1 damage per live channel to every port.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923241,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A vast amber lattice of glowing optical channels spreading like floodwater across a dark brass rail inside a ruined orbital cathedral, every channel reaching a different dark machine shape along the rail so that none is left untouched, small brass routers standing in the flood like pylons. Overflowing, generous, total. Chipped brass and ivory, dark water-like light, drifting sparks. Rich layered oil-paint brushwork, softly broken painted edges, muted colours with one amber-teal glow. No photography, smooth studio-product rendering, text, labels, border or interface. The channels themselves glow bright amber like molten light and overflow the rail edges on every side.",
+      "file": "public/art/cards/flood-fill.png",
+      "sha256": "2cc7bf2596587971a3549923bad53c2e8b0af14a9789d6606f393073f57c26ae",
+      "promptAddendum": "The channels themselves glow bright amber like molten light and overflow the rail edges on every side.",
+      "candidate": "artifacts/v4-cards-06/flood-fill.png",
+      "rejected": [
+        {
+          "seeds": [
+            240923203,
+            240923223,
+            240923230,
+            240923234
+          ],
+          "why": "verbatim prompt: a dull brass lattice over water, no glowing amber channels"
+        },
+        {
+          "seed": 240923238,
+          "why": "with addendum: good, but the flood stays on the rail; 240923241 overflows on every side"
+        }
+      ]
+    },
+    {
+      "id": "bulkhead",
+      "name": "Bulkhead",
+      "effect": "Gain 3 block; every online firewall blocks 1 more against each attack.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923237,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A massive riveted iron bulkhead door sealed across a ruined cathedral corridor, braced by three small brass firewall turrets set into the frame, each turret projecting its own thin amber force wall so the door is guarded three times over, scorch marks on the far side where something struck it. Heavy, patient, a fortress detail. Pitted iron, tarnished brass, cracked ivory conduit, dust in a shaft of amber light. Rich layered oil-paint brushwork, softly broken painted edges, muted colours, deep shadow. No photography, smooth studio-product rendering, text, labels, border or interface. In front of the door hang three translucent glowing amber force walls, one projected by each small turret, layered one behind the other.",
+      "file": "public/art/cards/bulkhead.png",
+      "sha256": "1ffdc59920f09ed494016d4227dde2107efee6939b9812e6a6210ba7e6573e5a",
+      "promptAddendum": "In front of the door hang three translucent glowing amber force walls, one projected by each small turret, layered one behind the other.",
+      "candidate": "artifacts/v4-cards-05/bulkhead.png",
+      "rejected": [
+        {
+          "seeds": [
+            240923204,
+            240923224,
+            240923229,
+            240923233
+          ],
+          "why": "door with pipe-like nozzles, no turrets or force walls"
+        },
+        {
+          "seed": 240923240,
+          "why": "with addendum: two lamp-like fittings, weaker than 240923237"
+        }
+      ]
+    },
+    {
+      "id": "spearhead",
+      "name": "Spearhead",
+      "effect": "Your buffer release this turn ignores armor and plating.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923205,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A single narrow spear of bright teal light, a packet drawn out to a needle point, punching cleanly through a thick armored iron plate inside a ruined orbital cathedral, the plate cracking around the hole, brass rivets popping, sparks and a puff of dust on the far side. Behind it, the dim outline of the brass buffer coil that stored the shot. Precise, sudden, quiet before it. Rich layered oil-paint brushwork, softly broken painted edges, muted colours, one teal highlight. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/spearhead.png",
+      "sha256": "d310cac43cf956cf7d276ccbeac3f01987a95bf11a10c4947a18038cb8b5002d",
+      "candidate": "artifacts/v4-cards-01/spearhead.png"
+    },
+    {
+      "id": "packet-storm",
+      "name": "Packet Storm",
+      "effect": "Your transmission deals +5 to every port this turn.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923225,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A storm of hundreds of small bright teal packets of light breaking like a wave over a ruined brass rail inside a derelict orbital cathedral, three dark hostile machine silhouettes on the rail caught in the same storm, every one of them struck, sparks and glass fragments flying. A brass storm-lantern in the foreground is the source. Overwhelming, brief. Rich layered oil-paint brushwork, softly broken painted edges, muted indigo colours with teal light. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/packet-storm.png",
+      "sha256": "8a9d9809d11bba692eb62f2522a3871a77b7b038318f6923ced3849c2473bf11",
+      "candidate": "artifacts/v4-cards-02/packet-storm.png",
+      "rejected": [
+        {
+          "seed": 240923206,
+          "why": "packets read as paper cards; 240923225 has a clearer storm and lantern source"
+        }
+      ]
+    },
+    {
+      "id": "quorum",
+      "name": "Quorum",
+      "effect": "Gain 3 block, +2 for every other hostile on the field. Draw 1.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923226,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. Three engraved brass seals, each carried by a small ivory machine, turning inward and locking together into one large round amber shield disc that hangs in the air before a ruined cathedral gate, the more seals the stronger the disc. Below, a single small brass router sheltered by it. Ceremony, agreement, protection by numbers. Worn brass, chipped ivory, warm amber light on dark stone. Rich layered oil-paint brushwork, softly broken painted edges, muted colours. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/quorum.png",
+      "sha256": "81dcac92cdef35288020a842c0abeaeb338e96eb9eab78acc4823eac466b82a2",
+      "candidate": "artifacts/v4-cards-02/quorum.png",
+      "rejected": [
+        {
+          "seed": 240923207,
+          "why": "static flat arrangement, no sheltered router; 240923226 closer to the brief"
+        }
+      ]
+    },
+    {
+      "id": "server-rack",
+      "name": "Server Rack",
+      "effect": "A rack that takes the wear for devices within reach.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923208,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A squat heavy brass equipment rack cabinet standing on a broken deck inside a ruined orbital cathedral, its riveted roof and side plates sheltering two small ivory-and-brass devices beneath it, a rust-orange iron spike lying bent and useless against its plating where it struck the rack instead of the devices. Solid, protective, scarred. Worn brass, dark cables, warm amber interior light. Rich layered oil-paint brushwork, softly broken painted edges, muted colours, dramatic shadow. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/server-rack.png",
+      "sha256": "31868839de745cbc427f2ac59aa6591385da874b8ae556b0358e3ba218887cda",
+      "candidate": "artifacts/v4-cards-01/server-rack.png"
+    },
+    {
+      "id": "redundant-psu",
+      "name": "Redundant PSU",
+      "effect": "Restore a device to full condition and raise its maximum condition.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923209,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. Two identical compact brass power units bolted side by side on an ancient workbench inside a ruined orbital cathedral, joined by a glass bridge chamber glowing amber, both feeding one small ivory router through a single braided cable; one unit shows scorch marks while the other still burns steadily. Redundancy as a promise. Chipped brass, cracked ivory, dark cables, warm light in the glass. Rich layered oil-paint brushwork, softly broken painted edges, muted colours. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/redundant-psu.png",
+      "sha256": "feebf33bd7a1bf8af34d4c392c07a9bf34d75b3f482d0b64a4af58710822d36e",
+      "candidate": "artifacts/v4-cards-01/redundant-psu.png"
+    },
+    {
+      "id": "sentry-firewall",
+      "name": "Sentry Firewall",
+      "effect": "A firewall whose quarantine degrades installations faster.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923210,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A five-sided brass bastion turret on a ruined cathedral rampart, projecting its broad amber force wall to one side while a brass searchlight on its crown sweeps a hard white-amber beam across the ground onto a magenta-glowing iron spike planted nearby, the spike smoking and cracking under the light. A guard that also hunts. Tarnished brass, chipped ivory, dark stone, one strong beam. Rich layered oil-paint brushwork, softly broken painted edges, muted colours. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/sentry-firewall.png",
+      "sha256": "c6e32c0863fcca5cbe03be899927afafdcb6ae2aee91b4147ecdb8b9d612bfff",
+      "candidate": "artifacts/v4-cards-01/sentry-firewall.png"
+    },
+    {
+      "id": "demolition-charge",
+      "name": "Demolition Charge",
+      "effect": "The focus packet deals +2; destroy an installation.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923235,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A brass plunger detonator box with a worn wooden handle on a broken deck plate inside a ruined orbital cathedral, its cable running to a magenta-glowing hostile spike that is shattering into fragments in a small controlled blast, teal sparks and dust rising, an engineer's gloved hand pressing the plunger. Deliberate, clean, satisfying. Worn brass and wood, dark cables, warm amber light. Rich layered oil-paint brushwork, softly broken painted edges, muted colours. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/demolition-charge.png",
+      "sha256": "7b3f0b9c60edefed67066bfed3fb217da5b2d8db290fff43c7646379c503d4fd",
+      "candidate": "artifacts/v4-cards-04/demolition-charge.png",
+      "rejected": [
+        {
+          "seed": 240923211,
+          "why": "no spike: the blast comes out of the plunger itself"
+        },
+        {
+          "seed": 240923227,
+          "why": "the shattering spike is tiny and off to the side"
+        }
+      ]
+    },
+    {
+      "id": "field-repair",
+      "name": "Field Repair",
+      "effect": "Restore every device to full condition.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923212,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. An open brass engineer's toolkit on an ancient workbench inside a ruined orbital cathedral, a glowing teal solder line being drawn across the scorched cracked casing of a small ivory router by a brass tool held in a gloved hand, the crack closing behind the light, spare plates and a second repaired device beside it. Care, patience, a thing made whole. Chipped brass and ivory, warm amber lamp light, dark cables. Rich layered oil-paint brushwork, softly broken painted edges, muted colours. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/field-repair.png",
+      "sha256": "a4084bfb043d427129b42dbf5c5e0492c9386a2f5ffcff6de07b1238a9855813",
+      "candidate": "artifacts/v4-cards-01/field-repair.png"
+    },
+    {
+      "id": "rapid-redeploy",
+      "name": "Rapid Redeploy",
+      "effect": "Put a hardware card from the discard pile into your hand, cheaper.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923213,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A small brass crane arm on a gyroscope base lifting a chipped ivory router tower out of a discard tray of spent cards and worn parts inside a ruined orbital cathedral, swinging it back toward an empty glowing socket on a dark table, amber light along the arm, dust falling from the router. Speed, thrift, a second chance for hardware. Worn brass, ivory ceramic, dark cables. Rich layered oil-paint brushwork, softly broken painted edges, muted colours. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/rapid-redeploy.png",
+      "sha256": "081ba20d446d0ae1f3e06f525db4030662e2713d73cc0814160f136a75e4fd64",
+      "candidate": "artifacts/v4-cards-01/rapid-redeploy.png"
+    },
+    {
+      "id": "phantom-node",
+      "name": "Phantom Node",
+      "effect": "A decoy socket that absorbs the next disruption.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923214,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A translucent pale teal wireframe ghost of a small router device hovering over an empty brass socket on a dark table inside a ruined orbital cathedral, half dissolved into drifting light, while a hostile brass shear closes on it and passes through nothing; the real ivory router stands safe and solid in the background. A decoy made of light. Dark table, chipped brass sockets, restrained teal glow. Rich layered oil-paint brushwork, softly broken painted edges, muted colours, deep shadow. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/cards/phantom-node.png",
+      "sha256": "8ad29d91fcf80fc1630fbb59f8979e621b037190b8abd02b2426821faa683184",
+      "candidate": "artifacts/v4-cards-01/phantom-node.png"
     }
   ]
 }

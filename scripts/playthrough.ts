@@ -13,7 +13,7 @@ import { chromium, type Page } from "@playwright/test";
 import { newExpedition, type Archetype } from "../src/core/expedition.ts";
 import { reachableRooms } from "../src/core/map.ts";
 import { CARDS, baseCard } from "../src/core/cards.ts";
-import { combatPreview, endTurn, zoneForNode, eventView, upgradableIndices } from "../src/core/run.ts";
+import { combatPreview, endTurn, zoneForNode, eventView, upgradableIndices, leaderOf } from "../src/core/run.ts";
 import { playBotTurn, PRIORITIES, type BotAction } from "./bot.ts";
 import type { CardId, MapRoom, RelicId, RunState } from "../src/core/types.ts";
 
@@ -62,6 +62,17 @@ async function perform(command: BotAction) {
     }
   } else if (command.kind === "scrub") {
     await click(`[data-scrub="${command.id}"]`);
+  } else if (command.kind === "repair") {
+    await click(`[data-repair="${command.id}"]`);
+  } else if (command.kind === "focus") {
+    // The port row opens the crest; the crest sets the focus (F on the keyboard).
+    await click(`.port-row[data-port="${command.port}"]`);
+    await click(`[data-focus-port="${command.port}"]`);
+  } else if (command.kind === "aim") {
+    const run = await read();
+    const port = command.port ?? run.focus ?? "centre";
+    await click(`.port-row[data-port="${port}"]`);
+    await click(`[data-aim="${command.key}"][data-aim-port="${port}"]`);
   } else {
     await page.keyboard.press(command.index === 9 ? "0" : String(command.index + 1));
     if (command.kind === "ground") await click(`#target-dock [data-deploy-zone="${zoneForNode(command)}"]`);
@@ -131,7 +142,7 @@ async function battleStep(r: RunState): Promise<void> {
   }, { storage, turn: r.turn }, { timeout: 30000 });
   await page.locator(".game-root:not(.busy)").waitFor({ timeout: 30000 });
   const after = await read();
-  assert.deepEqual(after, expected, `turn ${r.turn} vs ${r.enemy?.id}: the saved result differs from the forecast resolution`);
+  assert.deepEqual(after, expected, `turn ${r.turn} vs ${leaderOf(r)?.id}: the saved result differs from the forecast resolution`);
   checked++;
   turns++;
   if (current) {
@@ -154,10 +165,11 @@ async function screenStep(r: RunState) {
     rooms[room.type] = (rooms[room.type] ?? 0) + 1;
     await click(`[data-room="${room.id}"]`);
     const next = await read();
-    if (next.phase === "battle" && next.enemy) {
-      current = { stage: next.stage + 1, sector: next.floor + 1, room: room.type, enemy: next.enemy.id, before: next.integrity, turns: 0, interrupts: 0 };
+    const leader = leaderOf(next);
+    if (next.phase === "battle" && leader) {
+      current = { stage: next.stage + 1, sector: next.floor + 1, room: room.type, enemy: next.enemies.map(enemy => enemy.id).join("+"), before: next.integrity, turns: 0, interrupts: 0 };
       encounters.push(current);
-      console.log(`Stage ${next.stage + 1} sector ${next.floor + 1} ${room.type}: ${next.enemy.name}, integrity ${next.integrity}/${next.maxIntegrity}`);
+      console.log(`Stage ${next.stage + 1} sector ${next.floor + 1} ${room.type}: ${next.enemies.map(enemy => enemy.name).join(", ")}, integrity ${next.integrity}/${next.maxIntegrity}`);
       if (!next.bossIntroSeen) await click('.guardian-introduction [data-action="close"]');
     } else console.log(`Stage ${next.stage + 1} sector ${next.floor + 1}: ${room.type}`);
   } else if (r.phase === "reward") {
@@ -185,8 +197,8 @@ async function screenStep(r: RunState) {
     await click(`[data-screen="event-choice"][data-index="${choice}"]`);
     if (view.choices[choice].needsCard) await pickFirst();
     const next = await read();
-    if (next.phase === "battle" && next.enemy) {
-      current = { stage: next.stage + 1, sector: next.floor + 1, room: "event", enemy: next.enemy.id, before: next.integrity, turns: 0, interrupts: 0 };
+    if (next.phase === "battle" && next.enemies.length) {
+      current = { stage: next.stage + 1, sector: next.floor + 1, room: "event", enemy: next.enemies.map(enemy => enemy.id).join("+"), before: next.integrity, turns: 0, interrupts: 0 };
       encounters.push(current);
     }
   }

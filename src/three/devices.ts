@@ -13,6 +13,9 @@ export const COLORS: Record<Role, number> = {
   cache: 0x7fb0f2,
   power: 0xf4d25c,
   balancer: 0xb69cff,
+  // v4 (engine, minimal): the models/world agents own the final bodies.
+  rack: 0xb5cf7a,
+  phantom: 0x7ef5e6,
 };
 
 export interface Tinted {
@@ -38,6 +41,9 @@ export type DeviceGroup = THREE.Group & {
     online: boolean;
     role: Role;
     salvage: boolean;
+    /** Worn (condition below its maximum): fray-coloured rim and a sparse ember burst (World). */
+    worn?: boolean;
+    nextSpark?: number;
   };
 };
 
@@ -265,6 +271,19 @@ export function addRoleBody(group: DeviceGroup, node: NetworkNode, palette: Pale
     crest.position.y = 2.12;
     group.add(crest);
     data.floaters.push(crest);
+  } else if (node.role === "rack") {
+    // Placeholder chassis until the Blender body lands: an open frame with three shelves.
+    for (const x of [-0.42, 0.42]) for (const z of [-0.3, 0.3]) group.add(box(0.06, 1.1, 0.06, trim, x, 1.55, z));
+    for (const y of [1.1, 1.5, 1.9]) group.add(box(0.9, 0.05, 0.66, dark, 0, y, 0));
+    led(group, color, 0.5, 0.03, 0.02, 0, 1.72, 0.34, 1.8, 0.4);
+  } else if (node.role === "phantom") {
+    // Placeholder decoy until the Blender body lands: a pale wireframe core.
+    const ghost = new THREE.Mesh(new THREE.OctahedronGeometry(0.34, 0), glow(color, 0.55));
+    (ghost.material as THREE.MeshBasicMaterial).wireframe = true;
+    ghost.position.y = 1.55;
+    group.add(ghost);
+    data.floaters.push(ghost);
+    group.add(ring(0.5, 0.02, color, 1.2, 0.5));
   }
 }
 

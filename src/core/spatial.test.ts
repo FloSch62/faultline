@@ -18,8 +18,8 @@ import type { RunState } from "./types.ts";
 function manual(): RunState {
   const r = newExpedition("architect", 91).run;
   chooseRoom(r, "0-1");
-  r.enemy!.id = "leech";
-  r.enemy!.hp = r.enemy!.maxHp = 100;
+  r.enemies[0].id = "leech";
+  r.enemies[0].hp = r.enemies[0].maxHp = 100;
   r.relics = [];
   r.hand = ["router", "fiber", "fiber"];
   playGround(r, 0, 0, 0);
@@ -114,7 +114,7 @@ test("opposite router bands do not give separation when routes share a bottlenec
 
 test("Cable Wraith targets the longest exposed cable and previews length chip damage", () => {
   const r = manual();
-  r.enemy!.id = "wraith";
+  r.enemies[0].id = "wraith";
   r.topology.nodes.find((node) => node.id === "router1")!.x = -3;
   const p = combatPreview(r);
   assert.equal(p.faultTarget, "omega::router1");
@@ -124,8 +124,8 @@ test("Cable Wraith targets the longest exposed cable and previews length chip da
     1,
   );
   assert.equal(endTurn(r).integrityDamage, 1);
-  assert.equal(r.faultLink, p.faultTarget);
-  r.enemy!.turn = 0;
+  assert.equal(r.faultLinks[0], p.faultTarget);
+  r.enemies[0].turn = 0;
   r.topology.links.find((link) => link.b === "omega")!.armored = true;
   assert.equal(combatPreview(r).faultTarget, "alpha::router1");
   assert.equal(combatPreview(r).incomingRaw, 0);
@@ -133,12 +133,12 @@ test("Cable Wraith targets the longest exposed cable and previews length chip da
 
 test("Storm bands are telegraphed, cycle, and an empty band really dodges", () => {
   const r = manual();
-  r.enemy!.id = "storm";
+  r.enemies[0].id = "storm";
   assert.equal(combatPreview(r).hazardZone, "north");
   assert.equal(combatPreview(r).faultTarget, null);
   assert.equal(endTurn(r).integrityDamage, 0);
-  assert.equal(r.faultNode, null);
-  r.enemy!.turn = 3;
+  assert.deepEqual(r.faultNodes, []);
+  r.enemies[0].turn = 3;
   const before = combatPreview(r);
   assert.equal(before.hazardZone, "center");
   assert.equal(before.faultTarget, "router1");
@@ -146,39 +146,40 @@ test("Storm bands are telegraphed, cycle, and an empty band really dodges", () =
   relocateNode(r, "router1", 0, 2.4);
   assert.equal(combatPreview(r).faultTarget, null);
   endTurn(r);
-  assert.equal(r.faultNode, null);
-  r.enemy!.turn = 6;
+  assert.deepEqual(r.faultNodes, []);
+  r.enemies[0].turn = 6;
   assert.equal(combatPreview(r).hazardZone, "south");
   assert.equal(combatPreview(r).faultTarget, "router1");
 });
 
 test("Packet Leech healing is capped, forecast, and resolved from a missing route", () => {
   const r = manual();
-  r.enemy!.hp = 98;
-  r.faultLink = "alpha::router1";
+  r.enemies[0].hp = 98;
+  r.faultLinks = ["alpha::router1"];
   const p = combatPreview(r);
   assert.equal(p.packetDamage, 0);
   assert.equal(p.enemyHealing, 2);
   endTurn(r);
-  assert.equal(r.enemy!.hp, 100);
-  r.enemy!.hp = 80;
-  r.faultLink = null;
-  // Turn two is the Siphon Tap: it plants malware, then heals 1 per tap.
+  assert.equal(r.enemies[0].hp, 100);
+  r.enemies[0].hp = 80;
+  r.faultLinks = [];
+  // Turn two is the Siphon Tap: it plants a Tap installation, then heals 1 per Tap.
   const tap = combatPreview(r);
-  assert.equal(tap.intent?.kind, "infect");
+  assert.equal(tap.intent?.kind, "install");
+  assert.equal(tap.intent?.install, "tap");
   assert.ok(tap.malwareTarget);
   assert.equal(tap.enemyHealing, 1);
   const result = endTurn(r);
   assert.equal(result.packetDamage, 5);
   assert.ok(result.malwarePlanted);
-  assert.equal(r.enemy!.hp, 76);
+  assert.equal(r.enemies[0].hp, 76);
   // The tap now siphons 2 damage from every transmission until scrubbed.
   assert.equal(combatPreview(r).packetDamage, 3);
 });
 
 test("Sentinel plating is a signed damage term and a firewall bypass selects the better route", () => {
   const r = manual();
-  r.enemy!.id = "sentinel";
+  r.enemies[0].id = "sentinel";
   const p = combatPreview(r);
   assert.equal(p.rawPacketDamage, 5);
   assert.equal(p.packetDamage, 3);
@@ -247,7 +248,7 @@ test("VXLAN creates an amplified protected cable and inspection rewards an onlin
   assert.deepEqual(r.hand, ["guard", "pulse"]);
   assert.ok(r.exhaustPile.includes("inspect"));
   r.hand = ["inspect"];
-  r.faultNode = "router1";
+  r.faultNodes = ["router1"];
   r.drawPile = ["guard", "pulse"];
   playInstant(r, 0);
   assert.deepEqual(r.hand, ["guard"]);
@@ -261,7 +262,7 @@ test("legendary reward frequency is substantially below the specific Containerla
   for (let sample = 1; sample <= 5000; sample++) {
     r.rng = Math.imul(sample, 0x9e3779b1) >>> 0;
     r.phase = "battle";
-    r.enemy!.hp = 1;
+    r.enemies[0].hp = 1;
     endTurn(r);
     containerlab += Number(r.cardRewards.includes("containerlab"));
     clabernetes += Number(r.cardRewards.includes("clabernetes"));

@@ -2,12 +2,13 @@
  * relic choices and events. Combat rules live in run.ts; this module decides
  * what happens between fights. */
 import { CARDS, RELICS, REWARD_POOL, baseCard, canUpgrade, isUpgraded, upgraded } from "./cards.ts";
-import { reachableRooms, createMap, encounterHealth } from "./map.ts";
+import { reachableRooms, createMap } from "./map.ts";
 import { STAGES } from "./stages.ts";
 import { beginBattle } from "./run.ts";
 import { random, shuffle, log } from "./util.ts";
 import { EVENTS, eventDefinition, openEvent } from "./events.ts";
 import { creditMultiplier, priceMultiplier, repairMultiplier } from "./ascension.ts";
+import { PRE_UPGRADE_CHANCE, encounterRoom, planEncounter, slotRarity } from "./encounter.ts";
 import type { CardId, MapRoom, RelicId, RunState, ShopState } from "./types.ts";
 import type { ActionResult } from "./run.ts";
 
@@ -44,8 +45,7 @@ export function rollRelics(run: RunState, tier: "common" | "boss", count: number
   return shuffle(run, relicPool(run, tier)).slice(0, count);
 }
 
-const PRE_UPGRADE_CHANCE = [0, 0.1, 0.2];
-/** Later stages sometimes offer cards that are already upgraded. */
+/** Later stages sometimes offer cards that are already upgraded (PRE_UPGRADE_CHANCE by stage). */
 function maybeUpgraded(run: RunState, id: CardId, chance: number): CardId {
   return random(run) < chance && canUpgrade(id) ? upgraded(id) : id;
 }
@@ -60,12 +60,7 @@ export function cardRewards(run: RunState): CardId[] {
   const options: CardId[] = [];
   for (let i = 0; i < 3; i++) {
     const roll = random(run);
-    const rarity: Rarity =
-      elite && i === 0 ? "rare"
-        : roll < (elite ? 0.02 : 0.005) ? "legendary"
-          : roll < (elite ? 0.27 : 0.125) ? "rare"
-            : roll < (elite ? 0.77 : 0.505) ? "uncommon"
-              : "common";
+    const rarity: Rarity = elite && i === 0 ? "rare" : slotRarity(roll, elite);
     const card = rollCard(run, rarity, options.map(id => baseCard(id) as CardId));
     if (card) options.push(maybeUpgraded(run, card, PRE_UPGRADE_CHANCE[run.stage] ?? 0));
   }
@@ -134,16 +129,16 @@ export function chooseRoom(run: RunState, roomId: string): ActionResult {
     openEvent(run);
     log(run, `Unknown signal: ${eventDefinition(run.event!.id).title}.`);
   } else {
+    // planEncounter (called by beginBattle) applies every health rule: pack shares,
+    // Hardened and the ascension multipliers.
     beginBattle(run, room);
-    // Ascension health rules are part of the expedition layer. Overwriting is
-    // idempotent should combat already have applied them.
-    if (run.enemy) run.enemy.hp = run.enemy.maxHp = encounterHealth(run.stage, room, run.ascension);
   }
+  const guardian = run.enemies?.find(enemy => enemy.port === "centre") ?? run.enemies?.[0];
   return {
     ok: true,
     message:
       room.type === "boss"
-        ? `${run.enemy!.name} detected.`
+        ? `${guardian?.name ?? "The guardian"} detected.`
         : room.type === "shop" ? "Entered the market."
           : room.type === "event" ? "An unknown signal answers."
             : `Entered ${room.type.toUpperCase()} sector.`,
@@ -157,13 +152,29 @@ export function advanceRoom(run: RunState) {
   run.lastRoom = room.id;
   run.floor = room.floor + 1;
   run.currentRoom = null;
-  run.enemy = null;
+  run.enemies = [];
   run.zoneEffects = [];
-  run.faultNode = null;
-  run.faultLink = null;
+  run.faultNodes = [];
+  run.faultLinks = [];
   run.preparedCard = null;
   // Encounter-scoped combat state never survives a room.
-  run.malware = [];
+  run.installations = [];
+  run.focus = null;
+  run.aims = {};
+  run.enemyPhase = 0;
+  run.hostileActions = 0;
+  run.reinforcement = null;
+  run.signal = null;
+  run.offers = [];
+  run.encounterCards = [];
+  delete run.lingeringJams;
+  delete run.frayedByCut;
+  delete run.repairsThisTurn;
+  delete run.turnEffects;
+  delete run.creditLedger;
+  delete run.reclaim;
+  delete run.attackers;
+  delete run.entrance;
   run.protocols = [];
   run.buffer = 0;
   run.buffering = false;
@@ -175,7 +186,7 @@ export function advanceRoom(run: RunState) {
   if (run.floor >= 7 && run.stage < STAGES.length - 1) {
     run.stage++;
     run.floor = 0;
-    run.map = createMap(run.stage, run.seed);
+    run.map = createMap(run.stage, run.seed, run.ascension);
     run.lastRoom = null;
     const restored = Math.min(6, run.maxIntegrity - run.integrity);
     run.integrity += restored;
@@ -184,18 +195,34 @@ export function advanceRoom(run: RunState) {
   } else run.phase = run.floor >= 7 ? "won" : "map";
 }
 
-/** Called by combat when the hostile is defeated. */
+/** Called by combat when every hostile is defeated. Pays the room's credits, the
+ * encounter plan's pack / designation / reinforcement credits and everything banked
+ * during the fight (crates, messages; already multiplied by ascension 7), then leaves
+ * the itemised ledger in run.creditLedger for the reward screen ("14 room · 4 pack"). */
 export function grantVictory(run: RunState) {
   const room = currentRoom(run);
+  const fight = encounterRoom(run);
   run.phase = "reward";
   run.cardRewards = cardRewards(run);
   const base = room?.type === "boss" ? 50
     : room?.type === "elite" ? 30 + 5 * run.stage
       : room?.type === "event" ? 40
         : 14 + 3 * run.stage + Math.floor(random(run) * 5);
-  const credits = Math.round(base * creditMultiplier(run.ascension)) + (run.relics.includes("credit-line") ? 15 : 0);
+  const label = room?.type === "boss" ? "guardian" : room?.type === "elite" ? "elite" : room?.type === "event" ? "signal" : "room";
+  const ledger: { label: string; amount: number }[] = [{ label, amount: Math.round(base * creditMultiplier(run.ascension)) }];
+  const add = (line: { label: string; amount: number }) => {
+    const existing = ledger.find(item => item.label === line.label);
+    if (existing) existing.amount += line.amount; else ledger.push({ ...line });
+  };
+  if (fight) planEncounter(run, fight).credits.forEach(add);
+  (run.creditLedger ?? []).forEach(add);
+  if (run.relics.includes("credit-line")) add({ label: "credit line", amount: 15 });
+  const credits = ledger.reduce((sum, line) => sum + line.amount, 0);
   run.credits += credits;
   run.creditsEarned = credits;
+  run.creditLedger = ledger.filter(line => line.amount > 0);
+  // A crate's card choice is for this encounter only; after the fight it has nothing to give.
+  run.offers = (run.offers ?? []).filter(offer => offer.kind !== "crate-card");
   log(run, `+${credits} credits recovered.`);
 }
 

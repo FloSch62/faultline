@@ -117,6 +117,21 @@ const CARD_ART: Record<BaseCardId, [Atlas, number] | string> = {
   "rebuild": "art/cards/rebuild.png",
   "emergency": "art/cards/emergency.png",
   "protocol": "art/cards/protocol.png",
+  // v4 (Under Quarantine): local Krea 2 paintings, docs/art-v3-manifest.json.
+  "broadcast-storm": "art/cards/broadcast-storm.png",
+  "traffic-shaping": "art/cards/traffic-shaping.png",
+  "flood-fill": "art/cards/flood-fill.png",
+  "bulkhead": "art/cards/bulkhead.png",
+  "spearhead": "art/cards/spearhead.png",
+  "packet-storm": "art/cards/packet-storm.png",
+  "quorum": "art/cards/quorum.png",
+  "server-rack": "art/cards/server-rack.png",
+  "redundant-psu": "art/cards/redundant-psu.png",
+  "sentry-firewall": "art/cards/sentry-firewall.png",
+  "demolition-charge": "art/cards/demolition-charge.png",
+  "field-repair": "art/cards/field-repair.png",
+  "rapid-redeploy": "art/cards/rapid-redeploy.png",
+  "phantom-node": "art/cards/phantom-node.png",
 };
 
 function atlasStyle(atlas: Atlas, cell: number) {

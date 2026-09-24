@@ -7,7 +7,7 @@ import { glyph } from "./icons.ts";
 
 const R = RULES;
 type Role = "router" | "switch" | "firewall" | "honeypot" | "cache" | "power" | "balancer";
-type State = "primary" | "channel" | "online" | "offline" | "danger";
+type State = "primary" | "channel" | "online" | "offline" | "danger" | "worn";
 
 const GLYPHS: Record<Role, string> = {
   router: '<circle r="13"/><path d="M-6 0h12M0-6v12M-6 0l3-3m-3 3 3 3M6 0 3-3m3 3-3 3"/>',
@@ -185,5 +185,134 @@ export function loopDiagram(): string {
       return `<g class="hb-step"><path d="M${x.toFixed(1)} ${(y - 17).toFixed(1)} l17 17 -17 17 -17 -17Z"/><text class="hb-step-number" x="${x.toFixed(1)}" y="${(y + 6).toFixed(1)}" text-anchor="middle">${i + 1}</text><text class="hb-step-name" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${anchor}">${name}</text><text class="hb-step-note" x="${lx.toFixed(1)}" y="${(ly + 16).toFixed(1)}" text-anchor="${anchor}">${note}</text></g>`;
     }),
     `<text class="hb-ring-core" x="${cx}" y="${cy - 4}" text-anchor="middle">One</text><text class="hb-ring-core" x="${cx}" y="${cy + 15}" text-anchor="middle">Turn</text>`,
+  ].join(""));
+}
+
+// ---------------------------------------------------------------- v4 · Under Quarantine
+
+/** A small engraved diamond pip, filled (intact) or hollow (spent). */
+function pips(x: number, y: number, filled: number, total: number, cls = "") {
+  return Array.from({ length: total }, (_, i) =>
+    `<path class="hb-pip ${i < filled ? "on" : "off"} ${cls}" d="M${x + i * 11} ${y - 4.5} l4.5 4.5 -4.5 4.5 -4.5 -4.5Z"/>`).join("");
+}
+/** A hostile's plate on the far rail, drawn as the port strip reads it. */
+function port(y: number, name: string, role: string, amount: string, cls = "") {
+  return `<g class="hb-port ${cls}" transform="translate(500 ${y})"><rect x="-72" y="-25" width="144" height="50" rx="2"/>` +
+    `<text class="hb-port-name" x="-60" y="-4">${name}</text><text class="hb-port-role" x="-60" y="14">${role}</text>` +
+    `<text class="hb-port-amount" x="60" y="8" text-anchor="end">${amount}</text></g>`;
+}
+/** A delivery's packet glyph: the gold hexagon for the primary, a cyan diamond for bandwidth. */
+function packet(x: number, y: number, primary: boolean, amount: number) {
+  const shape = primary ? '<path d="M-9 0-4.5-7.8h9L9 0l-4.5 7.8h-9Z"/>' : '<path d="M0-8 8 0 0 8-8 0Z"/>';
+  return `<g class="hb-packet ${primary ? "primary" : "channel"}" transform="translate(${x} ${y})">${shape}<text y="24" text-anchor="middle">${amount}</text></g>`;
+}
+
+/** Packs & Ports: three channels become three deliveries; two merge on the focus. */
+export function portsDiagram(): string {
+  const primary = R.baseRouteDamage + R.switchDamage, band = R.bandwidthPerChannel;
+  const flight = (d: string, kind: "primary" | "channel") => `<path class="hb-flight ${kind}" d="${d}"/>`;
+  return svg("0 0 600 300", `Three channels deliver to the ports. The primary delivery and one bandwidth delivery merge at the centre into one packet of ${primary + band}; the third delivery is aimed at the left escort.`, [
+    wire(58, 150, 130, 72, "primary"), wire(130, 72, 212, 72, "primary"), wire(212, 72, 290, 150, "primary"),
+    wire(58, 150, 175, 150, "channel"), wire(175, 150, 290, 150, "channel"),
+    wire(58, 150, 175, 228, "channel"), wire(175, 228, 290, 150, "channel"),
+    terminal(40, 150, "Alpha", true), terminal(304, 150, "Omega", true),
+    device(130, 72, "router", "primary"), device(212, 72, "switch", "primary"),
+    device(175, 150, "router", "channel"), device(175, 228, "router", "channel"),
+    flight("M322 142 C 350 100, 380 52, 426 52", "channel"), flight("M322 150 H 426", "primary"), flight("M322 158 C 350 200, 400 200, 426 166", "channel"),
+    packet(367, 81, false, band), packet(376, 150, true, primary), packet(375, 190, false, band),
+    port(52, "Left", "Escort · aimed", String(band)),
+    port(150, "Centre", "Leader · focus", `${primary} + ${band}`, "focus"),
+    port(248, "Right", "Escort · dormant", "—", "dormant"),
+    `<path class="hb-crest" d="M500 115 l6 6 -6 6 -6 -6Z"/>`,
+    tag(170, 22, `Primary delivery · ${R.baseRouteDamage} + ${R.switchDamage} switch`, "gold"),
+    tag(170, 292, `Each further channel · +${band} bandwidth`, "cyan"),
+    tag(500, 292, `One packet of ${primary + band} · armor paid once`, "gold"),
+  ].join(""));
+}
+
+const INSTALL_GLYPHS: Record<"tap" | "jammer" | "spike" | "anchor" | "breaker", string> = {
+  tap: '<path d="M0-8 6 2a6 6 0 0 1-12 0Z"/>',
+  jammer: '<path d="M0 8V-3"/><path d="M-5-5a7 7 0 0 1 10 0M-8-9a11 11 0 0 1 16 0"/>',
+  spike: '<path d="M-6-8h12L0 9Z"/><path d="M-3-3h6"/>',
+  anchor: '<circle cy="-6" r="2.4"/><path d="M0-3.6V8M-4-1h8M-7 3a7 6 0 0 0 14 0"/>',
+  breaker: '<circle r="7"/>',
+};
+/** A hostile installation seen from above: its magenta base, its glyph, its integrity pips. */
+function installation(x: number, y: number, kind: keyof typeof INSTALL_GLYPHS, integrity: number, label: string, countdown?: number) {
+  const numeral = countdown === undefined ? "" : `<text class="hb-countdown" y="5" text-anchor="middle">${countdown}</text>`;
+  return `<g class="hb-install ${kind}" transform="translate(${x} ${y})"><path class="hb-install-base" d="M-8-14h16l6 6v16l-6 6h-16l-6-6v-16Z"/>${INSTALL_GLYPHS[kind]}${numeral}` +
+    `<text class="hb-install-name" y="-22" text-anchor="middle">${label}</text></g>${pips(x - (integrity - 1) * 5.5, y + 25, integrity, integrity, "install")}`;
+}
+
+/** The Table Front: a Spike and a Jammer with their reach rings, a worn router, a firewall's
+ * quarantine ring and a Breaker Charge counting down beside an injector. Scale: 1 unit = 32 px. */
+export function installationDiagram(): string {
+  const reach = R.reach * 32;
+  const ring = (x: number, y: number, cls: string) => `<circle class="hb-reach ${cls}" cx="${x}" cy="${y}" r="${reach}"/>`;
+  return svg("0 0 600 322", `The table front. Every reach effect uses one radius of ${R.reach.toFixed(1)} units. A Spike wears the router beside it, a Jammer jams the switch, a firewall's quarantine reaches the Jammer, and a Breaker Charge counts down beside an injector.`, [
+    ring(170, 102, "install"), ring(362, 106, "install"), ring(410, 150, "quarantine"), ring(250, 238, "charge"),
+    wire(58, 150, 196, 150, "primary"), wire(196, 150, 318, 150, "primary"), wire(318, 150, 410, 150, "primary"), wire(410, 150, 542, 150, "primary"),
+    wire(318, 150, 300, 252, "idle"),
+    terminal(40, 150, "Alpha", true), terminal(560, 150, "Omega", true),
+    device(196, 150, "router", "worn", "Router"), pips(191, 196, 1, 2, "device"),
+    device(318, 150, "switch", "danger", "Jammed"), device(410, 150, "firewall", "online", "Firewall"),
+    device(300, 252, "power", "danger"),
+    installation(170, 102, "spike", 2, "Spike"), installation(362, 106, "jammer", 2, "Jammer"),
+    installation(250, 238, "breaker", 1, "Charge", R.breakerCountdown),
+    `<path class="hb-measure" d="M378 106 H ${362 + reach}"/>`, tag(362 + reach / 2 + 8, 98, R.reach.toFixed(1), "install"),
+    tag(40, 24, `Spike · wears the router 1 each action`, "install", "start"),
+    tag(40, 44, `Worn router · repair ${R.repairCost} energy`, "fray", "start"),
+    tag(560, 24, `Jammer · jams the nearest device`, "install", "end"),
+    tag(560, 44, `Firewall quarantine · −${R.quarantineDamage} each phase`, "gold", "end"),
+    tag(300, 318, `Charge · ${R.breakerCountdown} actions, then everything in its ring breaks`, "danger"),
+  ].join(""));
+}
+
+/** Escalation: the three-pip gauge over a leader's own actions, both cadences. */
+export function escalationDiagram(): string {
+  const cadences = [
+    { name: "Stages I–II", start: R.escalationStart, every: R.escalationEvery, y: 96 },
+    { name: "Stage III", start: R.escalationStartLate, every: R.escalationEveryLate, y: 176 },
+  ];
+  const span = Math.max(...cadences.map(c => c.start + 2 * c.every));
+  const x0 = 170, x1 = 570, step = (x1 - x0) / (span - 1), at = (action: number) => x0 + (action - 1) * step;
+  const rows = cadences.map(({ name, start, every, y }) => {
+    const levelAt = (action: number) => action < start ? 0 : Math.min(3, 1 + Math.floor((action - start) / every));
+    const segments = Array.from({ length: span - 1 }, (_, i) =>
+      `<line class="hb-level l${levelAt(i + 1)}" x1="${at(i + 1)}" y1="${y}" x2="${at(i + 2)}" y2="${y}"/>`).join("");
+    const ticks = Array.from({ length: span }, (_, i) => {
+      const action = i + 1, level = levelAt(action), rises = level > levelAt(action - 1);
+      return rises
+        ? `<g class="hb-rise l${level}" transform="translate(${at(action)} ${y})"><path d="M0-12 12 0 0 12-12 0Z"/><text y="5" text-anchor="middle">${level}</text></g>`
+        : `<circle class="hb-tick l${level}" cx="${at(action)}" cy="${y}" r="3.5"/>`;
+    }).join("");
+    const warn = start + every;
+    return `<text class="hb-row-name" x="${x0 - 22}" y="${y + 5}" text-anchor="end">${name}</text>${segments}${ticks}` +
+      `<path class="hb-warn-bracket" d="M${at(warn - 2)} ${y + 22} v6 H ${at(warn)} v-6"/>${tag((at(warn - 2) + at(warn)) / 2, y + 44, "named 2 actions ahead", "danger")}`;
+  }).join("");
+  const numbers = Array.from({ length: span }, (_, i) => tag(at(i + 1), 50, String(i + 1), "muted")).join("");
+  return svg("0 0 600 236", `Escalation levels over a leader's own actions: from action ${R.escalationStart} every ${R.escalationEvery} in stages I and II, from action ${R.escalationStartLate} every ${R.escalationEveryLate} in stage III.`, [
+    tag(x0 - 22, 50, "Its own action", "muted", "end"), numbers,
+    `<g class="hb-gauge" transform="translate(40 136)"><rect x="-24" y="-44" width="48" height="88" rx="2"/>${[0, 1, 2].map(i => `<path class="hb-pip ${i < 2 ? "on" : "off"} gauge" d="M0 ${-30 + i * 26} l9 9 -9 9 -9 -9Z"/>`).join("")}</g>`,
+    tag(40, 202, "Gauge", "gold"),
+    rows,
+  ].join(""));
+}
+
+/** Designations: a bad ribbon, a good ribbon and a hidden one on three leader plates. */
+export function designationDiagram(bad: string, good: string): string {
+  const plate = (x: number, name: string, ribbon: string, kind: "bad" | "good" | "unknown", note: string) => {
+    const speckles = kind === "unknown"
+      ? Array.from({ length: 22 }, (_, i) => `<rect class="hb-static" x="${-50 + ((i * 37) % 100)}" y="${4 + ((i * 11) % 13)}" width="${i % 3 ? 3 : 5}" height="1.4"/>`).join("")
+      : "";
+    return `<g class="hb-leader ${kind}" transform="translate(${x} 86)"><rect class="hb-leader-plate" x="-84" y="-44" width="168" height="88" rx="2"/>` +
+      `<text class="hb-leader-name" y="-18" text-anchor="middle">${name}</text>` +
+      `<path class="hb-ribbon" d="M-58 0h116l-6 11 6 11h-116l6-11Z"/>${speckles}<text class="hb-ribbon-word" y="15" text-anchor="middle">${ribbon}</text></g>` +
+      tag(x, 158, note, kind === "bad" ? "danger" : kind === "good" ? "teal" : "muted");
+  };
+  return svg("0 0 600 176", "Three leader plates: a bad designation ribbon in coral, a good one in teal, and an unknown ribbon filled with static until the entrance line reveals it.", [
+    plate(106, "Coil Serpent", bad, "bad", "Bad · coral"),
+    plate(300, "Prism Widow", good, "good", "Good · teal"),
+    plate(494, "Null Storm", "Unknown", "unknown", "Revealed on entry"),
   ].join(""));
 }

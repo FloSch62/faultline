@@ -3,7 +3,7 @@
  * Screens emit `data-screen` controls; main.ts forwards them to screenAction. */
 import "./screens.css";
 import "./shell.css";
-import { ENEMIES } from "./core/enemies.ts";
+import { DESIGNATIONS, ENEMIES, designationRule, hostileName } from "./core/enemies.ts";
 import { STAGES } from "./core/stages.ts";
 import { TRACK_TITLES } from "./core/music.ts";
 import { CARDS, RELICS, RULES, canUpgrade, upgraded } from "./core/cards.ts";
@@ -36,12 +36,14 @@ import {
   type ActionResult,
 } from "./core/run.ts";
 import { ASCENSION_LEVELS, MAX_ASCENSION } from "./core/ascension.ts";
-import type { CardId, MapRoom, RelicId, RunState } from "./core/types.ts";
+import type { CardId, Enemy, MapRoom, RelicId, RunState } from "./core/types.ts";
 import type { AudioSettings } from "./audio.ts";
 import type { EffectKind } from "./audio-effects.ts";
 import type { Preferences } from "./preferences.ts";
-import { chapterForFloor, ARCHETYPE_STORIES, sanctuaryStory, OUTCOMES, enemyStory } from "./story.ts";
+import { chapterForFloor, ARCHETYPE_STORIES, sanctuaryStory, OUTCOMES, enemyStory, designationEntranceLine, reinforcementEntranceLine } from "./story.ts";
+import { encounterRoom, roomScout } from "./core/encounter.ts";
 import { asset, esc, icon, artStyle, cardMarkup } from "./ui.ts";
+import { designationGlyph, designationMark } from "./tutorial/icons.ts";
 
 // ------------------------------------------------------------------ helpers
 
@@ -63,6 +65,11 @@ const EXTRA_ICONS: Record<string, string> = {
   warn: '<path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.2" r=".6" fill="currentColor"/>',
   spark: '<path d="M12 2v5m0 10v5M2 12h5m10 0h5M5 5l3.5 3.5m7 7L19 19M5 19l3.5-3.5m7-7L19 5"/>',
   severed: '<path d="M10 8l4-4a5 5 0 0 1 7 7l-4 4M14 16l-4 4a5 5 0 0 1-7-7l4-4M12 8.5V6.5M8.5 12h-2M15.5 12h2M12 15.5v2"/>',
+  // v4 relics: a queue ordered toward its weakest entry, a wrench, a braced crate, a storm cell.
+  queue: '<path d="M3 5h11M3 10h8M3 15h5M3 20h2"/><path d="M19 4v14m-3.2-3.2L19 18l3.2-3.2"/><circle cx="19" cy="21" r=".6" fill="currentColor"/>',
+  wrench: '<path d="M13.4 10.6 4.3 19.7a1.6 1.6 0 0 0 2.3 2.3l9.1-9.1"/><path d="M13.4 10.6a4.8 4.8 0 0 1 6-6.5l-3 3 .4 2.6 2.6.4 3-3a4.8 4.8 0 0 1-6.7 6"/>',
+  crate: '<rect x="3" y="5" width="18" height="15" rx="1"/><path d="M3 9.5h18M3 15.5h18M7 9.5l10 6M9.5 7.2h5"/>',
+  storm: '<path d="M7.5 16.5H6.2a4.2 4.2 0 0 1-.5-8.4 6 6 0 0 1 11.6-.9 4.6 4.6 0 0 1 .9 9.1"/><path d="m13.2 11.5-3 5h3.6l-2.6 5"/>',
 };
 /** ui.icon plus the expedition-only glyphs. */
 export function sicon(name: string, size = 18): string {
@@ -99,6 +106,9 @@ const RELIC_GLYPHS: Record<RelicId, string> = {
   "spare-parts": "cache", "credit-line": "coins", watchdog: "eye", "spanning-tree": "tree",
   anycast: "target", "jumbo-frames": "frames", "bgp-hijack": "sword", "sdn-controller": "console",
   "zero-trust": "lock",
+  // v4 · Under Quarantine
+  "round-robin": "fanout", "ingress-filter": "lock", "priority-queue": "queue", "reinforced-frame": "frames",
+  "field-engineer": "wrench", "bill-of-lading": "crate", "storm-control": "storm", "scorched-earth": "sword",
 };
 export function relicEmblem(id: RelicId, size = 30): string {
   return `<span class="relic-emblem tier-${RELICS[id].tier}" style="--relic-color:${RELICS[id].color}">${sicon(RELIC_GLYPHS[id] ?? "elite", size)}</span>`;
@@ -462,15 +472,54 @@ const roomIcons: Record<MapRoom["type"], string> = {
   shop: "stall",
   event: "unknown",
 };
+/** What the chart knows about a fight room (content's roomScout): its hostiles leader first
+ * with their health, its designations, and whether interference still hides them (a cleared
+ * room shows its designation for the record, design 8.5). Reinforcements are never scouted. */
+type RoomScout = ReturnType<typeof roomScout>;
+const scoutRoom = (r: RunState, n: MapRoom): RoomScout => roomScout(r, n);
+/** The designation line of a room's tooltip: the ribbon word and its rule, or only the static. */
+function designationDetail(r: RunState, scout: RoomScout): string {
+  if (scout.hidden) return " Unknown designation. Revealed on entry.";
+  if (!scout.designations.length) return "";
+  return scout.designations.map(id => ` ${DESIGNATIONS[id].ribbon}: ${designationRule(id, r.stage)}`).join("");
+}
 function roomDetail(r: RunState, n: MapRoom): string {
-  const scout = n.enemyId ? ENEMIES[n.enemyId] : null;
-  if (scout) return `${title(scout.name)} · ${encounterHealth(r.stage, n, r.ascension)} integrity. ${scout.trait}`;
+  const scout = scoutRoom(r, n);
+  if (scout.members.length === 1) {
+    const [id] = scout.members;
+    return `${title(ENEMIES[id].name)} · ${scout.health[0] ?? encounterHealth(r.stage, n, r.ascension)} integrity. ${ENEMIES[id].trait}${designationDetail(r, scout)}`;
+  }
+  if (scout.members.length > 1) {
+    const health = scout.health, leader = n.enemyId ? scout.members[0] : null;
+    const roster = scout.members.map((id, i) => `${hostileName(id)}${id === leader && i === 0 ? " (leader)" : ""} ${health[i]}`).join(" · ");
+    const traits = scout.members.map((id, i) => id === leader && i === 0
+      ? ` ${ENEMIES[id].trait}`
+      : leader ? ` ${hostileName(id)}, ${ENEMIES[id].badge}.` : ` ${hostileName(id)}, ${ENEMIES[id].badge}: ${ENEMIES[id].trait}`).join("");
+    return `Pack of ${scout.members.length} · ${roster} integrity.${traits}${designationDetail(r, scout)}`;
+  }
   return {
     forge: `Sanctuary · one service: repair ${repairAmount(r)} integrity, upgrade a card, remove a card, or trade ${SALVAGE_COST} maximum integrity for a relic.`,
     cache: "Salvage cache · choose one card, and recover a few credits.",
     shop: `Market · spend credits on cards, relics, a Core Router, card removal or upgrades. You carry ${r.credits} credits.`,
     event: "Unknown signal · a short encounter. Every answer states its price before you choose.",
   }[n.type as "forge" | "cache" | "shop" | "event"] ?? "A hostile encounter.";
+}
+/** A hostile's portrait, cropped from its sprite sheet with the same background-position
+ * crop as the guardian entrance. A sheet still being painted leaves an empty, sized disc. */
+export function hostilePortrait(id: string, cls = "hostile-portrait"): string {
+  const art = ENEMIES[id]?.art;
+  const attr = cls ? ` class="${cls}"` : "";
+  if (!art) return `<span${attr}></span>`;
+  const x = art.columns === 1 ? 0 : art.index % art.columns / (art.columns - 1) * 100;
+  const y = art.rows === 1 ? 0 : Math.floor(art.index / art.columns) / (art.rows - 1) * 100;
+  return `<span${attr} style="background-image:url('${asset(`art/${art.file}.png`)}');background-size:${art.columns * 100}% ${art.rows * 100}%;background-position:${x}% ${y}%"></span>`;
+}
+/** The chart's designation glyphs for a room: one diamond per ribbon, or the UNKNOWN static. */
+function roomDesignations(scout: RoomScout): string {
+  if (!scout.hidden && !scout.designations.length) return "";
+  const marks = scout.hidden ? designationGlyph("unknown", 14)
+    : scout.designations.map(id => designationGlyph(id, 14, DESIGNATIONS[id].kind)).join("");
+  return `<span class="room-designation">${marks}</span>`;
 }
 
 export function mapMarkup(e: Expedition) {
@@ -484,15 +533,26 @@ export function mapMarkup(e: Expedition) {
   })).join("");
   const rooms = r.map.map((n) => {
     const p = pos(n), available = reachable.has(n.id);
-    const scout = n.enemyId ? ENEMIES[n.enemyId] : null;
+    const scout = scoutRoom(r, n), lead = scout.members[0], pack = scout.members.length > 1;
     const detail = roomDetail(r, n);
-    const name = n.type === "boss" ? stage.chapters[6] : scout ? title(scout.name) : roomNames[n.type];
-    // The icon and its colour carry the room type; the caption names what waits there.
-    const caption = scout && n.type !== "boss" ? `<span class="room-scout">${esc(name)}</span>` : esc(name);
-    return `<button class="route-room type-${n.type} ${available ? "available" : ""} ${n.cleared ? "cleared" : ""}" data-room="${n.id}" data-tooltip="${esc(detail)}" style="left:${p.x}%;top:${p.y}%" ${available ? "" : "disabled"} aria-label="Sector ${n.floor + 1}: ${esc(roomNames[n.type])}${scout ? `, ${esc(name)}, ${encounterHealth(r.stage, n, r.ascension)} integrity` : ""}. ${esc(detail)}"><span class="room-orbit"></span><span class="room-symbol">${sicon(n.cleared ? "check" : roomIcons[n.type], n.type === "boss" ? 28 : 20)}</span><span class="room-label">${caption}</span></button>`;
+    const name = n.type === "boss" ? stage.chapters[6] : lead ? title(ENEMIES[lead].name) : roomNames[n.type];
+    // The icon and its colour carry the room type; the caption names what waits there,
+    // the ordinal counts a pack, and the diamonds carry its designations.
+    const caption = lead && n.type !== "boss" ? `<span class="room-scout">${esc(name)}</span>${roomDesignations(scout)}` : esc(name);
+    const ordinal = pack ? `<span class="room-pack" aria-hidden="true">×${scout.members.length}</span>` : "";
+    const cameos = lead && n.type !== "boss" && !n.cleared
+      ? `<span class="room-cameos" aria-hidden="true">${scout.members.map(id => hostilePortrait(id, "room-cameo")).join("")}</span>` : "";
+    const summary = !lead ? "" : pack
+      ? `, ${esc(scout.members.map(hostileName).join(", "))}`
+      : `, ${esc(name)}, ${scout.health[0] ?? encounterHealth(r.stage, n, r.ascension)} integrity`;
+    return `<button class="route-room type-${n.type} ${available ? "available" : ""} ${n.cleared ? "cleared" : ""} ${pack ? "is-pack" : ""}" data-room="${n.id}" data-tooltip="${esc(detail)}" style="left:${p.x}%;top:${p.y}%" ${available ? "" : "disabled"} aria-label="Sector ${n.floor + 1}: ${esc(roomNames[n.type])}${summary}. ${esc(detail)}"><span class="room-orbit"></span>${cameos}<span class="room-symbol">${sicon(n.cleared ? "check" : roomIcons[n.type], n.type === "boss" ? 28 : 20)}</span>${ordinal}<span class="room-label">${caption}</span></button>`;
   }).join("");
   const legend = (["battle", "elite", "event", "shop", "cache", "forge"] as const)
-    .map((k) => `<span class="legend-${k}"><i>${sicon(roomIcons[k], 13)}</i>${roomNames[k]}</span>`).join("");
+    .map((k) => `<span class="legend-${k}"><i>${sicon(roomIcons[k], 13)}</i>${roomNames[k]}</span>`).join("") +
+    `<span class="legend-pack"><b>×2</b>Pack</span>` +
+    `<span class="legend-mark">${designationMark("bad", 13)}Bad designation</span>` +
+    `<span class="legend-mark">${designationMark("good", 13)}Good designation</span>` +
+    `<span class="legend-mark">${designationMark("unknown", 13)}Unknown</span>`;
   const relics = r.relics.map((id) => `<span class="carried-relic" data-tooltip="${esc(RELICS[id].rules)}" tabindex="0" aria-label="${esc(`${RELICS[id].name}: ${RELICS[id].rules}`)}">${relicEmblem(id, 13)}<span>${RELICS[id].name}</span></span>`).join("");
   return `<section class="map-screen"><aside class="map-story"><span class="eyebrow">STAGE ${stage.numeral} · ${stage.name.toUpperCase()}${r.ascension ? ` · ASCENSION ${r.ascension}` : ""}</span><div class="chapter-sigil">${icon("map", 40)}</div><h1>${stage.chapters[Math.min(r.floor, 6)]}</h1><p>${r.stage === 0 && r.floor < 3 ? chapterForFloor(r.floor).description : stage.description}</p><blockquote class="story-fragment">“${stage.fragment}”</blockquote><div class="map-condition" role="group" aria-label="Expedition status"><span class="map-stat map-integrity">${icon("heart", 17)}<strong>${r.integrity}<small>/${r.maxIntegrity}</small></strong><small>Integrity</small></span><span class="map-stat map-credits">${sicon("coins", 17)}<strong>${r.credits}</strong><small>Credits</small></span><span class="map-stat">${icon("deck", 17)}<strong>${r.deck.length}</strong><small>Cards</small></span></div><div class="map-relics"><h2 class="map-section">Relics</h2><div class="relic-list">${relics}</div></div><div class="map-actions"><button class="plate-button" data-action="deck">${icon("deck", 16)} Examine deck</button><span class="map-seed">Seed <b>${r.seed.toString(16).toUpperCase()}</b></span></div></aside><div class="map-main"><div class="route-scroll" role="region" tabindex="0" aria-label="Route chart. Scroll to scout future sectors."><div class="route-chart"><div class="map-rings" aria-hidden="true"></div><svg class="map-paths" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${lines}</svg>${rooms}</div></div><footer class="map-bottom"><div class="map-legend" aria-label="Map key">${legend}</div></footer></div></section>`;
 }
@@ -502,22 +562,43 @@ export function mapMarkup(e: Expedition) {
 /** A screen's heading: the name of the place or choice, an optional line of flavour. */
 const screenHead = (heading: string, flavour = "", kicker = "") =>
   `<header class="panel-head screen-head">${kicker ? `<span class="eyebrow">${kicker}</span>` : ""}<h1>${heading}</h1>${flavour ? `<p>${flavour}</p>` : ""}</header>`;
-/** The defeated hostile's proper name, for the spoils heading. */
-function foeName(r: RunState, room?: MapRoom): string {
-  const id = r.enemy?.id ?? room?.enemyId;
-  if (!id || !ENEMIES[id]) return "Hostile";
-  return enemyStory(id)?.name ?? title(ENEMIES[id].name);
+/** A hostile's proper name: its story name when it has one ("The Iron Regent"). */
+const properName = (id: string) => enemyStory(id)?.name ?? hostileName(id);
+/** The encounter's leader: the centre port (leader, single or guardian), else the first hostile. */
+function leaderOf(enemies: readonly Enemy[]): Enemy | null {
+  return enemies.find(enemy => enemy.port === "centre" && enemy.role !== "escort" && enemy.role !== "add") ?? enemies[0] ?? null;
+}
+/** The Victory kicker names the pack: "Coil Serpent silenced", "Static Nest and escort
+ * silenced", "Spark Mite and Splicer silenced" (a duo has no leader to name first). */
+function silencedLine(r: RunState, room?: MapRoom): string {
+  const ids = r.enemies.length ? null : room ? scoutRoom(r, room).members : [];
+  const leader = ids ? null : leaderOf(r.enemies);
+  const leaderId = ids ? (room?.enemyId ?? null) : leader && leader.role !== "escort" ? leader.id : null;
+  const members = ids ?? r.enemies.map(enemy => enemy.id);
+  if (!members.length) return "Hostile silenced";
+  if (!leaderId) return `${members.slice(0, 2).map(properName).join(" and ")}${members.length > 2 ? " and escort" : ""} silenced`;
+  const escorts = members.length - 1;
+  return `${properName(leaderId)}${escorts ? ` and escort${escorts > 1 ? "s" : ""}` : ""} silenced`;
+}
+/** The spoils plate: the total, then, when more than the room paid, its itemised ledger. */
+function spoilsMarkup(r: RunState): string {
+  const ledger = (r.creditLedger ?? []).filter(item => item.amount);
+  const earned = r.creditsEarned ?? ledger.reduce((sum, item) => sum + item.amount, 0);
+  if (!earned) return "";
+  const items = ledger.length > 1
+    ? `<span class="spoils-ledger">${ledger.map(item => `<span><b>${item.amount}</b> ${esc(item.label.toLowerCase())}</span>`).join('<i aria-hidden="true">·</i>')}</span>` : "";
+  const label = `+${earned} credits${ledger.length > 1 ? `: ${ledger.map(item => `${item.amount} ${item.label.toLowerCase()}`).join(", ")}` : ""}`;
+  return `<div class="spoils ${items ? "itemised" : ""}" role="status" aria-label="${esc(label)}">${sicon("coins", 20)}<b>+${earned}</b><span>credits</span>${items}</div>`;
 }
 
 export function rewardMarkup(r: RunState) {
   const room = r.map.find(room => room.id === r.currentRoom);
   const cache = room?.type === "cache", boss = room?.type === "boss", elite = room?.type === "elite";
   const final = boss && r.stage === STAGES.length - 1;
-  const kicker = cache ? "" : boss ? `STAGE ${STAGES[r.stage].numeral} · GUARDIAN DEFEATED` : `${foeName(r, room)} silenced`;
+  const kicker = cache ? "" : boss ? `STAGE ${STAGES[r.stage].numeral} · GUARDIAN DEFEATED` : esc(silencedLine(r, encounterRoom(r) ?? room));
   const cue = boss ? final ? "Choose your last card" : "Choose a card, then a guardian's relic"
     : elite ? "Choose a card, then a relic" : "Choose a card";
-  const earned = r.creditsEarned ?? 0;
-  return `<section class="reward-screen full-screen v3"><div class="reward-emblem">${icon(cache ? "cache" : boss ? "crown" : "sword", 30)}</div>${screenHead(cache ? "Salvage Cache" : "Victory", "", kicker)}<p class="screen-cue">${cue}</p>${earned ? `<div class="spoils" role="status">${sicon("coins", 20)}<b>+${earned}</b><span>credits</span></div>` : ""}<div class="reward-cards">${r.cardRewards.map((id, i) => cardMarkup(id, i, "reward")).join("")}</div><button class="plate-button reward-skip" data-action="skip-reward">Skip</button></section>`;
+  return `<section class="reward-screen full-screen v3"><div class="reward-emblem">${icon(cache ? "cache" : boss ? "crown" : "sword", 30)}</div>${screenHead(cache ? "Salvage Cache" : "Victory", "", kicker)}<p class="screen-cue">${cue}</p>${spoilsMarkup(r)}<div class="reward-cards">${r.cardRewards.map((id, i) => cardMarkup(id, i, "reward")).join("")}</div><button class="plate-button reward-skip" data-action="skip-reward">Skip</button></section>`;
 }
 
 export function relicMarkup(r: RunState) {
@@ -592,19 +673,65 @@ export function eventMarkup(r: RunState) {
   return `<section class="event-screen full-screen ${view.resolved ? "resolved" : ""}"><div class="event-frame"><figure class="event-art" aria-hidden="true" style="background-image:url('${art}')"><i></i></figure><div class="event-copy"><span class="eyebrow">${sicon("signal", 14)} ${esc(view.kicker)}</span><h1>${esc(view.title)}</h1><p class="event-text">${esc(view.text)}</p>${view.resolved ? `<div class="event-outcome" role="status"><p>${esc(view.outcome ?? "")}</p><button class="gold-button" data-screen="event-leave">Continue</button></div>` : `<div class="event-choices" role="group" aria-label="Your answer">${choices}</div>`}</div></div>${activePicker(r) ? deckPickerMarkup(r, activePicker(r)!) : ""}</section>`;
 }
 
+// ------------------------------------------------------------------ entrance
+
+/** The entrance lines of a fresh encounter (design 13.5), in content's words so the title card
+ * and the combat log agree: each designation the leader carries ("NESTING · its first action also
+ * plants a Siphon Tap"), marked when interference hid it on the chart, and an announced
+ * reinforcement in coral ("SIGNAL DETECTED · a Splicer arrives in 2 actions"). A Shedding
+ * escort is announced when it sheds, not here. */
+export interface EntranceLine { kind: "bad" | "good" | "arrival"; word: string; text: string; revealed?: boolean }
+export function entranceLines(r: RunState): EntranceLine[] {
+  const split = (line: string) => {
+    const at = line.indexOf(" · ");
+    return { word: line.slice(0, at), text: line.slice(at + 3).replace(/\.$/, "") };
+  };
+  const leader = leaderOf(r.enemies);
+  const room = encounterRoom(r);
+  const lines: EntranceLine[] = [];
+  if (leader && leader.role !== "escort" && leader.role !== "add")
+    for (const id of leader.designations ?? [])
+      lines.push({ kind: DESIGNATIONS[id].kind, ...split(designationEntranceLine(id, r.stage)), revealed: !!room?.designationHidden });
+  const arrival = r.reinforcement;
+  if (arrival && !arrival.shed && arrival.after > 0)
+    lines.push({ kind: "arrival", ...split(reinforcementEntranceLine(hostileName(arrival.enemyId), arrival.after)) });
+  return lines;
+}
+/** The title card that names the encounter ground, with the entrance lines beneath it. */
+export function terrainTitleMarkup(r: RunState): { html: string; lines: number } | null {
+  const lines = entranceLines(r);
+  if (!r.terrain && !lines.length) return null;
+  const ground = r.terrain
+    ? `<span>${icon("terrain", 15)} Encounter ground</span><strong>${esc(r.terrain.name)}</strong><i class="ornament-rule"></i><p>${esc(r.terrain.description)}</p>`
+    : `<span>${icon("terrain", 15)} Encounter</span>`;
+  // A ribbon that was hidden on the chart shows its static glyph giving way to its colour.
+  const mark = (line: EntranceLine) => line.kind === "arrival" ? sicon("signal", 15)
+    : line.revealed ? `<span class="entrance-reveal">${designationMark("unknown", 15)}${designationMark(line.kind, 15)}</span>` : designationMark(line.kind, 15);
+  const entrance = lines.map(line => `<div class="entrance-line is-${line.kind}${line.revealed ? " is-revealed" : ""}">${mark(line)}<b>${esc(line.word)}</b><em>${esc(line.text)}</em></div>`).join("");
+  return { html: `${ground}${entrance ? `<div class="entrance-lines">${entrance}</div>` : ""}`, lines: lines.length };
+}
+
 // ------------------------------------------------------------------ guardian intro, outcome, settings
 
+/** The guardian's adds, in one sentence: what the charge raises and what each costs the break. */
+function guardianAdds(guardianId: string, warning: string): string {
+  const adds = Object.values(ENEMIES).filter(enemy => enemy.kind === "add" && enemy.addOf === guardianId);
+  if (!adds.length || !RULES.addBreakBonus) return "";
+  const names = `${hostileName(adds[0].id)}s`;
+  // Content's warning may already name them; the sentence is never said twice.
+  if (warning.includes(names)) return "";
+  return ` Its charge raises two ${names} at the outer ports; each one alive when the ultimate resolves raises the break threshold by ${RULES.addBreakBonus}.`;
+}
 export function bossIntroMarkup(r: RunState) {
-  const enemy = ENEMIES[r.enemy!.id], stage = STAGES[r.stage], art = enemy.art;
-  const x = art.columns === 1 ? 0 : art.index % art.columns / (art.columns - 1) * 100;
-  const y = art.rows === 1 ? 0 : Math.floor(art.index / art.columns) / (art.rows - 1) * 100;
+  const guardian = leaderOf(r.enemies)!;
+  const enemy = ENEMIES[guardian.id], stage = STAGES[r.stage];
   return `<section class="guardian-entrance guardian-${enemy.id}" aria-labelledby="guardian-name" style="--guardian-color:#${enemy.color.toString(16).padStart(6,"0")}">
-    <div class="guardian-portrait" aria-hidden="true"><i></i><span style="background-image:url('${asset(`art/${art.file}.png`)}');background-size:${art.columns * 100}% ${art.rows * 100}%;background-position:${x}% ${y}%"></span></div>
+    <div class="guardian-portrait" aria-hidden="true"><i></i>${hostilePortrait(enemy.id, "")}</div>
     <div class="guardian-introduction"><div class="guardian-stages" aria-label="Stage ${stage.numeral} of ${STAGES.length}">${STAGES.map((s,i)=>`<span class="${i === r.stage ? "current" : i < r.stage ? "cleared" : ""}"><b>${i < r.stage ? icon("check",13) : s.numeral}</b></span>`).join('<i></i>')}</div>
     <span class="eyebrow">STAGE ${stage.numeral} · ${stage.name.toUpperCase()}</span><p class="guardian-arrival">${enemy.boss!.entrance}</p>
     <h1 id="guardian-name">${title(enemy.name.replace(/^THE /,""))}</h1><span class="guardian-subtitle">${enemy.title}</span>
-    <div class="guardian-challenge"><span>${icon("heart",17)}<b>${r.enemy!.maxHp}</b> Integrity</span><span>${icon("boss",17)} Stage guardian</span></div>
-    <p class="guardian-warning">${enemy.boss!.warning}</p><div class="guardian-actions"><button class="gold-button" data-action="close" autofocus>Face the guardian</button><small class="guardian-skip"><kbd>Enter</kbd> Begin <i></i> <kbd>Esc</kbd> Skip</small></div></div>
+    <div class="guardian-challenge"><span>${icon("heart",17)}<b>${guardian.maxHp}</b> Integrity</span><span>${icon("boss",17)} Stage guardian</span></div>
+    <p class="guardian-warning">${enemy.boss!.warning}${guardianAdds(enemy.id, enemy.boss!.warning)}</p><div class="guardian-actions"><button class="gold-button" data-action="close" autofocus>Face the guardian</button><small class="guardian-skip"><kbd>Enter</kbd> Begin <i></i> <kbd>Esc</kbd> Skip</small></div></div>
   </section>`;
 }
 

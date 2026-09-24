@@ -3,7 +3,7 @@
  * the run's card/threat RNG, so terrain is identical across reloads and choices. */
 import { RULES } from "./cards.ts";
 import { linkKey } from "./graph.ts";
-import type { NetworkNode, Role, Terrain, Topology, Zone, ZoneEffect } from "./types.ts";
+import type { NetworkNode, Role, Terrain, Topology, Wreck, Zone, ZoneEffect } from "./types.ts";
 
 type Point = { x: number; z: number };
 
@@ -32,6 +32,15 @@ export function frayedLinks(topology: Topology, terrain: Terrain | null): Set<st
     if (a && b && crossesWreckage(a, b, terrain.debris)) frayed.add(linkKey(link.a, link.b));
   }
   return frayed;
+}
+
+/** Adds encounter wreckage (breakdown, detonation, COLLAPSE). Terrain, breakdowns and
+ * signals share RULES.wreckCap (rules 43 and 61): beyond it the socket is simply freed.
+ * Returns whether the wreck landed. */
+export function addWreck(terrain: Terrain, wreck: Wreck): boolean {
+  if (terrain.debris.length >= RULES.wreckCap) return false;
+  terrain.debris.push(wreck);
+  return true;
 }
 
 export interface TerrainLayout {

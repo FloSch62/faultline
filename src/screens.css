@@ -45,6 +45,11 @@
 .spoils svg { color: #eac06a; filter: drop-shadow(0 0 8px #eab85f88); }
 .spoils b { font: 600 24px/1 var(--title); color: #ffe3a1; font-variant-numeric: tabular-nums; }
 .spoils span { font: 700 13px/1 var(--label); letter-spacing: .1em; color: #cdb88a; }
+/* v4: when crates, a pack or a designation paid too, the plate itemises the sum after an engraved rule. */
+.spoils .spoils-ledger { display: inline-flex; align-items: baseline; gap: 8px; margin-left: 6px; padding-left: 14px; border-left: 1px solid #c9a26355; font: inherit; letter-spacing: 0; }
+.spoils .spoils-ledger span { font: 700 13px/1 var(--label); letter-spacing: .08em; color: #b9a67c; }
+.spoils .spoils-ledger b { font: 600 18px/1 var(--title); letter-spacing: 0; color: #f0d59a; }
+.spoils .spoils-ledger i { font-style: normal; color: #8a6a3a; }
 
 /* ------------------------------------------------------------ map */
 .map-screen { inset: 92px 42px 24px; }
@@ -124,6 +129,27 @@
 .cleared .room-symbol { color: #a9c0ae; border-color: #7d8f7f66; background: #10151a; box-shadow: inset 0 0 0 2px #080a0d; }
 .cleared .room-label { color: #8e9189; }
 .route-room:disabled:not(.cleared):not(.available) .room-symbol { opacity: .85; }
+/* v4: a pack's head count sits beside its stone; designations ride after the name. */
+.room-pack {
+  position: absolute; left: calc(50% + 17px); top: -7px; pointer-events: none;
+  font: 600 15px/1 var(--title); letter-spacing: 0; color: color-mix(in srgb, var(--room) 70%, #fff4dc);
+  text-shadow: 0 1px 2px #000, 0 0 6px #000, 0 0 10px #000;
+}
+.available .room-pack { color: #fbe9c4; text-shadow: 0 1px 2px #000, 0 0 6px #000, 0 0 12px #ffb04a66; }
+.cleared .room-pack { color: #8e9189; }
+.room-designation { display: inline-flex; gap: 2px; margin-left: 5px; vertical-align: -1px; filter: drop-shadow(0 1px 2px #000); }
+.cleared .room-designation { opacity: .7; }
+/* Scouting portraits: the pack, leader first, cropped from its sheets; they surface beside the stone when you reach for the room. */
+.room-cameos {
+  position: absolute; right: calc(100% + 2px); top: 50%; display: flex; flex-direction: row-reverse; align-items: center; gap: 4px;
+  opacity: 0; transform: translate(6px, -50%); transition: opacity .18s, transform .18s; pointer-events: none;
+}
+.route-room:hover .room-cameos, .route-room:focus-visible .room-cameos { opacity: 1; transform: translate(0, -50%); }
+.room-cameo {
+  flex: none; width: 28px; height: 28px; border-radius: 50%; background-color: #0d1116; background-repeat: no-repeat;
+  border: 1px solid #8a6a3a; box-shadow: inset 0 0 0 2px #080a0d, 0 3px 8px #000b;
+}
+.room-cameo:first-child { width: 36px; height: 36px; border-color: var(--brass-hi); }
 /* The key: a small brass-set plate beneath the chart. */
 .map-bottom { position: static; display: flex; justify-content: center; padding: 10px 0 0; border: 0; font: inherit; letter-spacing: normal; color: inherit; }
 .map-legend {
@@ -134,6 +160,8 @@
 .map-legend > span { display: flex; align-items: center; gap: 8px; }
 .map-legend i { display: grid; place-items: center; width: 18px; height: 18px; transform: rotate(45deg); color: var(--room); background: #0f1318; border: 1px solid color-mix(in srgb, var(--room) 50%, #3a3226); }
 .map-legend i svg { width: 11px; height: 11px; transform: rotate(-45deg); }
+.map-legend .legend-pack b { font: 600 14px/1 var(--title); letter-spacing: 0; color: #eadbb8; }
+.map-legend .legend-mark .designation-mark { width: 13px; height: 13px; }
 
 /* ------------------------------------------------------------ reward */
 .reward-screen.v3 { padding-top: 26px; }
@@ -587,3 +615,197 @@
 .reduced-motion .spoils, .reduced-motion .relic-screen.v3 .relic-option, .reduced-motion .relic-halo::after,
 .reduced-motion .picker-layer, .reduced-motion .pick-tile, .reduced-motion .market-offer, .reduced-motion .event-frame,
 .reduced-motion .event-art::after, .reduced-motion .event-choice, .reduced-motion .event-outcome, .reduced-motion .unlock-moment { animation: none !important; }
+
+/* ------------------------------------------------------------ designation mark (v4)
+   One engraved diamond shared by the route chart, the entrance and the Handbook:
+   coral for a bad ribbon, teal for a good one, static for UNKNOWN. */
+.designation-mark { flex: none; overflow: visible; vertical-align: -2px; }
+.designation-mark .dm-rim { fill: #0d1015; stroke: #c9a263; stroke-width: 1.2; }
+.designation-mark.bad .dm-rim { stroke: #ef8f86; }
+.designation-mark.bad .dm-core { fill: #ef8f86; filter: drop-shadow(0 0 2px #ef8f8699); }
+.designation-mark.good .dm-rim { stroke: #8fd9c0; }
+.designation-mark.good .dm-core { fill: #8fd9c0; filter: drop-shadow(0 0 2px #8fd9c099); }
+.designation-mark.unknown .dm-rim { stroke: #9a9d98; }
+.designation-mark.unknown .dm-well { fill: #262a2c; }
+.designation-mark.unknown .dm-static { fill: #d9ddd6; }
+/* v4 (hud): the ten ribbon glyphs. The same engraved diamond with a brass-lined inlay and the
+   designation's motif; coral for a bad designation, teal for a good one. */
+.designation-glyph .dg-inlay { fill: #0a0d11; stroke: #c9a26366; stroke-width: .45; }
+.designation-glyph .dg-well { fill: #0a0d11; }
+.designation-glyph .dg-well-line { fill: none; stroke: #0a0d11; stroke-width: .9; stroke-linejoin: round; }
+.designation-glyph .dg-line { fill: none; stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round; }
+.designation-glyph.bad .dg-fill { fill: #ef8f86; }
+.designation-glyph.bad .dg-line { stroke: #ef8f86; }
+.designation-glyph.good .dg-fill { fill: #8fd9c0; }
+.designation-glyph.good .dg-line { stroke: #8fd9c0; }
+.designation-glyph.bad { filter: drop-shadow(0 0 2px #ef8f8666); }
+.designation-glyph.good { filter: drop-shadow(0 0 2px #8fd9c066); }
+
+/* ------------------------------------------------------------ Handbook diagrams (v4)
+   The v3 diagram marks live in tutorial.css; these add ports, installations, wear,
+   escalation and ribbons with the same palette. */
+.hb-pip { stroke-width: 1.2; }
+.hb-pip.on { fill: #e8c47c; stroke: #f3dca0; }
+.hb-pip.off { fill: #120f0b; stroke: #a8834a; }
+.hb-pip.install.on { fill: #d58ceb; stroke: #f0c4ff; }
+.hb-pip.device.on { fill: #d08a52; stroke: #f0b27e; }
+.hb-pip.device.off { stroke: #d08a52; }
+.hb-pip.gauge.on { fill: #ef8f86; stroke: #ffc0b4; filter: url(#hb-glow); }
+.hb-pip.gauge.off { stroke: #8a5a4c; }
+.hb-gauge rect { fill: #14110c; stroke: #8a6a3a; stroke-width: 1.2; }
+.hb-port rect { fill: #151a21; stroke: #6b5230; stroke-width: 1.2; }
+.hb-port.focus rect { stroke: #f3dca0; stroke-width: 1.6; filter: url(#hb-glow); }
+.hb-port.dormant { opacity: .62; }
+.hb-port-name { font: 600 15px var(--title); fill: #f0dcae; }
+.hb-port-role { font: 700 11.5px var(--label); letter-spacing: .06em; fill: #a9a394; }
+.hb-port.dormant .hb-port-role { font: italic 12.5px var(--text); letter-spacing: 0; }
+.hb-port-amount { font: 600 19px var(--title); fill: #ffe3a1; }
+.hb-crest { fill: #ffb04a; stroke: #fff0c4; stroke-width: 1; filter: url(#hb-glow); }
+.hb-flight { fill: none; stroke-width: 2; stroke-dasharray: 5 5; }
+.hb-flight.primary { stroke: #e8c47c; }
+.hb-flight.channel { stroke: #7fd4e6; }
+.hb-packet path { stroke-width: 1.6; }
+.hb-packet.primary path { fill: #3a2c14; stroke: #f1d08e; filter: url(#hb-glow); }
+.hb-packet.channel path { fill: #11282e; stroke: #8fe0f0; filter: url(#hb-glow); }
+.hb-packet text { font: 600 15px var(--title); fill: #f3e6c8; }
+.hb-device.worn { stroke: #d08a52; fill: #2a1a10; }
+.hb-device.worn text { fill: #f0b27e; }
+.hb-install { fill: none; stroke: #e0a4f4; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.hb-install-base { fill: #2a1330; stroke: #c77adf; }
+.hb-install.breaker circle { fill: #3a1512; stroke: #ff9a80; }
+.hb-countdown { font: 600 13px var(--title); fill: #ffd0a0; stroke: none; }
+.hb-install-name { font: 700 11.5px var(--label); letter-spacing: .06em; fill: #e8b8f6; stroke: none; }
+.hb-reach { fill: none; stroke-width: 1.4; stroke-dasharray: 5 6; }
+.hb-reach.install { stroke: #c77adf99; fill: #c77adf0d; }
+.hb-reach.quarantine { stroke: #c9a26399; }
+.hb-reach.charge { stroke: #ff8c73aa; stroke-dasharray: 10 5; fill: #ff8c730d; }
+.hb-measure { stroke: #e0a4f4; stroke-width: 1.2; }
+.hb-tag.install { fill: #e8b8f6; }
+.hb-tag.fray { fill: #f0b27e; }
+.hb-tag.teal { fill: #8fd9c0; }
+.hb-level { stroke-width: 4; stroke-linecap: round; }
+.hb-level.l0, .hb-tick.l0 { stroke: #4a4d4b; fill: #4a4d4b; }
+.hb-level.l1, .hb-tick.l1 { stroke: #b79656; fill: #b79656; }
+.hb-level.l2, .hb-tick.l2 { stroke: #d08a52; fill: #d08a52; }
+.hb-level.l3, .hb-tick.l3 { stroke: #ef8f86; fill: #ef8f86; }
+.hb-rise path { fill: #17130d; stroke-width: 1.6; }
+.hb-rise.l1 path { stroke: #e8c47c; }
+.hb-rise.l2 path { stroke: #f0b27e; }
+.hb-rise.l3 path { stroke: #ff9a80; filter: url(#hb-glow); }
+.hb-rise text { font: 600 14px var(--title); fill: #ffe3a1; }
+.hb-row-name { font: 600 13.5px var(--display); letter-spacing: .06em; fill: #efdcb3; }
+.hb-warn-bracket { fill: none; stroke: #ff9a8099; stroke-width: 1.2; }
+.hb-leader-plate { fill: #151a21; stroke: #6b5230; stroke-width: 1.2; }
+.hb-leader-name { font: 600 17px var(--title); fill: #f0dcae; }
+.hb-ribbon { stroke-width: 1.2; }
+.hb-leader.bad .hb-ribbon { fill: #3a1a16; stroke: #ef8f86; }
+.hb-leader.good .hb-ribbon { fill: #10292a; stroke: #8fd9c0; }
+.hb-leader.unknown .hb-ribbon { fill: #25292b; stroke: #9a9d98; }
+.hb-ribbon-word { font: 700 12.5px var(--label); letter-spacing: .14em; text-transform: uppercase; }
+.hb-leader.bad .hb-ribbon-word { fill: #ffc0b4; }
+.hb-leader.good .hb-ribbon-word { fill: #c4f0e2; }
+.hb-leader.unknown .hb-ribbon-word { fill: #c9ccc6; }
+.hb-static { fill: #d9ddd6; opacity: .35; }
+.hb-chapter .hb-ribbon-inline { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font: 700 13px var(--label); letter-spacing: .1em; }
+.hb-chapter .hb-ribbon-inline.bad { color: #ffb4a6; }
+.hb-chapter .hb-ribbon-inline.good { color: #a8e8d4; }
+.hb-pips { display: inline-flex; gap: 3px; margin-left: 4px; vertical-align: 1px; }
+.hb-pips i { width: 7px; height: 7px; transform: rotate(45deg); border: 1px solid #f3dca0; background: #e8c47c; }
+.hb-pips i.off { background: #120f0b; border-color: #d08a52; }
+.hb-pips.device i.on { background: #e8c47c; }
+.hb-pips.install i { border-color: #f0c4ff; background: #d58ceb; }
+
+/* ------------------------------------------------------------ entrance lines (v4)
+   Under the terrain sentence: the revealed designation and an announced reinforcement, each on its
+   own engraved plaque so the lines belong to the title card. main.ts places the card in the band
+   between the header and the field seals (compact when the band is short), so it never covers them. */
+.terrain-title { width: max-content; max-width: min(760px, calc(100% - 2 * var(--rail, 224px) - 40px)); }
+.terrain-title p { max-width: 560px; }
+.terrain-title.has-entrance { animation-duration: 5.9s; }
+.terrain-title.is-placed { transform: translateX(-50%); animation-name: terrain-card; }
+@keyframes terrain-card {
+  0% { opacity: 0; transform: translate(-50%, 10px); letter-spacing: .1em; }
+  12%, 72% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -10px); }
+}
+.reduced-motion .terrain-title.is-placed { transform: translateX(-50%); }
+@media (prefers-reduced-motion: reduce) { .terrain-title.is-placed { transform: translateX(-50%); } }
+.terrain-title .entrance-lines { display: grid; justify-items: stretch; gap: 7px; max-width: 100%; margin-top: 12px; }
+/* A designation: an iron plaque with pointed ends and a brass rim, lit from its jewel's side. */
+.terrain-title .entrance-line {
+  --line-glow: #ef8f8624;
+  position: relative; isolation: isolate; display: flex; align-items: center; justify-content: center; gap: 10px; max-width: 100%;
+  min-height: 36px; padding: 5px 28px 6px; text-shadow: 0 1px 3px #000;
+}
+.terrain-title .entrance-line::before, .terrain-title .entrance-line::after {
+  content: ""; position: absolute; z-index: -1; pointer-events: none;
+  clip-path: polygon(13px 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 13px 100%, 0 50%);
+}
+.terrain-title .entrance-line::before { inset: 0; background: linear-gradient(90deg, #4a3820, #c9a263 16%, #7d6034 50%, #c9a263 84%, #4a3820); filter: drop-shadow(0 4px 10px #000c); }
+.terrain-title .entrance-line::after {
+  inset: 1px;
+  background: radial-gradient(70% 160% at 0% 50%, var(--line-glow), transparent 60%), linear-gradient(#1e1b19fa, #0c0b0afa);
+  box-shadow: inset 0 1px 0 #f3dca01c, inset 0 -1px 0 #000;
+}
+.terrain-title .entrance-line.is-good { --line-glow: #8fd9c024; }
+.terrain-title .entrance-line svg { flex: none; }
+.terrain-title .entrance-line b { flex: none; font: 700 14px/1 var(--label); letter-spacing: .14em; }
+.terrain-title .entrance-line em { font: italic 16px/1.3 var(--text); color: #e4dcc8; text-align: left; }
+.terrain-title .entrance-line.is-bad b { color: #ffb4a6; }
+.terrain-title .entrance-line.is-good b { color: #a8e8d4; }
+/* The reinforcement warning sits on the painted warning plate: a brass plaque with a red lamp at
+   each end. The 9-slice keeps its corners and lamps unstretched at the line's fixed height. */
+.terrain-title .entrance-line.is-arrival {
+  height: 46px; min-height: 0; padding: 0 38px; white-space: nowrap;
+  border: 0 solid transparent; border-image: url("/art/ui/warning-plate.webp") 250 116 fill / 23px 10.7px stretch;
+  filter: drop-shadow(0 4px 10px #000c);
+}
+/* Its lamps are lit: a red glow over each painted glass, pulsing slowly while the card stands. */
+.terrain-title .entrance-line.is-arrival::before, .terrain-title .entrance-line.is-arrival::after {
+  inset: auto; top: 50%; z-index: 1; width: 22px; height: 22px; margin-top: -11px; clip-path: none; filter: none; box-shadow: none;
+  background: radial-gradient(circle, #ffd0c0 0 1.2px, #ff6a4add 2.4px, #ff3a1a55 5px, transparent 10px);
+  mix-blend-mode: screen; animation: lamp-pulse 1.6s ease-in-out infinite;
+}
+.terrain-title .entrance-line.is-arrival::before { left: -5.5px; }
+.terrain-title .entrance-line.is-arrival::after { right: -5.5px; }
+@keyframes lamp-pulse { 50% { opacity: .55; } }
+.reduced-motion .terrain-title .entrance-line.is-arrival::before, .reduced-motion .terrain-title .entrance-line.is-arrival::after { animation: none; }
+@media (prefers-reduced-motion: reduce) { .terrain-title .entrance-line.is-arrival::before, .terrain-title .entrance-line.is-arrival::after { animation: none; } }
+.terrain-title .entrance-line.is-arrival b, .terrain-title .entrance-line.is-arrival svg { color: #ff9a86; }
+.terrain-title .entrance-line.is-arrival b { text-shadow: 0 0 10px #ff5a3a66, 0 1px 2px #000; }
+.terrain-title .entrance-line.is-arrival em { color: #f6c2b4; }
+/* A short band between the header and the seals: a tighter card. */
+.terrain-title.is-compact { gap: 2px; padding: 8px 36px 10px; }
+.terrain-title.is-compact strong { font-size: 30px; }
+.terrain-title.is-compact p { font-size: 15px; }
+.terrain-title.is-compact .entrance-lines { gap: 5px; margin-top: 8px; }
+.terrain-title.is-compact .entrance-line { min-height: 32px; padding-block: 3px 4px; }
+.terrain-title.is-compact .entrance-line.is-arrival { height: 40px; min-height: 0; padding-block: 0; border-image-width: 20px 9.3px; }
+.terrain-title.is-compact .entrance-line b { font-size: 13px; }
+.terrain-title.is-compact .entrance-line em { font-size: 15px; }
+/* Still too tall (two long designation lines on a 720p table): smaller type again. */
+.terrain-title.is-tight { padding: 4px 28px 6px; }
+.terrain-title.is-tight > span { font-size: 11.5px; }
+.terrain-title.is-tight strong { font-size: 25px; }
+.terrain-title.is-tight .ornament-rule { margin-block: 0 2px; }
+.terrain-title.is-tight p { font-size: 13.5px; line-height: 1.3; }
+.terrain-title.is-tight .entrance-lines { gap: 4px; margin-top: 5px; }
+.terrain-title.is-tight .entrance-line { min-height: 28px; padding-block: 2px 3px; }
+.terrain-title.is-tight .entrance-line b { font-size: 12px; }
+.terrain-title.is-tight .entrance-line em { font-size: 13.5px; line-height: 1.25; }
+.terrain-title.is-tight .entrance-line.is-arrival { height: 36px; border-image-width: 18px 8.4px; }
+/* A hidden ribbon at the entrance: the static glyph gives way to the coloured diamond. */
+.terrain-title .entrance-reveal { position: relative; display: grid; flex: none; }
+.terrain-title .entrance-reveal > svg { grid-area: 1 / 1; }
+.terrain-title .entrance-reveal > svg.unknown { animation: entrance-static 1.1s .5s ease forwards; }
+.terrain-title .entrance-reveal > svg:not(.unknown) { opacity: 0; animation: entrance-ribbon 1.1s .5s ease forwards; }
+@keyframes entrance-static { to { opacity: 0; transform: scale(1.3); } }
+@keyframes entrance-ribbon { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+.reduced-motion .terrain-title .entrance-reveal > svg.unknown { animation: none; opacity: 0; }
+.reduced-motion .terrain-title .entrance-reveal > svg:not(.unknown) { animation: none; opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .terrain-title .entrance-reveal > svg.unknown { animation: none; opacity: 0; }
+  .terrain-title .entrance-reveal > svg:not(.unknown) { animation: none; opacity: 1; }
+}
+/* Before main.ts places it (and where it cannot measure the seals) the card rises a little. */
+.terrain-title.has-entrance:not(.is-placed) { top: 30%; }

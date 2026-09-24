@@ -5,7 +5,10 @@ with lancet firing slits. In the courtyard a grated fire pit feeds a faint curta
 of fire along the ramparts, and above it floats the ward: an ember icosahedron
 crystal behind a wall of five brass-rimmed heater shields.
 Stateful firewalls add a counter-turning gold lattice and an orbiting state table
-of six brass slates, each listing glowing connection rows."""
+of six brass slates, each listing glowing connection rows.
+Sentry firewalls (variant "sentry") raise a searchlight turret on a mast from the back-right
+rampart: a brass lamp housing with a glowing lens (z 2.0-2.4) on a yoke that turns slowly.
+The empty "sentry_beam" at the lens is where World.ts starts the quarantine beam."""
 
 import math
 
@@ -241,3 +244,43 @@ def build(role):
             (rows_a if (i + k) % 2 else rows_b).append(row)
     for name, parts in (("state_slates", frames), ("state_rows_gold", rows_a), ("state_rows_ember", rows_b)):
         fl.parent(fl.merge(name, parts), table)
+
+    # --- Sentry: a searchlight turret on the back-right rampart, sweeping on its yoke.
+    angle = math.radians(54)  # the rampart face behind and right of the ward
+    mx, my = math.cos(angle) * 0.47, math.sin(angle) * 0.47
+    mast_top = 2.04
+    mast = [
+        fl.prism("sentry_bracket", 4, 0.075, 0.06, pz1, pz1 + 0.06, bright, xy=(mx, my), rotation_z=angle + math.pi / 4, bevel=0),
+        fl.cylinder("sentry_mast", 0.026, pz1 + 0.06, mast_top, bright, xy=(mx, my), sides=8),
+        fl.cylinder("sentry_ring", 0.045, mast_top - 0.03, mast_top, bright, xy=(mx, my), sides=10),
+    ]
+    fl.variant(fl.merge("sentry_mast", mast, pivot=(mx, my, pz1)), "sentry")
+
+    yoke = fl.empty("sentry_yoke", (mx, my, mast_top))
+    fl.hook(yoke, "spinner", speed=0.5, axis="y")
+    fl.variant(yoke, "sentry")
+    # Built at the origin looking along +X, then set on the mast looking front-right (the yoke turns it).
+    pivot_z, arm = 0.17, 0.115
+    parts = [fl.cylinder("sentry_turntable", 0.055, 0.0, 0.03, bright, sides=10),
+             fl.box("sentry_fork", (0.03, arm * 2 + 0.03, 0.03), (0, 0, 0.045), bright, bevel=0.006, segments=1)]
+    for side in (-1, 1):
+        parts.append(fl.box(f"sentry_arm{side}", (0.024, 0.024, pivot_z - 0.03), (0, side * arm, pivot_z / 2 + 0.02), bright, bevel=0))
+    housing = [
+        fl.cylinder("sentry_housing", 0.08, -0.13, 0.11, brass, sides=12, r_top=0.097),
+        fl.cylinder("sentry_bezel", 0.108, 0.11, 0.145, bright, sides=12),
+        fl.cylinder("sentry_cap", 0.055, -0.165, -0.13, bright, sides=8),
+    ]
+    for k, z in enumerate((-0.07, 0.02)):
+        housing.append(fl.cylinder(f"sentry_fin{k}", 0.1, z - 0.01, z + 0.01, bright, sides=12))
+    lens = fl.dome("sentry_lens", 0.09, 0.04, 0.14, m("role_glow"), segments=12, rings=2)
+    for trunnion in (-1, 1):
+        stub = fl.cylinder(f"sentry_trunnion{trunnion}", 0.022, -0.02, 0.02, bright, sides=6)
+        stub.location = (0, trunnion * (arm - 0.02), 0)
+        stub.rotation_euler = (math.pi / 2, 0, 0)
+        housing.append(stub)
+    beam = fl.empty("sentry_beam", (0, 0, 0.19))
+    # The housing's axis (+Z) turned to +X and dipped 14 degrees toward the table.
+    fl.transform(housing + [lens, beam], Matrix.Translation((0, 0, pivot_z)) @ Matrix.Rotation(math.radians(90 + 14), 4, "Y"))
+    fl.transform(parts + housing + [lens, beam], Matrix.Translation((mx, my, mast_top)) @ Matrix.Rotation(math.radians(-40), 4, "Z"))
+    fl.merge_onto(yoke, parts + housing + [lens])
+    fl.parent(beam, yoke)

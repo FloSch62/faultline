@@ -8,10 +8,11 @@
  *   - `data-action="tutorial"`           → open the menu: lessonMenuMarkup(loadCompletedLessons())
  *   - `[data-lesson="<id>"]`             → battle lesson: run = createLessonRun(id);
  *                                           walkthrough ("expedition"): walkthroughMarkup(0) in the dialog
- *   - after every action / transmission  → progress = lessonProgress(id, run, lastResult, progress);
+ *   - after every action / transmission  → progress = lessonProgress(id, run, lastResult, progress, view);
  *                                           #lesson-layer = lessonPanelMarkup(progress, { showHint, collapsed })
  *   - progress.complete (first time)     → markLessonComplete(id)
  *   - panel actions: lesson-restart · lesson-menu · lesson-exit · lesson-next · lesson-hint · lesson-collapse
+ *                    · lesson-read (a reading step's "Got it")
  *   - walkthrough: [data-walkthrough="<page>"] · data-action="lesson-finish"
  *   - handbook: data-action="help" → handbookMarkup(); [data-handbook="<chapter>"] → handbookMarkup(chapter) */
 import "./tutorial.css";
@@ -39,6 +40,7 @@ export {
   type LessonDefinition,
   type LessonId,
   type LessonProgress,
+  type LessonView,
 } from "./tutorial/lessons.ts";
 export { HANDBOOK_CHAPTERS, handbookMarkup, type HandbookChapter } from "./tutorial/handbook.ts";
 
@@ -55,6 +57,28 @@ export interface PanelOptions {
   /** Minimised panel: title and current goal only. */
   collapsed?: boolean;
 }
+
+/** The coach's own break meter (the charge turn, while the enemy plate draws none): the guardian's
+ * threshold as a bar with one segment per add, lit while the add stands, and your packet against it.
+ * It is the reading step's control: a click (or Enter) on it is the player's "Got it". */
+function meterMarkup(progress: LessonProgress): string {
+  const m = progress.meter;
+  if (!m) return "";
+  const threshold = m.base + m.standing * m.bonus, most = Math.max(1, m.base + m.adds * m.bonus);
+  const pct = (n: number) => `${Math.min(100, (n / most) * 100)}%`;
+  const add = m.add ?? "add";
+  const segments = `<b style="width:${pct(m.base)}"></b>${Array.from({ length: m.adds }, (_, i) => `<b class="${i < m.standing ? "is-lit" : ""}" style="width:${pct(m.bonus)}"></b>`).join("")}`;
+  return `<button class="coach-break" data-action="lesson-read" aria-label="${esc(`Break meter: the ultimate breaks at ${threshold}, ${m.base} plus ${m.bonus} per living ${add}, ${m.standing} standing. Your transmission: ${m.packet}. Got it.`)}">
+    <span class="coach-break-head"><span>Break at <strong>${threshold}</strong></span><span class="coach-break-ok">${icon("check", 12)} Got it</span></span>
+    <span class="coach-break-bar" aria-hidden="true"><i style="width:${pct(m.packet)}"></i><span class="coach-break-segments">${segments}</span><em style="left:${pct(threshold)}"></em></span>
+    <span class="coach-break-foot">${m.base} + ${m.bonus} per living ${esc(add)} · your packet <b>${m.packet}</b></span>
+  </button>`;
+}
+
+/** A reading step ends on the player's word: an iron plate under the instruction. */
+const readButton = (progress: LessonProgress) => progress.reading
+  ? `<button class="plate-button training-read" data-action="lesson-read">${icon("check", 14)} Got it</button>`
+  : "";
 
 /** The coach panel docked beside the table during a battle lesson (render into #lesson-layer). */
 export function lessonPanelMarkup(progress: LessonProgress, options: PanelOptions = {}): string {
@@ -74,11 +98,11 @@ export function lessonPanelMarkup(progress: LessonProgress, options: PanelOption
     </header>
     <div class="training-meter" role="progressbar" aria-label="Lesson goals" aria-valuemin="0" aria-valuemax="${progress.goals.length}" aria-valuenow="${done}"><i></i></div>
     ${options.collapsed
-      ? progress.complete ? nextAction : `<p class="training-current">${rich(progress.coach) || esc(currentGoal?.label ?? "")}</p>`
+      ? progress.complete ? nextAction : `<p class="training-current">${rich(progress.coach) || esc(currentGoal?.label ?? "")}</p>${meterMarkup(progress)}${readButton(progress)}`
       : `${progress.complete ? nextAction : `<div class="training-progress"><ol class="training-goals" aria-label="Lesson steps">${progress.goals.map((goal, i) => `<li class="${goal.done ? "done" : i === progress.current ? "current" : "pending"}" data-tooltip="${esc(goal.label)}"><i aria-hidden="true"></i><span class="visually-hidden">${esc(goal.label)}${goal.done ? " (done)" : ""}</span></li>`).join("")}</ol><span class="training-count">Step <b>${progress.current + 1}</b> of ${progress.goals.length}</span></div>`}
       <div class="training-coach" aria-live="polite">${progress.complete
         ? `<strong class="training-label">Why this matters</strong><p class="coach-do">${rich(progress.coach)}</p>`
-        : `<div class="training-step"><strong class="training-label">${esc(currentGoal?.label ?? "Your next move")}</strong>${progress.hint && !options.showHint ? `<button class="training-hint-button" data-action="lesson-hint" aria-label="Show a hint" data-tooltip="Show a hint">${icon("hint", 16)}</button>` : ""}</div><p class="coach-do">${rich(progress.coach)}</p>${options.showHint && progress.hint ? `<p class="training-hint">${icon("hint", 16)}<span><b>Hint.</b> ${esc(progress.hint)}</span></p>` : ""}${progress.detail ? `<p class="coach-why">${rich(progress.detail)}</p>` : ""}`}</div>
+        : `<div class="training-step"><strong class="training-label">${esc(currentGoal?.label ?? "Your next move")}</strong>${progress.hint && !options.showHint ? `<button class="training-hint-button" data-action="lesson-hint" aria-label="Show a hint" data-tooltip="Show a hint">${icon("hint", 16)}</button>` : ""}</div><p class="coach-do">${rich(progress.coach)}</p>${meterMarkup(progress)}${readButton(progress)}${options.showHint && progress.hint ? `<p class="training-hint">${icon("hint", 16)}<span><b>Hint.</b> ${esc(progress.hint)}</span></p>` : ""}${progress.detail ? `<p class="coach-why">${rich(progress.detail)}</p>` : ""}`}</div>
       ${progress.warning ? `<p class="training-warning" role="alert">${icon("warning", 16)}<span>${esc(progress.warning)}</span></p>` : ""}
       <footer class="training-foot"><button class="text-button" data-action="lesson-restart">${icon("undo", 14)} Restart</button><button class="text-button" data-action="lesson-menu">${icon("book", 14)} Lessons</button><button class="text-button" data-action="lesson-exit">${icon("close", 14)} Leave</button></footer>`}
   </aside>`;
@@ -110,7 +134,14 @@ export function lessonMenuMarkup(completed: readonly string[]): string {
     <span class="lesson-summary">Each keeper has a command beside the hand and an engine of its own. Try all three.</span>
     <span class="lesson-variants">${consoles.map(lesson => `<button data-lesson="${lesson.id}" class="${done.has(lesson.id) ? "done" : ""} ${recommended === lesson.id ? "recommended" : ""}" aria-label="${esc(lesson.title)}${done.has(lesson.id) ? ". Completed." : ""}"><span>${esc(titleCase(lesson.archetype!))}${done.has(lesson.id) ? icon("check", 13) : ""}</span><small>${esc(titleCase(lesson.kicker.split(" · ")[0]))}</small></button>`).join("")}</span>
   </div>`;
-  const cards = [...others.filter(l => l.chapter < 7).map(l => lessonCard(l, done, recommended)), consoleCard, ...others.filter(l => l.chapter > 7).map(l => lessonCard(l, done, recommended))];
+  // The Handbook closes the grid as a wide plate, so the last lesson never stands alone in its row.
+  const handbookCard = `<button class="lesson-card lesson-handbook" data-action="help" aria-label="Open the Handbook: every rule and number, chapter by chapter">
+    <span class="lesson-icon" aria-hidden="true">${icon("book", 22)}</span>
+    <strong>The Handbook</strong>
+    <span class="lesson-summary">Every rule and number of the relay, chapter by chapter: packs and ports, the table front, escalation, crates and signals.</span>
+    <span class="lesson-meta">${icon("book", 14)} Reference · open it any time</span>
+  </button>`;
+  const cards = [...others.filter(l => l.chapter < 7).map(l => lessonCard(l, done, recommended)), consoleCard, ...others.filter(l => l.chapter > 7).map(l => lessonCard(l, done, recommended)), handbookCard];
   return `<section class="training-menu" aria-labelledby="training-title">
     <header class="panel-head training-menu-head"><h2 id="training-title">Field Training</h2>
       <p>Short practice battles with a coach at your side. Nothing here touches your expedition.</p></header>
@@ -119,7 +150,6 @@ export function lessonMenuMarkup(completed: readonly string[]): string {
       <span class="training-tally"><b>${count}</b><i>/</i>${LESSONS.length}<small>complete</small></span>
     </div>
     <div class="lesson-grid">${cards.join("")}</div>
-    <footer class="training-menu-foot"><button class="text-button" data-action="help">${icon("book", 16)} Open the Handbook</button></footer>
   </section>`;
 }
 

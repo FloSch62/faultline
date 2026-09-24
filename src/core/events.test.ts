@@ -4,6 +4,8 @@ import { newExpedition, parseExpedition } from "./expedition.ts";
 import { EVENTS, openEvent } from "./events.ts";
 import { chooseRoom, chooseEvent, leaveEvent, eventView, eventCardChoices, grantVictory, chooseCardReward } from "./meta.ts";
 import { encounterHealth } from "./map.ts";
+import { eventRoom, planEncounter } from "./encounter.ts";
+import { hostileName } from "./enemies.ts";
 import { CARDS } from "./cards.ts";
 import type { RunState } from "./types.ts";
 
@@ -52,7 +54,7 @@ test("every event offers two or three stated choices, and every available choice
       assert.equal(run.event!.resolved, true);
       assert.equal(run.event!.outcome, result.message);
       assert.equal(chooseEvent(run, choice).ok, false, "an answered event cannot be answered again");
-      assert.ok(parseExpedition(JSON.stringify({ version: 3, run, archetype: "architect", daily: false, startedAt: 1, recorded: false })), `${id}/${choice} saves`);
+      assert.ok(parseExpedition(JSON.stringify({ version: 4, run, archetype: "architect", daily: false, startedAt: 1, recorded: false })), `${id}/${choice} saves`);
       assert.ok(leaveEvent(run).ok);
       assert.equal(run.phase, "map");
       assert.equal(run.event, null);
@@ -95,17 +97,42 @@ test("Signal in the Static is an optional empowered fight with an elite-like rew
   const run = atEvent(7, "signal-in-the-static");
   const enemyId = run.event!.enemyId!;
   const credits = run.credits;
+  const room = run.map.find(item => item.id === run.currentRoom)!;
+  assert.match(eventView(run)!.choices[0].detail, new RegExp(`Fight ${hostileName(enemyId)} with 40% more integrity`));
   assert.ok(chooseEvent(run, 0).ok);
   assert.equal(run.phase, "battle");
-  assert.equal(run.enemy!.id, enemyId);
-  const room = run.map.find(item => item.id === run.currentRoom)!;
-  assert.equal(run.enemy!.maxHp, Math.round(encounterHealth(0, { ...room, type: "battle" }) * 1.4));
+  // Stage I, floor 2: too early for a pack or a ribbon, so the event's hostile fights alone.
+  assert.deepEqual(run.enemies.map(enemy => enemy.id), [enemyId]);
+  assert.equal(run.enemies[0].maxHp, Math.round(encounterHealth(0, { ...room, type: "battle" }) * 1.4));
   grantVictory(run);
   assert.equal(run.credits, credits + 40);
   assert.equal(CARDS[run.cardRewards[0]].rarity, "rare");
   chooseCardReward(run, null);
   assert.equal(run.phase, "map", "event fights never offer a relic");
   assert.equal(run.event, null);
+});
+
+test("Signal in the Static rolls packs and designations like the stage's normals", () => {
+  let packs = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const run = atEvent(seed, "signal-in-the-static", 2);
+    const room = run.map.find(item => item.id === run.currentRoom)!;
+    const fight = eventRoom(run, room, run.event!.enemyId!);
+    const plan = planEncounter(run, fight);
+    const detail = eventView(run)!.choices[0].detail;
+    for (const id of [fight.enemyId, ...(fight.pack ?? [])].filter(Boolean)) assert.match(detail, new RegExp(hostileName(id!)), "the choice names every member");
+    if (fight.designationHidden) assert.match(detail, /unknown designation/);
+    const credits = run.credits;
+    assert.ok(chooseEvent(run, 0).ok);
+    assert.deepEqual(run.enemies.map(enemy => [enemy.id, enemy.port, enemy.maxHp]), plan.enemies.map(enemy => [enemy.id, enemy.port, enemy.maxHp]));
+    const total = plan.enemies.reduce((sum, enemy) => sum + enemy.maxHp, 0);
+    assert.equal(encounterHealth(2, fight), Math.round(encounterHealth(2, { ...room, type: "battle" }) * 1.4), "event fights carry 40% more health");
+    if (!fight.pack) assert.equal(total, Math.round(encounterHealth(2, fight) * (fight.designations?.includes("hardened") ? 1.2 : 1)));
+    if (fight.pack) packs++;
+    grantVictory(run);
+    assert.equal(run.credits, credits + 40 + plan.credits.reduce((sum, line) => sum + line.amount, 0), "pack and ribbon credits are paid too");
+  }
+  assert.ok(packs >= 10, `${packs} of 40 event fights were packs`);
 });
 
 test("events never repeat within an expedition and story beats stay in their stage", () => {

@@ -99,15 +99,19 @@ dialog.medium { max-width: min(820px, calc(100cqw - 24px)); }
 .trait-explanation.is-guardian { border-color: #8a4a3a; }
 .trait-explanation.is-guardian h4, .trait-explanation.is-guardian h4 svg { color: #f3b8a2; }
 /* The order a turn resolves in, as studs on one rail. */
-.turn-sequence { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 30px 0 0; padding: 0; list-style: none; }
-.turn-sequence::before { content: ""; position: absolute; top: 14px; left: 12.5%; right: 12.5%; height: 1px; background: linear-gradient(90deg, #c9a26333, #c9a26399, #c9a26333); }
+.turn-sequence { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 30px 0 0; padding: 0; list-style: none; }
+.turn-sequence::before { content: ""; position: absolute; top: 14px; left: 10%; right: 10%; height: 1px; background: linear-gradient(90deg, #c9a26333, #c9a26399, #c9a26333); }
 .turn-sequence li { position: relative; display: grid; justify-items: center; gap: 8px; font: 14.5px/1.35 var(--text); color: var(--text-body); text-align: center; }
 .turn-sequence b { display: grid; place-items: center; width: 29px; height: 29px; font: 600 17px/1 var(--title); color: #f6e2b4; background: radial-gradient(circle at 50% 35%, #3a2d1b, #120d08 70%); border-radius: 50%; box-shadow: inset 0 0 0 1px #c9a263, inset 0 0 0 3px #120d08, 0 2px 6px #000c; }
 
 /* ---------------------------------------------------------------- devices */
 .device-inventory { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
-.device-tile { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; align-items: start; gap: 14px; padding: 13px 14px 14px 12px; text-align: left; color: inherit; transition: border-color .18s, box-shadow .18s; }
-.device-tile:hover, .device-tile:focus-visible { border-color: var(--brass-hi); box-shadow: inset 0 0 0 1px #05070a, inset 0 0 22px #ffb04a12, 0 0 20px #ffb04a2e, 0 6px 16px #000a; }
+/* A tile is an inlaid plate: the device itself (a button that opens relocation) above an
+   engraved condition rail that carries its Repair or Scrub plate. */
+.device-tile { display: grid; align-content: start; color: inherit; transition: border-color .18s, box-shadow .18s; }
+.device-tile:hover, .device-tile:focus-within { border-color: var(--brass-hi); box-shadow: inset 0 0 0 1px #05070a, inset 0 0 22px #ffb04a12, 0 0 20px #ffb04a2e, 0 6px 16px #000a; }
+.device-main { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; align-items: start; gap: 14px; width: 100%; padding: 13px 14px 12px 12px; text-align: left; color: inherit; }
+.device-main:focus-visible { outline-offset: -3px; }
 .device-glyph { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; color: #b9ab8c; background: radial-gradient(circle at 50% 35%, #2e2417, #0f0c08 72%); box-shadow: inset 0 0 0 1px #9b7a45, inset 0 0 0 3px #0f0c08, inset 0 0 0 4px #5a4322, 0 3px 8px #000b; }
 .device-tile.is-online .device-glyph { color: #c9f2e6; box-shadow: inset 0 0 0 1px #9b7a45, inset 0 0 0 3px #0f0c08, inset 0 0 0 4px #5a4322, 0 0 16px #5fd6c229, 0 3px 8px #000b; }
 .device-tile.is-fixed .device-glyph { color: #f0d9a2; }
@@ -126,6 +130,34 @@ dialog.medium { max-width: min(820px, calc(100cqw - 24px)); }
 .device-tile.is-online .device-state i { background: radial-gradient(circle at 40% 35%, #f0fffa, #5fd6c2 55%, #1f7a6c); box-shadow: 0 0 0 1px #0b0906, 0 0 10px #5fd6c2; }
 .device-tile.is-fixed .device-state { color: #d9c08c; }
 .device-tile.is-fixed .device-state i { background: radial-gradient(circle at 40% 35%, #fff4d0, var(--ember) 55%, #9b5a18); box-shadow: 0 0 0 1px #0b0906, 0 0 10px #ffb04a99; }
+/* The condition rail: pips, the number, and the plate that acts on it. */
+.device-copy strong .pips { margin-left: 8px; vertical-align: 2px; }
+.tile-condition { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px 12px; margin: 0 12px; padding: 9px 2px 11px 4px; background: linear-gradient(90deg, transparent, #c9a26340 18%, #c9a26340 82%, transparent) top / 100% 1px no-repeat; font: 14px/1.2 var(--text); color: var(--text-dim); }
+.tile-condition b { font: 600 17px/1 var(--title); font-variant-numeric: tabular-nums; color: #f0dcae; }
+.tile-condition.is-worn { color: #eab48c; }
+.tile-condition.is-worn b { color: #ffc89a; }
+.tile-condition > span:first-child { margin-right: auto; }
+.tile-action { min-height: 32px; padding: 5px 14px; font-size: 12px; }
+.tile-action .pips-pair { display: inline-flex; align-items: center; gap: 5px; margin-left: 2px; }
+.tile-action .pips-pair svg { width: 12px; height: 12px; color: #a58b5c; }
+.device-tile.is-worn { border-color: #8a5a34; }
+.device-tile.is-worn .device-glyph { color: #f3b98a; }
+/* Installations: the same plate in the malware violet, and a charge's countdown on an obsidian disc. */
+.installation-tile { border-color: #7a4a86; }
+.installation-tile .device-main { cursor: var(--cursor-default); }
+.installation-tile .device-glyph { color: #e0a4f4; box-shadow: inset 0 0 0 1px #9b6aab, inset 0 0 0 3px #0f0c08, inset 0 0 0 4px #4a2a52, 0 0 16px #c77adf2e, 0 3px 8px #000b; }
+.installation-tile .device-role { color: #d9a8e8; }
+.installation-tile .device-hint { font-style: normal; color: #f1c8fb; }
+.installation-tile .device-mods { color: #9fe0cf; }
+.installation-tile:hover, .installation-tile:focus-within { border-color: #f0b6ff; box-shadow: inset 0 0 0 1px #05070a, inset 0 0 22px #d07ae812, 0 0 20px #d07ae844, 0 6px 16px #000a; }
+.installation-tile .pips i.is-full { border-color: #f6d0ff; background: linear-gradient(135deg, #ffe6ff, #d58ae8 50%, #6d3a7a); box-shadow: 0 0 0 1px #05070a, 0 0 6px #d07ae8aa; }
+.tile-countdown { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: radial-gradient(circle at 45% 35%, #2a1c14, #080605 72%); box-shadow: inset 0 0 0 1px #d0674c, inset 0 0 0 3px #080605, 0 0 14px #ff6a4a55; }
+.tile-countdown b { font: 700 22px/1 var(--title); color: #ffb08a; text-shadow: 0 0 10px #ff6a4a; }
+/* Engraved diamonds for integrity and condition: a spent point goes hollow. */
+.pips { display: inline-flex; align-items: center; gap: 5px; padding: 0 2px; vertical-align: middle; }
+.pips i { width: 8px; height: 8px; transform: rotate(45deg); border: 1px solid #a58b5c; background: #0f0c08; box-shadow: 0 0 0 1px #05070a; }
+.pips i.is-full { border-color: #f3dca0; background: linear-gradient(135deg, #fff0c4, #d8b36d 50%, #7b5a2c); }
+.is-worn .pips i:not(.is-full) { border-color: #d08a52; }
 .cable-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 0 28px; margin: 0; padding: 0; list-style: none; }
 .cable-list li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; padding: 8px 2px; background: linear-gradient(90deg, #c9a26333, transparent 85%) bottom / 100% 1px no-repeat; }
 .cable-ends { display: flex; align-items: center; gap: 8px; font: 600 16px/1.2 var(--title); letter-spacing: .03em; color: #e5d8bb; }
@@ -136,9 +168,6 @@ dialog.medium { max-width: min(820px, calc(100cqw - 24px)); }
 .cable-tag { font: 700 12.5px/1.2 var(--label); letter-spacing: .06em; color: #a79c84; }
 .cable-tag.is-good { color: #9fe0cf; }
 .cable-tag.is-bad { color: #f0a58f; }
-.malware-inventory .cable-list { grid-template-columns: 1fr; }
-.malware-inventory .cable-ends > svg { color: #f0a58f; }
-.malware-inventory .plate-button { min-height: 34px; padding: 6px 14px; font-size: 12.5px; }
 .terrain-note { display: flex; align-items: flex-start; gap: 12px; margin: 26px 0 0; font: 15px/1.55 var(--text); color: var(--text-body); }
 .terrain-note svg { flex: none; margin-top: 3px; color: var(--brass); }
 .terrain-note b { margin-right: 6px; font: 600 18px/1 var(--title); color: var(--text-hi); }
@@ -215,7 +244,180 @@ button.prepare-row:hover:not(:disabled) strong { color: #fff3d6; }
 #game-tooltip::before { left: var(--arrow-x, 50%); }
 #game-tooltip[data-side="above"]::before { top: auto; bottom: -5px; }
 
+/* ---------------------------------------------------------------- forecast v4: deliveries, attacks, the table front */
+.ledger-sub { display: flex; align-items: center; gap: 10px; margin: 20px 0 8px; font: 700 12.5px/1.2 var(--label); letter-spacing: .1em; color: #c9a263; }
+.ledger-sub::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, #c9a26359, transparent); }
+/* A port tag: an iron tag with clipped corners, the port engraved in the label face. */
+.port-tag { flex: none; display: inline-grid; place-items: center; min-width: 60px; padding: 5px 9px 6px; font: 700 12px/1 var(--label); letter-spacing: .12em; color: #f0dcae; background: linear-gradient(#2a2218, #120e09); box-shadow: inset 0 0 0 1px #9b7a45, inset 0 0 0 2px #0c0906; clip-path: polygon(5px 0, calc(100% - 5px) 0, 100% 5px, 100% calc(100% - 5px), calc(100% - 5px) 100%, 5px 100%, 0 calc(100% - 5px), 0 5px); }
+.route-port { display: inline-flex; align-items: baseline; gap: 8px; margin-left: auto; padding-left: 16px; font: 700 12.5px/1 var(--label); letter-spacing: .1em; color: #e6d3a8; }
+.route-port small { font: italic 13.5px/1 var(--text); letter-spacing: 0; color: var(--text-dim); }
+.route-port b { font: 600 21px/1 var(--title); letter-spacing: 0; font-variant-numeric: tabular-nums; color: #ffe3a6; text-shadow: 0 0 12px #ffb04a55; }
+.route-port.is-aimed small { color: #9fe0cf; }
+.route-trace.is-secondary .route-port b { color: #bfeee2; text-shadow: 0 0 12px #5fd6c244; }
+.port-totals { display: grid; gap: 6px; margin: 10px 0 0; }
+.port-total { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "tag name state" "tag math math"; align-items: center; gap: 3px 12px; padding: 8px 14px 9px 10px; background: linear-gradient(#07090d, #0b1014); border: 1px solid #5a4322; box-shadow: inset 0 2px 6px #000d, 0 1px 0 #f3dca014; }
+.port-total > .port-tag { grid-area: tag; }
+.port-total-name { grid-area: name; font: 600 16px/1.2 var(--title); color: var(--text-hi); }
+.port-total-math { grid-area: math; font: 14.5px/1.4 var(--text); color: var(--text-dim); }
+.port-total-math b { font: 600 17px/1 var(--title); font-variant-numeric: tabular-nums; color: #e6d3a8; }
+.port-total-math strong { font: 700 21px/1 var(--title); font-variant-numeric: tabular-nums; color: #ffe3a6; text-shadow: 0 0 14px #ffb04a55; }
+.port-total > em { grid-area: state; font: 700 12px/1 var(--label); font-style: normal; letter-spacing: .12em; color: #a79c84; }
+.port-total > em.is-lethal { color: #ffd27a; text-shadow: 0 0 12px #ffb04a88; }
+.port-total > em.is-stored { color: #9fe0cf; }
+.overflow-line { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font: italic 14.5px/1.4 var(--text); color: #e9c77f; }
+.overflow-line b { font: 600 18px/1 var(--title); font-style: normal; color: #ffe3a6; }
+.overflow-line svg { flex: none; color: var(--brass); }
+/* Defenses in a pack: every attack in port order, its own guards, and what lands. */
+.attack-list { display: grid; gap: 8px; }
+.attack-entry { padding: 8px 14px 9px 10px; background: linear-gradient(#07090d, #0b1014); border: 1px solid #5a4322; box-shadow: inset 0 2px 6px #000d, 0 1px 0 #f3dca014; }
+.attack-head { display: flex; align-items: center; gap: 12px; font: 600 16px/1.2 var(--title); color: var(--text-hi); }
+.attack-head > span:not(.port-tag) { flex: 1; min-width: 0; }
+.attack-head i { font: italic 14.5px var(--text); color: var(--text-dim); }
+.attack-head > b { font: 600 21px/1 var(--title); font-variant-numeric: tabular-nums; color: #f0a58f; }
+.attack-entry .incoming-sources { margin: 6px 0 0 72px; padding-left: 12px; }
+.attack-entry .calculation-term.is-guard b { color: #9fe0cf; }
+.attack-note { margin: 5px 0 0 72px; font: italic 14px/1.4 var(--text); color: var(--text-dim); }
+.attack-lands { margin: 4px 0 0; text-align: right; font: 700 12px/1 var(--label); letter-spacing: .1em; color: #c9a263; }
+.attack-lands b { margin-left: 6px; font: 600 21px/1 var(--title); letter-spacing: 0; color: #ffab93; }
+.attack-entry.is-quiet { opacity: .72; }
+.attack-spite { margin-left: 6px; padding: 2px 7px 3px; font: 700 11.5px/1 var(--label); font-style: normal; letter-spacing: .1em; color: #ffc0b4; background: linear-gradient(#34191a, #1a0d0d); box-shadow: inset 0 1px 0 #ef8f86aa, inset 0 -1px 0 #ef8f86aa; }
+.trait-explanation .is-warning { display: flex; align-items: flex-start; gap: 8px; color: #f6b8a8; }
+.trait-explanation .is-warning svg { flex: none; margin-top: 4px; color: #ff9a86; }
+/* The table front: installations on one side, your devices on the other. */
+.front-ledger { margin: 30px 0 0; padding-top: 24px; background: linear-gradient(90deg, transparent, #c9a26359 15%, #c9a26359 85%, transparent) top / 100% 1px no-repeat; }
+.front-ledger h3 { display: flex; align-items: center; gap: 12px; margin: 0 0 4px; font: 600 18px/1.2 var(--display); letter-spacing: .05em; color: var(--text-hi); }
+.front-columns { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 0 60px; }
+.front-columns::before { content: ""; position: absolute; left: 50%; top: 18px; bottom: 4px; width: 1px; background: linear-gradient(transparent, #c9a26359 12%, #c9a26359 88%, transparent); }
+.front-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.front-row { display: grid; grid-template-columns: auto minmax(18px, 1fr) auto; align-items: baseline; gap: 1px 10px; padding: 6px 0 7px; }
+.front-row > i { border-bottom: 1px dotted #c9a26338; }
+.front-name { display: inline-flex; align-items: center; gap: 8px; font: 600 16px/1.2 var(--title); letter-spacing: .02em; color: var(--text-hi); }
+.front-name > svg { flex: none; color: var(--brass); }
+.front-value { font: 15px/1.2 var(--text); color: var(--text-body); white-space: nowrap; }
+.front-value b { font: 600 18px/1 var(--title); font-variant-numeric: tabular-nums; color: #f0dcae; }
+.front-row small { grid-column: 1 / -1; padding-left: 25px; font: italic 14px/1.45 var(--text); color: var(--text-dim); }
+.front-list.is-installations .front-name > svg { color: #e0a4f4; }
+.front-ledger + .calculation-grid { margin-top: 30px; }
+.front-row.is-new .front-value { font: 700 12px/1 var(--label); letter-spacing: .12em; color: #f1c8fb; }
+.front-row.is-threat .front-name { color: #ffc0a8; }
+.front-row.is-threat .front-value b { color: #ffc89a; }
+.front-ledger.is-clear .ledger-note { margin-top: 6px; }
+
+/* ---------------------------------------------------------------- offers: an undelivered message, a crate's cards */
+/* The message was already opened: no close stud, only its named choices. */
+dialog.offer-dialog { max-width: min(600px, calc(100cqw - 24px)); }
+dialog.offer-dialog:has(.offer-page.is-crate) { max-width: min(780px, calc(100cqw - 24px)); }
+dialog.offer-dialog .dialog-close { display: none; }
+dialog.offer-dialog .dialog-surface { padding-bottom: 22px; }
+.offer-page .panel-head { margin-bottom: 12px; }
+.offer-page .panel-head::after { margin-top: 10px; }
+.offer-page .panel-head p { color: #d6c49c; }
+.offer-fragment { margin: 0 auto 16px; max-width: 470px; font: 17px/1.5 var(--text); color: var(--text-hi); text-align: center; text-wrap: balance; }
+.offer-fragment::before { content: "“"; margin-right: 2px; color: var(--brass); }
+.offer-fragment::after { content: "”"; margin-left: 2px; color: var(--brass); }
+/* The painted illustration; its lower third stays dark for the option plates. Until the
+   painting lands, an engraved capsule on a dark bench stands in. */
+.offer-plate { position: relative; display: flex; flex-direction: column; justify-content: flex-end; aspect-ratio: 3 / 2; padding: 0 20px 16px;
+  background:
+    linear-gradient(transparent 52%, #05070a80 66%, #05070ad0),
+    var(--offer-art) center top / cover no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 110' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg stroke='%23c9a263' stroke-width='1.4' opacity='.62' transform='rotate%28-8 75 52%29'%3E%3Crect x='38' y='39' width='72' height='26' rx='13'/%3E%3Cpath d='M54 40v24M94 40v24'/%3E%3Cpath d='M60 45h28' opacity='.5'/%3E%3C/g%3E%3Cg stroke='%23c9a263' stroke-width='1.4' opacity='.5' transform='rotate%2816 126 46%29'%3E%3Crect x='115' y='33' width='22' height='26' rx='9'/%3E%3Cpath d='M126 34v24' opacity='.6'/%3E%3C/g%3E%3Cpath d='M108 58c16 14 30-8 46 4s28 2 38-4' stroke='%23ffb04a' stroke-width='1.6' opacity='.75'/%3E%3Cpath d='M116 66c14 10 26-6 40 3s22 1 30-3' stroke='%23ffb04a' stroke-width='1' opacity='.4'/%3E%3Cpath d='M158 18a8 8 0 0 0-4 13M163 33a8 8 0 0 0 4-13' stroke='%23e0766a' stroke-width='1.4' opacity='.7'/%3E%3C/svg%3E") center 24% / 50% auto no-repeat,
+    radial-gradient(40% 34% at 52% 26%, #ffb04a24, transparent 72%),
+    linear-gradient(#131922, #07090c 78%);
+  border: 1px solid #7b5a2c; box-shadow: inset 0 0 0 1px #05070a, inset 0 0 0 4px #0c0906, inset 0 0 0 5px #c9a26333, 0 10px 26px #000c; }
+.offer-options { display: grid; gap: 8px; }
+/* One row per choice: the stone, the choice in Grenze, its exact effect in Alegreya, the key. */
+.offer-row { position: relative; display: grid; grid-template-columns: 16px 104px minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 7px 12px 8px 12px; text-align: left; color: inherit; background: linear-gradient(170deg, #161d26e8, #0d1218f0 70%); transition: border-color .18s, box-shadow .18s; }
+.offer-copy { display: contents; }
+.offer-row strong { font: 600 19px/1.15 var(--title); letter-spacing: .02em; color: var(--text-hi); white-space: nowrap; }
+.offer-row small { font: 14.5px/1.35 var(--text); color: var(--text-body); padding-left: 12px; border-left: 1px solid #c9a26340; }
+.offer-row kbd { align-self: center; font-size: 12px; min-width: 26px; padding: 4px 6px 3px; }
+/* The stone at the row's edge is dark brass until the row is chosen: then it lights. */
+.offer-stone { justify-self: center; width: 11px; height: 11px; transform: rotate(45deg); background: linear-gradient(135deg, #8a7048, #3a2c18 60%, #1a130b); box-shadow: 0 0 0 1px #0b0906, 0 0 0 2px #7b5a2c; transition: background .18s, box-shadow .18s; }
+.offer-row:hover, .offer-row:focus-visible { border-color: var(--brass-hi); box-shadow: inset 0 0 0 1px #05070a, inset 0 0 22px #ffb04a14, 0 0 22px #ffb04a33, 0 6px 16px #000a; }
+.offer-row:hover strong, .offer-row:focus-visible strong { color: #fff3d6; }
+.offer-row:focus-visible { outline: none; }
+.offer-row:hover .offer-stone, .offer-row:focus-visible .offer-stone { background: linear-gradient(135deg, #fff4d0, var(--ember) 55%, #9b5a18); box-shadow: 0 0 0 1px #0b0906, 0 0 0 2px var(--brass-hi), 0 0 14px var(--ember); }
+.offer-queue { margin: 12px 0 0; text-align: center; font: italic 14.5px/1.4 var(--text); color: var(--text-dim); }
+.offer-queue b { font: 600 17px/1 var(--title); font-style: normal; color: #f0dcae; }
+/* The crate: its reveal plate beside the two named cards. */
+.offer-plate.is-crate { display: grid; grid-template-columns: minmax(150px, 1fr) auto; align-items: center; gap: 22px; aspect-ratio: auto; padding: 18px 22px 20px;
+  background: radial-gradient(60% 80% at 25% 50%, #ffb04a14, transparent 70%), linear-gradient(#131922, #07090c 78%); }
+.offer-crate-art { display: block; width: 100%; aspect-ratio: 1; border: 1px solid #7b5a2c; box-shadow: inset 0 0 0 1px #05070a, 0 8px 20px #000c;
+  background:
+    var(--offer-art) center / cover no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='none' stroke='%23c9a263' stroke-width='1.5' stroke-linejoin='round' stroke-linecap='round'%3E%3Cg opacity='.6'%3E%3Cpath d='M20 46h60v34H20z'/%3E%3Cpath d='M20 57h60M20 69h60' stroke-dasharray='5 3'/%3E%3Cpath d='M34 46v34M66 46v34'/%3E%3Cpath d='M18 46l4-12h58l2 12'/%3E%3Cpath d='M24 30l5-12h46l3 12' opacity='.7'/%3E%3C/g%3E%3Cpath d='M38 40c6-7 18-7 24 0' stroke='%23ffb04a' opacity='.75'/%3E%3C/svg%3E") center 58% / 62% auto no-repeat,
+    radial-gradient(46% 40% at 50% 46%, #ffb04a2e, transparent 72%),
+    #0a0d11; }
+.offer-cards { display: flex; gap: 18px; }
+.offer-card { display: grid; justify-items: center; gap: 10px; }
+.offer-card .game-card { --card-width: 178px; --card-height: 290px; --picture-height: 96px; animation: none; transition: transform .18s, border-color .18s, box-shadow .18s, filter .18s; }
+.offer-card .game-card:hover, .offer-card .game-card:focus-visible { transform: translateY(-5px); border-color: var(--brass-hi); filter: brightness(1.08); box-shadow: inset 0 0 0 3px #080f1b, 0 0 0 1px #0b0906, 0 0 24px #ffb04a3d, 0 12px 26px #000c; }
+.offer-card kbd { font-size: 12px; min-width: 26px; padding: 4px 6px 3px; }
+
+/* ---------------------------------------------------------------- dossier v4: the rail and the folio */
+.dossier-rail { margin-top: 0; }
+.dossier-rail .journal-note { margin-top: 12px; }
+.dossier-ports { display: grid; gap: 10px; }
+.dossier-port { position: relative; display: grid; grid-template-columns: auto 48px minmax(0, 1fr) auto; align-items: start; gap: 12px; width: 100%; padding: 12px 14px 12px 10px; text-align: left; color: inherit; transition: border-color .18s, box-shadow .18s; }
+.dossier-port > .port-tag { margin-top: 13px; }
+button.dossier-port:hover:not(.is-lit), button.dossier-port:focus-visible { border-color: var(--brass); box-shadow: inset 0 0 0 1px #05070a, inset 0 0 22px #ffb04a0d, 0 0 16px #ffb04a26, 0 4px 14px #0008; }
+.dossier-portrait, .folio-portrait { flex: none; display: block; width: 48px; height: 48px; border-radius: 50%; background-color: #0d1116; background-repeat: no-repeat; border: 1px solid #8a6a3a; box-shadow: inset 0 0 0 2px #080a0d, 0 3px 8px #000b; }
+.dossier-port.is-lit .dossier-portrait { border-color: var(--brass-hi); box-shadow: inset 0 0 0 2px #080a0d, 0 0 14px #ffb04a55, 0 3px 8px #000b; }
+.dossier-port-copy { display: grid; gap: 5px; min-width: 0; }
+.dossier-port-copy strong, .dossier-add-copy strong { font: 600 20px/1.1 var(--title); letter-spacing: .02em; color: var(--text-hi); }
+.dossier-role { font: 700 12.5px/1.3 var(--label); letter-spacing: .08em; color: #c9a263; }
+.dossier-role b { font: 600 15px/1 var(--title); letter-spacing: 0; color: #f0dcae; }
+.dossier-trait { font: 14.5px/1.45 var(--text); color: var(--text-body); }
+.dossier-ribbons { display: flex; flex-wrap: wrap; gap: 6px; }
+.dossier-trait b { margin-right: 4px; font: 700 12px/1 var(--label); letter-spacing: .1em; color: #e9c77f; }
+.dossier-designation { display: block; font: 14.5px/1.5 var(--text); color: var(--text-body); }
+.dossier-designation > .dossier-ribbon { margin-right: 9px; vertical-align: 1px; }
+.journal-section > .dossier-designation + .dossier-designation { margin-top: 8px; }
+/* The designation ribbon: an engraved band with notched ends, coral for bad, teal for good. */
+.dossier-ribbon { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 4px 13px 4px 9px; font: 700 12px/1 var(--label); letter-spacing: .12em; color: #d9d2c0; background: linear-gradient(#20252b, #111418); box-shadow: inset 0 1px 0 #c9ccc680, inset 0 -1px 0 #c9ccc680; clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 50%, 100% 100%, 0 100%, 6px 50%); padding-left: 12px; }
+.dossier-ribbon.bad { color: #ffc0b4; background: linear-gradient(#34191a, #1a0d0d); box-shadow: inset 0 1px 0 #ef8f86aa, inset 0 -1px 0 #ef8f86aa; }
+.dossier-ribbon.good { color: #b4efdc; background: linear-gradient(#123030, #0a1a1a); box-shadow: inset 0 1px 0 #8fd9c0aa, inset 0 -1px 0 #8fd9c0aa; }
+.dossier-crate { display: flex; align-items: center; gap: 8px; font: italic 14px/1.4 var(--text); color: #e9c77f; }
+.dossier-crate svg { flex: none; color: var(--brass); }
+.dossier-health { display: grid; justify-items: end; gap: 5px; padding-top: 2px; font: 15px/1 var(--title); color: var(--text-dim); white-space: nowrap; }
+.dossier-health b { font: 600 24px/1 var(--title); font-variant-numeric: tabular-nums; color: var(--text-hi); }
+.dossier-health small { font: 700 11px/1.2 var(--label); letter-spacing: .1em; color: #857f71; }
+.dossier-next { font: italic 14.5px/1.35 var(--text); color: #eadcbc; }
+.dossier-next b { font: 600 17px/1 var(--title); font-style: normal; color: #f0a58f; }
+.dossier-next.is-dormant { color: var(--text-dim); }
+.dossier-port.is-arrival { border-style: dashed; border-color: #8a4a3a; background: linear-gradient(170deg, #1e1515, #0f0b0b 70%); }
+.dossier-port.is-arrival .dossier-role { color: #ff9a86; }
+.dossier-port.is-arrival .dossier-portrait { opacity: .75; filter: saturate(.6); }
+.dossier-folio { margin-top: 26px; }
+.dossier-rail + .dossier-folio { padding-top: 24px; background: linear-gradient(90deg, transparent, #c9a26359 15%, #c9a26359 85%, transparent) top / 100% 1px no-repeat; }
+.folio-head { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 18px; margin: 0 0 16px; }
+.folio-portrait { width: 76px; height: 76px; border-color: var(--brass); }
+.folio-head strong { display: block; font: 600 28px/1.1 var(--title); letter-spacing: .02em; color: var(--text-hi); }
+.folio-head em { display: block; margin-top: 3px; font: italic 16px/1.4 var(--text); color: #b9b4a4; }
+.folio-head small { display: block; margin-top: 5px; font: 700 12.5px/1.2 var(--label); letter-spacing: .08em; color: #c9a263; }
+.numeral { font: 600 18px/1 var(--title); font-variant-numeric: tabular-nums; color: #f0dcae; }
+/* Escalation: three levels on the leader's own clock; a reached level glows coral. */
+.level-list { display: grid; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; }
+.level-row { display: grid; grid-template-columns: 12px auto minmax(0, 1fr); align-items: baseline; gap: 4px 12px; padding: 9px 14px 10px; background: linear-gradient(#07090d, #0b1014); border: 1px solid #4a3920; box-shadow: inset 0 2px 6px #000d; }
+.level-pip { width: 10px; height: 10px; align-self: center; transform: rotate(45deg); border: 1px solid #a58b5c; background: #0f0c08; }
+.level-row > b { font: 600 17px/1.2 var(--title); color: #e6d3a8; }
+.level-row > small { font: 700 12px/1.2 var(--label); letter-spacing: .08em; color: #a79c84; }
+.level-row > p { grid-column: 2 / -1; margin: 0; font: 14.5px/1.45 var(--text); color: var(--text-body); }
+.level-row.is-reached { border-color: #8a4a3a; }
+.level-row.is-reached .level-pip { border-color: #ffc0b4; background: linear-gradient(135deg, #ffd8cc, #ef8f86 55%, #7a3028); box-shadow: 0 0 8px #ef8f86aa; }
+.level-row.is-reached > b { color: #ffc0b4; }
+.dossier-adds { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-top: 14px; }
+.dossier-add { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 12px; padding: 12px 14px 13px 12px; }
+.dossier-add-copy { display: grid; gap: 4px; font: 14.5px/1.4 var(--text); color: var(--text-body); }
+.dossier-add-copy small { font: italic 14px/1.45 var(--text); color: var(--text-dim); }
+
 /* ---------------------------------------------------------------- short and narrow windows */
+@container game (min-width: 1500px) and (min-height: 900px) {
+  dialog.offer-dialog { max-width: min(700px, calc(100cqw - 24px)); }
+  dialog.offer-dialog:has(.offer-page.is-crate) { max-width: min(860px, calc(100cqw - 24px)); }
+  .offer-card .game-card { --card-width: 196px; --card-height: 304px; --picture-height: 110px; }
+}
 @container game (max-height: 700px) {
   .archive-toolbar { padding-block: 10px 18px; }
   .collection-grid { padding-top: 20px; }
@@ -252,8 +454,19 @@ button.prepare-row:hover:not(:disabled) strong { color: #fff3d6; }
   .inspect-facts > div { flex-wrap: wrap; }
   .inspect-facts dd { margin-left: auto; }
   .device-inventory, .cable-list { grid-template-columns: 1fr; }
-  .device-tile { grid-template-columns: 40px minmax(0, 1fr); gap: 4px 12px; }
+  .device-main { grid-template-columns: 40px minmax(0, 1fr); gap: 4px 12px; }
+  .tile-condition { padding-left: 2px; }
   .device-glyph { width: 40px; height: 40px; }
   .device-state { grid-column: 2; padding-top: 2px; }
   .enemy-pattern { grid-template-columns: repeat(2, 1fr); }
+  .front-columns { grid-template-columns: 1fr; gap: 18px; }
+  .front-columns::before { display: none; }
+  .attack-entry .incoming-sources, .attack-note { margin-left: 0; }
+  .offer-plate { padding: 0 14px 14px; }
+  .offer-plate.is-crate { grid-template-columns: 1fr; justify-items: center; }
+  .offer-crate-art { max-width: 150px; }
+  .offer-card .game-card { --card-width: 140px; --card-height: 226px; --picture-height: 70px; }
+  .dossier-port { grid-template-columns: 48px minmax(0, 1fr); }
+  .dossier-port > .port-tag { grid-column: 1 / -1; justify-self: start; margin: 0; }
+  .dossier-health { grid-column: 2; justify-items: start; }
 }

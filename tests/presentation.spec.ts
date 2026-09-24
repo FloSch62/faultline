@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 // Every test also fails on any page or console error (see helpers.ts).
 import { expect, test } from "./helpers.ts";
 import { newExpedition } from "../src/core/expedition.ts";
+import { makeEnemy } from "../src/core/encounter.ts";
 import { chooseRoom } from "../src/core/run.ts";
 import { ENEMIES } from "../src/core/enemies.ts";
 import { encounterHealth } from "../src/core/map.ts";
@@ -11,8 +12,8 @@ const storage = "faultline-expedition-v2";
 function fixture(id = "leech", hp = 40) {
   const e = newExpedition("architect", 924);
   chooseRoom(e.run, "0-1");
-  const d = ENEMIES[id];
-  e.run.enemy = { id, name: d.name, title: d.title, color: d.color, hp, maxHp: 40, turn: 0 };
+  e.run.enemies = [{ ...makeEnemy(id, "h1", "centre", "single", 40), hp }];
+  e.run.focus = "centre";
   e.run.topology.nodes.push({ id: "router1", role: "router", x: 0, z: 0 });
   e.run.topology.links.push({ a: "alpha", b: "router1" }, { a: "router1", b: "omega" });
   e.run.hand = ["guard", "guard", "guard"];
@@ -96,11 +97,15 @@ test("the seeded chart scouts the enemy that actually appears and respects saved
   await page.setViewportSize({ width: 1440, height: 900 });
   await room.click();
   await expect(page.getByRole("meter", { name: "Hostile integrity", exact: true })).toHaveAttribute("aria-valuenow", String(health));
-  const actual = await page.evaluate(storage => JSON.parse(localStorage.getItem(storage)!).run.enemy.id, storage);
+  const actual = await page.evaluate(storage => JSON.parse(localStorage.getItem(storage)!).run.enemies[0].id, storage);
   expect(actual).toBe(destination.enemyId);
 });
 
 test("all mastered effects decode as non-silent stereo recordings under the served base path", async ({ page }) => {
+  // v4 moments (design 14.8) each have their own cue, so this decode covers them too.
+  const v4 = ["arrive", "dormant", "aim", "install", "wear", "breakdown", "repair", "quarantine", "detonate", "crate", "message", "reveal", "warning", "signal"];
+  expect(Object.keys(EFFECTS)).toEqual(expect.arrayContaining(v4));
+  expect(EFFECTS.crate.variants, "crate: credits and cargo").toBeGreaterThanOrEqual(2);
   await page.goto("./");
   const files = Object.entries(EFFECTS).flatMap(([kind, cue]) => Array.from({ length: cue.variants }, (_, i) => `${kind}-${i + 1}.ogg`));
   const results = await page.evaluate(async files => {
@@ -195,8 +200,8 @@ test("lethal hits finish the enemy's dissolution before presenting rewards", asy
   await expect(page.locator(".reward-screen")).toBeVisible({ timeout: 15000 });
   expect(await page.evaluate(() => (window as any).__death)).toEqual({ busy: true, meter: "0", reward: false });
   const saved = await page.evaluate(storage => JSON.parse(localStorage.getItem(storage)!).run, storage);
-  expect(saved.enemy.hp).toBe(0);
-  expect(saved.enemy.turn).toBe(0);
+  expect(saved.enemies[0].hp).toBe(0);
+  expect(saved.enemies[0].turn).toBe(0);
   expect(errors).toEqual([]);
 });
 
@@ -238,7 +243,7 @@ test("a half-health crossing transforms the guardian before unlocking the next t
   await expect(page.locator("#world")).toHaveAttribute("data-enemy-enraged", "true");
   const saved = await page.evaluate(storage => JSON.parse(localStorage.getItem(storage)!).run, storage);
   expect(saved.turn).toBe(2);
-  expect(saved.enemy.hp).toBe(18);
+  expect(saved.enemies[0].hp).toBe(18);
 });
 
 test("reduced motion completes the same lethal turn without leaving controls locked", async ({ page }) => {

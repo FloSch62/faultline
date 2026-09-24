@@ -177,6 +177,64 @@ RECIPES = {
     "death": ([layer("scifi", "explosionCrunch_004", .4, .65), layer("impact", "impactGlass_heavy_003", .6, .6, .1),
                layer("impact", "impactMetal_heavy_002", .5, .75)], .9, -12.5, 1),
     "defeat": ([layer("impact", "impactBell_heavy_001", .65, .48), layer("scifi", "spaceEngineLow_003", .3, .6, length=2.0)], 1.5, -15, 1),
+    # ---- ports, table front and surprises (v4 · Under Quarantine) -----------
+    # Each sits in the tier of its nearest neighbour: aim/dormant beside select,
+    # install beside malware, repair beside cleanse, breakdown/detonate beside
+    # death/breach, warning beside the combat punctuation.
+    "arrive": ([layer("impact", ("impactMetal_heavy_002", "impactMetal_heavy_004"), 1., .75),
+                layer("impact", "impactPlate_heavy_004", .45, .9, .01, length=.35),
+                layer("scifi", ("impactMetal_000", "impactMetal_003"), .45, .9, .09),
+                layer("scifi", "forceField_001", .28, .8, .05, length=.42, hp=150)], .3, -14, 2, 1.5),
+    "dormant": ([layer("uiaudio", ("switch21", "switch24"), .8, .9),
+                 layer("scifi", "forceField_003", .5, .6, .03, start=.13, length=.36, hp=90),
+                 layer("scifi", "thrusterFire_003", .25, .8, .02, start=1., length=.3, lp=2500)], .1, -25, 2),
+    "aim": ([layer("impact", ("impactGlass_light_000", "impactGlass_light_003"), .3, 1.8),
+             layer("rpg", "metalClick", .8, 1.1, start=.088, length=.09)], .05, -24, 2),
+    "install": ([layer("impact", ("impactMining_000", "impactMining_003"), .9, .85),
+                 layer("impact", "impactPlate_light_000", .4, .9, .005),
+                 layer("scifi", "computerNoise_001", .16, 1.0, .09, start=2.4, length=.35, lp=5000, hp=400),
+                 layer("interface", "glitch_003", .18, 1.0, .12)], .25, -15, 2),
+    "wear": ([layer("rpg", "creak1", .55, .9, start=.28, length=.22, hp=300),
+              layer("impact", ("impactGlass_light_002", "impactGlass_light_004"), .35, 1.2, .05)], .18, -17, 2),
+    "breakdown": ([layer("impact", "impactMetal_heavy_004", .9, .65),
+                   layer("impact", "impactGlass_heavy_004", .6, .8, .03),
+                   layer("scifi", "explosionCrunch_003", .2, .9, .02, length=.65),
+                   layer("impact", "impactTin_medium_002", .5, .95, .38),
+                   layer("impact", "impactMetal_light_001", .35, .9, .55),
+                   layer("impact", "impactTin_medium_004", .3, 1.05, .72)], .6, -12.5, 1, 2),
+    "repair": ([layer("rpg", ("beltHandle1", "beltHandle2"), .8, 1.),
+                layer("scifi", "forceField_002", .35, 1.3, .12, True, start=.1, length=.35, hp=200),
+                layer("uiaudio", "switch32", .3, 1.0, .46)], .15, -17, 2),
+    "quarantine": ([layer("scifi", "forceField_004", .4, 1.4, start=.1, length=.2, hp=300),
+                    layer("scifi", "thrusterFire_000", .25, 1.2, .01, start=1., length=.15, hp=2000, lp=8000),
+                    layer("impact", ("impactMetal_light_001", "impactMetal_light_004"), .8, 1.1, .03)], .15, -16, 2),
+    "detonate": ([layer("scifi", "lowFrequency_explosion_000", .8, .9, length=.7),
+                  layer("impact", "impactMetal_heavy_003", .5, .8, .04),
+                  layer("scifi", "explosionCrunch_002", .4, 1.0, .08, length=.5),
+                  layer("impact", "impactTin_medium_001", .2, .9, .35)], .3, -13, 1, 2),
+    # crate-1 ends in coins (credits), crate-2 in paper (anything else); the
+    # caller picks the master by contents instead of the rotation.
+    "crate": ([layer("impact", "impactWood_heavy_002", .8, .9),
+               layer("impact", "impactMetal_medium_000", .35, .9, .01),
+               layer("rpg", "metalLatch", .55, 1.0, .12),
+               layer("rpg", ("handleCoins2", "bookFlip2"), .6, 1.0, .2)], .15, -17, 2),
+    "message": ([layer("impact", ("impactGlass_light_004", "impactGlass_light_001"), .5, .9),
+                 layer("casino", "card-slide-3", .6, .9, .06),
+                 layer("impact", "impactBell_heavy_002", .3, 1.2, .15, True)], .3, -18, 2),
+    "reveal": ([layer("scifi", "thrusterFire_000", .5, 1.0, start=1., length=.26, hp=1500, lp=6500),
+                layer("interface", "scratch_003", .4, 1.0, .02, lp=7000),
+                layer("impact", "impactMetal_medium_003", .9, .8, .22),
+                layer("impact", "impactPlate_medium_002", .5, 1.0, .22)], .35, -16, 1),
+    "warning": ([layer("impact", "impactBell_heavy_002", .7, .6),
+                 layer("impact", "impactPlate_heavy_001", .4, .75),
+                 layer("impact", "impactBell_heavy_002", .6, .58, .42),
+                 layer("impact", "impactPlate_heavy_001", .35, .72, .42),
+                 layer("scifi", "spaceEngineLow_000", .07, 1.0, .02, start=1., length=1.1)], .7, -13, 1, 2),
+    "signal": ([layer("scifi", "thrusterFire_000", .12, 1.0, start=1.4, length=.34, hp=900, lp=4500),
+                layer("scifi", "computerNoise_003", .1, 1.0, .03, start=1.2, length=.3, hp=800, lp=4000),
+                layer("interface", "glitch_001", .2, 1.0, .1),
+                layer("interface", "glitch_004", .16, 1.0, .2),
+                layer("impact", "impactBell_heavy_000", .55, 1.2, .3)], .5, -16, 1),
 }
 
 
@@ -305,12 +363,31 @@ def master(recipe, tail, loudness, variant_index, variation, drive=0.):
     return stereo
 
 
+def write_master(path, data):
+    """Encode one master, keeping the file on disk when it decodes to the same audio.
+
+    libsndfile gives every Ogg stream a random serial number, so re-encoding an
+    unchanged recipe changes the bytes but not a single sample; keeping the old
+    file means a rebuild only touches the cues whose recipe changed.
+    """
+    encoded = BytesIO()
+    sf.write(encoded, data, RATE, format="OGG", subtype="VORBIS")
+    fresh, _ = sf.read(BytesIO(encoded.getvalue()), always_2d=True)
+    if path.exists():
+        current, _ = sf.read(path, always_2d=True)
+        if current.shape == fresh.shape and np.array_equal(current, fresh):
+            return
+    path.write_bytes(encoded.getvalue())
+
+
 def main():
     obtain_sources()
     prune_sources()
     OUTPUT.mkdir(parents=True, exist_ok=True)
+    produced = {f"{cue}-{variant + 1}.ogg" for cue, (_, _, _, variants, *_) in RECIPES.items() for variant in range(variants)}
     for stale in OUTPUT.glob("*.ogg"):
-        stale.unlink()
+        if stale.name not in produced:
+            stale.unlink()
     for stale in OUTPUT.glob("LICENSE-*.txt"):
         stale.unlink()
     packs = sorted(used_sources())
@@ -325,7 +402,7 @@ def main():
         for variant in range(variants):
             data = master(recipe, tail, loudness, variant, variant - (variants - 1) / 2, drive)
             path = OUTPUT / f"{cue}-{variant + 1}.ogg"
-            sf.write(path, data, RATE, format="OGG", subtype="VORBIS")
+            write_master(path, data)
             decoded, _ = sf.read(path, always_2d=True)
             peak = float(abs(decoded).max())
             if not np.isfinite(decoded).all() or peak >= .98:
@@ -342,7 +419,7 @@ def main():
     print(f"Mastered {total} files for {len(RECIPES)} cues; {size:.0f} KiB.")
     for cue, entry in manifest["cues"].items():
         m = entry["masters"][0]
-        print(f"  {cue:9} {m['seconds']:5.2f}s  short-term {m['shortTermDb']:6.1f} (target {entry['targetShortTermDb']})  peak {m['peakDb']:6.1f}")
+        print(f"  {cue:10} {m['seconds']:5.2f}s  short-term {m['shortTermDb']:6.1f} (target {entry['targetShortTermDb']})  peak {m['peakDb']:6.1f}")
 
 
 if __name__ == "__main__":

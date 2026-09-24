@@ -7,8 +7,8 @@ import type { CardId } from "./types.ts";
 function captureBattle() {
   const run = newExpedition("architect", 315).run;
   chooseRoom(run, "0-1");
-  run.enemy!.id = "leech";
-  run.enemy!.hp = run.enemy!.maxHp = 100;
+  run.enemies[0].id = "leech";
+  run.enemies[0].hp = run.enemies[0].maxHp = 100;
   run.hand = ["wireshark"];
   run.drawPile = ["guard", "pulse", "fiber"];
   return run;
@@ -29,7 +29,7 @@ test("Wireshark rejects a missing live router route without consuming any state"
   assert.equal(playInstant(run, 0).ok, false);
   assert.deepEqual(run, before);
   const routed = routedBattle();
-  routed.faultNode = "router1";
+  routed.faultNodes = ["router1"];
   const faulted = structuredClone(routed);
   assert.equal(playInstant(routed, 0).ok, false);
   assert.deepEqual(routed, faulted);

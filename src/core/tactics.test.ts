@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { newExpedition, parseExpedition } from "./expedition.ts";
 import { ENEMIES } from "./enemies.ts";
 import { chooseRoom, chooseForge, chooseRelic, combatPreview, endTurn, intentFor, prepareCard, releasePreparedCard, HAND_LIMIT, SALVAGE_COST } from "./run.ts";
+import { makeEnemy } from "./encounter.ts";
 import { RELICS } from "./cards.ts";
 import type { RelicId } from "./types.ts";
 import type { RunState } from "./types.ts";
@@ -11,8 +12,7 @@ function battle(id = "core", turn = 5) {
   const expedition = newExpedition("architect", 246);
   const r = expedition.run;
   chooseRoom(r, "0-1");
-  const { name, title, color } = ENEMIES[id];
-  r.enemy = { id, name, title, color, hp: 90, maxHp: 100, turn };
+  r.enemies = [{ ...makeEnemy(id, "h1", "centre", "single", 100, { turn }), hp: 90 }];
   r.integrity = r.maxIntegrity = 40;
   r.topology.nodes.push({ id: "r1", role: "router", x: 0, z: 0 });
   r.topology.links.push({ a: "alpha", b: "r1" }, { a: "r1", b: "omega" });
@@ -61,7 +61,7 @@ test("prepared cards respect phases, hand limits, deep cache, saves, and victory
   assert.equal(r.hand.length, 7);
   prepareCard(r, 0);
   const cards = heldCards(r);
-  r.enemy!.hp = 1;
+  r.enemies[0].hp = 1;
   endTurn(r);
   assert.equal(r.preparedCard, null);
   assert.deepEqual(heldCards(r), cards);
@@ -72,16 +72,16 @@ test("every guardian telegraphs a zero-damage charge before its scaled ultimate"
   for (const id of ["regent", "cantor", "core"]) {
     const r = battle(id, 4).run;
     r.stage = 2;
-    r.enemy!.hp = 40;
-    const charge = intentFor(r)!;
+    r.enemies[0].hp = 40;
+    const charge = intentFor(r, r.enemies[0]);
     assert.equal(charge.kind, "charge");
     assert.equal(charge.amount, 0);
-    const ultimate = intentFor(r, 1)!;
+    const ultimate = intentFor(r, r.enemies[0], 1);
     assert.ok(ultimate.ultimate);
     assert.equal(ultimate.amount, ENEMIES[id].pattern[5].amount + 1 + 2 + ENEMIES[id].enrages!.attacks);
     assert.equal(combatPreview(r).incoming, 0);
     endTurn(r);
-    assert.deepEqual(intentFor(r), ultimate);
+    assert.deepEqual(intentFor(r, r.enemies[0]), ultimate);
   }
 });
 
@@ -99,11 +99,11 @@ test("interrupt requires actual post-armor damage, cancels the ultimate field, a
     assert.equal(p.zoneThreat, null);
     const result = endTurn(r);
     assert.equal(result.interrupted, true);
-    assert.equal(r.enemy!.exposed, true);
+    assert.equal(r.enemies[0].exposed, true);
     assert.equal(combatPreview(r).packetDamage, 8);
     assert.ok(combatPreview(r).damageTerms.some(t => t.label === "Exposed guardian"));
     endTurn(r);
-    assert.equal(r.enemy!.exposed, undefined);
+    assert.equal(r.enemies[0].exposed, undefined);
   }
 });
 
@@ -127,20 +127,20 @@ test("interrupts do not erase existing corrosion or consume an unused Shield Arr
   assert.equal(r.shieldArrayUsed, true);
   assert.deepEqual(r.zoneEffects, [{ zone: "center", kind: "corrosion", turns: 1 }]);
   assert.deepEqual(parseExpedition(JSON.stringify(e)), e);
-  (r.enemy as unknown as {exposed: string}).exposed = "true";
+  (r.enemies[0] as unknown as {exposed: string}).exposed = "true";
   assert.equal(parseExpedition(JSON.stringify(e)), null);
 });
 
 test("unbroken ultimates resolve the exact forecast; lethal takes priority over interrupt", () => {
   const r = battle().run;
-  r.enemy!.hp = 51;
+  r.enemies[0].hp = 51;
   const p = combatPreview(r);
   assert.ok(p.intent!.ultimate);
   assert.ok(p.incoming >= 11);
   assert.equal(endTurn(r).integrityDamage, p.incoming);
-  assert.equal(r.enemy!.exposed, undefined);
+  assert.equal(r.enemies[0].exposed, undefined);
   const kill = battle().run;
-  kill.enemy!.hp = 1;
+  kill.enemies[0].hp = 1;
   kill.packetBoost = 20;
   assert.equal(combatPreview(kill).interrupted, false);
   const result = endTurn(kill);

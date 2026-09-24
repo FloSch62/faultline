@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 // Every test also fails on any page or console error (see helpers.ts).
 import { expect, test } from "./helpers.ts";
 import { newExpedition } from "../src/core/expedition.ts";
+import { makeEnemy } from "../src/core/encounter.ts";
 import { chooseRoom } from "../src/core/run.ts";
 import { ENEMIES } from "../src/core/enemies.ts";
 import { STAGES } from "../src/core/stages.ts";
@@ -11,8 +12,8 @@ const storage = "faultline-expedition-v2";
 function fixture(id = "leech", turn = 0) {
   const e = newExpedition("architect", 923), r = e.run;
   chooseRoom(r, "0-1");
-  const { name, title, color } = ENEMIES[id];
-  r.enemy = { id, name, title, color, hp: 100, maxHp: 100, turn };
+  r.enemies = [makeEnemy(id, "h1", "centre", "single", 100, { turn })];
+  r.focus = "centre";
   r.topology.nodes.push({ id: "router1", role: "router", x: 0, z: 0 });
   r.topology.links.push({ a: "alpha", b: "router1" }, { a: "router1", b: "omega" });
   r.hand = ["guard", "guard", "guard", "guard", "guard", "guard"];
@@ -74,8 +75,8 @@ for (const [id, turn, kind] of [["core",0,"sever"],["core",1,"breach"],["core",2
     await expect(page.locator(".game-root")).not.toHaveClass(/busy/, { timeout: 15000 });
     const r = await saved(page);
     expect(r.turn).toBe(2);
-    if (kind === "jam") expect(r.faultNode).toBe("router1");
-    if (kind === "sever") expect(r.faultLink).toBe("alpha::router1");
+    if (kind === "jam") expect(r.faultNodes[0]).toBe("router1");
+    if (kind === "sever") expect(r.faultLinks[0]).toBe("alpha::router1");
     if (kind === "corrupt") expect(r.zoneEffects).toEqual([{ zone: "center", kind: "corrosion", turns: 2 }]);
     await expect(page.locator("#world")).not.toHaveAttribute("data-enemy-action");
   });
@@ -87,7 +88,7 @@ for (const stage of [0, 1, 2]) test(`stage ${stage + 1} introduces its guardian 
   await page.locator('[data-room="6-1"]').click();
   await expect(page.locator("dialog")).toHaveClass("boss-intro");
   await expect(page.locator("#guardian-name")).toContainText(["Iron Regent", "Hollow Choir", "Blackout Core"][stage]);
-  expect((await saved(page)).enemy.id).toBe(STAGES[stage].boss);
+  expect((await saved(page)).enemies[0].id).toBe(STAGES[stage].boss);
   const before = await saved(page);
   await page.keyboard.press("1");
   expect((await saved(page)).hand).toEqual(before.hand);
@@ -101,7 +102,7 @@ for (const stage of [0, 1, 2]) test(`stage ${stage + 1} introduces its guardian 
 test("defeating the first guardian awards a relic and opens a fresh second-stage map", async ({ page }) => {
   const e = fixture("regent");
   e.run.floor = 6; e.run.currentRoom = "6-1"; e.run.lastRoom = "5-1";
-  e.run.enemy!.hp = 1; e.run.integrity = 3;
+  e.run.enemies[0].hp = 1; e.run.integrity = 3;
   await install(page, e);
   await page.locator('[data-action="transmit"]').click();
   await expect(page.locator(".reward-screen")).toBeVisible({ timeout: 15000 });
@@ -123,7 +124,7 @@ test("battle music survives card plays and turns, then changes for the next enco
       constructor(src?: string) { super(src); (window as any).__scorePlayers.push(this); }
     };
   });
-  const e = fixture(); e.run.enemy!.hp = e.run.enemy!.maxHp = 10;
+  const e = fixture(); e.run.enemies[0].hp = e.run.enemies[0].maxHp = 10;
   await install(page, e);
   await expect.poll(() => page.evaluate(() => ((window as any).__scorePlayers as HTMLAudioElement[]).find(p => !p.loop)?.currentTime ?? 0)).toBeGreaterThan(0);
   const first = await page.locator("#now-playing").innerText();

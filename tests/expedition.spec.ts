@@ -86,8 +86,8 @@ test("an event's fight branch starts a real battle against the announced hostile
   await idle(page);
   const run = await saved(page);
   const room = run.map.find(item => item.id === run.currentRoom)!;
-  expect(run.enemy!.id).toBe(enemy);
-  expect(run.enemy!.maxHp).toBe(Math.round(encounterHealth(run.stage, { ...room, type: "battle" }, run.ascension) * 1.4));
+  expect(run.enemies[0].id).toBe(enemy);
+  expect(run.enemies[0].maxHp).toBe(Math.round(encounterHealth(run.stage, { ...room, type: "battle" }, run.ascension) * 1.4));
   expect(run.hand.length).toBeGreaterThan(0);
 });
 

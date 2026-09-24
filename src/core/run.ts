@@ -1,36 +1,41 @@
-import { CARDS, RULES, RELICS, STARTER_DECK, baseCard, type CardDefinition } from "./cards.ts";
-import {
-  canLink,
-  disjointPair,
-  initialTopology,
-  linkKey,
-  maximumChannels,
-  paths,
-  routes as enumerateRoutes,
-  type Route,
-} from "./graph.ts";
-import { createMap, encounterHealth } from "./map.ts";
+import { CARDS, RULES, STARTER_DECK, baseCard, type CardDefinition } from "./cards.ts";
+import { canLink, cableable, channelKey, initialTopology, linkKey, paths } from "./graph.ts";
+import { createMap } from "./map.ts";
 import { grantVictory } from "./meta.ts";
 import { random, shuffle, log } from "./util.ts";
+import { crossesWreckage, terrainFor } from "./terrain.ts";
+import { planEncounter } from "./encounter.ts";
+import type { BaseCardId, CardId, ConsoleId, EscalationLevel, Installation, MapRoom, NetworkNode, Port, RunState, Zone } from "./types.ts";
+import { crateText } from "./encounter.ts";
 import { ENEMIES } from "./enemies.ts";
-import { STAGES } from "./stages.ts";
-import { crossesWreckage, frayedLinks, terrainFor } from "./terrain.ts";
-import type {
-  BaseCardId,
-  CardId,
-  ConsoleId,
-  Malware,
-  MapRoom,
-  NetworkNode,
-  RunState,
-  Zone,
-  ZoneEffect,
-  ZoneEffectKind,
-} from "./types.ts";
+import { levelRule } from "./combat/intent.ts";
+import { openFallen, type ArrivalRecord, type FallenRecord } from "./combat/surprises.ts";
+import {
+  FIELD_RULES, INSTALLATION_NAMES, PORTS, ZONES, card, damageEnemy, deployCondition, destroyInstallation, effectiveFocus, enemyAt,
+  freeSocket, has, hostileFieldTurns, installField, insideGrid, isBlocked, isWorn, leaderOf, livingEnemies, maxConditionOf,
+  mostDangerous, mostWorn, repairDevice, scrubCost, startingFocus, wearable, zoneForNode,
+} from "./combat/board.ts";
+import { analyze } from "./combat/network.ts";
+import {
+  resolveTurn, simulationOf, sumTerms, turnDrawBase, turnEnergyBase,
+  type CombatPreview, type DestroyRecord, type PortForecast,
+} from "./combat/resolve.ts";
 
-export type { Zone } from "./types.ts";
+export type { Zone, Intent } from "./types.ts";
+export type {
+  CombatPreview, CombatTerm, Delivery, PortForecast, HostileForecast, HostileState, InstallForecast, InstallationEffect,
+  QuarantineRecord, ProtocolTrigger, WearRecord, BreakRecord, DestroyRecord,
+} from "./combat/resolve.ts";
 export { random } from "./util.ts";
 export { RULES } from "./cards.ts";
+export { channelKey } from "./graph.ts";
+export {
+  PORTS, ZONES, FIELD_RULES, INSTALLATION_NAMES, livingEnemies, enemyAt, leaderOf, isBlocked, zoneForNode, conditionOf,
+  maxConditionOf, isWorn, scrubCost, mostDangerous, effectiveFocus, shelterOf, livingLeader,
+} from "./combat/board.ts";
+export { zoneDescription } from "./combat/board.ts";
+export { intentFor, actsInPhase, escalationLevel, nextLevel, levelRule, wounded } from "./combat/intent.ts";
+export { emptySidePort, type ArrivalRecord, type FallenRecord } from "./combat/surprises.ts";
 export {
   chooseRoom, chooseCardReward, chooseRelic, chooseForge, removeDeckCard,
   SALVAGE_COST, SALVAGE_MIN_INTEGRITY,
@@ -56,27 +61,39 @@ export interface TurnResult {
   bufferLost: boolean;
   protocolsTriggered: CardId[];
   enemyDamage: number;
-  malwarePlanted: Malware | null;
+  /** First installation planted this phase (compatibility with the v3 malware cue). */
+  malwarePlanted: Installation | null;
   junkAdded: CardId[];
   backpressureStored: number;
-}
-export interface Intent {
-  kind: "strike" | "sever" | "jam" | "breach" | "corrupt" | "charge" | "infect";
-  ultimate?: boolean;
-  field?: "corrosion" | "suppression";
-  /** Junk cards shuffled into your draw pile when the action resolves. */
-  junk?: { card: CardId; count: number };
-  /** Plants malware in addition to its main action (enraged Core jam). */
-  infect?: boolean;
-  label: string;
-  amount: number;
-  pressure: number;
-  target?: string;
+  // ---- v4
+  /** The forecast this turn resolved (per port, per hostile, per installation). */
+  forecast: CombatPreview;
+  /** Damage that landed on each port. */
+  portDamage: Partial<Record<Port, number>>;
+  /** Enemy.uid of every hostile that fell this turn. */
+  deaths: string[];
+  /** Installations planted, and installations destroyed during the phase. */
+  planted: Installation[];
+  destroyed: DestroyRecord[];
+  /** One line per hostile that acted, in port order. */
+  actions: string[];
+  // ---- v4 · M2: events the UI animates
+  /** Hostiles that took a port at the end of the phase: a reinforcement (or Shedding spawn), guardian adds. */
+  arrived: ArrivalRecord[];
+  /** The signal named at the start of the next turn (its announcement), or fired at its start. */
+  signalAnnounced: string | null;
+  signalFired: string | null;
+  /** Uids whose Shedding spawn was armed this turn (it arrives at the end of the phase). */
+  shed: string[];
+  /** Leaders whose escalation level rose (the gauge fills). */
+  escalated: { uid: string; level: EscalationLevel }[];
+  /** What the fallen left: crates opened (contents), credits banked, hardware placed, offers queued. */
+  fallen: FallenRecord[];
+  /** Offers queued this turn (card choices and messages; they open before the next hand). */
+  offersQueued: number;
 }
 
 export const HAND_LIMIT = RULES.handLimit;
-const has = (run: RunState, relic: keyof typeof RELICS) => run.relics.includes(relic);
-const card = (id: CardId): CardDefinition => CARDS[id];
 
 function draw(run: RunState, count: number) {
   for (let i = 0; i < count && run.hand.length < HAND_LIMIT; i++) {
@@ -92,6 +109,14 @@ function draw(run: RunState, count: number) {
 function guaranteedDraw(run: RunState, match: (id: CardId) => boolean) {
   const index = run.drawPile.findIndex(match);
   if (index !== -1) run.hand.push(run.drawPile.splice(index, 1)[0]);
+}
+
+/** Every encounter-scoped v4 field at its empty value. */
+function freshEncounter(): Pick<RunState, "enemies" | "faultNodes" | "faultLinks" | "installations" | "focus" | "aims" | "enemyPhase" | "hostileActions" | "reinforcement" | "signal" | "offers" | "encounterCards"> {
+  return {
+    enemies: [], faultNodes: [], faultLinks: [], installations: [], focus: null, aims: {}, enemyPhase: 0, hostileActions: 0,
+    reinforcement: null, signal: null, offers: [], encounterCards: [],
+  };
 }
 
 export function createRun(seed = Date.now() >>> 0): RunState {
@@ -123,9 +148,7 @@ export function createRun(seed = Date.now() >>> 0): RunState {
     energy: RULES.baseEnergy,
     turn: 1,
     topology: initialTopology(),
-    enemy: null,
-    faultNode: null,
-    faultLink: null,
+    ...freshEncounter(),
     nextNodeId: 1,
     cardRewards: [],
     relicRewards: [],
@@ -136,7 +159,6 @@ export function createRun(seed = Date.now() >>> 0): RunState {
     ascension: 0,
     credits: 0,
     terrain: null,
-    malware: [],
     protocols: [],
     consoleUses: 0,
     buffer: 0,
@@ -148,35 +170,34 @@ export function createRun(seed = Date.now() >>> 0): RunState {
   };
 }
 
-/** Energy at the start of a turn before online power injectors. */
-function turnEnergyBase(run: RunState): number {
-  return RULES.baseEnergy + Number(has(run, "anycast")) + Number(has(run, "jumbo-frames"));
-}
-function turnDrawBase(run: RunState): number {
-  return RULES.handDraw + Number(has(run, "deep-cache")) - Number(has(run, "jumbo-frames"));
-}
-
+/** Composes the encounter from content's plan (pure, seeded by the chart) and sets the table. */
 export function beginBattle(run: RunState, room: MapRoom) {
-  const stage = STAGES[run.stage];
-  const pool = room.type === "elite" ? stage.elites : stage.encounters;
-  const enemyId = room.enemyId ?? (room.type === "boss" ? stage.boss : pool[Math.floor(random(run) * pool.length)]);
-  const template = ENEMIES[enemyId];
-  const hp = encounterHealth(run.stage, room, run.ascension);
-  const { id, name, title, color } = template;
-  run.enemy = { id, name, title, color, hp, maxHp: hp, turn: 0 };
+  const plan = planEncounter(run, room);
+  Object.assign(run, freshEncounter());
+  run.enemies = plan.enemies;
+  run.reinforcement = plan.reinforcement;
+  run.signal = plan.signal ? { id: plan.signal, firesOnTurn: RULES.signalTurn, resolved: false } : null;
+  run.entrance = [...plan.entrance];
+  run.focus = startingFocus(run);
+  run.turnEffects = {};
+  run.reclaim = 0;
+  run.repairsThisTurn = 0;
+  run.attackers = [];
+  run.lingeringJams = {};
+  run.frayedByCut = [];
   run.bossIntroSeen = room.type !== "boss";
   run.phase = "battle";
   run.turn = 1;
   run.energy = turnEnergyBase(run) + Number(has(run, "cold-start")) - Number(has(run, "sdn-controller"));
   run.topology = initialTopology();
-  run.faultNode = null;
-  run.faultLink = null;
   run.nextNodeId = 1;
   run.zoneEffects = [];
   const layout = terrainFor(run.seed, run.stage, room.id, run.stage === 0 && room.floor === 0);
   run.terrain = layout.terrain;
-  if (layout.salvage)
-    run.topology.nodes.push({ ...layout.salvage, id: `${layout.salvage.role}${run.nextNodeId++}` });
+  if (layout.salvage) {
+    const condition = deployCondition(run, true);
+    run.topology.nodes.push({ ...layout.salvage, id: `${layout.salvage.role}${run.nextNodeId++}`, condition, maxCondition: condition });
+  }
   if (layout.field) run.zoneEffects.push(layout.field);
   run.drawPile = shuffle(run, [...run.deck]);
   run.discardPile = [];
@@ -190,48 +211,50 @@ export function beginBattle(run: RunState, room: MapRoom) {
   run.firstFiberPlayed = false;
   run.shieldArrayUsed = false;
   run.watchdogUsed = false;
-  run.malware = [];
   run.protocols = [];
   run.consoleUses = 0;
   run.buffer = 0;
   run.buffering = false;
   run.backpressure = 0;
+  // Round Robin: every hostile takes 2 as the fight begins (it never ends a fight before it starts).
+  if (has(run, "round-robin"))
+    for (const enemy of run.enemies) damageEnemy(run, enemy, Math.min(RULES.roundRobinDamage, enemy.hp - 1));
   guaranteedDraw(run, (id) => ["router", "hardened-router"].includes(baseCard(id)));
   guaranteedDraw(run, (id) => card(id).target === "link");
   guaranteedDraw(run, (id) => card(id).target === "link");
   if (has(run, "spare-parts")) run.hand.push("fiber");
   draw(run, turnDrawBase(run) - run.hand.length + Number(has(run, "spare-parts")));
-  log(run, `${run.enemy.name} enters the grid. ${run.terrain.name}. Establish a route.`);
+  const names = run.enemies.map(enemy => enemy.name).join(", ");
+  log(run, `${names} ${run.enemies.length > 1 ? "enter" : "enters"} the grid. ${run.terrain.name}. Establish a route.`);
+  for (const line of plan.entrance) log(run, line);
 }
 
-export function intentFor(run: RunState, turnsAhead = 0): Intent | null {
-  if (!run.enemy) return null;
-  const definition = ENEMIES[run.enemy.id];
-  const pattern = definition.pattern;
-  const turn = run.enemy.turn + turnsAhead;
-  const base = pattern[turn % pattern.length];
-  const pressure = Math.floor(turn / 3);
-  const threshold = definition.boss && run.ascension >= 10 ? 0.6 : 0.5;
-  const enraged = !!definition.enrages && run.enemy.hp <= run.enemy.maxHp * threshold;
-  const attack = base.kind === "strike" || base.kind === "breach";
-  const ascension = attack && run.ascension >= 4 ? 1 : 0;
-  const ultimate = base.ultimate && run.ascension >= 10 ? 2 : 0;
-  const amount =
-    base.amount +
-    (attack
-      ? pressure + run.stage + (enraged ? definition.enrages!.attacks : 0) + ascension + ultimate
-      : enraged && base.kind !== "charge"
-        ? definition.enrages!.faults
-        : 0);
-  const infect = !!(definition.enragedInfect && enraged && base.kind === "jam");
-  return {
-    ...base,
-    ...(infect ? { infect: true } : {}),
-    amount,
-    pressure,
-    label: `${enraged ? "ENRAGED · " : ""}${base.label}${run.stage && attack ? ` +${run.stage} STAGE THREAT` : ""}${pressure && attack ? ` +${pressure} PRESSURE` : ""}${ascension ? " +1 ASCENSION" : ""}`,
-  };
+// ------------------------------------------------------------------ focus and aim
+
+/** Rule 15: set the port every unaimed delivery goes to and overflow lands on. Free. */
+export function setFocus(run: RunState, port: Port): ActionResult {
+  if (run.phase !== "battle") return { ok: false, message: "Set the focus during an encounter." };
+  const enemy = enemyAt(run, port);
+  if (!enemy) return { ok: false, message: "No living hostile stands at that port." };
+  run.focus = port;
+  return { ok: true, message: `Focus · ${port.toUpperCase()} · ${enemy.name}.` };
 }
+/** Rule 16–17: aim a live channel's delivery at a port (null follows the focus). Free. */
+export function aimChannel(run: RunState, key: string, port: Port | null): ActionResult {
+  if (run.phase !== "battle") return { ok: false, message: "Aim deliveries during an encounter." };
+  const channels = analyze(run, run.faultNodes, run.faultLinks).channels.map(route => channelKey(route.path));
+  if (!channels.includes(key)) return { ok: false, message: "That channel is not live." };
+  if (port === null) {
+    delete run.aims[key];
+    return { ok: true, message: "Delivery follows the focus." };
+  }
+  const enemy = enemyAt(run, port);
+  if (!enemy) return { ok: false, message: "No living hostile stands at that port." };
+  run.aims[key] = port;
+  return { ok: true, message: `Delivery aimed at ${port.toUpperCase()} · ${enemy.name}.` };
+}
+
+// ------------------------------------------------------------------ hand
 
 /** Set one card aside now; it replaces one draw in your next hand. */
 export function prepareCard(run: RunState, index: number): ActionResult {
@@ -260,6 +283,8 @@ export function costFor(run: RunState, index: number): number {
   let cost = definition.cost;
   if (baseCard(id) === "fiber" && !run.firstFiberPlayed && has(run, "hot-swap")) cost = 0;
   if (definition.target === "link" && has(run, "zero-trust")) cost += 1;
+  // Rapid Redeploy: the recovered hardware card costs less this turn.
+  if (run.turnEffects?.discounted?.includes(id)) cost = Math.max(0, cost - 1);
   return cost;
 }
 function canPlay(run: RunState, index: number, target: CardDefinition["target"]): ActionResult {
@@ -272,11 +297,20 @@ function canPlay(run: RunState, index: number, target: CardDefinition["target"])
     return { ok: false, message: "Not enough energy. End the turn to recharge." };
   return { ok: true, message: "" };
 }
+/** Cards found or offered during an encounter exhaust when played and never enter the deck. */
+function encounterOnly(run: RunState, id: CardId): boolean {
+  const index = run.encounterCards?.indexOf(id) ?? -1;
+  if (index < 0) return false;
+  run.encounterCards.splice(index, 1);
+  return true;
+}
 function consume(run: RunState, index: number) {
   const id = run.hand[index];
   run.energy -= costFor(run, index);
+  const discounted = run.turnEffects?.discounted;
+  if (discounted?.includes(id)) discounted.splice(discounted.indexOf(id), 1);
   run.hand.splice(index, 1);
-  (card(id).exhaust ? run.exhaustPile : run.discardPile).push(id);
+  (card(id).exhaust || encounterOnly(run, id) ? run.exhaustPile : run.discardPile).push(id);
   run.cardsPlayed++;
   if (baseCard(id) === "fiber") run.firstFiberPlayed = true;
   run.score += 1;
@@ -292,73 +326,47 @@ function applyValues(run: RunState, id: CardId) {
   if (v.buffer) run.buffer += v.buffer;
   if (v.draw) draw(run, v.draw);
 }
+const effects = (run: RunState) => (run.turnEffects ??= {});
+/** A hostile killed during your turn (Scorched Earth) drops its crate and cargo at once. */
+function settleFallen(run: RunState) {
+  const fallen = run.enemies.filter(enemy => enemy.hp <= 0 && !enemy.looted).map(enemy => enemy.uid);
+  if (fallen.length) openFallen(run, fallen, true);
+}
+/** Jams leave with their lingering turns. */
+function unjam(run: RunState, keep: (id: string) => boolean) {
+  run.faultNodes = run.faultNodes.filter(keep);
+  if (run.lingeringJams) for (const id of Object.keys(run.lingeringJams)) if (!keep(id)) delete run.lingeringJams[id];
+}
 
 // ------------------------------------------------------------------ placement
-
-const GRID = { x: 7.25, z: 4.7 };
-/** Why a socket is illegal, or null. `ignore` skips one device (relocation). */
-export function isBlocked(run: RunState, x: number, z: number, ignore?: string): string | null {
-  if (!Number.isFinite(x) || !Number.isFinite(z) || Math.abs(x) > GRID.x || Math.abs(z) > GRID.z)
-    return "Keep hardware inside the build grid.";
-  if (run.topology.nodes.some((node) => node.id !== ignore && Math.hypot(node.x - x, node.z - z) < RULES.deviceSpacing))
-    return "Device sockets need more space.";
-  if (run.terrain?.debris.some((spot) => Math.hypot(spot.x - x, spot.z - z) < RULES.debrisClearance))
-    return "Wreckage blocks this socket.";
-  if (run.malware.some((spot) => Math.hypot(spot.x - x, spot.z - z) < RULES.debrisClearance))
-    return "Malware occupies this socket. Scrub it first.";
-  return null;
-}
-// Deterministic sockets keep deployment readable, replayable, and collision free.
-function freeSocket(run: RunState): { x: number; z: number } | null {
-  if (run.topology.nodes.length >= RULES.maxDevices) return null;
-  for (const x of [0, -2.5, 2.5, -5, 5, -1.25, 1.25, -3.75, 3.75, -7, 7]) {
-    for (const z of [0, 2.4, -2.4, 4.2, -4.2, 1.2, -1.2]) {
-      if (!isBlocked(run, x, z)) return { x, z };
-    }
-  }
-  return null;
-}
-export function zoneForNode(node: Pick<NetworkNode, "z">): Zone {
-  return node.z < -1.3 ? "north" : node.z > 1.3 ? "south" : "center";
-}
-export const ZONES: readonly Zone[] = ["north", "center", "south"];
-export const FIELD_RULES: Record<ZoneEffectKind, { name: string; rules: string; hostile: boolean }> = {
-  resonance: { name: "Resonance", rules: `+${RULES.resonanceDamage} damage when your primary route crosses this band`, hostile: false },
-  aegis: { name: "Aegis", rules: `+${RULES.aegisShield} shield while an online device sits in this band`, hostile: false },
-  stasis: { name: "Null field", rules: `+${RULES.nullFieldShield} shield while your hardware occupies this band`, hostile: false },
-  corrosion: { name: "Corrosion", rules: `+${RULES.corrosionDamage} incoming damage while your hardware occupies this band`, hostile: true },
-  suppression: { name: "Suppression", rules: `−${RULES.suppressionPenalty} damage when your primary route crosses this band`, hostile: true },
-};
-export function zoneDescription(run: RunState, zone: Zone): string {
-  const fields = run.zoneEffects.filter(effect => effect.zone === zone);
-  return fields.map(effect => `${FIELD_RULES[effect.kind].name}: ${FIELD_RULES[effect.kind].rules} · ${effect.permanent ? "terrain" : `${effect.turns} turn${effect.turns === 1 ? "" : "s"}`}`).join(". ") || "Clear ground · no active fields";
-}
-function installField(run: RunState, effect: ZoneEffect) {
-  // Each band holds one temporary allied and one temporary hostile field. Terrain
-  // fields keep their own slot. Recasting replaces that side's temporary field.
-  run.zoneEffects = run.zoneEffects.filter(existing => existing.permanent || existing.zone !== effect.zone || FIELD_RULES[existing.kind].hostile !== FIELD_RULES[effect.kind].hostile);
-  run.zoneEffects.push(effect);
-}
-function hostileFieldTurns(run: RunState) {
-  return RULES.hostileFieldTurns + (run.ascension >= 9 ? 1 : 0);
-}
 
 export function playZone(run: RunState, index: number, zone: Zone): ActionResult {
   const ready = canPlay(run, index, "zone");
   if (!ready.ok) return ready;
   if (!ZONES.includes(zone)) return { ok: false, message: "Choose North, Center, or South." };
   const id = run.hand[index], base = baseCard(id);
+  let purged = "";
   if (base === "purge-field") {
-    run.zoneEffects = run.zoneEffects.filter(effect => effect.zone !== zone || !FIELD_RULES[effect.kind].hostile);
-    if (run.topology.nodes.some(node => node.id === run.faultNode && zoneForNode(node) === zone)) run.faultNode = null;
-    run.malware = run.malware.filter(item => zoneForNode(item) !== zone);
+    const anchor = run.installations.find(item => item.kind === "anchor" && zoneForNode(item) === zone);
+    if (anchor) {
+      // Rule 35: Purge Field on an anchored band destroys the Anchor and nothing else.
+      run.reclaim = (run.reclaim ?? 0) + destroyInstallation(run, anchor, "Purge Field");
+      purged = " · Anchor destroyed; purge again for the fields";
+    } else {
+      run.zoneEffects = run.zoneEffects.filter(effect => effect.zone !== zone || !FIELD_RULES[effect.kind].hostile);
+      unjam(run, nodeId => !run.topology.nodes.some(node => node.id === nodeId && zoneForNode(node) === zone));
+      const gone = run.installations.filter(item => zoneForNode(item) === zone);
+      for (const item of gone) run.reclaim = (run.reclaim ?? 0) + destroyInstallation(run, item, "Purge Field");
+      if (gone.length) purged = ` · ${gone.length} installation${gone.length === 1 ? "" : "s"} destroyed`;
+    }
   } else {
     const kind = base === "resonance-field" ? "resonance" : base === "aegis-field" ? "aegis" : "stasis";
     installField(run, { zone, kind, turns: RULES.alliedFieldTurns });
   }
   consume(run, index);
   applyValues(run, id);
-  const message = `${card(id).name} · ${zone.toUpperCase()}${base === "purge-field" ? " cleansed" : ` · ${RULES.alliedFieldTurns} turns`}.`;
+  settleFallen(run);
+  const message = `${card(id).name} · ${zone.toUpperCase()}${base === "purge-field" ? ` cleansed${purged}` : ` · ${RULES.alliedFieldTurns} turns`}.`;
   log(run, message);
   return { ok: true, message };
 }
@@ -368,7 +376,7 @@ export function relocateNode(run: RunState, id: string, x: number, z: number): A
   const node = run.topology.nodes.find((item) => item.id === id);
   if (!node || node.fixed)
     return { ok: false, message: "Only deployed devices can be relocated." };
-  if (!Number.isFinite(x) || !Number.isFinite(z) || Math.abs(x) > GRID.x || Math.abs(z) > GRID.z)
+  if (!insideGrid(x, z))
     return { ok: false, message: "Keep hardware inside the build grid." };
   if (Math.hypot(node.x - x, node.z - z) < 0.01)
     return { ok: true, message: "Device position unchanged." };
@@ -399,14 +407,14 @@ function linked(run: RunState, a: string, b: string) {
 }
 function nearest(run: RunState, origin: { x: number; z: number; id?: string }, count: number) {
   return run.topology.nodes
-    .filter(node => node.id !== origin.id && (!origin.id || !linked(run, origin.id, node.id)))
+    .filter(node => node.id !== origin.id && cableable(node) && (!origin.id || !linked(run, origin.id, node.id)))
     .sort((a, b) => Math.hypot(a.x - origin.x, a.z - origin.z) - Math.hypot(b.x - origin.x, b.z - origin.z) || a.id.localeCompare(b.id))
     .slice(0, count);
 }
 export function playGround(run: RunState, index: number, x: number, z: number): ActionResult {
   const ready = canPlay(run, index, "ground");
   if (!ready.ok) return ready;
-  if (!Number.isFinite(x) || !Number.isFinite(z) || Math.abs(x) > GRID.x || Math.abs(z) > GRID.z)
+  if (!insideGrid(x, z))
     return { ok: false, message: "Place hardware inside the build grid." };
   if (run.topology.nodes.length >= RULES.maxDevices)
     return { ok: false, message: "The table has no more device slots." };
@@ -416,9 +424,12 @@ export function playGround(run: RunState, index: number, x: number, z: number): 
   const role = card(id).role!;
   if (role === "firewall" && has(run, "anycast"))
     return { ok: false, message: "Anycast forbids firewalls on your table." };
-  const node: NetworkNode = { id: `${role}${run.nextNodeId++}`, role, x, z };
-  if (["hardened-router", "relay", "bastion"].includes(base) || id === "stateful-firewall+") node.shielded = true;
+  const node: NetworkNode = { id: `${role}${run.nextNodeId++}`, role, x, z, deployedBy: id };
+  if (["hardened-router", "relay", "bastion"].includes(base) || id === "stateful-firewall+" || id === "sentry-firewall+") node.shielded = true;
   if (base === "stateful-firewall") node.stateful = true;
+  if (base === "sentry-firewall") node.sentry = true;
+  if (role === "phantom") node.absorbs = card(id).values.absorbs ?? 1;
+  else node.condition = node.maxCondition = role === "rack" ? RULES.rackCondition : deployCondition(run);
   const autoLinks = base === "linux-bridge"
     ? nearest(run, { x, z }, card(id).values.links ?? 1)
     : base === "spine-leaf" ? run.topology.nodes.filter(other => other.role === "router") : [];
@@ -455,8 +466,9 @@ export function canTargetNode(run: RunState, index: number, id: string): boolean
   if (base === "firmware") return node.role === "router" && !node.upgraded;
   if (base === "compression") return node.role === "switch" && !node.amplified;
   if (base === "startup-config") return node.role === "router" && !node.configured;
-  if (base === "shield") return !node.fixed && !node.shielded;
-  if (base === "mesh-weave") return nearest(run, node, 1).length > 0;
+  if (base === "shield") return !node.fixed && !node.shielded && cableable(node);
+  if (base === "mesh-weave") return cableable(node) && nearest(run, node, 1).length > 0;
+  if (base === "redundant-psu") return wearable(node);
   return false;
 }
 export function playNode(run: RunState, index: number, id: string): ActionResult {
@@ -470,6 +482,7 @@ export function playNode(run: RunState, index: number, id: string): ActionResult
   if (base === "clabernetes") {
     const socket = freeSocket(run);
     if (!socket) return { ok: false, message: "The table has no free socket for a replica." };
+    const condition = deployCondition(run);
     const replica: NetworkNode = {
       id: `router${run.nextNodeId++}`,
       role: "router",
@@ -478,12 +491,15 @@ export function playNode(run: RunState, index: number, id: string): ActionResult
       upgraded: node.upgraded,
       amplified: node.amplified,
       configured: node.configured,
+      condition,
+      maxCondition: condition,
+      deployedBy: held,
     };
     const links = run.topology.links
       .filter((link) => link.a === id || link.b === id)
       .map((link) => ({ ...link, a: replica.id, b: link.a === id ? link.b : link.a }));
     node.shielded = true;
-    if (run.faultNode === node.id) run.faultNode = null;
+    unjam(run, item => item !== node.id);
     run.topology.nodes.push(replica);
     run.topology.links.push(...links);
     consume(run, index);
@@ -499,48 +515,75 @@ export function playNode(run: RunState, index: number, id: string): ActionResult
   }
   if (base === "shield") {
     node.shielded = true;
-    if (run.faultNode === node.id) run.faultNode = null;
+    unjam(run, item => item !== node.id);
+  }
+  if (base === "redundant-psu") {
+    // Full condition and a raised maximum for this battle.
+    node.maxCondition = Math.max(maxConditionOf(node), RULES.psuCondition);
+    node.condition = node.maxCondition;
   }
   if (base === "compression") node.amplified = true;
   if (base === "startup-config") node.configured = true;
   if (base === "firmware") node.upgraded = true;
   consume(run, index);
   applyValues(run, held);
-  log(run, `${node.id.toUpperCase()} ${base === "shield" ? "shielded" : base === "compression" ? "amplified" : base === "startup-config" ? "configured" : "overclocked"}.`);
+  const verb = base === "shield" ? "shielded" : base === "compression" ? "amplified" : base === "startup-config" ? "configured" : base === "redundant-psu" ? "given a redundant power supply" : "overclocked";
+  log(run, `${node.id.toUpperCase()} ${verb}.`);
   return { ok: true, message: `${card(held).name} applied.` };
 }
-export function playInstant(run: RunState, index: number): ActionResult {
+/** Rule 23 and 44: Hot Patch, Fast Reroute and Link Recovery clear every active fault and
+ * restore condition on the most worn device (Harden restores it too). */
+function clearFaultsAndRepair(run: RunState, clear: boolean): string | null {
+  if (clear) {
+    run.faultNodes = [];
+    run.faultLinks = [];
+    run.lingeringJams = {};
+  }
+  const primary = analyze(run, run.faultNodes, run.faultLinks).primary?.path ?? [];
+  const worn = mostWorn(run, primary);
+  return worn && repairDevice(worn, RULES.faultClearRepair) ? worn.id : null;
+}
+export function playInstant(run: RunState, index: number, installationId?: string): ActionResult {
   const ready = canPlay(run, index, "instant");
   if (!ready.ok) return ready;
   const id = run.hand[index], base = baseCard(id), values = card(id).values;
-  const network = analyze(run, run.faultNode, run.faultLink);
+  const network = analyze(run, run.faultNodes, run.faultLinks);
   const primary = network.primary;
   if (base === "wireshark" && !primary)
     return { ok: false, message: "Wireshark needs a live ALPHA → router → OMEGA route to capture." };
   if (base === "mirror" && network.channelCount < 2)
     return { ok: false, message: "Mirror Protocol needs two or more live channels." };
-  if (base === "ecmp" && !primary)
-    return { ok: false, message: "Equal-Cost Multipath needs a live route." };
+  if ((base === "ecmp" || base === "flood-fill") && !primary)
+    return { ok: false, message: `${card(id).name} needs a live route.` };
   if (base === "salvage" && !run.discardPile.some((held) => card(held).target === "link"))
     return { ok: false, message: "No cable cards are in your discard pile." };
   if (base === "reflect" && !run.backpressure)
     return { ok: false, message: "No backpressure is stored yet." };
   if (base === "replay-attack" && !run.buffer)
     return { ok: false, message: "Your buffer is empty." };
+  const hardware = (held: CardId) => card(held).target === "ground";
+  if (base === "rapid-redeploy" && !run.discardPile.some(hardware))
+    return { ok: false, message: "No hardware card is in your discard pile." };
+  const demolish = base === "demolition-charge" && run.installations.length
+    ? (installationId ? run.installations.find(item => item.id === installationId) : mostDangerous(run)) : null;
+  if (base === "demolition-charge" && installationId && !demolish)
+    return { ok: false, message: "Choose an installation on the table." };
   const capturedRoles = base === "wireshark" && primary
     ? new Set(primary.path.map(nodeId => run.topology.nodes.find(node => node.id === nodeId)!).filter(node => node.role !== "client").map(node => node.role))
     : null;
   if (base === "containerlab" || base === "rebuild") {
     const socket = freeSocket(run);
     if (!socket) return { ok: false, message: "The table has no free socket for a new lab." };
-    const node: NetworkNode = { id: `router${run.nextNodeId++}`, role: "router", ...socket, upgraded: base === "containerlab" };
+    const condition = deployCondition(run);
+    const node: NetworkNode = { id: `router${run.nextNodeId++}`, role: "router", ...socket, upgraded: base === "containerlab", condition, maxCondition: condition, deployedBy: id };
     run.topology.nodes.push(node);
     run.topology.links.push({ a: "alpha", b: node.id }, { a: node.id, b: "omega" });
   }
   consume(run, index);
+  let note = "";
   if (["patch", "reroute", "protocol"].includes(base)) {
-    run.faultNode = null;
-    run.faultLink = null;
+    const repaired = clearFaultsAndRepair(run, true);
+    if (repaired) note = ` · ${repaired.toUpperCase()} repaired`;
   }
   let capturedDraw = 0;
   if (base === "inspect") draw(run, primary ? values.draw ?? 2 : values.drawOffline ?? 1);
@@ -565,14 +608,46 @@ export function playInstant(run: RunState, index: number): ActionResult {
       run.hand.push(run.discardPile.splice(i, 1)[0]);
       recovered++;
     }
-  } else applyValues(run, id);
+  } else {
+    // ---- v4 cards (values from content's definitions, design defaults as fallbacks)
+    if (base === "broadcast-storm" || base === "packet-storm") effects(run).everyPort = (run.turnEffects!.everyPort ?? 0) + (values.everyPort ?? 2);
+    if (base === "flood-fill") effects(run).everyPort = (run.turnEffects!.everyPort ?? 0) + (values.perChannelEveryPort ?? 1) * network.channelCount;
+    if (base === "traffic-shaping") {
+      effects(run).forceFocus = true;
+      run.turnEffects!.focusBonus = (run.turnEffects!.focusBonus ?? 0) + (values.focusBonus ?? 1);
+    }
+    if (base === "demolition-charge") {
+      effects(run).focusBonus = (run.turnEffects!.focusBonus ?? 0) + (values.focusBonus ?? 2);
+      if (demolish) {
+        run.reclaim = (run.reclaim ?? 0) + destroyInstallation(run, demolish, card(id).name);
+        note = ` · ${INSTALLATION_NAMES[demolish.kind]} destroyed`;
+        settleFallen(run);
+      }
+    }
+    if (base === "spearhead") effects(run).spearhead = true;
+    if (base === "bulkhead") effects(run).firewallBonus = (run.turnEffects!.firewallBonus ?? 0) + (values.firewallBonus ?? 1);
+    if (base === "quorum") run.block += (values.perHostile ?? 2) * Math.max(0, livingEnemies(run).length - 1);
+    if (base === "field-repair") for (const node of run.topology.nodes) if (wearable(node)) node.condition = maxConditionOf(node);
+    if (base === "rapid-redeploy") {
+      // Deterministic: the most recently discarded hardware card.
+      for (let i = run.discardPile.length - 1; i >= 0 && run.hand.length < HAND_LIMIT; i--) {
+        if (!hardware(run.discardPile[i])) continue;
+        const recovered = run.discardPile.splice(i, 1)[0];
+        run.hand.push(recovered);
+        (effects(run).discounted ??= []).push(recovered);
+        note = ` · ${card(recovered).name} returns for ${Math.max(0, card(recovered).cost - (values.discount ?? 1))}`;
+        break;
+      }
+    }
+    applyValues(run, id);
+  }
   log(
     run,
     capturedRoles
       ? `Wireshark captured ${[...capturedRoles].join(" + ")}: +${capturedRoles.size} burst, drew ${capturedDraw} card${capturedDraw === 1 ? "" : "s"} · exhausted for this encounter.`
-      : `${card(id).name} activated${card(id).exhaust ? " · exhausted for this encounter" : ""}.`,
+      : `${card(id).name} activated${note}${card(id).exhaust ? " · exhausted for this encounter" : ""}.`,
   );
-  return { ok: true, message: `${card(id).name} activated.` };
+  return { ok: true, message: `${card(id).name} activated${note}.` };
 }
 
 /** Arms a protocol. It fires automatically during a matching enemy action. */
@@ -604,22 +679,52 @@ export function playJunk(run: RunState, index: number): ActionResult {
   log(run, `${card(id).name} deleted.`);
   return { ok: true, message: `${card(id).name} deleted.` };
 }
-export function scrubMalware(run: RunState, id: string): ActionResult {
-  if (run.phase !== "battle") return { ok: false, message: "Scrub malware during an encounter." };
-  const index = run.malware.findIndex(item => item.id === id);
-  if (index < 0) return { ok: false, message: "Choose malware on the table." };
-  if (run.energy < RULES.scrubCost) return { ok: false, message: `Scrubbing costs ${RULES.scrubCost} energy.` };
-  run.energy -= RULES.scrubCost;
-  run.malware.splice(index, 1);
-  log(run, `${id.toUpperCase()} scrubbed.`);
-  return { ok: true, message: "Malware scrubbed." };
+
+// ------------------------------------------------------------------ the table front: scrub and repair
+
+/** Rule 34: 1 energy removes 1 integrity (2 while a Quarantine Drone lives); at 0 the
+ * installation is destroyed and Reclaim adds 2 shield to the coming enemy phase. */
+export function scrubInstallation(run: RunState, id: string): ActionResult {
+  if (run.phase !== "battle") return { ok: false, message: "Scrub installations during an encounter." };
+  const item = run.installations.find(entry => entry.id === id);
+  if (!item) return { ok: false, message: "Choose an installation on the table." };
+  const cost = scrubCost(run);
+  if (run.energy < cost) return { ok: false, message: `Scrubbing costs ${cost} energy per point.` };
+  run.energy -= cost;
+  item.integrity--;
+  const name = INSTALLATION_NAMES[item.kind];
+  if (item.integrity > 0) {
+    log(run, `${name} scrubbed · ${item.integrity} integrity left.`);
+    return { ok: true, message: `${name} scrubbed · ${item.integrity} left.` };
+  }
+  run.reclaim = (run.reclaim ?? 0) + destroyInstallation(run, item, "scrub");
+  settleFallen(run);
+  log(run, `${name} destroyed · Reclaim +${RULES.reclaimShield} shield.`);
+  return { ok: true, message: `${name} destroyed · +${RULES.reclaimShield} shield.` };
+}
+/** Rule 44: 1 energy restores 1 condition (Field Engineer: the first repair each turn is free). */
+export function repairCost(run: RunState): number {
+  return has(run, "field-engineer") && !(run.repairsThisTurn ?? 0) ? 0 : RULES.repairCost;
+}
+export function repairNode(run: RunState, id: string): ActionResult {
+  if (run.phase !== "battle") return { ok: false, message: "Repair devices during an encounter." };
+  const node = run.topology.nodes.find(item => item.id === id);
+  if (!node || !wearable(node)) return { ok: false, message: "Choose a deployed device." };
+  if (!isWorn(node)) return { ok: false, message: `${node.id.toUpperCase()} is at full condition.` };
+  const cost = repairCost(run);
+  if (run.energy < cost) return { ok: false, message: `Repair costs ${cost} energy.` };
+  run.energy -= cost;
+  run.repairsThisTurn = (run.repairsThisTurn ?? 0) + 1;
+  repairDevice(node, 1);
+  log(run, `${node.id.toUpperCase()} repaired · condition ${node.condition}/${maxConditionOf(node)}.`);
+  return { ok: true, message: `${node.id.toUpperCase()} repaired.` };
 }
 
 // ------------------------------------------------------------------ console
 
 export const CONSOLES: Record<ConsoleId, { name: string; rules: string; cost: number; target: "instant" | "link" }> = {
   patch: { name: "Patch Cable", cost: 1, target: "link", rules: "Connect two devices with a standard cable. Once per turn." },
-  harden: { name: "Harden", cost: 1, target: "instant", rules: `Gain ${RULES.hardenShield} block, +${RULES.hardenPerFirewall} per online firewall. Once per turn.` },
+  harden: { name: "Harden", cost: 1, target: "instant", rules: `Gain ${RULES.hardenShield} block, +${RULES.hardenPerFirewall} per online firewall${RULES.hardenPerHostile ? `, +${RULES.hardenPerHostile} per hostile on the field beyond the first` : ""}${RULES.hardenPerAdd ? `, +${RULES.hardenPerAdd} more per guardian add` : ""}, and restore ${RULES.faultClearRepair} condition on your most worn device. Once per turn.` },
   buffer: { name: "Buffer", cost: 0, target: "instant", rules: `Store this turn's transmission ×${RULES.bufferMultiplier} instead of dealing it. Your next transmission releases the whole buffer. If you have no live route at the start of a turn, the buffer is lost. Use again to cancel.` },
 };
 export function consoleFor(run: RunState): ConsoleId {
@@ -660,452 +765,62 @@ export function useConsole(run: RunState, a?: string, b?: string): ActionResult 
     log(run, `Patch Cable: ${a.toUpperCase()} ↔ ${b.toUpperCase()}.`);
     return { ok: true, message: "Patch cable connected." };
   }
-  const firewalls = analyze(run, run.faultNode, run.faultLink).onlineNodes.filter(node => node.role === "firewall").length;
-  const gained = RULES.hardenShield + RULES.hardenPerFirewall * firewalls;
+  const gained = hardenBlock(run);
   run.block += gained;
   run.energy -= state.cost;
   run.consoleUses++;
-  log(run, `Harden: +${gained} block.`);
-  return { ok: true, message: `Hardened · +${gained} block.` };
+  const repaired = clearFaultsAndRepair(run, false);
+  log(run, `Harden: +${gained} block${repaired ? ` · ${repaired.toUpperCase()} repaired` : ""}.`);
+  return { ok: true, message: `Hardened · +${gained} block${repaired ? ` · ${repaired.toUpperCase()} repaired` : ""}.` };
+}
+
+/** Block the Warden's Harden grants now: base, per online firewall, per living hostile beyond the
+ * first (hardenPerHostile) and per living guardian add (hardenPerAdd). One hostile and no adds:
+ * the v3 Harden. The console preview should read this. */
+export function hardenBlock(run: RunState): number {
+  const firewalls = analyze(run, run.faultNodes, run.faultLinks).onlineNodes.filter(node => node.role === "firewall").length;
+  const living = livingEnemies(run);
+  const others = Math.max(0, living.length - 1);
+  const adds = living.filter(enemy => enemy.role === "add").length;
+  return RULES.hardenShield + RULES.hardenPerFirewall * firewalls + RULES.hardenPerHostile * others + RULES.hardenPerAdd * adds;
 }
 
 // ------------------------------------------------------------------ network analysis
 
-interface ScoredRoute extends Route {
-  score: number;
-}
-interface Network {
-  routes: ScoredRoute[];
-  primary: ScoredRoute | null;
-  channels: ScoredRoute[];
-  channelCount: number;
-  online: Set<string>;
-  onlineNodes: NetworkNode[];
-  clusters: Zone[];
-  separated: boolean;
-}
-
-/** Fields of one kind per band. A cast field and a permanent terrain field stack. */
-function fieldBands(run: RunState, kind: ZoneEffectKind): Map<Zone, number> {
-  const bands = new Map<Zone, number>();
-  for (const field of run.zoneEffects)
-    if (field.kind === kind) bands.set(field.zone, (bands.get(field.zone) ?? 0) + 1);
-  return bands;
-}
-function analyze(run: RunState, faultNode: string | null, faultLink: string | null, light = false): Network {
-  const nodes = run.topology.nodes;
-  const all = enumerateRoutes(
-    run.topology,
-    faultNode ? new Set([faultNode]) : new Set(),
-    faultLink ? new Set([faultLink]) : new Set(),
-    frayedLinks(run.topology, run.terrain),
-  );
-  const zoneBit: Record<Zone, number> = { north: 1, center: 2, south: 4 };
-  const lens = has(run, "packet-lens");
-  const contribution = nodes.map(node =>
-    (node.role === "switch" ? (lens ? RULES.packetLensSwitchDamage : RULES.switchDamage) + (node.amplified ? RULES.compressionDamage : 0) : 0) +
-    (node.role === "router" ? (node.configured ? RULES.configuredDamage : 0) + (node.upgraded ? RULES.overclockDamage : 0) : 0));
-  const band = nodes.map(node => node.fixed ? 0 : zoneBit[zoneForNode(node)]);
-  let routerMask = 0, terminals = 0;
-  nodes.forEach((node, i) => {
-    if (node.role === "router") routerMask |= 1 << i;
-    if (node.fixed) terminals |= 1 << i;
-  });
-  const resonant = fieldBands(run, "resonance"), suppressed = fieldBands(run, "suppression");
-  const scored: ScoredRoute[] = [];
-  for (const route of all) {
-    if (!(route.mask & routerMask)) continue;
-    let score = RULES.baseRouteDamage + route.boosted * RULES.amplifiedCableDamage - route.frayed * RULES.frayedCableDamage, bands = 0;
-    for (let m = route.mask, i = 0; m; m >>= 1, i++) {
-      if (!(m & 1)) continue;
-      score += contribution[i];
-      bands |= band[i];
-    }
-    for (const zone of ZONES) {
-      if (!(bands & zoneBit[zone])) continue;
-      score += (resonant.get(zone) ?? 0) * RULES.resonanceDamage;
-      score -= (suppressed.get(zone) ?? 0) * RULES.suppressionPenalty;
-    }
-    (route as ScoredRoute).score = score;
-    scored.push(route as ScoredRoute);
-  }
-  // Routes arrive sorted by length then id order: the documented tie-breaks.
-  const ranked = scored.map((route, i) => ({ route, i })).sort((a, b) => b.route.score - a.route.score || a.i - b.i).map(entry => entry.route);
-  const primary = ranked[0] ?? null;
-  let channels: ScoredRoute[] = [];
-  let channelCount = 0;
-  if (primary && light) channelCount = maximumChannels(ranked, routerMask, terminals).length;
-  else if (primary) {
-    const best = maximumChannels(ranked, routerMask, terminals);
-    const withPrimary = maximumChannels(ranked, routerMask, terminals, primary);
-    channelCount = best.length;
-    channels = withPrimary.length >= best.length ? withPrimary : [primary, ...best];
-  }
-  let onlineMask = 0;
-  for (const route of ranked) onlineMask |= route.mask;
-  onlineMask &= ~terminals;
-  const onlineNodes = nodes.filter((_, i) => onlineMask & (1 << i));
-  const online = new Set(onlineNodes.map(node => node.id));
-  const clusters = ZONES.filter(zone => onlineNodes.filter(node => zoneForNode(node) === zone).length >= RULES.clusterThreshold);
-  const routerIn = (route: ScoredRoute, zone: Zone) => {
-    for (let m = route.mask & routerMask, i = 0; m; m >>= 1, i++) if (m & 1 && !nodes[i].fixed && zoneForNode(nodes[i]) === zone) return true;
-    return false;
-  };
-  const separated = !light && channelCount >= 2 && disjointPair(ranked.filter(route => routerIn(route, "north")), ranked.filter(route => routerIn(route, "south")), terminals);
-  return { routes: ranked, primary, channels, channelCount, online, onlineNodes, clusters, separated };
-}
-
 export function livePaths(run: RunState): string[][] {
-  return paths(
-    run.topology,
-    run.faultNode ? new Set([run.faultNode]) : new Set(),
-    run.faultLink ? new Set([run.faultLink]) : new Set(),
-  );
+  return paths(run.topology, new Set(run.faultNodes), new Set(run.faultLinks));
 }
 /** Router routes, strongest (primary) first. */
 export function signalPaths(run: RunState): string[][] {
-  return analyze(run, run.faultNode, run.faultLink).routes.map(route => route.path);
+  return analyze(run, run.faultNodes, run.faultLinks).routes.map(route => route.path);
 }
 
-export interface CombatTerm {
-  label: string;
-  amount: number;
-}
-export interface CombatPreview {
-  signalPath: string[];
-  alternatePath: string[];
-  packetDamage: number;
-  damageTerms: CombatTerm[];
-  shield: number;
-  shieldTerms: CombatTerm[];
-  incoming: number;
-  incomingRaw: number;
-  intent: Intent | null;
-  lethal: boolean;
-  independent: boolean;
-  faultTarget: string | null;
-  hazardZone: Zone | null;
-  enemyHealing: number;
-  rawPacketDamage: number;
-  incomingTerms: CombatTerm[];
-  traitDescription: string;
-  zoneThreat: ZoneEffect | null;
-  interrupted: boolean;
-  breakDamage: number | null;
-  // v3
-  channels: number;
-  channelPaths: string[][];
-  online: string[];
-  clusters: Zone[];
-  protocolTriggers: { card: CardId; name: string; effect: string }[];
-  buffering: boolean;
-  bufferGain: number;
-  bufferRelease: number;
-  bufferAtRisk: boolean;
-  backpressureGain: number;
-  enemyDamage: number;
-  enemyDefeatedByTraps: boolean;
-  malwareTarget: { x: number; z: number } | null;
-  junk: { card: CardId; count: number } | null;
-  nextTurn: { energy: number; draw: number };
-}
-
-/** Terms of one transmission along `primary`. `storable` excludes enemy armor
- * and exposure: a buffered transmission stores packets before they meet the enemy. */
-function transmissionTerms(run: RunState, network: Network, primary: ScoredRoute | null): { terms: CombatTerm[]; storable: number } {
-  if (!primary) return { terms: [], storable: 0 };
-  const nodes = run.topology.nodes.filter(node => primary.path.includes(node.id));
-  const count = (test: (node: NetworkNode) => boolean) => nodes.filter(test).length;
-  const route: CombatTerm[] = [{ label: "Live router route", amount: RULES.baseRouteDamage }];
-  const switches = count(node => node.role === "switch");
-  if (switches) route.push({ label: `Edge switches on route ×${switches}`, amount: switches * (has(run, "packet-lens") ? RULES.packetLensSwitchDamage : RULES.switchDamage) });
-  const configured = count(node => node.role === "router" && !!node.configured);
-  if (configured) route.push({ label: `Startup Config ×${configured}`, amount: configured * RULES.configuredDamage });
-  const overclocked = count(node => node.role === "router" && !!node.upgraded);
-  if (overclocked) route.push({ label: `Overclocked routers ×${overclocked}`, amount: overclocked * RULES.overclockDamage });
-  const compressed = count(node => node.role === "switch" && !!node.amplified);
-  if (compressed) route.push({ label: `Packet Compression ×${compressed}`, amount: compressed * RULES.compressionDamage });
-  if (primary.boosted) route.push({ label: `Amplified cables ×${primary.boosted}`, amount: primary.boosted * RULES.amplifiedCableDamage });
-  if (primary.frayed) route.push({ label: `Frayed cables ×${primary.frayed} · crossing wreckage`, amount: -primary.frayed * RULES.frayedCableDamage });
-  const bands = new Set(nodes.filter(node => !node.fixed).map(zoneForNode));
-  for (const zone of ZONES) {
-    if (!bands.has(zone)) continue;
-    const resonance = fieldBands(run, "resonance").get(zone) ?? 0, suppression = fieldBands(run, "suppression").get(zone) ?? 0;
-    if (resonance) route.push({ label: `${zone.toUpperCase()} · Resonance${resonance > 1 ? ` ×${resonance}` : ""}`, amount: resonance * RULES.resonanceDamage });
-    if (suppression) route.push({ label: `${zone.toUpperCase()} · Suppression${suppression > 1 ? ` ×${suppression}` : ""}`, amount: -suppression * RULES.suppressionPenalty });
-  }
-  const terms = [...route];
-  const spanning = has(run, "spanning-tree");
-  const routeSum = route.reduce((sum, term) => sum + term.amount, 0);
-  if (spanning && routeSum > 0) terms.push({ label: "Spanning Tree · primary route ×2", amount: routeSum });
-  const channels = network.channelCount;
-  if (!spanning && channels > 1)
-    terms.push({ label: `Bandwidth · ${channels} channels`, amount: (channels - 1) * (has(run, "parallel-core") ? RULES.parallelCorePerChannel : RULES.bandwidthPerChannel) });
-  const balancers = network.onlineNodes.filter(node => node.role === "balancer").length;
-  if (!spanning && balancers) terms.push({ label: `Load balancers ×${balancers} · ${channels} channel${channels === 1 ? "" : "s"}`, amount: balancers * channels * RULES.balancerPerChannel });
-  for (const zone of network.clusters) terms.push({ label: `${zone.toUpperCase()} · Cluster`, amount: RULES.clusterDamage });
-  if (run.malware.length) terms.push({ label: `Malware ×${run.malware.length}`, amount: -run.malware.length * RULES.malwarePenalty });
-  if (run.packetBoost) terms.push({ label: "Packet boost this turn", amount: run.packetBoost });
-  if (has(run, "bgp-hijack")) terms.push({ label: "BGP Hijack", amount: RULES.bgpHijackDamage });
-  if (run.backpressure) terms.push({ label: "Backpressure", amount: run.backpressure });
-  if (!run.buffering && run.buffer) terms.push({ label: "Buffer release", amount: run.buffer });
-  const storable = terms.reduce((sum, term) => sum + term.amount, 0);
-  if (run.enemy?.exposed) terms.push({ label: "Exposed guardian", amount: RULES.exposedBonus });
-  const armor = run.enemy && ENEMIES[run.enemy.id].armor;
-  if (armor && !run.enemy?.exposed) {
-    const firewall = network.onlineNodes.some(node => node.role === "firewall");
-    const amount = armor.bypass === "firewall"
-      ? (firewall ? 0 : armor.amount)
-      : Math.max(0, armor.amount - (armor.perChannel ?? RULES.gradedArmorPerChannel) * (channels - 1));
-    if (amount > 0)
-      terms.push({ label: `${run.enemy!.name} armor · ${armor.bypass === "firewall" ? "needs an online firewall" : `each extra channel strips ${armor.perChannel ?? RULES.gradedArmorPerChannel}`}`, amount: -amount });
-  }
-  return { terms, storable };
-}
-const sumTerms = (terms: CombatTerm[]) => terms.reduce((sum, term) => sum + term.amount, 0);
-
-export function damageFromPath(run: RunState, signal: string[]): number {
-  const network = analyze(run, run.faultNode, run.faultLink);
-  const route = network.routes.find(item => item.path.join() === signal.join());
-  return Math.max(0, sumTerms(transmissionTerms(run, network, route ?? null).terms));
-}
-
-function honeypotAt(run: RunState, id: string) {
-  const node = run.topology.nodes.find(item => item.id === id);
-  return node?.role === "honeypot" ? node : null;
-}
-function malwareSocket(run: RunState): { x: number; z: number } | null {
-  if (run.malware.length >= RULES.maxMalware) return null;
-  const counts = ZONES.map(zone => ({ zone, count: run.topology.nodes.filter(node => !node.fixed && zoneForNode(node) === zone).length }));
-  const order = [...counts].sort((a, b) => b.count - a.count || ["center", "north", "south"].indexOf(a.zone) - ["center", "north", "south"].indexOf(b.zone));
-  const rows: Record<Zone, number[]> = { north: [-2.6, -3.8, -1.8], center: [0, 0.8, -0.8], south: [2.6, 3.8, 1.8] };
-  for (const { zone } of order) {
-    for (const z of rows[zone])
-      for (const x of [0, 1.3, -1.3, 2.6, -2.6, 3.9, -3.9])
-        if (!isBlocked(run, x, z)) return { x, z };
-  }
-  return null;
-}
-
-/** Pure forecast. Resolution uses these exact values and targets. */
+/** Pure forecast (rule 1 of the surprise contract). Resolution uses these exact values and targets. */
 export function combatPreview(run: RunState): CombatPreview {
-  const network = analyze(run, run.faultNode, run.faultLink);
-  const primary = network.primary;
-  const signalPath = primary?.path ?? [];
-  const { terms, storable } = transmissionTerms(run, network, primary);
-  const buffering = run.buffering && !!primary;
-  const bufferGain = buffering ? Math.floor(Math.max(0, storable) * RULES.bufferMultiplier) : 0;
-  if (buffering && sumTerms(terms) !== 0) terms.push({ label: `Stored in buffer · +${bufferGain} (×${RULES.bufferMultiplier})`, amount: -sumTerms(terms) });
-  const packetDamage = Math.max(0, sumTerms(terms));
-  const rawPacketDamage = sumTerms(terms.filter((term) => term.amount > 0));
-  if (sumTerms(terms) < 0) terms.push({ label: "Minimum signal damage", amount: -sumTerms(terms) });
-  const bufferRelease = !buffering && primary ? run.buffer : 0;
-  const intent = intentFor(run);
-  const lethal = !!run.enemy && packetDamage >= run.enemy.hp;
-  const definition = run.enemy ? ENEMIES[run.enemy.id] : null;
-  const breakDamage = definition?.boss?.breakDamage ?? null;
-  const interrupted = !lethal && !!intent?.ultimate && breakDamage !== null && packetDamage >= breakDamage;
-  const incomingTerms: CombatTerm[] = intent && intent.amount ? [{ label: intent.label, amount: intent.amount }] : [];
-  let raw = intent?.amount ?? 0;
-  if (interrupted) {
-    raw = 0;
-    incomingTerms.push({ label: "Ultimate interrupted", amount: -intent!.amount });
-  }
-  const attack = !interrupted && (intent?.kind === "strike" || intent?.kind === "breach");
-  if (intent?.kind === "strike" && run.enemy?.id === "serpent" && network.channelCount <= 1) {
-    raw += RULES.serpentBonus;
-    incomingTerms.push({ label: "Coil pressure · only one channel", amount: RULES.serpentBonus });
-  }
-  if (intent?.kind === "strike" && run.enemy?.id === "weaver" && run.topology.links.length >= RULES.weaverCables) {
-    raw += RULES.weaverBonus;
-    incomingTerms.push({ label: `Tension trap · ${RULES.weaverCables} or more cables`, amount: RULES.weaverBonus });
-  }
-  if (attack && has(run, "bgp-hijack")) {
-    raw += RULES.bgpHijackEnemyBonus;
-    incomingTerms.push({ label: "BGP Hijack · enemy retaliation", amount: RULES.bgpHijackEnemyBonus });
-  }
-  const worms = run.hand.filter(id => baseCard(id) === "worm").length;
-  if (worms) {
-    raw += worms * RULES.wormDamage;
-    incomingTerms.push({ label: `Worm in hand ×${worms}`, amount: worms * RULES.wormDamage });
-  }
-  const jamZone: Zone | null =
-    definition?.jamBands && intent?.kind === "jam"
-      ? ZONES[Math.floor(run.enemy!.turn / definition.pattern.length) % 3]
-      : null;
-  let hazardZone = jamZone;
-  let zoneThreat: ZoneEffect | null = null;
-  if (!interrupted && (intent?.kind === "corrupt" || intent?.field)) {
-    const corruption = intent.field ?? (definition?.corruption === "alternating"
-      ? Math.floor(run.enemy!.turn / 2) % 2 ? "corrosion" : "suppression"
-      : definition?.corruption ?? "corrosion");
-    const eligible = run.topology.nodes.filter(node => !node.fixed && (corruption !== "suppression" || signalPath.includes(node.id)));
-    hazardZone = jamZone ?? (["center", "north", "south"] as Zone[]).sort((a, b) => eligible.filter(node => zoneForNode(node) === b).length - eligible.filter(node => zoneForNode(node) === a).length)[0];
-    zoneThreat = { zone: hazardZone, kind: corruption, turns: hostileFieldTurns(run) };
-  }
-  const shields: CombatTerm[] = [];
-  for (const zone of ZONES) {
-    const occupied = run.topology.nodes.some(node => !node.fixed && zoneForNode(node) === zone);
-    const online = network.onlineNodes.some(node => zoneForNode(node) === zone);
-    const label = (kind: ZoneEffectKind) => `${zone.toUpperCase()} · ${FIELD_RULES[kind].name}`;
-    const kinds = new Set(run.zoneEffects.filter(field => field.zone === zone).map(field => field.kind));
-    if (kinds.has("corrosion") && occupied) { raw += RULES.corrosionDamage; incomingTerms.push({ label: label("corrosion"), amount: RULES.corrosionDamage }); }
-    if (kinds.has("aegis") && online) shields.push({ label: label("aegis"), amount: RULES.aegisShield });
-    if (kinds.has("stasis") && occupied) shields.push({ label: label("stasis"), amount: RULES.nullFieldShield });
-  }
-  // Disruption targets: honeypots decoy first, then the primary route.
-  let faultTarget: string | null = null;
-  let honeypotHit: string | null = null;
-  const honeypots = run.topology.nodes.filter(node => node.role === "honeypot" && run.topology.links.some(link => link.a === node.id || link.b === node.id));
-  if (!interrupted && intent?.kind === "sever") {
-    const eligible = run.topology.links.filter((link) => !link.armored);
-    const length = (link: (typeof eligible)[number]) => {
-      const a = run.topology.nodes.find((node) => node.id === link.a)!, b = run.topology.nodes.find((node) => node.id === link.b)!;
-      return Math.hypot(a.x - b.x, a.z - b.z);
-    };
-    const decoy = run.enemy?.id === "wraith" ? undefined : eligible.find(link => honeypotAt(run, link.a) || honeypotAt(run, link.b));
-    const target = decoy
-      ?? (run.enemy?.id === "wraith"
-        ? [...eligible].sort((a, b) => length(b) - length(a) || linkKey(a.a, a.b).localeCompare(linkKey(b.a, b.b)))[0]
-        : (eligible.find((link) => signalPath.some((id, i) => i > 0 && linkKey(signalPath[i - 1], id) === linkKey(link.a, link.b))) ?? eligible[0]));
-    if (target) {
-      faultTarget = linkKey(target.a, target.b);
-      if (decoy) honeypotHit = (honeypotAt(run, decoy.a) ?? honeypotAt(run, decoy.b))!.id;
-      if (run.enemy?.id === "wraith" && length(target) > RULES.cableExposureLength) {
-        raw++;
-        incomingTerms.push({ label: `Exposed cable longer than ${RULES.cableExposureLength} units`, amount: 1 });
-      }
-    } else if (!run.topology.links.length) {
-      raw++;
-      incomingTerms.push({ label: "Exposed backbone · no cables", amount: 1 });
-    }
-  }
-  if (!interrupted && intent?.kind === "jam") {
-    const eligible = run.topology.nodes.filter((node) => !node.fixed && !node.shielded && (!jamZone || zoneForNode(node) === jamZone));
-    const decoy = eligible.find(node => honeypots.includes(node));
-    const target = decoy
-      ?? (definition?.jamsFirewalls ? eligible.find(node => node.role === "firewall" && network.online.has(node.id)) : undefined)
-      ?? eligible.find((node) => signalPath.includes(node.id)) ?? eligible[0];
-    if (target) {
-      faultTarget = target.id;
-      if (decoy) honeypotHit = decoy.id;
-    } else if (!jamZone && !run.topology.nodes.some((node) => !node.fixed)) {
-      raw++;
-      incomingTerms.push({ label: "Exposed backbone · no devices", amount: 1 });
-    }
-  }
-  let enemyDamage = 0;
-  if (honeypotHit) {
-    enemyDamage += RULES.honeypotDamage + (has(run, "honeynet") ? RULES.honeynetBonus : 0);
-    if (has(run, "honeynet")) shields.push({ label: "Honeynet · decoy triggered", amount: RULES.honeynetShield });
-  }
-  // Armed protocols: the first matching protocol of each trigger fires.
-  const protocolTriggers: CombatPreview["protocolTriggers"] = [];
-  const fired = new Set<string>();
-  for (const id of run.protocols) {
-    const protocolCard = card(id), trigger = protocolCard.protocol!, v = protocolCard.values;
-    if (fired.has(trigger) || (interrupted && trigger !== "field")) continue;
-    let effect = "";
-    if (trigger === "sever" && intent?.kind === "sever" && faultTarget && !honeypotHit) {
-      faultTarget = null;
-      shields.push({ label: `${protocolCard.name} · cut cancelled`, amount: v.shield ?? 3 });
-      effect = `Cancels the cable cut and gives ${v.shield ?? 3} shield.`;
-    } else if (trigger === "jam" && intent?.kind === "jam" && faultTarget && !honeypotHit) {
-      faultTarget = null;
-      enemyDamage += v.damage ?? 4;
-      effect = `Cancels the jam; the attacker takes ${v.damage ?? 4}.`;
-    } else if (trigger === "strike" && intent?.kind === "strike" && intent.amount > 0) {
-      shields.push({ label: `${protocolCard.name} vs strike`, amount: v.reduce ?? 5 });
-      effect = `Reduces the strike by ${v.reduce ?? 5}.`;
-    } else if (trigger === "breach" && intent?.kind === "breach" && intent.amount > 0) {
-      shields.push({ label: `${protocolCard.name} vs breach`, amount: v.reduce ?? 6 });
-      effect = `Reduces the breach by ${v.reduce ?? 6}.`;
-    } else if (trigger === "field" && zoneThreat) {
-      effect = `Cancels ${FIELD_RULES[zoneThreat.kind].name} on ${zoneThreat.zone.toUpperCase()}.`;
-      zoneThreat = null;
-      if (!jamZone) hazardZone = null;
-    } else if (trigger === "ultimate" && (intent?.kind === "charge" || intent?.ultimate)) {
-      enemyDamage += v.damage ?? 8;
-      effect = `The guardian takes ${v.damage ?? 8}.`;
-    }
-    if (!effect) continue;
-    fired.add(trigger);
-    protocolTriggers.push({ card: id, name: protocolCard.name, effect });
-  }
-  const malwareTarget = !interrupted && (intent?.kind === "infect" || intent?.infect) ? malwareSocket(run) : null;
-  const junk = !interrupted && intent?.junk ? intent.junk : null;
-  // Online firewalls block breaches and strikes; they stack. Stateful and Zero Trust double them.
-  if (attack) {
-    const firewalls = network.onlineNodes.filter(node => node.role === "firewall");
-    const per = intent!.kind === "breach" ? RULES.firewallBreachBlock : RULES.firewallStrikeBlock;
-    const amount = firewalls.reduce((sum, node) => sum + per * (node.stateful ? 2 : 1) * (has(run, "zero-trust") ? 2 : 1), 0);
-    if (amount) shields.push({ label: `Online firewalls ×${firewalls.length} vs ${intent!.kind}`, amount });
-  }
-  if (network.separated) shields.push({ label: "Separated circuits · north + south", amount: RULES.separatedCircuitShield });
-  if (run.block > 0) shields.push({ label: "Block this turn", amount: run.block });
-  if (!primary && has(run, "watchdog") && !run.watchdogUsed) shields.push({ label: "Watchdog · no live route", amount: RULES.watchdogShield });
-  if (raw > sumTerms(shields) && has(run, "shield-array") && !run.shieldArrayUsed)
-    shields.push({ label: "Shield Array (once per battle)", amount: Math.min(RULES.shieldArrayPrevent, raw - sumTerms(shields)) });
-  const shield = sumTerms(shields);
-  const hpAfter = run.enemy ? run.enemy.hp - packetDamage : 0;
-  const enemyDefeatedByTraps = !lethal && !!run.enemy && enemyDamage > 0 && enemyDamage >= hpAfter;
-  const ends = lethal || enemyDefeatedByTraps;
-  const incoming = ends ? 0 : Math.max(0, raw - shield);
-  const backpressureGain = !ends && has(run, "backpressure") ? Math.ceil(Math.min(raw, shield) * RULES.backpressureRatio) : 0;
-  // Next turn: the old fault clears, the new one installs, then power and caches count.
-  const newFaultNode = !ends && intent?.kind === "jam" ? faultTarget : null;
-  const newFaultLink = !ends && intent?.kind === "sever" ? faultTarget : null;
-  const after = ends || (newFaultNode === run.faultNode && newFaultLink === run.faultLink)
-    ? network
-    : analyze(run, newFaultNode, newFaultLink, true);
-  const bufferAfter = buffering ? run.buffer + bufferGain : primary ? 0 : run.buffer;
-  const bufferAtRisk = !ends && bufferAfter > 0 && !after.primary;
-  const malwareAfter = run.malware.length + (malwareTarget ? 1 : 0);
-  const enemyHealing = !ends && run.enemy?.id === "leech"
-    ? Math.max(0, Math.min((packetDamage === 0 ? RULES.leechHeal : 0) + malwareAfter * RULES.leechTapHeal, run.enemy.maxHp - Math.max(0, hpAfter - enemyDamage)))
-    : 0;
-  const nextTurn = {
-    energy: turnEnergyBase(run) + run.reserveEnergy + (has(run, "reserve-cell") ? Math.min(2, run.energy) : 0) + after.onlineNodes.filter(node => node.role === "power").length,
-    draw: turnDrawBase(run) + after.onlineNodes.filter(node => node.role === "cache").length + (has(run, "fanout") && after.channelCount >= 3 ? 1 : 0),
-  };
-  return {
-    signalPath,
-    alternatePath: network.channels[1]?.path ?? [],
-    channels: network.channelCount,
-    channelPaths: network.channels.map(route => route.path),
-    online: [...network.online],
-    clusters: network.clusters,
-    interrupted,
-    breakDamage,
-    zoneThreat: ends ? null : zoneThreat,
-    hazardZone: ends ? null : hazardZone,
-    enemyHealing,
-    rawPacketDamage,
-    incomingTerms: ends ? [] : incomingTerms,
-    traitDescription: run.enemy ? ENEMIES[run.enemy.id].trait : "",
-    packetDamage,
-    damageTerms: terms,
-    shield,
-    shieldTerms: shields,
-    incoming,
-    incomingRaw: ends ? 0 : raw,
-    intent: intent ? { ...intent, ...(faultTarget && !ends ? { target: faultTarget } : {}) } : null,
-    lethal,
-    independent: network.channelCount >= 2,
-    faultTarget: ends ? null : faultTarget,
-    protocolTriggers: lethal ? [] : protocolTriggers,
-    buffering,
-    bufferGain,
-    bufferRelease,
-    bufferAtRisk,
-    backpressureGain,
-    enemyDamage: lethal ? 0 : enemyDamage,
-    enemyDefeatedByTraps,
-    malwareTarget: ends ? null : malwareTarget,
-    junk: ends ? null : junk,
-    nextTurn,
-  };
+  return resolveTurn(simulationOf(run)).preview;
 }
+
+/** Total damage if `signal` were the primary route and every delivery merged on the leader. */
+export function damageFromPath(run: RunState, signal: string[]): number {
+  const network = analyze(run, run.faultNodes, run.faultLinks);
+  const index = network.routes.findIndex(item => item.path.join() === signal.join());
+  if (index < 0) return 0;
+  const sim = simulationOf(run);
+  sim.buffering = false;
+  const leader = leaderOf(sim);
+  sim.aims = {};
+  sim.focus = leader?.port ?? null;
+  // Promote the chosen route by fencing off every stronger one: evaluate it alone.
+  const forecast = resolveTurn(sim).preview;
+  if (forecast.signalPath.join() === signal.join()) return forecast.packetDamage;
+  const route = network.routes[index];
+  const lone = simulationOf(run);
+  lone.topology.links = lone.topology.links.filter(link => route.path.some((id, i) => i > 0 && linkKey(route.path[i - 1], id) === linkKey(link.a, link.b)));
+  lone.aims = {};
+  return Math.max(0, resolveTurn(lone).preview.packetDamage);
+}
+
+// ------------------------------------------------------------------ the end of the turn
 
 function victory(run: RunState, result: TurnResult) {
   result.defeated = true;
@@ -1114,133 +829,181 @@ function victory(run: RunState, result: TurnResult) {
   run.block = 0;
   run.packetBoost = 0;
   run.zoneEffects = [];
-  run.malware = [];
+  run.installations = [];
   run.buffer = 0;
   run.buffering = false;
   run.backpressure = 0;
   run.protocols = [];
   run.consoleUses = 0;
+  run.turnEffects = {};
+  run.reclaim = 0;
   if (run.preparedCard) run.discardPile.push(run.preparedCard);
   run.preparedCard = null;
-  delete run.enemy!.exposed;
-  log(run, `${run.enemy!.name} neutralized. Its intent is cancelled.`);
+  for (const enemy of run.enemies) delete enemy.exposed;
+  const names = run.enemies.map(enemy => enemy.name);
+  log(run, `${names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0]} neutralized. ${names.length > 1 ? "Their intents are" : "Its intent is"} cancelled.`);
   grantVictory(run);
 }
 
+/** "a Jammer", "an Anchor". */
+const article = (name: string) => `${/^[aeiou]/i.test(name) ? "an" : "a"} ${name}`;
+function actionLine(run: RunState, forecast: CombatPreview, uid: string): string | null {
+  const hostile = forecast.hostiles.find(item => item.uid === uid);
+  const enemy = run.enemies.find(item => item.uid === uid);
+  if (!hostile || !enemy || hostile.state === "dormant") return null;
+  if (hostile.interrupted) return `${enemy.name}'s ultimate interrupted! Armor broken and +${RULES.exposedBonus} signal damage next turn.`;
+  if (hostile.state !== "acts" && hostile.state !== "spiteful") return null;
+  const parts: string[] = [];
+  if (hostile.field) parts.push(`cast ${FIELD_RULES[hostile.field.kind].name} on ${hostile.field.zone.toUpperCase()}`);
+  for (const id of hostile.jams) parts.push(`jammed ${id.toUpperCase()}`);
+  for (const key of hostile.cuts) parts.push(`cut ${key.toUpperCase().replace("::", " ↔ ")}`);
+  if (hostile.overload) parts.push(`overloaded ${hostile.overload.toUpperCase()}`);
+  for (const install of hostile.installs) parts.push(install.absorbed ? "lost an installation to a phantom"
+    : install.boosts ? `reinforced ${install.boosts.toUpperCase()}`
+      : install.destroyed ? `planted ${article(INSTALLATION_NAMES[install.kind])} the honeypot destroyed`
+        : `planted ${article(INSTALLATION_NAMES[install.kind])}`);
+  if (hostile.junk) parts.push(`injected ${hostile.junk.count} ${CARDS[hostile.junk.card].name}`);
+  if (hostile.raw || !parts.length) parts.push(`dealt ${hostile.incoming} integrity damage${hostile.raw > hostile.incoming ? ` (${hostile.raw - hostile.incoming} blocked)` : ""}`);
+  return `${enemy.name}${hostile.state === "spiteful" ? " (spiteful, resolving anyway)" : ""} ${parts.join("; ")}.`;
+}
+
 export function endTurn(run: RunState): TurnResult {
-  if (run.phase !== "battle" || !run.enemy)
+  if (run.phase !== "battle" || !run.enemies.length)
     throw new Error("No active encounter.");
-  const preview = combatPreview(run);
+  const resolution = resolveTurn(run);
+  const forecast = resolution.preview;
+  const portDamage: Partial<Record<Port, number>> = {};
+  for (const port of PORTS) {
+    const entry: PortForecast | null = forecast.ports[port];
+    if (entry && !forecast.buffering && forecast.signalPath.length) portDamage[port] = entry.packet - entry.overflowOut;
+  }
   const result: TurnResult = {
-    signalPath: preview.signalPath,
-    alternatePath: preview.alternatePath,
-    channelPaths: preview.channelPaths,
-    packetDamage: preview.packetDamage,
+    signalPath: forecast.signalPath,
+    alternatePath: forecast.alternatePath,
+    channelPaths: forecast.channelPaths,
+    packetDamage: forecast.packetDamage,
     enemyAction: "",
     integrityDamage: 0,
     defeated: false,
     lost: false,
-    interrupted: preview.interrupted,
+    interrupted: forecast.interrupted,
     buffered: 0,
     bufferReleased: 0,
     bufferLost: false,
     protocolsTriggered: [],
     enemyDamage: 0,
-    malwarePlanted: null,
+    malwarePlanted: resolution.planted[0] ?? null,
     junkAdded: [],
     backpressureStored: 0,
+    forecast,
+    portDamage,
+    deaths: resolution.deaths,
+    planted: resolution.planted,
+    destroyed: forecast.destroyed,
+    actions: [],
+    arrived: resolution.events.arrived,
+    signalAnnounced: resolution.events.signalAnnounced,
+    signalFired: resolution.events.signalFired,
+    shed: resolution.events.shed,
+    escalated: resolution.events.escalated,
+    fallen: [],
+    offersQueued: 0,
   };
-  if (preview.buffering) {
-    run.buffer += preview.bufferGain;
-    run.backpressure = 0;
-    result.buffered = preview.bufferGain;
-    log(run, `Transmission buffered: +${preview.bufferGain} stored (${run.buffer} total).`);
-  } else if (preview.signalPath.length) {
-    run.enemy.hp = Math.max(0, run.enemy.hp - preview.packetDamage);
-    result.bufferReleased = preview.bufferRelease;
-    run.buffer = 0;
-    run.backpressure = 0;
-  }
-  if (!preview.signalPath.length && preview.shieldTerms.some(term => term.label.startsWith("Watchdog"))) run.watchdogUsed = true;
-  run.score += preview.packetDamage * 10;
-  if (!preview.buffering)
+  const offersBefore = run.offers.length;
+  // Crates open, Laden messages and Salvaged drops fall once the damage is applied; salvage lands
+  // on the table at the end of the enemy phase (contract §1), or yields credits once the fight is over.
+  const settle = (onTable: boolean) => {
+    result.fallen = openFallen(run, resolution.deaths, onTable);
+    result.offersQueued = run.offers.length - offersBefore;
+    for (const record of result.fallen) {
+      const name = run.enemies.find(enemy => enemy.uid === record.uid)?.name ?? "";
+      if (record.crate) log(run, `${name}'s crate · ${record.crate.kind === "salvage" && !record.placed ? `${record.credits} credits (no free socket)` : crateText(record.crate)}.`);
+      if (record.placed?.source === "salvaged") log(run, `${name} drops a salvaged ${record.placed.role} at ${zoneForNode(record.placed).toUpperCase()}.`);
+    }
+    if (result.offersQueued) log(run, `${result.offersQueued === 1 ? "An undelivered message waits" : `${result.offersQueued} offers wait`} for your answer.`);
+  };
+  if (forecast.buffering) {
+    result.buffered = forecast.bufferGain;
+    log(run, `Transmission buffered: +${forecast.bufferGain} stored (${run.buffer} total).`);
+  } else if (forecast.signalPath.length) result.bufferReleased = forecast.bufferRelease;
+  run.score += forecast.packetDamage * 10;
+  if (!forecast.buffering)
     log(
       run,
-      preview.packetDamage
-        ? `Signal dealt ${preview.packetDamage}: ${preview.damageTerms.map((term) => `${term.label} ${term.amount >= 0 ? "+" : ""}${term.amount}`).join(" · ")}.`
-        : preview.signalPath.length ? "The live signal was absorbed by armor or hostile fields. No damage." : "No live router route. No signal damage.",
+      forecast.packetDamage
+        ? `Signal dealt ${forecast.packetDamage}: ${forecast.damageTerms.map((term) => `${term.label} ${term.amount >= 0 ? "+" : ""}${term.amount}`).join(" · ")}.`
+        : forecast.signalPath.length ? "The live signal was absorbed by armor or hostile fields. No damage." : "No live router route. No signal damage.",
     );
-  if (preview.lethal) {
+  if (resolution.ended === "transmission") {
+    settle(false);
     victory(run, result);
     return result;
   }
-  // Traps resolve at the start of the enemy action.
-  result.protocolsTriggered = preview.protocolTriggers.map(trigger => trigger.card);
-  for (const id of result.protocolsTriggered) {
-    run.protocols.splice(run.protocols.indexOf(id), 1);
-    run.discardPile.push(id);
+  result.protocolsTriggered = forecast.protocolTriggers.map(trigger => trigger.card);
+  run.discardPile.push(...result.protocolsTriggered);
+  if (forecast.enemyDamage) {
+    result.enemyDamage = forecast.enemyDamage;
+    // A body a trap killed may have left the rail to an arrival at its port: name it from the forecast.
+    const struck = forecast.hostiles.filter(hostile => hostile.trapDamage).map(hostile => run.enemies.find(enemy => enemy.uid === hostile.uid)?.name ?? ENEMIES[hostile.id]?.name ?? hostile.id);
+    log(run, `Traps dealt ${forecast.enemyDamage} to ${struck.join(" and ")}.`);
   }
-  if (preview.enemyDamage) {
-    run.enemy.hp = Math.max(0, run.enemy.hp - preview.enemyDamage);
-    result.enemyDamage = preview.enemyDamage;
-    log(run, `Traps dealt ${preview.enemyDamage} to ${run.enemy.name}.`);
-  }
-  if (preview.enemyDefeatedByTraps) {
+  for (const record of forecast.quarantine) log(run, `${record.firewallId.toUpperCase()} quarantines ${record.installationId.toUpperCase()} · ${record.damage}${record.destroys ? " · destroyed" : ""}.`);
+  if (resolution.ended === "traps") {
+    settle(false);
     victory(run, result);
     return result;
   }
-  const intent = preview.intent!;
-  if (preview.malwareTarget) {
-    const used = new Set(run.malware.map(item => item.id));
-    let n = 1;
-    while (used.has(`malware${n}`)) n++;
-    const planted = { id: `malware${n}`, ...preview.malwareTarget };
-    run.malware.push(planted);
-    result.malwarePlanted = planted;
-  }
-  if (preview.enemyHealing) {
-    run.enemy.hp = Math.min(run.enemy.maxHp, run.enemy.hp + preview.enemyHealing);
-    log(run, `${run.enemy.name} siphoned ${preview.enemyHealing} health.`);
-  }
-  run.faultNode = null;
-  run.faultLink = null;
-  run.zoneEffects = run.zoneEffects.map(field => field.permanent ? field : { ...field, turns: field.turns - 1 }).filter(field => field.turns > 0);
-  if (preview.zoneThreat) installField(run, preview.zoneThreat);
-  if (intent.kind === "sever") run.faultLink = preview.faultTarget;
-  if (intent.kind === "jam") run.faultNode = preview.faultTarget;
-  if (preview.junk) {
-    for (let i = 0; i < preview.junk.count; i++) {
+  // Step 7: junk lands at seeded positions in the draw pile (the only RNG in the enemy phase).
+  for (const batch of resolution.junk)
+    for (let i = 0; i < batch.count; i++) {
       const position = Math.floor(random(run) * (run.drawPile.length + 1));
-      run.drawPile.splice(position, 0, preview.junk.card);
-      result.junkAdded.push(preview.junk.card);
+      run.drawPile.splice(position, 0, batch.card);
+      result.junkAdded.push(batch.card);
     }
+  for (const enemy of run.enemies) {
+    const heal = forecast.hostiles.find(item => item.uid === enemy.uid)?.heal;
+    if (heal) log(run, `${enemy.name} siphoned ${heal} health.`);
   }
-  result.integrityDamage = preview.incoming;
-  run.integrity = Math.max(0, run.integrity - preview.incoming);
-  if (preview.shieldTerms.some((term) => term.label.startsWith("Shield Array"))) run.shieldArrayUsed = true;
-  if (preview.backpressureGain) {
-    run.backpressure += preview.backpressureGain;
-    result.backpressureStored = preview.backpressureGain;
+  result.integrityDamage = forecast.incoming;
+  result.backpressureStored = forecast.backpressureGain;
+  result.actions = forecast.hostiles.map(hostile => actionLine(run, forecast, hostile.uid)).filter((line): line is string => !!line);
+  // A Spiteful hostile took the last body with it: its action resolved, then the fight ends.
+  if (resolution.ended === "phase") {
+    for (const line of result.actions) log(run, line);
+    if (run.integrity <= 0) {
+      run.phase = "lost";
+      result.lost = true;
+      return result;
+    }
+    settle(false);
+    victory(run, result);
+    return result;
   }
-  const fault = preview.faultTarget
-    ? `${intent.kind === "jam" ? "jammed" : "cut"} ${preview.faultTarget.toUpperCase().replace("::", " ↔ ")}; `
-    : "";
-  result.enemyAction = `${run.enemy.name} ${preview.zoneThreat ? `cast ${FIELD_RULES[preview.zoneThreat.kind].name} on ${preview.zoneThreat.zone.toUpperCase()}; ` : ""}${fault}${result.malwarePlanted ? "planted malware; " : ""}${result.junkAdded.length ? `injected ${result.junkAdded.length} ${card(result.junkAdded[0]).name}; ` : ""}dealt ${preview.incoming} integrity damage${preview.shield ? ` (${Math.min(preview.incomingRaw, preview.shield)} blocked)` : ""}.`;
-  log(run, result.enemyAction);
-  if (result.protocolsTriggered.length) log(run, `Protocols fired: ${preview.protocolTriggers.map(t => `${t.name} — ${t.effect}`).join(" ")}`);
-  if (preview.interrupted) {
-    result.enemyAction = `${run.enemy.name}'s ultimate interrupted! Armor broken and +${RULES.exposedBonus} signal damage next turn.${preview.incoming ? ` Existing fields dealt ${preview.incoming} integrity damage.` : ""}`;
-    log(run, result.enemyAction);
-  } else if (intent.kind === "charge") {
-    log(run, `${run.enemy.name} is charging. Prepare a burst to interrupt the next transmission, or brace for the impact.`);
+  settle(true);
+  result.enemyAction = result.actions.join(" ") || "The hostiles hold their positions.";
+  if (forecast.hostiles.length > 1 || !result.actions.length) {
+    if (forecast.incoming || forecast.incomingRaw) log(run, `Enemy phase: ${forecast.incoming} integrity damage${forecast.shield ? ` (${Math.min(forecast.incomingRaw, forecast.shield)} blocked)` : ""}.`);
   }
-  if (preview.interrupted) run.enemy.exposed = true;
-  else delete run.enemy.exposed;
-  run.enemy.turn++;
+  for (const line of result.actions) log(run, line);
+  for (const effect of forecast.installationEffects)
+    if (effect.effect === "jam" && effect.target && !effect.decoyed && !effect.absorbed && !effect.cancelled) log(run, `${effect.id.toUpperCase()} jams ${effect.target.toUpperCase()}.`);
+    else if (effect.effect === "detonate") log(run, `${effect.id.toUpperCase()} detonates.`);
+  for (const record of forecast.wear) if (!record.breaks) log(run, `${record.nodeId.toUpperCase()} worn by ${record.source} · condition ${record.to}.`);
+  for (const record of forecast.breakdowns) log(run, `${record.nodeId.toUpperCase()} breaks${record.wreck ? " · wreckage remains" : ""}.`);
+  if (result.protocolsTriggered.length) log(run, `Protocols fired: ${forecast.protocolTriggers.map(t => `${t.name} — ${t.effect}`).join(" ")}`);
+  const charging = forecast.hostiles.find(hostile => hostile.state === "acts" && hostile.intent?.kind === "charge");
+  if (charging) log(run, `${run.enemies.find(enemy => enemy.uid === charging.uid)?.name ?? ENEMIES[charging.id]?.name ?? "The guardian"} is charging. Prepare a burst to interrupt the next transmission, or brace for the impact.`);
+  for (const uid of result.shed) log(run, `${run.enemies.find(enemy => enemy.uid === uid)?.name ?? "It"} sheds an escort.`);
+  for (const step of result.escalated) log(run, `${run.enemies.find(enemy => enemy.uid === step.uid)?.name ?? "The leader"} escalates to level ${step.level}: ${levelRule(run, step.level)}.`);
+  for (const arrival of result.arrived)
+    log(run, arrival.kind === "add" ? `${ENEMIES[arrival.id].name} rises at the ${arrival.port.toUpperCase()} port.` : `${ENEMIES[arrival.id].name} arrives at the ${arrival.port.toUpperCase()} port.`);
+  if (result.signalFired) log(run, result.signalFired);
+  if (result.signalAnnounced) log(run, result.signalAnnounced);
+  // Step 10: the next turn on the post-phase board.
   run.turn++;
-  run.energy = preview.nextTurn.energy;
+  run.energy = forecast.nextTurn.energy;
   run.reserveEnergy = 0;
-  if (preview.bufferAtRisk) {
+  if (forecast.bufferAtRisk) {
     log(run, `Packet loss: no live route — the ${run.buffer}-damage buffer is lost.`);
     run.buffer = 0;
     result.bufferLost = true;
@@ -1251,14 +1014,26 @@ export function endTurn(run: RunState): TurnResult {
   run.firstFiberPlayed = false;
   run.consoleUses = 0;
   run.buffering = false;
+  run.turnEffects = {};
+  run.reclaim = 0;
+  run.repairsThisTurn = 0;
+  // Rule 17 and 49: a channel that no longer exists loses its aim; the focus follows rule 15.
+  const live = new Set(analyze(run, run.faultNodes, run.faultLinks).channels.map(route => channelKey(route.path)));
+  for (const key of Object.keys(run.aims)) if (!live.has(key) || !enemyAt(run, run.aims[key])) delete run.aims[key];
+  run.focus = effectiveFocus(run);
   for (const held of run.hand.splice(0))
     (baseCard(held) === "packet-loss" ? run.exhaustPile : run.discardPile).push(held);
   if (run.preparedCard) run.hand.push(run.preparedCard);
   run.preparedCard = null;
-  draw(run, preview.nextTurn.draw - run.hand.length);
+  draw(run, forecast.nextTurn.draw - run.hand.length);
   if (run.integrity <= 0) {
     run.phase = "lost";
     result.lost = true;
   }
   return result;
 }
+
+/** Deprecated v3 name kept for the zone helpers' callers. */
+export { hostileFieldTurns };
+/** Sum of terms, for callers that reconcile ledgers. */
+export { sumTerms };

@@ -32,7 +32,7 @@
  *   move      A device is relocated (drop or band buttons). Replaces any card cue.
  *   field     An allied field is cast on a band.
  *   cleanse   Faults/fields are cleared, integrity is repaired.
- *   scrub     Malware is scrubbed, or a card is removed from the deck.
+ *   scrub     An installation loses a point to Scrub, or a card is removed from the deck.
  *   transmit  Transmit / End Turn is pressed: the packet launches.
  *   buffer    Ghost: a transmission is stored in the buffer instead of dealt.
  *   release   Ghost: the buffer is released with a transmission (before `hit`).
@@ -44,13 +44,30 @@
  *   block     Shield is raised by a card or console, or absorbs part of an attack.
  *   strike / breach / sever / jam   The announced enemy action lands.
  *   corrupt   A hostile field is installed on a band.
- *   malware   A malware node is planted on your table.
+ *   malware   A Siphon Tap is planted on your table (every other installation: install).
  *   junk      Junk cards (Packet Loss, Worm) are shuffled into your piles.
  *   charge    A guardian charges its ultimate (or a breach winds up).
  *   boss      A guardian is introduced.
  *   enrage    A hostile crosses its half-health threshold.
  *   death     The hostile is defeated.
  *   defeat    The expedition is lost.
+ *
+ * Ports, table front and surprises (v4 · Under Quarantine)
+ *   arrive     An escort or reinforcement takes a port (also the guardian's adds rising).
+ *   dormant    An escort goes dormant for the phase.
+ *   aim        A channel is aimed at a port, or the focus changes.
+ *   install    A Jammer, Spike, Anchor or Breaker Charge is planted (Taps keep malware).
+ *   wear       An overload or a Spike removes a condition point.
+ *   breakdown  A device breaks and leaves wreckage.
+ *   repair     A condition point is restored (click repair, Harden, a repair card).
+ *   quarantine A firewall degrades an installation in the trap phase.
+ *   detonate   A Breaker Charge reaches zero.
+ *   crate      A crate lands and opens on an escort's death. Pick the master by contents:
+ *              { variant: 1 } credits (coins), { variant: 2 } anything else (paper).
+ *   message    A message fragment drops, and again when a choice resolves.
+ *   reveal     A hidden designation is revealed at the entrance line.
+ *   warning    A reinforcement is announced.
+ *   signal     A mid-fight signal fires (good or bad share the cue; the text carries the meaning).
  */
 export const EFFECTS = {
   hover: { variants: 2, gain: 1, priority: 0 },
@@ -97,15 +114,30 @@ export const EFFECTS = {
   enrage: { variants: 1, gain: 1, priority: 3 },
   death: { variants: 1, gain: 1, priority: 3 },
   defeat: { variants: 1, gain: 1, priority: 3 },
+  arrive: { variants: 2, gain: 1, priority: 2 },
+  dormant: { variants: 2, gain: 1, priority: 1 },
+  aim: { variants: 2, gain: 1, priority: 0 },
+  install: { variants: 2, gain: 1, priority: 2 },
+  wear: { variants: 2, gain: 1, priority: 2 },
+  breakdown: { variants: 1, gain: 1, priority: 3 },
+  repair: { variants: 2, gain: 1, priority: 1 },
+  quarantine: { variants: 2, gain: 1, priority: 1 },
+  detonate: { variants: 1, gain: 1, priority: 3 },
+  crate: { variants: 2, gain: 1, priority: 2 },
+  message: { variants: 2, gain: 1, priority: 2 },
+  reveal: { variants: 1, gain: 1, priority: 2 },
+  warning: { variants: 1, gain: 1, priority: 3 },
+  signal: { variants: 1, gain: 1, priority: 2 },
 } as const;
 export type EffectKind = keyof typeof EFFECTS;
-/** pan −1…1 (clamped to ±.65), power scales gain (.5–1.2), delay in seconds (≤ 1). */
-export interface EffectOptions { pan?: number; power?: number; delay?: number }
+/** pan −1…1 (clamped to ±.65), power scales gain (.5–1.2), delay in seconds (≤ 1),
+ * variant picks a master (1-based) instead of the rotation, e.g. crate by contents. */
+export interface EffectOptions { pan?: number; power?: number; delay?: number; variant?: number }
 interface Voice { source: AudioBufferSourceNode; gain: GainNode; pan: StereoPannerNode; priority: number }
 
-/** Minimum spacing between two plays of the same cue. Hover and pickup are
- * rate-limited harder so sweeping across a hand never becomes a rattle. */
-const SPACING: Partial<Record<EffectKind, number>> = { hover: 110, pickup: 60, select: 60, draw: 60 };
+/** Minimum spacing between two plays of the same cue. Hover, pickup and aim are
+ * rate-limited harder so sweeping across a hand or re-aiming never becomes a rattle. */
+const SPACING: Partial<Record<EffectKind, number>> = { hover: 110, pickup: 60, select: 60, draw: 60, aim: 110 };
 
 export class EffectsPlayer {
   private readonly bus: GainNode;
@@ -174,8 +206,9 @@ export class EffectsPlayer {
     const now = performance.now();
     if (now - (this.lastAt.get(kind) ?? -Infinity) < (SPACING[kind] ?? 28)) return;
     this.lastAt.set(kind, now);
-    const variant = (this.sequence.get(kind) ?? 0) % cue.variants;
-    this.sequence.set(kind, variant + 1);
+    const chosen = Number.isFinite(options.variant) ? Math.max(1, Math.floor(options.variant!)) : 0;
+    const variant = chosen ? (chosen - 1) % cue.variants : (this.sequence.get(kind) ?? 0) % cue.variants;
+    if (!chosen) this.sequence.set(kind, variant + 1);
     const key = `${kind}-${variant + 1}`;
     const buffer = this.buffers.get(key);
     if (buffer) this.start(buffer, kind, options);

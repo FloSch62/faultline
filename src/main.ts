@@ -8,10 +8,11 @@ import type { EffectKind } from "./audio-effects.ts";
 import { ENEMIES } from "./core/enemies.ts";
 import { STAGES } from "./core/stages.ts";
 import { TRACK_TITLES } from "./core/music.ts";
-import { CARDS, RULES } from "./core/cards.ts";
+import { CARDS, RULES, baseCard } from "./core/cards.ts";
 import {
   ARCHETYPES,
   dailySeed,
+  EXPEDITION_VERSION,
   newExpedition,
   parseExpedition,
   type Archetype,
@@ -41,7 +42,21 @@ import {
   releasePreparedCard,
   playProtocol,
   playJunk,
-  scrubMalware,
+  scrubInstallation,
+  repairNode,
+  leaderOf,
+  livingEnemies,
+  effectiveFocus,
+  setFocus,
+  aimChannel,
+  mostDangerous,
+  isWorn,
+  conditionOf,
+  maxConditionOf,
+  repairCost,
+  scrubCost,
+  INSTALLATION_NAMES,
+  PORTS,
   useConsole,
   consoleState,
   isBlocked,
@@ -50,9 +65,11 @@ import {
   type ActionResult,
   type TurnResult,
 } from "./core/run.ts";
-import type { CardId, RelicId, RunState, Zone } from "./core/types.ts";
+import type { CardId, Port, RelicId, RunState, Zone } from "./core/types.ts";
+import { chooseOffer } from "./core/encounter.ts";
 import { World, type WorldPoint } from "./three/World.ts";
-import { loadDeviceModels } from "./three/models.ts";
+import { playTurn, syncWorld } from "./battle-playback.ts";
+import { loadAllModels } from "./three/models.ts";
 import * as ui from "./ui.ts";
 import * as battleUi from "./battle-ui.ts";
 import * as screens from "./screens.ts";
@@ -65,13 +82,12 @@ const $ = <T extends HTMLElement = HTMLElement>(selector: string) =>
 const STORAGE = "faultline-expedition-v2";
 const sound = new Soundscape();
 // Fetch the device models behind the title screen so the first table is built with them.
-void loadDeviceModels();
-/** Enemy intent → the cue heard on its contact frame. */
-const INTENT_CUES: Record<string, EffectKind> = {
-  strike: "strike", breach: "breach", sever: "sever", jam: "jam", corrupt: "corrupt", charge: "charge", infect: "malware",
-};
+void loadAllModels();
+/** Faults as one comparable signature (v4 lists). */
+const faultKey = (state: RunState) => `${state.faultNodes.join(",")}|${state.faultLinks.join(",")}`;
+const installationPoints = (state: RunState) => state.installations.reduce((sum, item) => sum + item.integrity, 0);
 /** Controls whose hover deserves a whisper; icon buttons and toolbars stay silent. */
-const HOVER_CUES = ".game-card:not(.drag-ghost), .route-room:not([disabled]), .archetype, .relic-option, [data-forge], .transmit-button, .console-button, .title-menu button, .gold-button, .field-seal.targetable, .lesson-card";
+const HOVER_CUES = ".game-card:not(.drag-ghost), .route-room:not([disabled]), .archetype, .relic-option, [data-forge], .transmit-button, .console-button, .title-menu button, .gold-button, .field-seal.targetable, .lesson-card, button.port-row, .port-stud";
 let expedition: Expedition | null = null;
 let records: RunRecord[] = [];
 try {
@@ -91,6 +107,10 @@ let daily = false;
 let selected: number | null = null;
 let source: string | null = null;
 let selectedNode: string | null = null;
+/** Far rail and table-front selection (reading only; focus and aims live in the run). */
+const hud: battleUi.HudView = { port: null, delivery: null, installation: null, demolition: false };
+/** Encounters whose hidden designation was already re-engraved, and arrivals already announced. */
+let revealedKey = "", announcedKey = "", hudRoom = "";
 let busy = false;
 let world: World | null = null;
 let webglFailed = false;
@@ -117,6 +137,8 @@ let practice: {
   last?: TurnResult;
   showHint: boolean;
   collapsed: boolean;
+  /** Reading steps the player acknowledged (Got it, or a click on the spotlit control). */
+  read: string[];
 } | null = null;
 let hintTimer = 0;
 /** Patch Cable (Architect console) is choosing its two devices. */
@@ -140,7 +162,7 @@ let lastScreen = "";
 
 
 $("#app").innerHTML =
-  `<main class="game-root"><div class="scene-backdrop"></div><div class="scene-shade"></div><div class="motes" aria-hidden="true">${Array.from({ length: 22 }, (_, i) => `<i style="--x:${(i * 47) % 100}%;--duration:${14 + (i % 8) * 3}s;--delay:-${i * 2.7}s;--size:${(i % 3) + 1}px"></i>`).join("")}</div><div class="world-stage"><canvas id="world" aria-label="Network battlefield. Use cards and the device targeting controls to build your route."></canvas></div><div class="texture"></div><header id="header" class="game-header"></header><div id="screen"></div><div id="battle-hud"></div><div id="hand-zone"></div><div id="target-dock"></div><div id="lesson-spotlight" aria-hidden="true"><i></i></div><div id="lesson-layer"></div><div id="game-tooltip" role="tooltip"></div><div id="impact-layer" aria-hidden="true"></div><div id="battle-flash"></div><div id="toast" role="status" aria-live="polite"></div><div class="now-playing" id="now-playing"></div></main><dialog id="dialog" aria-label="Field journal"><button class="dialog-close" data-action="close" aria-label="Close dialog">${ui.icon("close", 16)}</button><div class="dialog-surface"><div id="dialog-content"></div></div></dialog>`;
+  `<main class="game-root"><div class="scene-backdrop"></div><div class="scene-shade"></div><div class="motes" aria-hidden="true">${Array.from({ length: 22 }, (_, i) => `<i style="--x:${(i * 47) % 100}%;--duration:${14 + (i % 8) * 3}s;--delay:-${i * 2.7}s;--size:${(i % 3) + 1}px"></i>`).join("")}</div><div class="world-stage"><canvas id="world" aria-label="Network battlefield. Use cards and the device targeting controls to build your route."></canvas></div><div class="texture"></div><header id="header" class="game-header"></header><div id="screen"></div><div id="battle-hud"></div><div id="hand-zone"></div><div id="target-dock"></div><div id="battle-foot"></div><div id="lesson-spotlight" aria-hidden="true"><i></i></div><div id="lesson-layer"></div><div id="game-tooltip" role="tooltip"></div><div id="impact-layer" aria-hidden="true"></div><div id="battle-flash"></div><div id="toast" role="status" aria-live="polite"></div><div class="now-playing" id="now-playing"></div></main><dialog id="dialog" aria-label="Field journal"><button class="dialog-close" data-action="close" aria-label="Close dialog">${ui.icon("close", 16)}</button><div class="dialog-surface"><div id="dialog-content"></div></div></dialog>`;
 const root = $(".game-root"),
   dialog = $<HTMLDialogElement>("#dialog");
 sound.update({});
@@ -198,7 +220,7 @@ function audioScene(): ScoreScene {
   if (view === "run" && run.phase === "event") return "sanctuary";
   if (view === "run" && run.phase === "battle" && run.map.find(room => room.id === run.currentRoom)?.type === "elite") return "elite";
   return view === "run" && run.phase === "battle"
-    ? run.enemy && ENEMIES[run.enemy.id].boss
+    ? leaderOf(run) && ENEMIES[leaderOf(run)!.id].boss
       ? "boss"
       : "battle"
     : "explore";
@@ -211,9 +233,11 @@ function ensureWorld() {
       onNode,
       onLink: () => {},
       onMove,
-      onMalware: scrub,
+      onPort: selectPort,
+      onAim: aimDelivery,
+      onInstallation: selectInstallation,
     });
-    world.setBattle(run.topology, run.enemy, run.faultNode, run.faultLink);
+    world.setBattle(run.topology, run.enemies, run.faultNodes, run.faultLinks);
   } catch (error) {
     webglFailed = true;
     console.error("Could not create battlefield", error);
@@ -229,6 +253,8 @@ function clearSelection() {
   source = null;
   selectedNode = null;
   consoleTargeting = false;
+  hud.installation = null;
+  hud.demolition = false;
   world?.setPlacement(null);
   world?.setSelected(null);
   world?.setZoneTargeting(false);
@@ -241,7 +267,7 @@ function playable() {
 function interfaceScale() { return Number.parseFloat(getComputedStyle($("#app")).zoom) || 1; }
 function render(rebuild = true) {
   // A finished training battle stays on its board: the coach panel carries the debrief.
-  const debrief = !!practice && view === "run" && run.phase !== "battle" && !!run.enemy;
+  const debrief = !!practice && view === "run" && run.phase !== "battle" && run.enemies.length > 0;
   const battle = view === "run" && (run.phase === "battle" || debrief);
   root.dataset.view = view === "run" ? (debrief ? "battle" : run.phase) : view;
   const stage = STAGES[view === "run" ? run.stage : 0];
@@ -264,22 +290,13 @@ function render(rebuild = true) {
   );
   if (battle) {
     ensureWorld();
-    world?.setStage(run.stage);
-    // Terrain first: cables read the wreckage to know whether they fray.
-    world?.setTerrain?.(run.terrain);
-    if (rebuild)
-      world?.setBattle(run.topology, debrief ? null : run.enemy, run.faultNode, run.faultLink);
     const forecast = combatPreview(run);
-    root.dataset.guardianWindow = forecast.lethal ? "" : forecast.interrupted ? "break" : forecast.intent?.ultimate ? "ultimate" : forecast.intent?.kind === "charge" ? "charge" : run.enemy?.exposed ? "exposed" : "";
+    // The table and the rail mirror the run, its forecast and the HUD's selections (battle-playback.ts).
+    syncWorld(world, run, forecast, worldView(), { rebuild, debrief });
+    root.dataset.guardianWindow = forecast.lethal ? "" : forecast.interrupted ? "break" : forecast.intent?.ultimate ? "ultimate" : forecast.intent?.kind === "charge" ? "charge" : leaderOf(run)?.exposed ? "exposed" : "";
     root.classList.toggle("is-buffering", run.buffering);
-    world?.setMalware?.(run.malware, forecast.malwareTarget);
-    world?.setOnline?.(forecast.online);
-    if (world?.setChannels) world.setChannels(forecast.channelPaths);
-    else world?.setSignalRoute(forecast.signalPath, forecast.alternatePath);
-    world?.setForecastTarget(forecast.faultTarget);
-    world?.setForecastZone(forecast.hazardZone);
-    world?.setZoneEffects(run.zoneEffects);
     showTerrainTitle();
+    announceArrival(forecast);
   }
   if (!battle) delete root.dataset.guardianWindow;
   world?.setVisible(battle);
@@ -314,7 +331,9 @@ function render(rebuild = true) {
       chart.scrollLeft = Math.max(0, nextRoom.offsetLeft - chart.clientWidth / 2);
     }
   }
-  $("#battle-hud").innerHTML = battle
+  settleHud();
+  const revealing = battle && !debrief && revealDesignation();
+  const hudMarkup = battle
     ? battleUi.battleMarkup(run, {
         selected,
         source,
@@ -323,8 +342,14 @@ function render(rebuild = true) {
         undo: undoStack.length > 0,
         consoleTargeting,
         training: !!practice,
+        hud,
+        revealing,
       })
-    : "";
+    : null;
+  // The foot (piles, prepare, transmit) follows the hand in the DOM so Tab reaches the cards first.
+  $("#battle-hud").innerHTML = hudMarkup?.hud ?? "";
+  $("#battle-foot").innerHTML = hudMarkup?.foot ?? "";
+  if (battle) { fitEnemyPlate(); fitLedger(); }
   const signature = battle
     ? `${run.currentRoom}|${run.turn}|${run.energy}|${run.firstFiberPlayed}|${run.hand.join(",")}`
     : "";
@@ -381,7 +406,7 @@ function render(rebuild = true) {
     }
     save();
   }
-  if (battle && !practice && !run.bossIntroSeen && run.enemy && ENEMIES[run.enemy.id].boss && !dialog.open) {
+  if (battle && !practice && !run.bossIntroSeen && leaderOf(run) && ENEMIES[leaderOf(run)!.id].boss && !dialog.open) {
     modal = "boss-intro";
     dialog.className = "boss-intro";
     $("#dialog-content").innerHTML = screens.bossIntroMarkup(run);
@@ -389,6 +414,129 @@ function render(rebuild = true) {
     dialog.showModal();
     sound.effect("boss");
   }
+  // A choice waiting for the player (a message, a crate's cards) opens before the next hand
+  // is played, and on the victory screen.
+  if (view === "run" && !busy && !dialog.open && run.offers?.length && (run.phase === "battle" || run.phase === "reward")) openOffer();
+}
+/** The hostile plate must end above the Transmit dial (or the hand): long forecasts fold step
+ * by step — the description to fewer lines, then the ledger footer, then the description into
+ * the medallion's tooltip, then extras another element already shows. Every folded line stays
+ * in a tooltip and in Details. */
+function fitEnemyPlate() {
+  const plate = document.querySelector<HTMLElement>(".enemy-plate");
+  if (!plate) return;
+  // A port-strip name that folds onto a second line sets a little smaller, so both lines sit in the row.
+  plate.querySelectorAll<HTMLElement>(".port-name > span").forEach(name =>
+    name.classList.toggle("is-folded", name.offsetHeight > Number.parseFloat(getComputedStyle(name).fontSize) * 1.5));
+  // The chosen port's name sets a size smaller rather than lose letters beside its marks.
+  const head = plate.querySelector<HTMLElement>(".port-detail-head h2");
+  if (head && head.scrollWidth > head.clientWidth) head.classList.add("is-long");
+  clearFrame(plate);
+  const box = () => plate.getBoundingClientRect();
+  const dial = document.querySelector<HTMLElement>(".transmit-button")?.getBoundingClientRect();
+  const hand = document.querySelector<HTMLElement>(".card-fan")?.getBoundingClientRect();
+  const below = [dial, hand].filter((rect): rect is DOMRect => !!rect && rect.width > 0 && rect.left < box().right && rect.right > box().left && rect.top > box().top);
+  if (!below.length) return;
+  const limit = Math.min(...below.map(rect => rect.top)) - 2 * interfaceScale();
+  let clear = true;
+  for (const level of ["fold-1", "fold-2", "fold-3", "fold-4", "fold-5", "fold-6", "fold-7"]) {
+    if (box().bottom <= limit) return;
+    // Past the prose folds the frame's clearance gives way before any more content does.
+    if (clear && level === "fold-5") {
+      clear = false;
+      plate.style.paddingTop = plate.style.paddingBottom = "";
+      if (box().bottom <= limit) return;
+    }
+    plate.classList.add(level);
+    if (clear) clearFrame(plate);
+  }
+  // Still too tall: the dial matters more than the frame's clearance.
+  if (box().bottom > limit) plate.style.paddingTop = plate.style.paddingBottom = "";
+}
+/** The painted thorn frame stretches with the plate, so a tall plate's crest and corner spikes reach
+ * further in: the plate pads its first and last lines past them (measured from combat-frames.png:
+ * the top rail and crest arms end at 13.8 % of the frame's height beside the kicker's words, the
+ * bottom rail and corner spikes at 13.2 % above its foot). */
+function clearFrame(plate: HTMLElement) {
+  plate.style.paddingTop = plate.style.paddingBottom = "";
+  const frame = getComputedStyle(plate, "::before");
+  if (!frame.backgroundImage.includes("combat-frames")) return;
+  const style = getComputedStyle(plate);
+  const baseTop = Number.parseFloat(style.paddingTop), baseBottom = Number.parseFloat(style.paddingBottom);
+  const over = -Number.parseFloat(frame.top) || 0, under = -Number.parseFloat(frame.bottom) || 0;
+  for (let pass = 0; pass < 3; pass++) {
+    const height = plate.offsetHeight + over + under;
+    plate.style.paddingTop = `${Math.max(baseTop, Math.ceil(.138 * height - over + 3))}px`;
+    plate.style.paddingBottom = `${Math.max(baseBottom, Math.ceil(.132 * height - under + 3))}px`;
+  }
+}
+/** The network ledger stays one line above the field seals: tags fold (see battle.css) until it
+ * fits between the rails; only a ledger that still overflows wraps to a second line. */
+function fitLedger() {
+  const ledger = document.querySelector<HTMLElement>(".is-battle .network-ledger");
+  if (!ledger || getComputedStyle(ledger).flexWrap === "wrap") return;
+  const overflows = () => ledger.scrollWidth > ledger.clientWidth + 1;
+  for (const level of ["tight-1", "tight-2", "tight-3"]) {
+    if (!overflows()) return;
+    ledger.classList.add(level);
+  }
+  if (overflows()) ledger.classList.add("is-wrapping");
+}
+/** Encounter-scoped HUD moments: a hidden designation re-engraves once, an announced arrival rings once. */
+function revealDesignation(): boolean {
+  const key = `${run.seed}:${run.stage}:${run.currentRoom}`;
+  if (key !== hudRoom) { hudRoom = key; hud.port = hud.delivery = hud.installation = null; hud.demolition = false; }
+  const room = run.map.find(item => item.id === run.currentRoom);
+  if (practice || revealedKey === key || !room?.designationHidden || run.turn !== 1 || run.cardsPlayed) return false;
+  revealedKey = key;
+  // The strike of the cue lands as the ribbon's static clears.
+  sound.effect("reveal", { delay: .35 });
+  return true;
+}
+function announceArrival(forecast: ReturnType<typeof combatPreview>) {
+  const arrival = forecast.arrivals;
+  if (!arrival || practice) return;
+  const key = `${run.seed}:${run.stage}:${run.currentRoom}:${arrival.enemyId}`;
+  if (announcedKey === key) return;
+  announcedKey = key;
+  sound.effect("warning", { delay: .2 });
+}
+/** The message / crate-card dialog: no close stud, keys 1–3 choose. */
+function openOffer() {
+  const markup = alpha.offerDialogMarkup(run);
+  if (!markup) return;
+  cancelDrag();
+  modal = "offer";
+  $("#dialog-content").innerHTML = markup;
+  dialog.className = alpha.OFFER_DIALOG_CLASS;
+  hideTooltip();
+  if (!dialog.open) dialog.showModal();
+  resetDialogScroll();
+  sound.effect(alpha.offerKind(run) === "message" ? "message" : "pickup");
+}
+function answerOffer(index: number) {
+  if (modal !== "offer" || busy) return;
+  const kind = alpha.offerKind(run);
+  modal = "";
+  dialog.close();
+  dialog.className = "";
+  const cue = kind === "message" ? "message" : "draw";
+  if (run.phase === "battle") {
+    let message = "";
+    if (!playAction(() => { const result = chooseOffer(run, index); message = result.message; return result; }, cue)) { render(false); return; }
+    toast(message);
+    return;
+  }
+  const result = chooseOffer(run, index);
+  if (result.ok) {
+    toast(result.message);
+    sound.effect(cue);
+  } else {
+    toast(result.message, "error");
+    sound.effect("error");
+  }
+  save();
+  render();
 }
 /** Cable target button: warns before a new cable would fray over wreckage. */
 function cableTarget(id: string, cardId: CardId | null) {
@@ -397,7 +545,7 @@ function cableTarget(id: string, cardId: CardId | null) {
 }
 const bandName = (zone: string) => zone[0].toUpperCase() + zone.slice(1);
 function renderTargetDock() {
-  let markup = "";
+  let markup = "", front = false;
   if (view === "run" && run.phase === "battle") {
     if (consoleTargeting) {
       markup = `<div class="target-options console-targets"><span>Patch Cable · ${source ? "connect to" : "choose a device"}</span>${run.topology.nodes
@@ -409,6 +557,8 @@ function renderTargetDock() {
         markup = `<div class="target-options"><span>Place on the table, or</span><button data-action="auto-place">${ui.icon("cache", 14)} Deploy in a free socket</button>${(["north", "center", "south"] as const).map(zone => `<button data-deploy-zone="${zone}">${bandName(zone)} band</button>`).join("")}</div>`;
       else if (c?.target === "zone")
         markup = `<div class="target-options"><span>${ui.esc(c.name)} · choose a band or a field seal</span></div>`;
+      else if (hud.demolition)
+        markup = `<div class="target-options installation-targets"><span>${ui.esc(c.name)} · destroy an installation</span>${run.installations.map(item => `<button data-demolish="${item.id}" aria-label="${ui.esc(`Destroy the ${INSTALLATION_NAMES[item.kind]} in ${zoneForNode(item).toUpperCase()}`)}">${battleUi.glyph(item.kind, 14)} ${ui.esc(INSTALLATION_NAMES[item.kind])} <i class="plate-pips">${battleUi.integrityPips(item)}</i> · ${bandName(zoneForNode(item))}</button>`).join("")}<button data-action="cancel" class="target-cancel">Cancel <kbd>Esc</kbd></button></div>`;
       else if (c?.target === "link" || c?.target === "node")
         markup = `<div class="target-options"><span>${source ? "Connect to" : "Choose a device"}</span>${run.topology.nodes
           .filter(
@@ -424,13 +574,40 @@ function renderTargetDock() {
     }
     if (selected === null && selectedNode) {
       const node = run.topology.nodes.find(n => n.id === selectedNode);
-      const online = node && !node.fixed && combatPreview(run).online.includes(node.id);
-      if (node) markup = `<div class="target-options device-controls"><span><b>${ui.esc(node.id.toUpperCase())}</b> · ${bandName(zoneForNode(node))}${node.fixed ? "" : online ? " · online" : " · offline"}${node.configured ? " · configured" : ""}${node.upgraded ? " · overclocked" : ""}${node.shielded ? " · jam protected" : ""}${node.salvage ? " · salvaged" : ""}</span>${node.fixed ? "" : `<span>Relocate · ${RULES.relocateCost} energy</span>${(["north", "center", "south"] as const).map(zone => `<button data-relocate-zone="${zone}" ${run.energy < RULES.relocateCost ? "disabled" : ""}>${bandName(zone)}</button>`).join("")}`}<button data-action="cancel" class="target-cancel">Close <kbd>Esc</kbd></button></div>`;
+      const forecast = combatPreview(run);
+      const online = node && !node.fixed && forecast.online.includes(node.id);
+      if (node) {
+        // Condition pips in the header; Repair beside the relocation bands (disabled with its reason).
+        const wearable = !node.fixed && node.role !== "phantom";
+        const condition = wearable ? conditionOf(node) : 0, max = wearable ? maxConditionOf(node) : 0;
+        const cost = repairCost(run), worn = wearable && isWorn(node);
+        const reason = !wearable ? "" : !worn ? `${node.id.toUpperCase()} is at full condition.` : run.energy < cost ? `Repair costs ${cost} energy.` : "";
+        const threat = forecast.wear.find(record => record.nodeId === node.id || record.sheltered === node.id);
+        const pip = (now: number) => `${"◆".repeat(now)}${"◇".repeat(Math.max(0, max - now))}`;
+        const repairButton = wearable ? `<button class="repair-button" data-repair="${node.id}" ${reason ? "disabled" : ""} data-tooltip="${ui.esc(reason || `Restore one condition point for ${cost} energy.`)}" aria-label="${ui.esc(`Repair ${node.id.toUpperCase()}, ${cost} energy, condition ${condition} of ${max}${reason ? `. ${reason}` : ""}`)}">${battleUi.glyph("wrench", 14)} Repair · ${cost}${ui.icon("bolt", 12)} · ${pip(condition)} → ${pip(Math.min(max, condition + 1))} <kbd>R</kbd></button>` : "";
+        const source = (text: string) => text.replace(/^([^·]+?)(?= ·|$)/, name => name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase()));
+        // One row where it fits (who, what threatens it, relocation, repair), wrapping to two.
+        markup = `<div class="target-options device-controls"><span><b>${ui.esc(node.id.toUpperCase())}</b>${wearable ? ` <i class="plate-pips${worn ? " is-worn" : ""}" aria-label="condition ${condition} of ${max}">${pip(condition)}</i>` : ""} · ${bandName(zoneForNode(node))}${node.fixed ? "" : online ? " · online" : " · offline"}${worn ? " · worn" : ""}${node.configured ? " · configured" : ""}${node.upgraded ? " · overclocked" : ""}${node.shielded ? " · jam protected" : ""}${node.salvage ? " · salvaged" : ""}${threat ? ` <em class="device-threat">${ui.esc(`${source(threat.source)} ${threat.breaks ? "breaks it" : `wears it ${threat.from} → ${threat.to}`}${threat.sheltered ? ` (${threat.nodeId.toUpperCase()} shelters it)` : ""}`)}</em>` : ""}</span><button data-action="cancel" class="target-cancel plate-close" aria-label="Close · Esc" data-tooltip="Close · Esc">${ui.icon("close", 11)}</button>${node.fixed && !repairButton ? "" : `<span class="dock-actions">${node.fixed ? "" : `<span class="dock-label">Relocate · ${RULES.relocateCost}${ui.icon("bolt", 12)}</span>${(["north", "center", "south"] as const).map(zone => `<button data-relocate-zone="${zone}" ${run.energy < RULES.relocateCost ? "disabled" : ""}>${bandName(zone)}</button>`).join("")}`}${repairButton}</span>`}</div>`;
+      }
     }
+    if (selected === null && !selectedNode && hud.installation) {
+      const item = run.installations.find(entry => entry.id === hud.installation);
+      if (item) {
+        const forecast = combatPreview(run), cost = scrubCost(run), name = INSTALLATION_NAMES[item.kind];
+        const base = Math.max(item.integrity, RULES.installationIntegrity[item.kind] ?? item.integrity);
+        const pip = (now: number) => `${"◆".repeat(Math.max(0, now))}${"◇".repeat(Math.max(0, base - now))}`;
+        const reason = run.energy < cost ? `Scrubbing costs ${cost} energy per point${cost > RULES.scrubCost ? " while a Quarantine Drone lives" : ""}.` : "";
+        markup = `<div class="target-options installation-controls kind-${item.kind}"><span><b>${ui.esc(name.toUpperCase())}</b> <i class="plate-pips" aria-label="integrity ${item.integrity}">${pip(item.integrity)}</i> · ${bandName(zoneForNode(item))}${item.kind === "breaker" && item.countdown !== undefined ? ` · <i class="plate-count">${item.countdown}</i>` : ""}</span><span class="installation-effect">${ui.esc(battleUi.installationEffectLine(run, forecast, item))}</span><button class="scrub-button" data-scrub="${item.id}" ${reason ? "disabled" : ""} data-tooltip="${ui.esc(reason || `Remove one integrity point for ${cost} energy; at 0 it is destroyed and Reclaim adds ${RULES.reclaimShield} shield.`)}" aria-label="${ui.esc(`Scrub the ${name}, ${cost} energy, ${item.integrity} integrity left${reason ? `. ${reason}` : ""}`)}">${battleUi.glyph("scrub", 14)} Scrub · ${cost} energy · ${pip(item.integrity)} → ${pip(item.integrity - 1)} <kbd>S</kbd></button><button data-action="cancel" class="target-cancel plate-close" aria-label="Close · Esc" data-tooltip="Close · Esc">${ui.icon("close", 11)}</button></div>`;
+      }
+    }
+    // The table-front plates (a device, an installation) take the field seals' row, so they
+    // never cover the table they describe; card targeting keeps its place above the seals.
+    front = /device-controls|installation-controls/.test(markup);
     if (webglFailed)
       markup += `<div class="fallback-network">${run.topology.links.map((l) => `${ui.esc(l.a)} ↔ ${ui.esc(l.b)}`).join(" · ") || "ALPHA · No connections · OMEGA"}</div>`;
   }
   $("#target-dock").innerHTML = markup;
+  $("#target-dock").classList.toggle("is-front", front);
 }
 function openModal(type: string) {
   if (busy) return;
@@ -444,7 +621,7 @@ function openModal(type: string) {
   else if (type === "help") content.innerHTML = training.handbookMarkup();
   else if (type === "training") content.innerHTML = training.lessonMenuMarkup(training.loadCompletedLessons());
   else if (type === "combat-details") content.innerHTML = alpha.combatDetailsMarkup(run);
-  else if (type === "enemy-dossier") content.innerHTML = alpha.enemyDossierMarkup(run);
+  else if (type === "enemy-dossier") content.innerHTML = alpha.enemyDossierMarkup(run, hud.port ?? effectiveFocus(run) ?? undefined);
   else if (type === "combat-log") content.innerHTML = alpha.historyMarkup(run);
   else if (type === "devices") content.innerHTML = alpha.devicesMarkup(run);
   else if (type === "prepare") content.innerHTML = alpha.prepareMarkup(run);
@@ -469,12 +646,14 @@ function openModal(type: string) {
     "training",
   ].includes(type)
     ? `wide${type === "help" ? " handbook-dialog" : type === "training" ? " training-dialog" : ""}`
-    : type === "devices" ? "medium" : "";
+    : type === "devices" || type === "enemy-dossier" ? "medium" : "";
   hideTooltip();
   if (!dialog.open) dialog.showModal();
   resetDialogScroll();
 }
 function closeModal() {
+  // A message was already opened: it is answered, never dismissed.
+  if (modal === "offer") return;
   if (modal === "boss-intro") {
     run.bossIntroSeen = true;
     save();
@@ -521,15 +700,18 @@ function reshuffled(before: RunState, after: RunState) {
   return newLogLines(before, after).some(line => /reshuffl/i.test(line));
 }
 function liveChannels(state: RunState) {
-  return state.phase === "battle" && state.enemy ? combatPreview(state).channels : 0;
+  return state.phase === "battle" && state.enemies.length ? combatPreview(state).channels : 0;
 }
 /** The primary cue for a successful card or board action, chosen by its real effect. */
 function actionCue(before: RunState, after: RunState, card?: CardId): EffectKind {
   if (after.topology.nodes.length > before.topology.nodes.length) return "deploy";
   if (after.topology.links.length > before.topology.links.length) return "connect";
   if (card && CARDS[card]?.target === "protocol") return "protocol";
-  if (after.malware.length < before.malware.length) return "scrub";
-  if (after.integrity > before.integrity || after.faultNode !== before.faultNode || after.faultLink !== before.faultLink) return "cleanse";
+  if (installationPoints(after) < installationPoints(before)) return "scrub";
+  if (after.integrity > before.integrity || faultKey(after) !== faultKey(before)) return "cleanse";
+  // A repair card restored a condition point (design 13.12: a device is repaired).
+  const condition = (r: RunState) => r.topology.nodes.reduce((sum, node) => sum + (isWorn(node) ? conditionOf(node) - maxConditionOf(node) : 0), 0);
+  if (after.topology.nodes.length === before.topology.nodes.length && condition(after) > condition(before)) return "repair";
   if (after.block > before.block) return "block";
   if (card && (CARDS[card]?.junk || CARDS[card]?.curse)) return "scrub";
   return card ? "instant" : "card";
@@ -547,7 +729,7 @@ function playAction(action: () => ActionResult, cue?: EffectKind, card?: CardId)
   undoStack.push(before);
   if (undoStack.length > 20) undoStack.shift();
   if (run.block > before.block) world?.pulseNetwork("shield");
-  else if (run.faultNode !== before.faultNode || run.faultLink !== before.faultLink || run.integrity > before.integrity) world?.pulseNetwork("repair");
+  else if (faultKey(run) !== faultKey(before) || run.integrity > before.integrity) world?.pulseNetwork("repair");
   else if (run.energy > before.energy || run.packetBoost > before.packetBoost || run.buffer > before.buffer) world?.pulseNetwork("surge");
   if (run.block > before.block) floatText(`+${run.block - before.block} shield`, false, "shield");
   if (run.packetBoost > before.packetBoost) floatText(`+${run.packetBoost - before.packetBoost} burst`, true, "burst");
@@ -594,6 +776,15 @@ function chooseCard(index: number) {
   }
   consoleTargeting = false;
   if (c.target === "instant") {
+    // Demolition Charge chooses the installation it destroys (click one, its tag, or the table).
+    if (baseCard(id) === "demolition-charge" && run.installations.length) {
+      const lifting = !(selected === index && hud.demolition);
+      clearSelection();
+      if (lifting) { selected = index; hud.demolition = true; }
+      render(false);
+      sound.effect(lifting ? "pickup" : "undo");
+      return;
+    }
     playAction(() => playInstant(run, index), undefined, id);
     return;
   }
@@ -635,11 +826,119 @@ function activateConsole() {
 }
 function scrub(id: string) {
   if (!playable()) return;
-  const target = run.malware.find(m => m.id === id);
-  if (playAction(() => scrubMalware(run, id), "scrub") && target) {
+  const target = run.installations.find(m => m.id === id);
+  if (target && lessonMove({ kind: "scrub", installation: id })) return;
+  const open = hud.installation === id;
+  if (playAction(() => scrubInstallation(run, id), "scrub") && target) {
     world?.pulseNode?.(id, "scrub");
-    floatText(`malware scrubbed`, true, "scrub");
+    const standing = run.installations.some(m => m.id === id);
+    floatText(standing ? "scrubbed −1" : "installation destroyed", true, "scrub");
+    // The plate stays open on a standing installation, so a second point is one more press.
+    if (open && standing) { hud.installation = id; render(false); }
   }
+}
+function repair(id: string) {
+  if (!playable()) return;
+  if (lessonMove({ kind: "repair", node: id })) return;
+  const open = selectedNode === id;
+  if (playAction(() => repairNode(run, id), "repair")) {
+    world?.pulseNode?.(id, "repair");
+    if (open && run.topology.nodes.some(n => n.id === id)) { selectedNode = id; render(false); }
+  }
+}
+/** Run a table-front move from inside the Devices journal: the dialog steps aside for the action
+ * (playAction needs a closed dialog), then the journal returns with the new state and focus. */
+function journalAction(move: () => void) {
+  const scroll = dialog.querySelector(".dialog-surface")?.scrollTop ?? 0;
+  const focusKey = (document.activeElement as HTMLElement | null)?.dataset;
+  const again = focusKey?.scrub ? `[data-scrub="${focusKey.scrub}"]` : focusKey?.repair ? `[data-repair="${focusKey.repair}"]` : "";
+  modal = "";
+  dialog.close();
+  move();
+  if (run.phase !== "battle" || dialog.open) return;
+  modal = "devices";
+  $("#dialog-content").innerHTML = alpha.devicesMarkup(run);
+  dialog.className = "medium";
+  dialog.showModal();
+  const surface = dialog.querySelector(".dialog-surface");
+  if (surface) surface.scrollTop = scroll;
+  if (again) dialog.querySelector<HTMLElement>(again)?.focus();
+}
+/** Rails for the v4 moves (aim, focus, repair, scrub): the lesson guard refuses them outside their step. */
+function lessonMove(action: Extract<training.LessonAction, { kind: "aim" | "focus" | "repair" | "scrub" }>): boolean {
+  return lessonBlocks(action);
+}
+/** Select a port (rail plate, sprite or strip row): the right plate shows its hostile.
+ * Reading only: selection never changes a number. */
+function selectPort(port: Port) {
+  if (!playable() || !livingEnemies(run).some(enemy => enemy.port === port)) return;
+  const changed = hud.port !== port;
+  hud.port = port;
+  render(false);
+  if (changed) sound.effect("select");
+}
+/** Make a port the focus: every unaimed delivery and all overflow go there (free, undoable). */
+function focusPort(port: Port) {
+  if (!playable() || !livingEnemies(run).some(enemy => enemy.port === port)) return;
+  hud.port = port;
+  if (effectiveFocus(run) === port && run.focus === port) { render(false); return; }
+  if (lessonMove({ kind: "focus", port })) return;
+  playAction(() => setFocus(run, port), "aim");
+}
+/** Re-aim one delivery at a port (null follows the focus): ledger studs, T, and the table's packet glyphs. */
+function aimDelivery(channelKey: string, port: Port | null) {
+  if (!playable()) return;
+  const delivery = combatPreview(run).deliveries.find(item => item.channelKey === channelKey);
+  if (!delivery) return;
+  hud.delivery = channelKey;
+  if (port !== null && delivery.port === port && (delivery.aimed || effectiveFocus(run) === port)) { render(false); return; }
+  if (lessonMove({ kind: "aim", key: channelKey, port })) return;
+  playAction(() => aimChannel(run, channelKey, port), "aim");
+}
+/** Select an installation (table click, ledger or journal): its scrub plate opens in the dock.
+ * While Demolition Charge is choosing, the installation is its target instead. */
+function selectInstallation(id: string) {
+  if (!playable() || !run.installations.some(item => item.id === id)) return;
+  if (hud.demolition && selected !== null) { demolish(id); return; }
+  if (selected !== null || consoleTargeting) return;
+  hud.installation = hud.installation === id ? null : id;
+  selectedNode = null;
+  render(false);
+  sound.effect(hud.installation ? "select" : "undo");
+}
+/** Demolition Charge on the chosen installation. */
+function demolish(id: string) {
+  if (selected === null || baseCard(run.hand[selected]) !== "demolition-charge") return;
+  const index = selected, card = run.hand[index], item = run.installations.find(entry => entry.id === id);
+  if (!item) return;
+  if (playAction(() => playInstant(run, index, id), undefined, card)) {
+    world?.pulseNode?.(id, "scrub");
+    floatText(`${INSTALLATION_NAMES[item.kind]} destroyed`, true, "scrub");
+  }
+}
+/** The device the R key repairs without a selection: the most worn (ties: primary route, then earliest). */
+function mostWornDevice() {
+  const primary = combatPreview(run).signalPath;
+  return run.topology.nodes.filter(isWorn)
+    .sort((a, b) => conditionOf(a) - maxConditionOf(a) - (conditionOf(b) - maxConditionOf(b)) || Number(!primary.includes(a.id)) - Number(!primary.includes(b.id)))[0] ?? null;
+}
+/** The view the table mirrors: selected port, delivery and installation, and installation targeting. */
+function worldView() {
+  return {
+    selectedPort: hud.port,
+    selectedDelivery: hud.delivery,
+    selectedInstallation: hud.installation,
+    targetingInstallation: hud.demolition,
+  };
+}
+// Browser tests reach the table's click targets without the canvas (dev server only).
+if (import.meta.env.DEV) (globalThis as { __faultlineHud?: unknown }).__faultlineHud = { selectPort, selectInstallation, aimDelivery, focusPort, selectNode: onNode };
+/** Forget selections that no longer point at anything (a fallen hostile, a scrubbed installation). */
+function settleHud() {
+  if (view !== "run" || run.phase !== "battle") { hud.port = hud.delivery = hud.installation = null; hud.demolition = false; return; }
+  if (hud.port && !livingEnemies(run).some(enemy => enemy.port === hud.port)) hud.port = null;
+  if (hud.installation && !run.installations.some(item => item.id === hud.installation)) hud.installation = null;
+  if (hud.demolition && (selected === null || baseCard(run.hand[selected] ?? "guard") !== "demolition-charge")) hud.demolition = false;
 }
 function onGround(point: WorldPoint) {
   if (!playable() || selected === null) return;
@@ -702,6 +1001,7 @@ function onNode(id: string) {
   }
   if (selectedNode !== id) sound.effect("select");
   selectedNode = id;
+  hud.installation = null;
   render(false);
 }
 function onMove(id: string, point: WorldPoint | null, finished: boolean) {
@@ -745,7 +1045,7 @@ function onMove(id: string, point: WorldPoint | null, finished: boolean) {
   const topology = structuredClone(run.topology);
   const moved = topology.nodes.find(n => n.id === id)!;
   moved.x = point.x; moved.z = point.z;
-  world?.setBattle(topology, run.enemy, run.faultNode, run.faultLink);
+  world?.previewTopology(topology);
 }
 function relocateToZone(zone: "north" | "center" | "south") {
   if (!selectedNode || !playable()) return;
@@ -802,66 +1102,41 @@ function undo() {
   render();
   sound.effect("undo");
 }
-function floatText(text: string, good: boolean, kind = "") {
+function floatText(text: string, good: boolean, kind = "", anchored = false) {
   const el = document.createElement("span");
   el.className = `damage-number ${good ? "outgoing" : "incoming"} ${kind}`;
   el.textContent = text;
-  $("#impact-layer").append(el);
+  const layer = $("#impact-layer");
+  // Numbers born in the same beat at the same spot ("2 blocked", "installation planted") stack
+  // one under the other instead of printing over each other.
+  if (!anchored) {
+    const now = performance.now(), side = good ? "outgoing" : "incoming";
+    const recent = Array.from(layer.querySelectorAll<HTMLElement>(`.damage-number.${side}[data-born]`)).filter(item => now - Number(item.dataset.born) < 900).length;
+    el.dataset.born = String(now);
+    if (recent) el.style.marginTop = `${recent * 1.05}em`;
+  }
+  layer.append(el);
   window.setTimeout(() => el.remove(), 1500);
 }
-/** Where a honeypot or protocol answered the forecast action, for the trap flash. */
-function trapFocus(forecast: ReturnType<typeof combatPreview>): { id: string; kind: "trap" | "trigger" } | null {
-  const target = forecast.faultTarget;
-  const role = (id: string) => run.topology.nodes.find(n => n.id === id)?.role;
-  if (target) {
-    const ends = target.split("::");
-    const decoy = ends.find(id => role(id) === "honeypot");
-    if (decoy && forecast.enemyDamage) return { id: decoy, kind: "trap" };
-    if (forecast.protocolTriggers.length) return { id: ends.find(id => !["alpha", "omega"].includes(id)) ?? ends[0], kind: "trigger" };
-  }
-  if (forecast.protocolTriggers.length) {
-    const firewall = run.topology.nodes.find(n => n.role === "firewall" && forecast.online.includes(n.id));
-    return { id: firewall?.id ?? "omega", kind: "trigger" };
-  }
-  return null;
-}
+/** Transmit: resolve the turn on a copy, play the enemy phase from its forecast (battle-playback.ts),
+ * then commit. The generation guard abandons a playback when the battle changes under it. */
 function transmit() {
   if (!playable()) return;
   if (lessonBlocks({ kind: "transmit" })) return;
   const generation = ++battleGeneration;
-  const forecast = combatPreview(run);
   clearSelection();
   busy = true;
   undoStack.length = 0;
-  const next = structuredClone(run),
+  const before = run, next = structuredClone(run),
     result = endTurn(next);
-  const becomesEnraged = !result.defeated && next.enemy && ENEMIES[next.enemy.id].enrages && run.enemy!.hp > run.enemy!.maxHp / 2 && next.enemy.hp <= next.enemy.maxHp / 2;
   const reshuffle = reshuffled(run, next);
-  const trap = trapFocus(forecast);
-  if (result.buffered) sound.effect("buffer");
-  else {
-    sound.effect("transmit");
-    if (result.bufferReleased) sound.effect("release", { delay: .12 });
-  }
   render(false);
-  const finish = () => {
-    if (generation !== battleGeneration) return;
-    if (result.packetDamage) {
-      world?.impact(0xfbd69a, 36);
-      sound.effect("hit", { power: Math.min(1.2, .7 + result.packetDamage / 12) });
-      floatText(`−${result.packetDamage}`, true);
-      // Show contact immediately while the already forecast enemy action remains
-      // committed. The rule state advances only when the sequence completes.
-      const hp = Math.max(0, run.enemy!.hp - result.packetDamage);
-      const health = $(".enemy-health");
-      health.setAttribute("aria-valuenow", String(hp));
-      health.querySelector<HTMLElement>("span")!.style.width = `${hp / run.enemy!.maxHp * 100}%`;
-      health.querySelector(".health-risk")?.remove();
-      $(".enemy-health-label strong").innerHTML = `${hp}<small> / ${run.enemy!.maxHp}</small>`;
-    } else if (result.buffered) floatText(`+${result.buffered} buffered`, true, "buffer");
-    else if (!result.enemyDamage) toast(result.signalPath.length ? "The signal was absorbed. Check armor, malware and hostile fields." : "No live route. The signal could not reach OMEGA.", "error");
-    const resolve = () => {
-      if (generation !== battleGeneration) return;
+  playTurn({
+    world, before, next, result, reshuffle,
+    fast: preferences.fast,
+    motion: sound.settings.motion,
+    alive: () => generation === battleGeneration,
+    commit: () => {
       run = next;
       expedition!.run = run;
       busy = false;
@@ -870,96 +1145,37 @@ function transmit() {
       updateLesson();
       save();
       render();
-      if (forecast.zoneThreat && !result.defeated) { world?.pulseZone(forecast.zoneThreat.zone,"corrupt"); if (forecast.intent?.kind !== "corrupt") sound.effect("corrupt", { delay: .1 }); }
-      if (result.junkAdded.length && !result.defeated) {
-        sound.effect("junk", { delay: .25 });
-        toast(`${result.junkAdded.length} ${CARDS[result.junkAdded[0]].name} shuffled into your draw pile.`, "error");
-      }
-      if (result.malwarePlanted && !result.defeated) floatText("malware planted", false, "malware");
-      if (result.backpressureStored) floatText(`+${result.backpressureStored} backpressure`, true, "burst");
-      if (result.defeated) {
-        sound.effect("reward");
-        return;
-      }
-      if (result.bufferLost) toast("Packet loss: no live route at the start of your turn. The buffer was lost.", "error");
-      if (result.integrityDamage) {
-        world?.pulseThreat();
-        sound.effect(result.lost ? "defeat" : "hurt");
-        floatText(`−${result.integrityDamage}`, false);
+    },
+    hooks: {
+      sound: (kind, options) => sound.effect(kind, options),
+      toast,
+      floatText: (text, good, kind = "", port) => {
+        const at = port ? world?.portScreen(port) : null;
+        floatText(text, good, kind, !!at);
+        const layer = $("#impact-layer"), number = layer.lastElementChild as HTMLElement | null;
+        if (!at || !number) return;
+        // Over its hostile: numbers for several ports stack side by side instead of on one spot.
+        const box = layer.getBoundingClientRect();
+        number.style.left = `${(at.x - box.left) / box.width * 100}%`;
+        number.style.top = `${(at.y - box.top) / box.height * 100}%`;
+        number.style.marginLeft = `${-number.offsetWidth / 2}px`;
+      },
+      render: rebuild => render(rebuild),
+      showPortHit: battleUi.showPortHit,
+      data: (key, value) => { if (value === null) delete root.dataset[key]; else root.dataset[key] = value; },
+      shake: () => {
         root.classList.remove("shake");
         void root.offsetWidth;
         if (sound.settings.motion) root.classList.add("shake");
-      } else if (result.enemyAction) {
-        if (!result.interrupted && forecast.intent?.kind !== "charge") world?.pulseThreat();
-        if (forecast.shield && forecast.incomingRaw) {
-          floatText(`${Math.min(forecast.shield, forecast.incomingRaw)} blocked`, false, "shield");
-          sound.effect("block");
-        }
-        toast(result.enemyAction);
-      }
-      if (forecast.enemyHealing) floatText(`+${forecast.enemyHealing} siphoned`, true, "enemy-heal");
-      if (result.interrupted) toast("Ultimate interrupted. The guardian is exposed for one transmission.");
-      else if (becomesEnraged) toast(`${run.enemy!.name} awakens. Its attacks grow stronger.`, "error");
-      // The new hand arrives after the hit has landed; a reshuffle is heard only when it happened.
-      if (!result.lost) {
-        const delay = result.integrityDamage ? .45 : .15;
-        if (reshuffle) sound.effect("shuffle", { delay });
-        sound.effect("deal", { delay: reshuffle ? delay + .75 : delay });
-      }
-      const flash = $("#battle-flash");
-      flash.classList.remove("active");
-      void flash.offsetWidth;
-      flash.classList.add("active");
-    };
-    const afterEnemy = () => {
-      if (generation !== battleGeneration) return;
-      if (becomesEnraged && !result.lost) {
-        sound.effect("enrage");
-        if (world) world.playEnemyTransition("enrage", resolve, preferences.fast);
-        else resolve();
-      } else resolve();
-    };
-    window.setTimeout(() => {
-      if (generation !== battleGeneration) return;
-      // Countermeasures fire on the same contact frame as the attack they answer.
-      const springTraps = () => {
-        if (!trap && !result.enemyDamage && !result.protocolsTriggered.length) return;
-        sound.effect("trigger", { delay: .06 });
-        if (trap) world?.pulseNode?.(trap.id, trap.kind);
-        if (result.enemyDamage) floatText(`−${result.enemyDamage} trap`, true, "trap");
-        if (result.protocolsTriggered.length) floatText(result.protocolsTriggered.map(id => CARDS[id].name).join(" · "), true, "protocol");
-      };
-      if (result.interrupted) {
-        root.dataset.enemyAction = "break";
-        sound.effect("trigger");
-        floatText("INTERRUPTED", true, "burst");
-        if (world) world.playEnemyTransition("break", afterEnemy, preferences.fast);
-        else afterEnemy();
-      } else if (!result.defeated && forecast.intent) {
-        const kind = forecast.intent.kind;
-        root.dataset.enemyAction = kind;
-        if (kind === "breach" || kind === "charge") sound.effect("charge");
-        const impact = () => {
-          if (kind !== "charge") sound.effect(INTENT_CUES[kind] ?? "strike", { pan: kind === "breach" ? .35 : kind === "strike" ? -.35 : 0, power: forecast.intent?.ultimate ? 1.2 : 1 });
-          if (forecast.intent?.infect && kind !== "infect") sound.effect("malware", { delay: .1 });
-          springTraps();
-        };
-        if (world) world.playEnemyAction(kind, forecast.faultTarget, forecast.hazardZone, afterEnemy, preferences.fast, impact);
-        else { impact(); window.setTimeout(afterEnemy, 160); }
-      } else {
-        // Traps can finish the hostile as it moves: show them before it falls.
-        if (!result.packetDamage || result.enemyDamage) springTraps();
-        sound.effect("death");
-        if (world) world.playEnemyTransition("death", resolve, preferences.fast);
-        else resolve();
-      }
-    }, preferences.fast || !sound.settings.motion ? 80 : 350);
-  };
-  const channels = result.channelPaths.length ? result.channelPaths : [result.signalPath].filter(path => path.length);
-  if (channels.length && world && !preferences.fast && sound.settings.motion) {
-    if (world.playChannels) world.playChannels(channels, finish);
-    else world.playPacket(channels[0], finish);
-  } else window.setTimeout(finish, preferences.fast || !sound.settings.motion ? 80 : 550);
+      },
+      flash: () => {
+        const flash = $("#battle-flash");
+        flash.classList.remove("active");
+        void flash.offsetWidth;
+        flash.classList.add("active");
+      },
+    },
+  });
 }
 function exportNetwork() {
   const link = document.createElement("a");
@@ -991,6 +1207,7 @@ async function action(name: string) {
     sound.effect("select");
     return;
   }
+  if (name === "lesson-read" && practice) { acknowledgeLesson(); return; }
   if (name === "close") {
     closeModal();
     return;
@@ -1144,6 +1361,8 @@ document.addEventListener("click", (event) => {
     void action(name);
     return;
   }
+  const offer = target.closest<HTMLElement>("[data-offer]")?.dataset.offer;
+  if (offer !== undefined && modal === "offer") { answerOffer(Number(offer)); return; }
   const managedNode = target.closest<HTMLElement>("[data-manage-node]")?.dataset.manageNode;
   if (managedNode && modal === "devices") { closeModal(); onNode(managedNode); return; }
   const preparedIndex = target.closest<HTMLElement>("[data-prepare-card]")?.dataset.prepareCard;
@@ -1171,10 +1390,41 @@ document.addEventListener("click", (event) => {
     sound.effect("select");
     return;
   }
+  // The far rail: the crest sets the focus, a row selects its port, a stud aims a delivery.
+  if (!dialog.open) {
+    const crest = target.closest<HTMLElement>("[data-focus-port]")?.dataset.focusPort as Port | undefined;
+    if (crest) { focusPort(crest); return; }
+    const row = target.closest<HTMLElement>(".port-row[data-port]")?.dataset.port as Port | undefined;
+    if (row) { selectPort(row); return; }
+    const stud = target.closest<HTMLElement>("[data-aim][data-aim-port]");
+    if (stud) { aimDelivery(stud.dataset.aim!, stud.dataset.aimPort as Port); return; }
+    const delivery = target.closest<HTMLElement>(".delivery-row[data-delivery]")?.dataset.delivery;
+    if (delivery && playable()) { hud.delivery = delivery; render(false); sound.effect("select"); return; }
+    const demolishId = target.closest<HTMLElement>("[data-demolish]")?.dataset.demolish;
+    if (demolishId) { selectInstallation(demolishId); return; }
+  }
+  // The dossier's rail: each hostile's plate opens its page in place.
+  const dossierPort = target.closest<HTMLElement>("[data-dossier-port]")?.dataset.dossierPort as Port | undefined;
+  if (dossierPort && modal === "enemy-dossier") {
+    hud.port = livingEnemies(run).some(enemy => enemy.port === dossierPort) ? dossierPort : hud.port;
+    $("#dialog-content").innerHTML = alpha.enemyDossierMarkup(run, dossierPort);
+    sound.effect("select");
+    return;
+  }
+  // From the Devices journal, scrub and repair keep the journal open (keyboard-only play can
+  // scrub twice or repair then scrub); it re-renders with the new pips.
   const scrubId = target.closest<HTMLElement>("[data-scrub]")?.dataset.scrub;
+  const repairId = target.closest<HTMLElement>("[data-repair]")?.dataset.repair;
+  if ((scrubId || repairId) && modal === "devices") {
+    journalAction(() => scrubId ? scrub(scrubId) : repair(repairId!));
+    return;
+  }
   if (scrubId) {
-    if (modal === "devices") closeModal();
     scrub(scrubId);
+    return;
+  }
+  if (repairId) {
+    repair(repairId);
     return;
   }
   const fieldZone = target.closest<HTMLElement>("[data-field-zone]")?.dataset.fieldZone as Zone | undefined;
@@ -1375,7 +1625,7 @@ function cancelDrag() {
   cardDrag = null;
   world?.cancelInteraction?.();
   world?.setPlacement(null);
-  if (restorePreview) world?.setBattle(run.topology, run.enemy, run.faultNode, run.faultLink);
+  if (restorePreview) world?.setBattle(run.topology, run.enemies, run.faultNodes, run.faultLinks);
 }
 window.addEventListener("pointercancel", cancelDrag);
 window.addEventListener("blur", cancelDrag);
@@ -1395,7 +1645,17 @@ window.addEventListener("pointerup", (event) => {
   setTimeout(() => (ignoreClick = false), 0);
 });
 document.addEventListener("keydown", (event) => {
-  if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+  // [ and ] need AltGr on some layouts (German): let exactly those through.
+  const altGraph = (event.key === "[" || event.key === "]") && event.getModifierState?.("AltGraph");
+  if (((event.ctrlKey || event.altKey) && !altGraph) || event.metaKey || event.repeat) return;
+  // A message waits for its answer: 1, 2, 3 choose.
+  if (dialog.open && modal === "offer") {
+    if (/^[1-9]$/.test(event.key) && dialog.querySelector(`[data-offer="${Number(event.key) - 1}"]`)) {
+      event.preventDefault();
+      answerOffer(Number(event.key) - 1);
+    }
+    return;
+  }
   if (event.target instanceof HTMLInputElement || dialog.open) return;
   if (event.key.toLowerCase() === "i") {
     const card = ((event.target as HTMLElement).closest<HTMLElement>("[data-card-id]")?.dataset.cardId ?? (selected !== null ? run.hand[selected] : undefined)) as CardId | undefined;
@@ -1420,7 +1680,7 @@ document.addEventListener("keydown", (event) => {
   }
   if (event.key === "Escape") {
     event.preventDefault();
-    if (selected !== null || selectedNode || deviceDragging || cardDrag || consoleTargeting) {
+    if (selected !== null || selectedNode || deviceDragging || cardDrag || consoleTargeting || hud.installation || hud.demolition) {
       clearSelection();
       render(false);
       sound.effect("undo");
@@ -1446,6 +1706,7 @@ document.addEventListener("keydown", (event) => {
     event.preventDefault();
     undo();
   }
+  if (tableKey(event)) return;
   if (
     (event.key === "Enter" || event.code === "Space") &&
     !(event.target instanceof HTMLButtonElement)
@@ -1467,6 +1728,53 @@ window.addEventListener("pagehide", (event) => {
   save();
   if (!event.persisted) world?.dispose();
 });
+/** Targeting and table-front keys (13.8): F focus, [ ] choose a delivery, T aim it, R repair, S scrub. */
+function tableKey(event: KeyboardEvent): boolean {
+  const key = event.key.toLowerCase();
+  if (!["f", "[", "]", "t", "r", "s"].includes(key)) return false;
+  event.preventDefault();
+  const living = livingEnemies(run).map(enemy => enemy.port);
+  if (key === "f") {
+    if (hud.port && living.includes(hud.port) && hud.port !== effectiveFocus(run)) focusPort(hud.port);
+    else if (living.length > 1) {
+      const focus = effectiveFocus(run);
+      focusPort(living[(living.indexOf(focus ?? living[0]) + 1) % living.length]);
+    }
+    return true;
+  }
+  if (key === "[" || key === "]") {
+    const deliveries = combatPreview(run).deliveries;
+    if (!deliveries.length) return true;
+    const at = deliveries.findIndex(item => item.channelKey === hud.delivery);
+    const next = at < 0 ? (key === "]" ? 0 : deliveries.length - 1) : (at + (key === "]" ? 1 : -1) + deliveries.length) % deliveries.length;
+    hud.delivery = deliveries[next].channelKey;
+    render(false);
+    sound.effect("select");
+    document.querySelector<HTMLElement>(`.delivery-row[data-delivery="${CSS.escape(hud.delivery)}"] .port-stud.is-current`)?.focus({ preventScroll: true });
+    return true;
+  }
+  if (key === "t") {
+    const deliveries = combatPreview(run).deliveries;
+    const delivery = deliveries.find(item => item.channelKey === hud.delivery) ?? deliveries[0];
+    if (!delivery || living.length < 2) return true;
+    aimDelivery(delivery.channelKey, living[(living.indexOf(delivery.port) + 1) % living.length]);
+    return true;
+  }
+  if (key === "r") {
+    const chosen = selectedNode && run.topology.nodes.find(node => node.id === selectedNode);
+    const node = chosen && isWorn(chosen) ? chosen : chosen ? null : mostWornDevice();
+    if (chosen && !node) { toast(`${chosen.id.toUpperCase()} is at full condition.`); sound.effect("error"); return true; }
+    if (!node) { toast("Nothing on the table is worn."); return true; }
+    if (!chosen) toast(`Repair · ${node.id.toUpperCase()} (most worn) · ${repairCost(run)} energy · Z undoes`);
+    repair(node.id);
+    return true;
+  }
+  const item = (hud.installation && run.installations.find(entry => entry.id === hud.installation)) || mostDangerous(run);
+  if (!item) { toast("No installation stands on the table."); return true; }
+  if (!hud.installation) toast(`Scrub · ${INSTALLATION_NAMES[item.kind]} in ${zoneForNode(item).toUpperCase()} (most dangerous) · ${scrubCost(run)} energy · Z undoes`);
+  scrub(item.id);
+  return true;
+}
 function inspectCard(id: CardId) {
   if (busy || !CARDS[id]) return;
   clearSelection();
@@ -1514,17 +1822,20 @@ function startLesson(id: training.LessonId) {
   const lessonRun = training.createLessonRun(id);
   // Short screens start with the coach folded to its current goal; it expands on demand.
   const short = root.getBoundingClientRect().height / interfaceScale() < 780;
-  practice = { id, ...parked, progress: null, showHint: false, collapsed: practice?.collapsed ?? short };
-  expedition = { version: 3, run: lessonRun, archetype: lessonRun.archetype, daily: false, startedAt: Date.now(), recorded: true };
+  practice = { id, ...parked, progress: null, showHint: false, collapsed: practice?.collapsed ?? short, read: [] };
+  expedition = { version: EXPEDITION_VERSION, run: lessonRun, archetype: lessonRun.archetype, daily: false, startedAt: Date.now(), recorded: true };
   run = lessonRun;
   view = "run";
   busy = false;
   battleGeneration++;
   undoStack.length = 0;
   clearSelection();
+  // A drill starts unread: no port or delivery carried over from another board.
+  hud.port = hud.delivery = null;
+  lessonViewKey = "";
   handKey = "";
   world?.resetCamera();
-  practice.progress = training.lessonProgress(id, run);
+  practice.progress = training.lessonProgress(id, run, undefined, undefined, lessonView());
   render();
   armHint();
   sound.effect("turn");
@@ -1552,16 +1863,54 @@ function finishPractice() {
 function updateLesson() {
   if (!practice) return;
   const before = practice.progress;
-  const progress = training.lessonProgress(practice.id, run, practice.last, before ?? undefined);
+  const progress = training.lessonProgress(practice.id, run, practice.last, before ?? undefined, lessonView());
   const done = (p: training.LessonProgress | null) => p ? p.goals.filter(goal => goal.done).length : -1;
   practice.progress = progress;
-  if (done(progress) > done(before)) { practice.showHint = false; armHint(); }
+  if (done(progress) > done(before)) {
+    practice.showHint = false;
+    armHint();
+    // An objection belongs to the step it stopped: once the drill moves on, it goes.
+    const note = document.getElementById("toast");
+    if (note?.classList.contains("coach")) note.className = "";
+  }
   if (progress.complete && !before?.complete) {
     training.markLessonComplete(practice.id);
     clearTimeout(hintTimer);
     sound.effect("reward", { delay: .35 });
   }
 }
+/** What the lessons read beyond the run: the selected port and the reading steps acknowledged. */
+function lessonView(): training.LessonView {
+  return { port: hud.port, read: practice?.read ?? [], selected: selected !== null ? run.hand[selected] ?? null : null };
+}
+let lessonViewKey = "";
+/** Selection is reading, not a move, so no action recomputes the lesson: a step met by
+ * selecting (or reading) moves on here, on the render that shows the selection. */
+function syncLessonView() {
+  if (!practice?.progress || view !== "run") return;
+  const key = `${practice.id}|${hud.port}|${practice.read.join(",")}|${selected !== null ? run.hand[selected] : ""}`;
+  if (key === lessonViewKey) return;
+  lessonViewKey = key;
+  const before = practice.progress;
+  updateLesson();
+  if (practice.progress !== before && root.classList.contains("is-battle"))
+    patchLessonLayer(training.lessonPanelMarkup(practice.progress!, { showHint: practice.showHint, collapsed: practice.collapsed }));
+}
+/** A reading step is done: "Got it" in the panel, or a click on the spotlit control. */
+function acknowledgeLesson() {
+  const progress = practice?.progress;
+  const goal = progress?.goals[progress.current];
+  if (!practice || !progress?.reading || !goal || busy || practice.read.includes(goal.id)) return;
+  practice.read.push(goal.id);
+  updateLesson();
+  renderLesson();
+  railHand();
+  sound.effect("select");
+}
+document.addEventListener("click", event => {
+  if (!practice?.progress?.reading || dialog.open || busy) return;
+  if ((event.target as HTMLElement).closest(".lesson-focus")) acknowledgeLesson();
+});
 /** Offer the hint after a stretch of inactivity (the lesson owns the delay). */
 function armHint() {
   clearTimeout(hintTimer);
@@ -1613,12 +1962,18 @@ function morphChildren(from: ParentNode & Node, to: ParentNode) {
 // Window size changes move the vitals card and the spotlit control.
 window.addEventListener("resize", () => { if (practice) { fitLesson(); spotlightLesson(); } });
 /** The coach panel fills the left column down to the compact vitals card. */
-/** Field Training points at the control its current step needs (e.g. the Prepare slot). */
+/** Field Training points at the control its current step needs (e.g. the Prepare slot).
+ * `A || B` falls back to B while nothing matching A is on screen. */
 function spotlightLesson() {
+  syncLessonView();
   const focus = (!busy && root.classList.contains("is-battle") && practice?.progress?.focus) || "";
   let targets: Element[] = [];
-  try { if (focus) targets = Array.from(document.querySelectorAll(focus)); }
-  catch { /* A malformed selector must never break the lesson. */ }
+  try {
+    for (const tier of focus.split("||").map(part => part.trim()).filter(Boolean)) {
+      targets = Array.from(document.querySelectorAll(tier));
+      if (targets.some(el => el instanceof HTMLElement && el.offsetParent !== null)) break;
+    }
+  } catch { targets = []; /* A malformed selector must never break the lesson. */ }
   // Leave elements that keep the spotlight untouched: re-adding the class would not
   // restart the pulse, but removing and re-adding it every render did.
   document.querySelectorAll(".lesson-focus").forEach(el => { if (!targets.includes(el)) el.classList.remove("lesson-focus"); });
@@ -1628,15 +1983,18 @@ function spotlightLesson() {
   // the step moves on.
   const overlay = $("#lesson-spotlight"), hole = overlay.firstElementChild as HTMLElement;
   const target = targets.find((el): el is HTMLElement => el instanceof HTMLElement && el.offsetParent !== null);
-  const resting = selected !== null || consoleTargeting || !!cardDrag || deviceDragging || dialog.open;
+  // A lifted card rests the dimmer, unless the step points past the hand at what the card targets.
+  const resting = (selected !== null && !!target?.closest("#hand-zone")) || consoleTargeting || !!cardDrag || deviceDragging || dialog.open;
   if (!target || resting) { overlay.classList.remove("active"); return; }
   const fresh = !overlay.classList.contains("active");
   if (fresh) hole.style.transition = "none";
-  const scale = interfaceScale(), origin = root.getBoundingClientRect(), rect = target.getBoundingClientRect(), pad = 9;
-  hole.style.left = `${(rect.left - origin.left) / scale - pad}px`;
-  hole.style.top = `${(rect.top - origin.top) / scale - pad}px`;
-  hole.style.width = `${rect.width / scale + pad * 2}px`;
-  hole.style.height = `${rect.height / scale + pad * 2}px`;
+  const scale = interfaceScale(), origin = root.getBoundingClientRect(), rect = target.getBoundingClientRect();
+  // A tiny control (a delivery stud) still gets a hole the eye finds: at least 40 px a side.
+  const padX = Math.max(9, (40 - rect.width / scale) / 2), padY = Math.max(9, (40 - rect.height / scale) / 2);
+  hole.style.left = `${(rect.left - origin.left) / scale - padX}px`;
+  hole.style.top = `${(rect.top - origin.top) / scale - padY}px`;
+  hole.style.width = `${rect.width / scale + padX * 2}px`;
+  hole.style.height = `${rect.height / scale + padY * 2}px`;
   if (fresh) { void hole.offsetWidth; hole.style.transition = ""; }
   overlay.classList.add("active");
 }
@@ -1656,22 +2014,41 @@ function fitLesson() {
   const scale = interfaceScale(), top = (plate.getBoundingClientRect().top - root.getBoundingClientRect().top) / scale;
   root.style.setProperty("--training-room", `${Math.max(120, Math.round(top - 84 - 12))}px`);
 }
-/** A brief title card naming the encounter ground, once per fresh battle. */
+/** The title card sits in the band between the header and the field seals, centred in it, and
+ * tightens (smaller type, closer lines) when that band is short, so it never covers the seals. */
+function placeTerrainTitle(el: HTMLElement) {
+  const seals = document.querySelector<HTMLElement>(".is-battle .field-strip")?.getBoundingClientRect();
+  const header = document.querySelector<HTMLElement>("#header")?.getBoundingClientRect();
+  if (!seals?.height) return;
+  const scale = interfaceScale(), box = root.getBoundingClientRect();
+  const ceiling = Math.max(0, ((header?.bottom ?? box.top) - box.top) / scale) + 6;
+  const floor = (seals.top - box.top) / scale - 10;
+  el.classList.add("is-placed");
+  if (el.offsetHeight > floor - ceiling) el.classList.add("is-compact");
+  if (el.offsetHeight > floor - ceiling) el.classList.add("is-tight");
+  el.style.top = `${Math.round(Math.max(ceiling, ceiling + (floor - ceiling - el.offsetHeight) / 2))}px`;
+}
+/** A brief title card naming the encounter ground, once per fresh battle, with the
+ *  entrance lines beneath it: the revealed designation and an announced reinforcement. */
 function showTerrainTitle() {
-  if (practice || !run.terrain || run.phase !== "battle") return;
+  if (practice || run.phase !== "battle") return;
+  const title = screens.terrainTitleMarkup(run);
+  if (!title) return;
   const key = `${run.seed}:${run.stage}:${run.currentRoom}`;
   if (terrainShown === key) return;
   terrainShown = key;
   if (run.turn !== 1 || run.cardsPlayed) return;
   document.querySelector(".terrain-title")?.remove();
   const el = document.createElement("div");
-  el.className = "terrain-title";
+  el.className = `terrain-title${title.lines ? " has-entrance" : ""}`;
   el.setAttribute("role", "status");
-  el.innerHTML = `<span>${ui.icon("terrain", 15)} Encounter ground</span><strong>${ui.esc(run.terrain.name)}</strong><i class="ornament-rule"></i><p>${ui.esc(run.terrain.description)}</p>`;
+  el.innerHTML = title.html;
   root.append(el);
-  // A short beat: it leaves on its own, or the moment the player acts.
+  // Placed once the HUD of this render exists (the seals it must clear), before the frame paints.
+  queueMicrotask(() => placeTerrainTitle(el));
+  // A short beat: it leaves on its own, or the moment the player acts. Entrance lines hold it longer.
   const dismiss = () => { el.classList.add("leaving"); window.setTimeout(() => el.remove(), 260); };
-  const timer = window.setTimeout(dismiss, 3600);
+  const timer = window.setTimeout(dismiss, title.lines ? 5600 : 3600);
   const early = () => { window.clearTimeout(timer); dismiss(); };
   document.addEventListener("pointerdown", early, { once: true, capture: true });
   document.addEventListener("keydown", early, { once: true, capture: true });

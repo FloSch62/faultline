@@ -1,6 +1,10 @@
-import type { MapRoom, RoomType, RunState } from "./types.ts";
+import type { DesignationId, MapRoom, RoomType, RunState } from "./types.ts";
 import { STAGES } from "./stages.ts";
-import { healthMultiplier } from "./ascension.ts";
+import { ascends, healthMultiplier } from "./ascension.ts";
+import { RULES } from "./cards.ts";
+import {
+  DESIGNATIONS, PACKS, designationsCompatible, eligibleDesignations, type PackTemplate,
+} from "./enemies.ts";
 
 /** Rooms where a hostile is fought. */
 export const FIGHT_ROOMS: readonly RoomType[] = ["battle", "elite", "boss"];
@@ -42,7 +46,12 @@ export function minimumFights(map: MapRoom[]): number {
   return Math.min(...map.filter(room => room.floor === 6).map(room => best.get(room.id) ?? Infinity));
 }
 
-export function createMap(stage = 0, seed = 1): MapRoom[] {
+/** The chart for one stage. Every roll (layout, hostiles, packs, designations and the
+ * reinforced elites) comes from a local generator seeded by seed + stage, so reloads
+ * and card choices never change it. The v4 rolls run after the v3 ones, so the v3
+ * layout and hostile streams are unchanged. Pass the expedition's ascension: level 9
+ * raises pack frequency, levels 7 and 10 add second designations. */
+export function createMap(stage = 0, seed = 1, ascension = 0): MapRoom[] {
   const random = generator(seed, stage);
   const region = STAGES[stage];
   const templates = FLOORS.map(row => [...row]);
@@ -88,6 +97,12 @@ export function createMap(stage = 0, seed = 1): MapRoom[] {
       room.enemyId = enemyId;
     }
   }
+  // ---- v4: packs, designations and the reinforced elites, after every v3 roll.
+  for (const room of map) {
+    const others = new Set(map.filter(item => item.floor === room.floor && item !== room && item.enemyId).map(item => item.enemyId!));
+    rollRoomContents(random, stage, room, ascension, others);
+  }
+  assignReinforcedElites(map, stage, random);
   return map;
 }
 
@@ -95,16 +110,145 @@ export function connectsTo(from: MapRoom, to: MapRoom): boolean {
   return to.floor === from.floor + 1 && (from.exits ? from.exits.includes(to.id) : Math.abs(to.lane - from.lane) <= 1);
 }
 
-/** Hostile integrity for a room. Pass the expedition's ascension to include its health rules. */
+/** Hostile integrity for a room: the single hostile's health, which a pack shares out
+ * (planEncounter). Pass the expedition's ascension to include its health rules.
+ * Signal in the Static ("event" rooms) fights at RULES.eventHealthScale of a normal room. */
 export function encounterHealth(stage: number, room: MapRoom, ascension = 0): number {
   const base = room.type === "boss" ? STAGES[stage].bossHp
     : room.type === "elite" ? 30 + room.floor * 2 + stage * 10
     : 16 + room.floor * 5 + stage * 13;
-  return Math.round(base * healthMultiplier(room.type, ascension));
+  const health = Math.round(base * healthMultiplier(room.type, ascension));
+  return room.type === "event" ? Math.round(health * RULES.eventHealthScale) : health;
 }
 
 export function reachableRooms(run: RunState): MapRoom[] {
   if (run.floor > 6) return [];
   const previous = run.lastRoom ? run.map.find(room => room.id === run.lastRoom) : null;
   return run.map.filter(room => room.floor === run.floor && (!previous || connectsTo(previous, room)));
+}
+
+// ---------------------------------------------------------------- v4 · packs and designations
+
+/** Chance that a normal (or Signal in the Static) room holds a pack. */
+export function packChance(stage: number, floor: number, ascension = 0): number {
+  const base = RULES.packRate[stage] ?? 0;
+  if (base <= 0 || (stage === 0 && floor < RULES.packFromFloor)) return 0;
+  return Math.min(1, base + (ascends(ascension, 9) ? RULES.packRateAscensionBonus : 0));
+}
+
+/** Chance that a room's leader or single hostile carries a designation (rule 66). */
+export function designationChance(stage: number, floor: number, type: RoomType): number {
+  const rate = RULES.designationRate[stage] ?? 0;
+  if (rate <= 0 || type === "boss") return 0;
+  if (type === "elite" && stage >= 1) return 1;
+  if (stage === 0 && floor < RULES.designationFromFloor) return 0;
+  return rate;
+}
+
+/** The pack template a room's hostiles came from, if any. */
+export function roomTemplate(stage: number, room: MapRoom): PackTemplate | null {
+  if (!room.pack?.length) return null;
+  const kind = room.type === "elite" ? "elite" : "battle";
+  return PACKS.find(template => template.stage === stage && template.room === kind &&
+    template.leader === (room.enemyId ?? null) &&
+    template.escorts.length === room.pack!.length && template.escorts.every((id, i) => room.pack![i] === id)) ?? null;
+}
+
+function weightedDesignation(random: () => number, pool: DesignationId[]): DesignationId | null {
+  const total = pool.reduce((sum, id) => sum + DESIGNATIONS[id].weight, 0);
+  if (!pool.length || total <= 0) return null;
+  let roll = random() * total;
+  for (const id of pool) {
+    roll -= DESIGNATIONS[id].weight;
+    if (roll < 0) return id;
+  }
+  return pool[pool.length - 1];
+}
+
+/** One designation from the weighted table. A bad designation heavier than the
+ * template's headroom falls back to Laden or Salvaged (rule 70). */
+export function rollDesignation(random: () => number, eligible: DesignationId[], headroom = Infinity): DesignationId | null {
+  const id = weightedDesignation(random, eligible);
+  if (!id) return null;
+  if (DESIGNATIONS[id].kind === "bad" && DESIGNATIONS[id].threat > headroom) {
+    const cargo = eligible.filter(item => DESIGNATIONS[item].kind === "good");
+    return cargo.length ? cargo[Math.floor(random() * cargo.length)] : null;
+  }
+  return id;
+}
+
+/** Rolls a fight room's pack (normal rooms by chance, elites from stage II always), then
+ * its designations and the interference flag. Mutates the room. `others` holds the
+ * hostiles of the floor's other rooms, so a substituted leader never repeats on a floor.
+ * Guardian rooms, rest rooms and rooms without a hostile are left untouched. */
+export function rollRoomContents(random: () => number, stage: number, room: MapRoom, ascension = 0, others: ReadonlySet<string> = new Set()) {
+  if (!["battle", "elite", "event"].includes(room.type) || !room.enemyId) return;
+  const elite = room.type === "elite";
+  let template: PackTemplate | null = null;
+  if (!elite) {
+    if (random() < packChance(stage, room.floor, ascension)) {
+      const trio = stage >= 2 && random() < RULES.trioShare;
+      const shape = PACKS.filter(item => item.stage === stage && item.room === "battle" &&
+        (item.leader === null || item.escorts.length === (trio ? 2 : 1)));
+      const own = shape.filter(item => item.leader === room.enemyId);
+      const fresh = shape.filter(item => item.leader === null || !others.has(item.leader));
+      const candidates = own.length ? own : fresh.length ? fresh : shape;
+      template = candidates.length ? candidates[Math.floor(random() * candidates.length)] : null;
+    }
+  } else if (stage >= 1 && (RULES.packRate[stage] ?? 0) > 0) {
+    template = PACKS.find(item => item.stage === stage && item.room === "elite" && item.leader === room.enemyId) ?? null;
+  }
+  if (template) {
+    room.pack = [...template.escorts];
+    if (template.leader) room.enemyId = template.leader;
+    else delete room.enemyId;
+  }
+  // Duos carry no designation: only a leader or a single hostile rolls one.
+  const leader = room.enemyId;
+  if (!leader) return;
+  const chance = designationChance(stage, room.floor, room.type);
+  if (!(random() < chance)) return;
+  const trio = (template?.escorts.length ?? 0) >= 2;
+  const eligible = eligibleDesignations(leader, stage, !trio);
+  const first = rollDesignation(random, eligible, template ? template.headroom : Infinity);
+  if (!first) return;
+  const designations: DesignationId[] = [first];
+  // Ascension 7: elites carry a second; ascension 10: normals may. The second is never a
+  // repeat, never Stoked with Shedding, never a second good one, and ignores the A0 budget.
+  // The rates are RULES.eliteSecondDesignation / normalSecondDesignation; a sure elite draws nothing.
+  const eliteRate = RULES.eliteSecondDesignation;
+  const second = (elite && ascends(ascension, 7) && (eliteRate >= 1 || random() < eliteRate))
+    || (!elite && ascends(ascension, 10) && random() < chance * RULES.normalSecondDesignation);
+  if (second) {
+    const pick = weightedDesignation(random, eligible.filter(id => designationsCompatible(first, id)));
+    if (pick) designations.push(pick);
+  }
+  room.designations = designations;
+  // Interference hides the ribbon until the entrance line. Spiteful is never hidden.
+  if (!designations.includes("spiteful") && random() < (RULES.hiddenShare[stage] ?? 0)) room.designationHidden = true;
+}
+
+/** Rooms from which `room` can be reached. */
+function ancestors(map: MapRoom[], room: MapRoom): MapRoom[] {
+  const found = new Set<MapRoom>();
+  const queue = [room];
+  while (queue.length) {
+    const next = queue.shift()!;
+    for (const from of map) if (connectsTo(from, next) && !found.has(from)) { found.add(from); queue.push(from); }
+  }
+  return [...found];
+}
+
+/** Elite reinforcements are decided by the chart, floor by floor: an elite is reinforced
+ * (stage III always, stage II at the stage's rate) unless a path through it already
+ * crosses a reinforced elite. No path ever crosses two in one stage. */
+export function assignReinforcedElites(map: MapRoom[], stage: number, random: () => number) {
+  const rate = RULES.reinforcementRate[stage] ?? 0;
+  if (rate <= 0) return;
+  for (let floor = 0; floor <= 6; floor++) {
+    for (const room of map.filter(item => item.floor === floor && item.type === "elite").sort((a, b) => a.lane - b.lane)) {
+      if (ancestors(map, room).some(item => item.reinforced)) continue;
+      if (stage >= 2 || random() < rate) room.reinforced = true;
+    }
+  }
 }

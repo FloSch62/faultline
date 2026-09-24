@@ -9,7 +9,7 @@ function encounter(enemy = "prophet") {
   const e = newExpedition("architect", 292);
   const r = e.run;
   chooseRoom(r,"0-1");
-  r.enemy!.id = enemy; r.enemy!.hp = r.enemy!.maxHp = 100;
+  r.enemies[0].id = enemy; r.enemies[0].hp = r.enemies[0].maxHp = 100;
   r.integrity = r.maxIntegrity = 100; r.energy = 20;
   r.topology.nodes.push({ id: "router1", role: "router", x: 0, z: 0 });
   r.topology.links.push({ a: "alpha", b: "router1" },{ a: "router1", b: "omega" });
@@ -68,9 +68,9 @@ test("cleansing removes only hostile fields and jams in the chosen zone",()=>{
   const e=encounter(),r=e.run;
   field(e,"resonance-field","center");endTurn(r);
   r.zoneEffects.push({zone:"north",kind:"suppression",turns:2});
-  r.faultNode="router1";r.drawPile=["fiber"];
+  r.faultNodes=["router1"];r.drawPile=["fiber"];
   field(e,"purge-field","center");
-  assert.equal(r.faultNode,null);
+  assert.deepEqual(r.faultNodes,[]);
   assert.deepEqual(r.zoneEffects,[{zone:"center",kind:"resonance",turns:2},{zone:"north",kind:"suppression",turns:2}]);
   assert.deepEqual(r.hand,["fiber"]);
   assert.equal(combatPreview(r).packetDamage,8);
@@ -101,7 +101,7 @@ test("aegis requires a live route; null fields defend occupied hardware without 
   assert.equal(combatPreview(r).shield,0);
 });
 test("a finishing blow cancels corruption and clears encounter fields",()=>{
-  const e=encounter(),r=e.run;field(e,"resonance-field","center");r.enemy!.hp=1;
+  const e=encounter(),r=e.run;field(e,"resonance-field","center");r.enemies[0].hp=1;
   assert.equal(combatPreview(r).zoneThreat,null);
   assert.equal(endTurn(r).defeated,true);
   assert.deepEqual(r.zoneEffects,[]);

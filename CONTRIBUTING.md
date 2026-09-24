@@ -30,7 +30,8 @@ The browser suite launches a preview server on port 4174 for that production che
 - Keep readable enemy intentions, card rules and actual damage in agreement.
 - Desktop is the primary target. Check 1366×768 and 1920×1080, long hands, keyboard controls and reduced motion.
 - Use the existing brass, worn ivory and indigo art direction. Preserve enough contrast to read cards during play.
-- Device models are built by the scripts in `blender/devices/`; change the script and run `npm run models` rather than editing a GLB by hand. `/dev/world-preview.html?scene=gallery` shows every role in the real renderer. See [blender/README.md](blender/README.md).
+- Device, installation and prop models are built by the scripts in `blender/devices/`, `blender/installations/` and `blender/props/`; change the script and run `npm run models` (or `npm run models -- <name>`) rather than editing a GLB by hand. `/dev/world-preview.html?scene=gallery` shows every model in the real renderer. See [blender/README.md](blender/README.md).
+- The v4 hostile sheets (escorts, new leaders, guardian adds) are cut out and composed from their manifest with `uv run scripts/compose_sheet.py --manifest docs/art-v4-bodies-manifest.json --sheet <name> --output <dir>`; rebuild a sheet that way rather than editing it by hand.
 - Include a screenshot or a short recording for visual changes. `node scripts/capture.mjs` captures a repeatable encounter while the dev server runs.
 - Preserve third-party notices. Document new assets and their source/license. Generated art and music have their prompts and production metadata documented in the repository.
 - Finished artwork, fonts and playable music are bundled. Do not add API keys or require a music model to play the game.

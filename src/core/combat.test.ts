@@ -19,19 +19,21 @@ import {
   playProtocol,
   playZone,
   relocateNode,
-  scrubMalware,
+  scrubInstallation,
   useConsole,
 } from "./run.ts";
 import { crossesWreckage, terrainFor } from "./terrain.ts";
+import { makeEnemy } from "./encounter.ts";
 import type { Archetype, CardId, NetworkNode, RelicId, RunState } from "./types.ts";
 
 /** A clean first-fight table: only terminals, a chosen hostile and intent index. */
 function table(enemy = "wraith", turn = 0, archetype: Archetype = "architect"): RunState {
   const run = newExpedition(archetype, 0x5eed1234).run;
   chooseRoom(run, "0-1");
-  run.enemy!.id = enemy;
-  run.enemy!.hp = run.enemy!.maxHp = 200;
-  run.enemy!.turn = turn;
+  const foe = run.enemies[0];
+  foe.id = enemy;
+  foe.hp = foe.maxHp = 200;
+  foe.turn = turn;
   run.integrity = run.maxIntegrity = 100;
   run.energy = 20;
   run.relics = [];
@@ -148,10 +150,10 @@ test("a cabled honeypot decoys jams and cuts; the attacker takes damage (Wraith 
   let p = combatPreview(jam);
   assert.equal(p.faultTarget, "hp");
   assert.equal(p.enemyDamage, RULES.honeypotDamage);
-  const before = jam.enemy!.hp;
+  const before = jam.enemies[0].hp;
   endTurn(jam);
-  assert.equal(jam.faultNode, "hp");
-  assert.equal(jam.enemy!.hp, before - RULES.baseRouteDamage - RULES.honeypotDamage);
+  assert.deepEqual(jam.faultNodes, ["hp"]);
+  assert.equal(jam.enemies[0].hp, before - RULES.baseRouteDamage - RULES.honeypotDamage);
 
   const cut = table("widow", 1); // sever
   route(cut, "r1", 0);
@@ -183,7 +185,7 @@ test("cache servers and PoE injectors act at turn start; a jam can take them off
   assert.equal(r.energy, RULES.baseEnergy + 1);
   assert.equal(r.hand.length, RULES.handDraw + 1);
   // Wraith's next action jams the primary route's router: both devices go offline.
-  r.enemy!.turn = 2;
+  r.enemies[0].turn = 2;
   r.hand = [];
   const jammed = combatPreview(r);
   assert.equal(jammed.faultTarget, "r1");
@@ -229,9 +231,9 @@ test("Buffer stores ×multiplier, releases on the next transmission, and a toggl
   assert.equal(p.packetDamage, 0);
   assert.equal(p.bufferGain, Math.floor(RULES.baseRouteDamage * RULES.bufferMultiplier));
   assert.equal(sum(p.damageTerms), 0);
-  const hp = r.enemy!.hp, stored = p.bufferGain;
+  const hp = r.enemies[0].hp, stored = p.bufferGain;
   endTurn(r);
-  assert.equal(r.enemy!.hp, hp);
+  assert.equal(r.enemies[0].hp, hp);
   assert.equal(r.buffer, stored);
   // Next turn the Wraith jams r1, but the buffer is released before the jam.
   r.drawPile = [];
@@ -292,7 +294,7 @@ test("protocols arm (max 2), fire on the matching intent, and go to discard", ()
   assert.ok(p.shieldTerms.some(term => term.label.startsWith("Failover Policy")));
   const result = endTurn(r);
   assert.deepEqual(result.protocolsTriggered, ["failover-policy"]);
-  assert.equal(r.faultLink, null);
+  assert.deepEqual(r.faultLinks, []);
   assert.deepEqual(r.protocols, ["rate-limiter"]);
   assert.ok(r.discardPile.includes("failover-policy"));
 });
@@ -300,7 +302,7 @@ test("protocols arm (max 2), fire on the matching intent, and go to discard", ()
 test("Port Security and Tarpit damage can defeat the enemy before it acts", () => {
   const r = table("wraith", 2); // jam
   route(r, "r1", 0);
-  r.enemy!.hp = 8;
+  r.enemies[0].hp = 8;
   r.hand = ["port-security+"];
   playProtocol(r, 0);
   const p = combatPreview(r);
@@ -417,29 +419,31 @@ test("permanent terrain fields never tick down and can be purged when hostile", 
   const r = table("wraith", 1);
   route(r, "r1", 0);
   r.zoneEffects = [{ zone: "center", kind: "suppression", turns: 3, permanent: true }];
-  for (let i = 0; i < 4; i++) { r.enemy!.turn = 1; endTurn(r); }
+  for (let i = 0; i < 4; i++) { r.enemies[0].turn = 1; endTurn(r); }
   assert.equal(r.zoneEffects.length, 1);
   r.hand = ["purge-field"];
   assert.ok(playZone(r, 0, "center").ok);
   assert.equal(r.zoneEffects.length, 0);
 });
 
-test("malware siphons damage, is scrubbed for energy, and purged by band", () => {
-  const r = table("leech", 1); // infect
+test("Siphon Taps siphon damage, are scrubbed for energy, and purged by band", () => {
+  const r = table("leech", 1); // SIPHON TAP
   route(r, "r1", 0);
   const p = combatPreview(r);
   assert.ok(p.malwareTarget);
   endTurn(r);
-  assert.equal(r.malware.length, 1);
+  assert.equal(r.installations.length, 1);
+  assert.equal(r.installations[0].kind, "tap");
   assert.equal(combatPreview(r).packetDamage, RULES.baseRouteDamage - RULES.malwarePenalty);
-  assert.match(isBlocked(r, r.malware[0].x, r.malware[0].z)!, /Malware/);
+  assert.match(isBlocked(r, r.installations[0].x, r.installations[0].z)!, /installation/);
   r.energy = 3;
-  assert.ok(scrubMalware(r, r.malware[0].id).ok);
+  assert.ok(scrubInstallation(r, r.installations[0].id).ok);
   assert.equal(r.energy, 3 - RULES.scrubCost);
-  r.malware = [{ id: "malware1", x: 0, z: 2.6 }];
+  assert.equal(r.reclaim, RULES.reclaimShield, "a destroyed installation grants Reclaim");
+  r.installations = [{ id: "tap1", kind: "tap", x: 0, z: 2.6, integrity: 1, activeFrom: 0, owner: "h1" }];
   r.hand = ["purge-field"];
   playZone(r, 0, "south");
-  assert.equal(r.malware.length, 0);
+  assert.equal(r.installations.length, 0);
 });
 
 test("junk: Packet Loss vanishes at end of turn, Worms hurt unless deleted, injections are seeded", () => {
@@ -457,7 +461,7 @@ test("junk: Packet Loss vanishes at end of turn, Worms hurt unless deleted, inje
   assert.ok(withWorms.incomingTerms.some(term => term.label === "Worm in hand ×2" && term.amount === 4));
   assert.ok(playJunk(r, 1).ok);
   assert.ok(r.exhaustPile.includes("worm"));
-  r.enemy!.turn = 1;
+  r.enemies[0].turn = 1;
   endTurn(r);
   assert.ok(r.exhaustPile.includes("packet-loss"));
   assert.ok(!r.deck.includes("packet-loss"));
@@ -523,24 +527,24 @@ test("SDN Controller costs a starting energy; Spare Parts adds a Fiber; Watchdog
 
 test("ascension 4, 9 and 10 raise attacks, lengthen fields and enrage guardians sooner", () => {
   const r = table("wraith", 1);
-  const base = intentFor(r)!.amount;
+  const base = intentFor(r, r.enemies[0]).amount;
   r.ascension = 4;
-  assert.equal(intentFor(r)!.amount, base + 1);
+  assert.equal(intentFor(r, r.enemies[0]).amount, base + 1);
   const f = table("prophet", 0);
   route(f, "r1", 0);
   f.ascension = 9;
   assert.equal(combatPreview(f).zoneThreat!.turns, RULES.hostileFieldTurns + 1);
   const g = table("regent", 0);
-  g.enemy!.hp = Math.floor(g.enemy!.maxHp * 0.55);
-  assert.ok(!intentFor(g)!.label.startsWith("ENRAGED"));
+  g.enemies[0].hp = Math.floor(g.enemies[0].maxHp * 0.55);
+  assert.ok(!intentFor(g, g.enemies[0]).label.startsWith("ENRAGED"));
   g.ascension = 10;
-  assert.ok(intentFor(g)!.label.startsWith("ENRAGED"));
-  g.enemy!.turn = 5;
-  g.enemy!.hp = g.enemy!.maxHp;
+  assert.ok(intentFor(g, g.enemies[0]).label.startsWith("ENRAGED"));
+  g.enemies[0].turn = 5;
+  g.enemies[0].hp = g.enemies[0].maxHp;
   g.ascension = 9;
-  const ultimate = intentFor(g)!.amount;
+  const ultimate = intentFor(g, g.enemies[0]).amount;
   g.ascension = 10;
-  assert.equal(intentFor(g)!.amount, ultimate + 2);
+  assert.equal(intentFor(g, g.enemies[0]).amount, ultimate + 2);
 });
 
 // ------------------------------------------------------------------ forecast contract
@@ -552,7 +556,7 @@ test("randomized boards: the preview is pure and matches resolution exactly", ()
   const rand = () => ((state = (state * 1103515245 + 12345) >>> 0) / 0x100000000);
   for (let trial = 0; trial < 160; trial++) {
     const r = table(enemies[trial % enemies.length], Math.floor(rand() * 6), (["architect", "warden", "ghost"] as const)[trial % 3]);
-    r.enemy!.hp = 5 + Math.floor(rand() * 40);
+    r.enemies[0].hp = 5 + Math.floor(rand() * 40);
     r.relics = (["backpressure", "honeynet", "zero-trust", "parallel-core", "packet-lens", "shield-array"] as RelicId[]).filter(() => rand() < 0.3);
     const count = 2 + Math.floor(rand() * 8);
     for (let i = 0; i < count; i++) {
@@ -565,7 +569,7 @@ test("randomized boards: the preview is pure and matches resolution exactly", ()
       if (a !== b && !r.topology.links.some(link => (link.a === a && link.b === b) || (link.a === b && link.b === a)))
         r.topology.links.push({ a, b, boosted: rand() < 0.2, armored: rand() < 0.2 });
     }
-    if (rand() < 0.3) r.malware = [{ id: "malware1", x: 6, z: 4 }];
+    if (rand() < 0.3) r.installations = [{ id: "tap1", kind: "tap", x: 6, z: 4, integrity: 1, activeFrom: 0, owner: "h1" }];
     if (rand() < 0.4) r.protocols = [(["failover-policy", "port-security", "rate-limiter", "ips-signature", "quarantine-rule", "tarpit"] as CardId[])[Math.floor(rand() * 6)]];
     r.block = Math.floor(rand() * 6);
     r.buffer = rand() < 0.3 ? 6 : 0;
@@ -576,16 +580,16 @@ test("randomized boards: the preview is pure and matches resolution exactly", ()
     const p = combatPreview(r);
     assert.deepEqual(r, snapshot, "preview must not mutate");
     assert.equal(p.packetDamage, Math.max(0, sum(p.damageTerms)));
-    const hp = r.enemy!.hp, integrity = r.integrity;
+    const hp = r.enemies[0].hp, integrity = r.integrity;
     const result = endTurn(r);
     assert.equal(result.packetDamage, p.packetDamage);
     assert.equal(result.integrityDamage, p.incoming, `trial ${trial}`);
     assert.equal(integrity - r.integrity, p.incoming);
     if (!result.defeated) {
-      assert.equal(r.enemy!.hp, Math.min(r.enemy!.maxHp, hp - (p.buffering ? 0 : p.packetDamage) - p.enemyDamage + p.enemyHealing), `trial ${trial}`);
+      assert.equal(r.enemies[0].hp, Math.min(r.enemies[0].maxHp, hp - (p.buffering ? 0 : p.packetDamage) - p.enemyDamage + p.enemyHealing), `trial ${trial}`);
       assert.equal(r.energy, p.nextTurn.energy);
-      if (p.intent?.kind === "sever") assert.equal(r.faultLink, p.faultTarget);
-      if (p.intent?.kind === "jam") assert.equal(r.faultNode, p.faultTarget);
+      if (p.intent?.kind === "sever") assert.equal(r.faultLinks[0] ?? null, p.faultTarget);
+      if (p.intent?.kind === "jam") assert.equal(r.faultNodes[0] ?? null, p.faultTarget);
     } else assert.ok(p.lethal || p.enemyDefeatedByTraps);
   }
 });
@@ -614,20 +618,60 @@ test("a full fourteen-device table forecasts in under 5 ms (15 ms on shared CI r
   }
   const budget = process.env.CI ? 15 : 5;
   assert.ok(combatPreview(r).channels >= 3);
+  console.log(`# fourteen-device table: ${elapsed.toFixed(2)} ms per forecast`);
   assert.ok(elapsed < budget, `preview took ${elapsed.toFixed(2)} ms (budget ${budget} ms)`);
+});
+
+test("a full table with a trio and four installations forecasts in under 5 ms (15 ms on shared CI runners)", () => {
+  const r = table("nest");
+  r.enemies = [
+    makeEnemy("rigger-drone", "h1", "left", "escort", 30),
+    makeEnemy("nest", "h2", "centre", "leader", 60, { turn: 1 }),
+    makeEnemy("tap-spinner", "h3", "right", "escort", 30),
+  ];
+  r.focus = "centre";
+  const spots = [[-3.5, -3], [-3.5, 0], [-3.5, 3], [-1.2, -3], [-1.2, 0], [-1.2, 3], [1.2, -3], [1.2, 0], [1.2, 3], [3.5, -3], [3.5, 0], [3.5, 3]];
+  spots.forEach(([x, z], i) => device(r, `d${i}`, i % 2 ? "router" : i % 3 ? "switch" : "firewall", x, z));
+  for (let i = 0; i < spots.length; i++) {
+    if (i % 3 < 2) wire(r, `d${i}`, `d${i + 1}`);
+    if (i + 3 < spots.length) wire(r, `d${i}`, `d${i + 3}`);
+    if (i % 3 < 2 && i + 4 < spots.length) wire(r, `d${i}`, `d${i + 4}`);
+  }
+  for (const i of [0, 1, 2]) wire(r, "alpha", `d${i}`);
+  for (const i of [9, 10, 11]) wire(r, `d${i}`, "omega");
+  r.installations = [
+    { id: "jammer1", kind: "jammer", x: -2.35, z: -1.5, integrity: 2, activeFrom: 0, owner: "h2" },
+    { id: "spike1", kind: "spike", x: 2.35, z: 1.5, integrity: 3, activeFrom: 0, owner: "h1" },
+    { id: "breaker1", kind: "breaker", x: 0, z: 1.5, integrity: 1, countdown: 1, activeFrom: 0, owner: "h2" },
+    { id: "tap1", kind: "tap", x: 0, z: -4.4, integrity: 1, activeFrom: 0, owner: "h3" },
+  ];
+  const p = combatPreview(r);
+  assert.equal(p.hostiles.length, 3);
+  assert.ok(p.installationEffects.some(effect => effect.effect === "detonate"));
+  assert.ok(p.channels >= 3);
+  for (let i = 0; i < 10; i++) combatPreview(r);
+  let elapsed = Infinity;
+  for (let batch = 0; batch < 8; batch++) {
+    const start = performance.now();
+    for (let i = 0; i < 10; i++) combatPreview(r);
+    elapsed = Math.min(elapsed, (performance.now() - start) / 10);
+  }
+  const budget = process.env.CI ? 15 : 5;
+  assert.ok(elapsed < budget, `preview took ${elapsed.toFixed(2)} ms (budget ${budget} ms)`);
+  console.log(`# trio + four installations: ${elapsed.toFixed(2)} ms per forecast`);
 });
 
 test("beginBattle installs terrain, salvage and resets every v3 resource", () => {
   const e = newExpedition("ghost", 0x77aa55);
   const r = e.run;
-  r.buffer = 9; r.backpressure = 4; r.protocols = ["tarpit"]; r.malware = [{ id: "malware1", x: 0, z: 0 }];
+  r.buffer = 9; r.backpressure = 4; r.protocols = ["tarpit"]; r.installations = [{ id: "tap1", kind: "tap", x: 0, z: 0, integrity: 1, activeFrom: 0, owner: "h1" }];
   const room = { ...r.map.find(item => item.floor === 1 && item.type === "battle")!, id: "1-0", floor: 1 };
   beginBattle(r, room);
   assert.ok(r.terrain && r.terrain.debris.length >= 1);
   assert.equal(r.buffer, 0);
   assert.equal(r.backpressure, 0);
   assert.deepEqual(r.protocols, []);
-  assert.deepEqual(r.malware, []);
+  assert.deepEqual(r.installations, []);
   assert.ok(r.hand.filter(id => CARDS[id].target === "link").length >= 2);
   assert.ok(r.topology.nodes.filter(node => !node.fixed).every(node => node.salvage));
 });

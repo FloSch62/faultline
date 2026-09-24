@@ -49,7 +49,7 @@ test("a new expedition: title → archetype and ascension → map → first batt
   const after = await saved(page);
   expect(after).toEqual(expected);
   if (after.phase === "battle") {
-    expect(after.enemy!.hp).toBe(run.enemy!.hp - forecast);
+    expect(after.enemies[0].hp).toBe(run.enemies[0].hp - forecast);
     await idle(page);
   }
 });
@@ -69,7 +69,7 @@ test("save → reload restores the exact expedition and the same battle screen",
   expect(await saved(page)).toEqual(before);
   await expect(page.locator(".energy-orb strong")).toHaveText(energy!);
   await expect(page.locator("[data-hand]")).toHaveCount(before.hand.length);
-  await expect(page.getByRole("meter", { name: "Hostile integrity", exact: true })).toHaveAttribute("aria-valuenow", String(before.enemy!.hp));
+  await expect(page.getByRole("meter", { name: "Hostile integrity", exact: true })).toHaveAttribute("aria-valuenow", String(before.enemies[0].hp));
 });
 
 test("a version 2 save is rejected gracefully: the title offers a new expedition, nothing breaks", async ({ page }) => {
@@ -83,7 +83,7 @@ test("a version 2 save is rejected gracefully: the title offers a new expedition
   await expect(page.locator(".map-screen")).toBeVisible();
   const run = await saved(page);
   expect(run.archetype).toBe("architect");
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("faultline-expedition-v2")!).version)).toBe(3);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("faultline-expedition-v2")!).version)).toBe(4);
 });
 
 for (const [width, height] of [[1280, 720], [1440, 900], [1920, 1080]] as const) {

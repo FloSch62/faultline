@@ -19,6 +19,22 @@ const RIGS: Record<string, Rig> = {
   regent: { motion: "armored", speed: .95, bend: .01, breath: .028, float: .026, roll: .012 },
   cantor: { motion: "chorus", speed: 1.1, bend: .045, breath: .032, float: .12, roll: .018 },
   core: { motion: "reactor", speed: 1.5, bend: .024, breath: .042, float: .075, roll: .025 },
+  // v4 leaders
+  foreman: { motion: "armored", speed: 1.05, bend: .012, breath: .026, float: .03, roll: .012 },
+  nest: { motion: "scuttle", speed: 1.6, bend: .05, breath: .028, float: .05, roll: .024 },
+  demolition: { motion: "armored", speed: .8, bend: .008, breath: .03, float: .02, roll: .008 },
+  blight: { motion: "coil", speed: 1.35, bend: .055, breath: .024, float: .045, roll: .026 },
+  // v4 escorts and adds: small bodies, quicker and lighter than the machines they serve.
+  "spark-mite": { motion: "scuttle", speed: 3.4, bend: .04, breath: .02, float: .07, roll: .03 },
+  splicer: { motion: "scuttle", speed: 2.6, bend: .05, breath: .02, float: .05, roll: .026 },
+  "relay-drone": { motion: "reactor", speed: 2.2, bend: .02, breath: .03, float: .15, roll: .035 },
+  "ward-node": { motion: "armored", speed: 1.25, bend: .01, breath: .024, float: .05, roll: .012 },
+  "tap-spinner": { motion: "scuttle", speed: 2.2, bend: .06, breath: .022, float: .06, roll: .028 },
+  "glass-echo": { motion: "spectral", speed: 1.6, bend: .04, breath: .026, float: .14, roll: .035 },
+  "rigger-drone": { motion: "reactor", speed: 2, bend: .022, breath: .03, float: .11, roll: .03 },
+  "gate-warden": { motion: "armored", speed: 1, bend: .01, breath: .026, float: .03, roll: .012 },
+  chorister: { motion: "chorus", speed: 1.3, bend: .04, breath: .03, float: .1, roll: .018 },
+  "quarantine-drone": { motion: "reactor", speed: 1.8, bend: .022, breath: .036, float: .09, roll: .025 },
 };
 
 /** Up-lit rim of dilated alpha: a hard, readable silhouette against the busy relay backdrop. */
@@ -129,7 +145,12 @@ export class EnemyActor {
   private readonly underColor = { value: new THREE.Color(0xff7a4a) };
   private readonly tint = new THREE.Color();
   private readonly rest: Float32Array;
-  constructor() {
+  /** 0–1: a dormant escort sits dimmer and quieter (its phase passes). */
+  dim = 0;
+  /** A placeholder cell until the painted sheet lands: tinted toward the hostile's colour. */
+  stand = 0;
+  /** `layer` lifts every render order by 10 per layer, so a nearer port draws after the leader. */
+  constructor(layer = 0) {
     const geometry = new THREE.PlaneGeometry(1, 1, 28, 28);
     const material = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
     material.onBeforeCompile = shader => {
@@ -161,7 +182,7 @@ export class EnemyActor {
       `);
     };
     this.mesh = new THREE.Mesh(geometry, material);
-    this.mesh.renderOrder = 6;
+    this.mesh.renderOrder = 6 + layer * 10;
     this.rest = new Float32Array(geometry.attributes.position.array);
 
     this.shadow = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
@@ -169,7 +190,7 @@ export class EnemyActor {
     }));
     this.shadow.position.set(0, -.012, -.03);
     this.shadow.scale.setScalar(1.035);
-    this.shadow.renderOrder = 4;
+    this.shadow.renderOrder = 4 + layer * 10;
     this.mesh.add(this.shadow);
 
     this.rim = new THREE.Mesh(geometry, new THREE.ShaderMaterial({
@@ -181,7 +202,7 @@ export class EnemyActor {
       },
     }));
     this.rim.position.z = -.015;
-    this.rim.renderOrder = 5;
+    this.rim.renderOrder = 5 + layer * 10;
     this.mesh.add(this.rim);
 
     this.sigil = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({
@@ -189,7 +210,7 @@ export class EnemyActor {
       toneMapped: false, color: 0xff8a5a,
     }));
     this.sigil.position.set(0, .06, -.09);
-    this.sigil.renderOrder = 3;
+    this.sigil.renderOrder = 3 + layer * 10;
     this.sigil.visible = false;
     this.mesh.add(this.sigil);
 
@@ -207,7 +228,7 @@ export class EnemyActor {
         color: { value: new THREE.Color(0xff8a5a) }, intensity: { value: .8 },
       },
     }));
-    this.embers.renderOrder = 7;
+    this.embers.renderOrder = 7 + layer * 10;
     this.embers.frustumCulled = false;
   }
   enter(id: string, boss = false) {
@@ -224,6 +245,7 @@ export class EnemyActor {
     this.transition = { kind, start: performance.now(), duration: quick ? 180 : kind === "death" ? 1150 : 1000, done };
   }
   clear() { this.transition = null; this.dissolve.value = 0; }
+  transitioning() { return this.transition !== null; }
   update(camera: THREE.Camera, now: number, time: number, reduced: boolean, size: number,
     color: number, enraged: boolean, hurt: number, attack: number | null, kind?: string) {
     const rig = RIGS[this.id] ?? RIGS.leech;
@@ -279,6 +301,8 @@ export class EnemyActor {
     this.tint.setHex(enraged ? 0xff9c80 : color);
     this.mesh.material.color.lerp(this.tint, (enraged ? .12 : 0) + power * .55 + broken * .3);
     if (hurt > 0) this.mesh.material.color.lerp(new THREE.Color(1.6, 1.45, 1.35), hurt * .4);
+    if (this.stand > 0) this.mesh.material.color.lerp(this.tint.setHex(color), this.stand);
+    if (this.dim > 0) this.mesh.material.color.multiplyScalar(1 - this.dim * .45);
     this.dissolve.value = reduced ? 0 : death * .95;
 
     // Eyes and cores flare with breath, anticipation and rage.
@@ -309,7 +333,7 @@ export class EnemyActor {
     ember.time.value = reduced ? 0 : time;
     ember.color.value.setHex(color).lerp(new THREE.Color(0xff7040), enraged ? .6 : .35);
     ember.rate.value = (enraged ? .13 : .085) * (1 + windup * .6);
-    ember.intensity.value = enter * (1 - death * .5) * (reduced ? .45 : .85) * (this.boss ? 1.2 : 1);
+    ember.intensity.value = enter * (1 - death * .5) * (reduced ? .45 : .85) * (this.boss ? 1.2 : 1) * (1 - this.dim * .6);
     ember.width.value = size * .95;
     ember.height.value = size * 1.15;
     ember.size.value = this.boss ? .12 : .095;

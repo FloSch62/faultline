@@ -66,7 +66,7 @@ test("Ghost: Buffer stores the transmission, releases it next turn, and warns be
   await transmit(page);
   expect(await saved(page)).toEqual(expected);
   expect(expected.buffer).toBe(base * RULES.bufferMultiplier);
-  expect(expected.enemy!.hp).toBe(run.enemy!.hp);
+  expect(expected.enemies[0].hp).toBe(run.enemies[0].hp);
   await idle(page);
   run = await saved(page);
   const release = combatPreview(run);
@@ -76,7 +76,7 @@ test("Ghost: Buffer stores the transmission, releases it next turn, and warns be
   await transmit(page);
   expect(await saved(page)).toEqual(expected);
   expect(expected.buffer).toBe(0);
-  expect(expected.enemy!.hp).toBe(run.enemy!.hp - release.packetDamage);
+  expect(expected.enemies[0].hp).toBe(run.enemies[0].hp - release.packetDamage);
 });
 
 test("Ghost: buffering into a cut on the only route shows AT RISK", async ({ page }) => {
@@ -107,7 +107,7 @@ test("a protocol arms, is forecast to fire, and cancels the cut when the enemy a
   await transmit(page);
   run = await saved(page);
   expect(run).toEqual(expected);
-  expect(run.faultLink).toBeNull();
+  expect(run.faultLinks).toEqual([]);
   expect(run.protocols).toEqual([]);
   expect([...run.discardPile, ...run.hand, ...run.drawPile]).toContain("failover-policy");
 });
@@ -127,8 +127,8 @@ test("a honeypot draws the cut to its own cable and the attacker takes damage", 
   const expected = resolved(run);
   await transmit(page);
   expect(await saved(page)).toEqual(expected);
-  expect(expected.faultLink).toContain("honeypot1");
-  expect(expected.enemy!.hp).toBe(80 - forecast.packetDamage - RULES.honeypotDamage);
+  expect(expected.faultLinks[0]).toContain("honeypot1");
+  expect(expected.enemies[0].hp).toBe(80 - forecast.packetDamage - RULES.honeypotDamage);
 });
 
 /** Search outward from the table centre until the cursor turns into a pointer: the only
@@ -154,12 +154,14 @@ test("malware is scrubbed from the network dock and by clicking it on the table"
   await expect(page.locator(".ledger-chip.is-malware")).toHaveCount(2);
   await page.locator('[data-scrub="malware1"]').click();
   let run = await saved(page);
-  expect(run.malware.map(m => m.id)).toEqual(["malware2"]);
+  expect(run.installations.map(m => m.id)).toEqual(["malware2"]);
   expect(run.energy).toBe(5 - RULES.scrubCost);
   await expect(page.locator(".ledger-chip.is-malware")).toHaveCount(1);
   const spot = await malwareOnTable(page);
+  // v4 (design 13.3): clicking an installation on the table opens its plate; the plate scrubs.
   await page.mouse.click(spot.x, spot.y);
-  await expect.poll(async () => (await saved(page)).malware.length).toBe(0);
+  await page.locator('.installation-controls [data-scrub="malware2"]').click();
+  await expect.poll(async () => (await saved(page)).installations.length).toBe(0);
   run = await saved(page);
   expect(run.energy).toBe(5 - 2 * RULES.scrubCost);
 });
@@ -251,7 +253,7 @@ test("a guardian charges, a burst breaks its ultimate, and it is exposed for one
   await idle(page);
   run = await saved(page);
   expect(run).toEqual(expected);
-  expect(run.enemy!.exposed).toBe(true);
+  expect(run.enemies[0].exposed).toBe(true);
   await expect(page.locator(".game-root")).toHaveAttribute("data-guardian-window", "exposed");
 });
 

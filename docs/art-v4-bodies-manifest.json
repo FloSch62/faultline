@@ -1,0 +1,585 @@
+{
+  "description": "FAULTLINE v4 'Under Quarantine' hostile bodies (1024 x 1024 on a flat charcoal backdrop, cut out into atlases by scripts/compose_sheet.py) and the crate illustration (opaque, card anchor at 0.8). Bodies use LoRA 0.6 and the card's resolution-dependent shift (no constant shift: the first Spark Mite held its silhouette, and constant 1.15 changed nothing visible). Anchor: docs/art-refs/hostile-anchor-drone.png (cell 0 of hostiles.png, 724 x 724 at x 0, y 0). The design's Coil Serpent crop (docs/art-refs/hostile-anchor.png) was evaluated first and rejected: its emerald scales leaked into every body at LoRA 0.3-1.0, and at 0.3-0.45 the serpent itself reappeared. Two per-entry exceptions (see anchorNote): the Spark Mite uses the serpent crop turned teal (hostile-anchor-teal.png), the Chorister the Hollow Choir cell (hostile-anchor-choir.png). promptAddendum marks the only prompt changes (appended to the design's verbatim prompt, never replacing it). Same runtime and model revisions as the v3 passes; rendered with scripts/generate_stage_art.py --manifest <this file>; entries 'file' = the chosen candidate, 'sheet' = its atlas cell, 'cutoutKeys' = manual colour-key boxes (design 14.3 manual masking).",
+  "local": {
+    "model": "Krea-2-Turbo",
+    "diffusionModel": "krea2_turbo_fp8_scaled.safetensors",
+    "textEncoder": "qwen3vl_4b_fp8_scaled.safetensors",
+    "vae": "qwen_image_vae.safetensors",
+    "width": 1024,
+    "height": 1024,
+    "steps": 8,
+    "cfg": 1,
+    "sampler": "euler",
+    "scheduler": "simple",
+    "modelSource": "https://huggingface.co/Comfy-Org/Krea-2",
+    "modelRevision": "eb1eddd3983a54678545a9b2c178c5853b30f7be",
+    "runtime": "ComfyUI",
+    "runtimeRevision": "b5cc8830279eae909a59de030af1e50761c36751",
+    "styleReference": {
+      "lora": "krea2_style_reference.safetensors",
+      "strength": 0.6
+    }
+  },
+  "sheets": {
+    "hostiles-escorts": {
+      "file": "public/art/hostiles-escorts.png",
+      "columns": 4,
+      "rows": 2,
+      "cell": 512,
+      "sha256": "084b3767eef7016d5818f39ca3ab6d2f15574cc4ddf93ed12732747aad36ecaf",
+      "composedBy": "uv run scripts/compose_sheet.py --manifest docs/art-v4-bodies-manifest.json --sheet hostiles-escorts --output artifacts/v4-sheets-04"
+    },
+    "hostiles-front": {
+      "file": "public/art/hostiles-front.png",
+      "columns": 4,
+      "rows": 1,
+      "cell": 724,
+      "sha256": "7b126015772c800944920173110a706c085e094cbbd0e9d470b47322794b7172",
+      "composedBy": "uv run scripts/compose_sheet.py --manifest docs/art-v4-bodies-manifest.json --sheet hostiles-front --output artifacts/v4-sheets-front-03"
+    },
+    "hostiles-adds": {
+      "file": "public/art/hostiles-adds.png",
+      "columns": 3,
+      "rows": 1,
+      "cell": 724,
+      "sha256": "ab0e9bdf07828ceff215da45f658a4bb6239f317bec5c59f713d0e8d032a49de",
+      "composedBy": "uv run scripts/compose_sheet.py --manifest docs/art-v4-bodies-manifest.json --sheet hostiles-adds --output artifacts/v4-sheets-adds-01"
+    }
+  },
+  "images": [
+    {
+      "id": "spark-mite",
+      "name": "Spark Mite",
+      "effect": "Escort: a small swarm cutter whose bite grows with every other hostile alive.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923157,
+      "reference": "docs/art-refs/hostile-anchor-teal.png",
+      "referenceStrength": 0.6,
+      "postprocess": "cutout",
+      "sheet": {
+        "file": "public/art/hostiles-escorts.png",
+        "columns": 4,
+        "rows": 2,
+        "index": 0
+      },
+      "prompt": "Use case: stylized-concept. Asset type: one finished square game sprite painting of a single small hostile machine, full body, centered with 10 percent padding, on a flat uniform very dark charcoal backdrop with no floor, no ground plane and no cast shadow, ready to be cut out. FAULTLINE, a ruined orbital cathedral network tactics card game. Subject: Spark Mite, a fist-sized weathered brass tick with six hooked segmented legs, a chipped ivory carapace and one oversized serrated mandible; a single bright teal electric spark arcs between the mandible tips and lights the face from below. Small, quick, mean, clearly a swarm creature. Painterly premium oil concept art, tangible worn metal, dramatic readable amber rim light from above left, restrained teal glow only at the spark. Strong readable silhouette, no motion blur, no backgrounds, no frames, no UI, no text, no logos, no watermark.",
+      "file": "artifacts/v4-bodies-09-mite/spark-mite@240923157.png",
+      "sha256": "52b9e3897dfad6deab129365a6ac0b859275f2efdf37d023f661ca28f647bde2",
+      "cutoutKeys": [
+        [
+          392,
+          652,
+          640,
+          730
+        ],
+        [
+          380,
+          640,
+          420,
+          700
+        ]
+      ],
+      "rejected": [
+        {
+          "seed": 240923101,
+          "reference": "docs/art-refs/hostile-anchor.png",
+          "why": "emerald serpent palette leaked into the carapace; no spark"
+        },
+        {
+          "seed": 240923121,
+          "reference": "docs/art-refs/hostile-anchor.png",
+          "why": "spark present but emerald jewel carapace from the serpent anchor"
+        },
+        {
+          "seed": 240923122,
+          "reference": "docs/art-refs/hostile-anchor.png",
+          "why": "emerald palette leak; no spark"
+        },
+        {
+          "seeds": [
+            240923101,
+            240923131,
+            240923132,
+            240923133,
+            240923134,
+            240923139,
+            240923140,
+            240923141,
+            240923142,
+            240923143,
+            240923144,
+            240923147,
+            240923148,
+            240923149
+          ],
+          "reference": "docs/art-refs/hostile-anchor-drone.png",
+          "why": "the drone anchor turns the teal spark into a glowing eye every time (also tried constant shift 1.15 and LoRA 0.8/1.0: no spark, floor shadows at 1.0)"
+        },
+        {
+          "seeds": [
+            240923101,
+            240923150,
+            240923151,
+            240923152
+          ],
+          "reference": "docs/art-refs/hostile-anchor-drone.png",
+          "why": "prompt addendum stressing the spark: still no spark"
+        },
+        {
+          "seeds": [
+            240923101,
+            240923153,
+            240923154,
+            240923155
+          ],
+          "reference": "card-anchor / moth crop",
+          "why": "no spark or crab/wing leaks"
+        },
+        {
+          "seeds": [
+            240923101,
+            240923121,
+            240923156
+          ],
+          "reference": "docs/art-refs/hostile-anchor-teal.png",
+          "why": "weaker spark than 240923157"
+        }
+      ],
+      "anchorNote": "The Mite alone uses the design anchor (the Coil Serpent crop) with its green hue turned to teal (hostile-anchor-teal.png): the serpent anchor is the only one that paints the arcing spark, and teal is the Mite own accent, so the leak becomes its feature. The spark strands are colour-keyed against the backdrop inside cutoutKeys (compose_sheet.py --key).",
+      "referenceSha256": "6c02dd587b47ccbef6fa1ab64db260759a1a0f2fe7db3e172fa20009097f02aa"
+    },
+    {
+      "id": "splicer",
+      "name": "Splicer",
+      "effect": "Escort: a shear drone whose cut severs two cables while a leader lives.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923102,
+      "reference": "docs/art-refs/hostile-anchor-drone.png",
+      "referenceStrength": 0.6,
+      "postprocess": "cutout",
+      "sheet": {
+        "file": "public/art/hostiles-escorts.png",
+        "columns": 4,
+        "rows": 2,
+        "index": 1
+      },
+      "prompt": "Use case: stylized-concept. Asset type: one finished square game sprite painting of a single hostile machine, full body, centered with 10 percent padding, on a flat uniform very dark charcoal backdrop with no floor and no cast shadow, ready to be cut out. FAULTLINE, a ruined orbital cathedral network tactics card game. Subject: Splicer, a hovering maintenance drone the size of a lantern, its two front limbs replaced by heavy tarnished brass cable shears held open, a spool of severed dark optical cable ends hanging from its belly, a small cold blue optic in a chipped ivory housing. It exists to cut threads. Painterly premium oil concept art, worn hammered brass, ivory ceramic, dramatic amber rim light, faint teal reflections on the blades. Strong silhouette with the open shears clearly readable, no backgrounds, no frames, no UI, no text, no watermark.",
+      "file": "artifacts/v4-bodies-02/splicer.png",
+      "sha256": "a6c35883f499a1332f187690ff695f2859abccf1136acdd164a2080cce530168",
+      "rejected": [
+        {
+          "seeds": [
+            240923135,
+            240923136
+          ],
+          "why": "asymmetric side-on blades read less as open shears at 96 px"
+        }
+      ],
+      "referenceSha256": "bcf213b262aae198b20bde6b72616922871e63aa1a9c1e76b9eef40aa98c6251"
+    },
+    {
+      "id": "relay-drone",
+      "name": "Relay Drone",
+      "effect": "Escort: a signal mast whose uplink adds 1 to every leader strike while it lives.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923103,
+      "reference": "docs/art-refs/hostile-anchor-drone.png",
+      "referenceStrength": 0.6,
+      "postprocess": "cutout",
+      "sheet": {
+        "file": "public/art/hostiles-escorts.png",
+        "columns": 4,
+        "rows": 2,
+        "index": 2
+      },
+      "prompt": "Use case: stylized-concept. Asset type: one finished square game sprite painting of a single hostile machine, full body, centered with 10 percent padding, on a flat uniform very dark charcoal backdrop with no floor and no cast shadow, ready to be cut out. FAULTLINE, a ruined orbital cathedral network tactics card game. Subject: Relay Drone, a slender floating brass antenna mast balanced on a small spinning gyroscope ring, a chipped ivory parabolic dish tilted to one side as if listening to a larger machine, one amber uplink lamp glowing at the mast tip, thin copper wires trailing below. Elegant, fragile, clearly a signal relay. Painterly premium oil concept art, worn brass and ivory, dramatic rim light, a faint amber beam only at the lamp. Strong silhouette, no backgrounds, no frames, no UI, no text, no watermark.",
+      "file": "artifacts/v4-bodies-02/relay-drone.png",
+      "sha256": "fa3ad08a215fadad874347a9be33ac0c85c917731d293e6c41b88a28c4ed9ad1",
+      "referenceSha256": "bcf213b262aae198b20bde6b72616922871e63aa1a9c1e76b9eef40aa98c6251"
+    },
+    {
+      "id": "ward-node",
+      "name": "Ward Node",
+      "effect": "Escort: a plated sphere that lends the leader plating 2 while it lives.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923104,
+      "reference": "docs/art-refs/hostile-anchor-drone.png",
+      "referenceStrength": 0.6,
+      "postprocess": "cutout",
+      "sheet": {
+        "file": "public/art/hostiles-escorts.png",
+        "columns": 4,
+        "rows": 2,
+        "index": 3
+      },
+      "prompt": "Use case: stylized-concept. Asset type: one finished square game sprite painting of a single hostile machine, full body, centered with 10 percent padding, on a flat uniform very dark charcoal backdrop with no floor and no cast shadow, ready to be cut out. FAULTLINE, a ruined orbital cathedral network tactics card game. Subject: Ward Node, a floating sphere the size of a helmet, clad in overlapping chipped ivory ceramic plates riveted with brass, a narrow pale violet lens at its front projecting a thin translucent violet shield disc a short distance ahead of it. Defensive, stubborn, a guard that exists to cover something else. Painterly premium oil concept art, worn plating, dramatic amber rim light, restrained violet emissive only at the lens and disc. Strong silhouette, no backgrounds, no frames, no UI, no text, no watermark.",
+      "file": "artifacts/v4-bodies-02/ward-node.png",
+      "sha256": "f70ddb1e4f172b07b7b12e68acfaf31f6c0bf579f123fbab5ac9be8fd98504bd",
+      "referenceSha256": "bcf213b262aae198b20bde6b72616922871e63aa1a9c1e76b9eef40aa98c6251"
+    },
+    {
+      "id": "tap-spinner",
+      "name": "Tap Spinner",
+      "effect": "Escort: a spool spider that plants Siphon Taps and heals from them.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923138,
+      "reference": "docs/art-refs/hostile-anchor-drone.png",
+      "referenceStrength": 0.6,
+      "postprocess": "cutout",
+      "sheet": {
+        "file": "public/art/hostiles-escorts.png",
+        "columns": 4,
+        "rows": 2,
+        "index": 4
+      },
+      "prompt": "Use case: stylized-concept. Asset type: one finished square game sprite painting of a single hostile machine, full body, centered with 10 percent padding, on a flat uniform very dark charcoal backdrop with no floor and no cast shadow, ready to be cut out. FAULTLINE, a ruined orbital cathedral network tactics card game. Subject: Tap Spinner, a brass spider drone with a bulbous spool abdomen paying out a thin magenta-glowing siphon line, six thin articulated legs, two forelegs holding a small dark tap connector like an offering. Patient, parasitic. Painterly premium oil concept art, tarnished brass, dark cable, dramatic amber rim light, magenta glow only along the siphon line and in the tap. Strong silhouette, no backgrounds, no frames, no UI, no text, no watermark.",
+      "file": "artifacts/v4-bodies-03/tap-spinner@240923138.png",
+      "sha256": "809ef0ae2751863be9fe9815a5d9db9fa44b4b643a629d696ad0fcd53afa5970",
+      "rejected": [
+        {
+          "seed": 240923105,
+          "why": "round abdomen, spool and held tap not readable"
+        },
+        {
+          "seed": 240923137,
+          "why": "spool hidden inside a torpedo abdomen"
+        }
+      ],
+      "referenceSha256": "bcf213b262aae198b20bde6b72616922871e63aa1a9c1e76b9eef40aa98c6251"
+    },
+    {
+      "id": "glass-echo",
+      "name": "Glass Echo",
+      "effect": "Escort: a glass bell fragment whose death makes the leader's next hit +3.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923158,
+      "reference": "docs/art-refs/hostile-anchor-drone.png",
+      "referenceStrength": 0.6,
+      "postprocess": "cutout",
+      "sheet": {
+        "file": "public/art/hostiles-escorts.png",
+        "columns": 4,
+        "rows": 2,
+        "index": 5
+      },
+      "prompt": "Use case: stylized-concept. Asset type: one finished square game sprite painting of a single hostile apparition, full body, centered with 10 percent padding, on a flat uniform very dark charcoal backdrop with no floor and no cast shadow, ready to be cut out. FAULTLINE, a ruined orbital cathedral network tactics card game. Subject: Glass Echo, a broken translucent glass bell fragment floating upright, a faint serene choir face visible inside the glass, lit from within by pale violet light, a few thin threads of grey static trailing from its rim, a cracked brass clapper hanging inside. Quiet, mournful, a leftover voice. Painterly premium oil concept art, glass rendered as painted refraction with opaque solid edges so it can be cut out, dramatic amber rim light on the brass, violet emissive inside. Strong silhouette, no backgrounds, no frames, no UI, no text, no watermark.",
+      "file": "artifacts/v4-bodies-10-echo/glass-echo@240923158.png",
+      "sha256": "9e62bec0a8b4a8e281455b989eea7bc14e43af082b1839622cac83f843e5f9f1",
+      "rejected": [
+        {
+          "seed": 240923106,
+          "why": "dark cast shadow under the stand survived the matte (floor-shadow rule)"
+        },
+        {
+          "seeds": [
+            240923159,
+            240923160,
+            240923161
+          ],
+          "why": "weaker bell rim silhouette than 240923158"
+        }
+      ],
+      "referenceSha256": "bcf213b262aae198b20bde6b72616922871e63aa1a9c1e76b9eef40aa98c6251"
+    },
+    {
+      "id": "rigger-drone",
+      "name": "Rigger Drone",
+      "effect": "Escort: a crane drone that rigs Spikes beside the leader's target.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923107,
+      "reference": "docs/art-refs/hostile-anchor-drone.png",
+      "referenceStrength": 0.6,
+      "postprocess": "cutout",
+      "sheet": {
+        "file": "public/art/hostiles-escorts.png",
+        "columns": 4,
+        "rows": 2,
+        "index": 6
+      },
+      "prompt": "Use case: stylized-concept. Asset type: one finished square game sprite painting of a single hostile machine, full body, centered with 10 percent padding, on a flat uniform very dark charcoal backdrop with no floor and no cast shadow, ready to be cut out. FAULTLINE, a ruined orbital cathedral network tactics card game. Subject: Rigger Drone, a squat tracked construction drone in scuffed brass with hazard-striped ivory rings on a single crane arm, the arm carrying a small rack of three rust-orange iron spikes ready to be planted, a dim red work lamp on its cab. Industrial, deliberate, a builder working for the enemy. Painterly premium oil concept art, worn metal and rust, dramatic amber rim light, faint red glow at the lamp. Strong silhouette with the spike rack readable, no backgrounds, no frames, no UI, no text, no watermark.",
+      "file": "artifacts/v4-bodies-02/rigger-drone.png",
+      "sha256": "26c7b22c10914e7c93a15f4ffafd91c18ba10148453a083e0183b0e2f25f8549",
+      "referenceSha256": "bcf213b262aae198b20bde6b72616922871e63aa1a9c1e76b9eef40aa98c6251"
+    },
+    {
+      "id": "foreman",
+      "name": "Scrap Foreman",
+      "effect": "Hostile: a scrap-press automaton that overloads hardware and plants Spikes.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923108,
+      "reference": "docs/art-refs/hostile-anchor-drone.png",
+      "referenceStrength": 0.6,
+      "postprocess": "cutout",
+      "sheet": {
+        "file": "public/art/hostiles-front.png",
+        "columns": 4,
+        "rows": 1,
+        "index": 0
+      },
+      "prompt": "Use case: stylized-concept. Asset type: one finished square game sprite painting of a single large hostile machine, full body, centered with 10 percent padding, on a flat uniform very dark charcoal backdrop with no floor and no cast shadow, ready to be cut out. FAULTLINE, a ruined orbital cathedral network tactics card game. Subject: Scrap Foreman, a hulking scrap-press automaton of riveted iron and tarnished brass, one arm a massive piston hammer, the other a claw, a rack of rust-orange iron spikes strapped to its back, a foreman's brass lantern set into its chest glowing amber, a low heavy head with a slit visor. Brutal, industrial, patient. Painterly premium oil concept art, pitted metal, dramatic amber rim light. Strong asymmetrical tower silhouette, no resemblance to a humanoid knight, no backgrounds, no frames, no UI, no text, no watermark.",
+      "file": "artifacts/v4-bodies-11-front/foreman.png",
+      "sha256": "9dbd14983baf2a859b19c1f41b90402321d1ec2c2b2876c47cf9f9b39283b3ff",
+      "rejected": [
+        {
+          "seed": 240923168,
+          "why": "symmetric armoured-knight robot, against the prompt (asymmetrical tower, no knight)"
+        }
+      ],
+      "referenceSha256": "bcf213b262aae198b20bde6b72616922871e63aa1a9c1e76b9eef40aa98c6251"
+    },
+    {
+      "id": "nest",
+      "name": "Static Nest",
+      "effect": "Hostile: a cable nest that plants Siphon Taps and Jammers.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923172,
+      "reference": "docs/art-refs/hostile-anchor-drone.png",
+      "referenceStrength": 0.6,
+      "postprocess": "cutout",
+      "sheet": {
+        "file": "public/art/hostiles-front.png",
+        "columns": 4,
+        "rows": 1,
+        "index": 1
+      },
+      "prompt": "Use case: stylized-concept. Asset type: one finished square game sprite painting of a single hostile structure, full body, centered with 10 percent padding, on a flat uniform very dark charcoal backdrop with no floor and no cast shadow, ready to be cut out. FAULTLINE, a ruined orbital cathedral network tactics card game. Subject: Static Nest, a dense woven nest of dark optical cables and bent brass conduit the size of a barrel, several pale tap-larvae glowing magenta curled inside its openings, fine grey static crawling over the outer strands, one larger cable rising from the top like a neck with a dim magenta eye. Organic in shape, mechanical in material. Painterly premium oil concept art, dark rubber and tarnished brass, dramatic amber rim light, magenta emissive only inside. Strong compact silhouette, no backgrounds, no frames, no UI, no text, no watermark. The magenta larvae glowing inside the openings and the single magenta eye on the raised cable are bright, clearly visible accents against the dark cables.",
+      "file": "artifacts/v4-bodies-14-front/nest@240923172.png",
+      "sha256": "81ab874b164208a3c4fb138a0772348936e84780a4ba52f6c0e04647be334fce",
+      "promptAddendum": "The magenta larvae glowing inside the openings and the single magenta eye on the raised cable are bright, clearly visible accents against the dark cables.",
+      "rejected": [
+        {
+          "seeds": [
+            240923109,
+            240923162,
+            240923163,
+            240923164
+          ],
+          "why": "verbatim prompt: an almost black ball of cable, the magenta larvae and eye barely visible (fails the one-feature read)"
+        },
+        {
+          "seeds": [
+            240923109,
+            240923169
+          ],
+          "referenceStrength": 0.8,
+          "why": "LoRA 0.8: magenta blotchy, no eye"
+        },
+        {
+          "seeds": [
+            240923109,
+            240923171
+          ],
+          "why": "with addendum: weaker eye/larvae than 240923172"
+        }
+      ],
+      "referenceSha256": "bcf213b262aae198b20bde6b72616922871e63aa1a9c1e76b9eef40aa98c6251"
+    },
+    {
+      "id": "demolition",
+      "name": "Demolition Engine",
+      "effect": "Hostile: a breaching engine that plants Breaker Charges.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923110,
+      "reference": "docs/art-refs/hostile-anchor-drone.png",
+      "referenceStrength": 0.6,
+      "postprocess": "cutout",
+      "sheet": {
+        "file": "public/art/hostiles-front.png",
+        "columns": 4,
+        "rows": 1,
+        "index": 2
+      },
+      "prompt": "Use case: stylized-concept. Asset type: one finished square game sprite painting of a single large hostile machine, full body, centered with 10 percent padding, on a flat uniform very dark charcoal backdrop with no floor and no cast shadow, ready to be cut out. FAULTLINE, a ruined orbital cathedral network tactics card game. Subject: Demolition Engine, a heavy tracked breaching engine in scorched iron and brass, a blunt iron ram at the front, a rack of small brass breaker charges with red glass caps along its flank, one large round countdown lamp on its turret glowing ember red, hazard-striped ivory plates on the treads. Slow, certain, made to bring walls down. Painterly premium oil concept art, scorched metal, dramatic amber rim light, red glow at the lamp and caps. Strong low wide silhouette, no backgrounds, no frames, no UI, no text, no watermark.",
+      "file": "artifacts/v4-bodies-11-front/demolition.png",
+      "sha256": "4b7808253fd8f34674dd551fe94959124a64dc20b5530c8d2262d0fc08730e7e",
+      "referenceSha256": "bcf213b262aae198b20bde6b72616922871e63aa1a9c1e76b9eef40aa98c6251"
+    },
+    {
+      "id": "blight",
+      "name": "Root Blight",
+      "effect": "Hostile: a rust tree that plants Anchors and spreads corrosion.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923186,
+      "reference": "docs/art-refs/hostile-anchor-drone.png",
+      "referenceStrength": 0.6,
+      "postprocess": "cutout",
+      "sheet": {
+        "file": "public/art/hostiles-front.png",
+        "columns": 4,
+        "rows": 1,
+        "index": 3
+      },
+      "prompt": "Use case: stylized-concept. Asset type: one finished square game sprite painting of a single hostile structure, full body, centered with 10 percent padding, on a flat uniform very dark charcoal backdrop with no floor and no cast shadow, ready to be cut out. FAULTLINE, a ruined orbital cathedral network tactics card game. Subject: Root Blight, a leafless tree grown from corroded brass pipes and split conduit, its roots driven into a fragment of broken deck plate that it carries with it, iron anchor spikes hammered into that plate, bright orange oxide blooms flowering at the pipe joints, a faint ember light deep in the trunk. Slow, spreading, a corrosion that took root. Painterly premium oil concept art, rust and verdigris, dramatic amber rim light, restrained orange emissive at the blooms. Strong branching silhouette, no backgrounds, no frames, no UI, no text, no watermark. Its crown is only five or six thick bent pipe limbs ending in capped valve joints, like a crooked candelabra of plumbing, with no thin twigs at all; each joint bursts into a large glowing orange oxide bloom, clearly visible.",
+      "file": "artifacts/v4-bodies-18-blight/blight@240923186.png",
+      "sha256": "b21b02c21954d3ef867d48eced6bbbd103ebb2006051b9b487c3e56c1bd9ca38",
+      "promptAddendum": "Its crown is only five or six thick bent pipe limbs ending in capped valve joints, like a crooked candelabra of plumbing, with no thin twigs at all; each joint bursts into a large glowing orange oxide bloom, clearly visible.",
+      "rejected": [
+        {
+          "seeds": [
+            240923111,
+            240923165,
+            240923166,
+            240923167
+          ],
+          "why": "verbatim prompt paints a natural leafless tree: hundreds of fine twigs that the matte half-dissolves (thin-parts rule), blooms invisible"
+        },
+        {
+          "seeds": [
+            240923111,
+            240923170
+          ],
+          "referenceStrength": 0.8,
+          "why": "same twigs at LoRA 0.8"
+        },
+        {
+          "seeds": [
+            240923111,
+            240923173,
+            240923174
+          ],
+          "why": "first addendum (no fine twigs): twigs remain"
+        },
+        {
+          "seeds": [
+            240923111,
+            240923175,
+            240923176,
+            240923177,
+            240923179,
+            240923180,
+            240923184,
+            240923185
+          ],
+          "reference": "hostiles.png cell 2 (Core) crop",
+          "why": "better rust, but twigs remain"
+        },
+        {
+          "seed": 240923181,
+          "why": "orange flames at the joints and anchor spikes, but its thin twigs came out half-transparent after the matte"
+        },
+        {
+          "seeds": [
+            240923178,
+            240923182,
+            240923183,
+            240923187,
+            240923188,
+            240923189
+          ],
+          "why": "twigs, or a weaker silhouette than 240923186"
+        },
+        {
+          "seed": 240923111,
+          "note": "clean candelabra (artifacts/v4-bodies-16-blight) was the runner-up"
+        }
+      ],
+      "referenceSha256": "bcf213b262aae198b20bde6b72616922871e63aa1a9c1e76b9eef40aa98c6251"
+    },
+    {
+      "id": "gate-warden",
+      "name": "Gate Warden",
+      "effect": "Add of the Iron Regent: a walking fragment of the gate.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923190,
+      "reference": "docs/art-refs/hostile-anchor-drone.png",
+      "referenceStrength": 0.6,
+      "postprocess": "cutout",
+      "sheet": {
+        "file": "public/art/hostiles-adds.png",
+        "columns": 3,
+        "rows": 1,
+        "index": 0
+      },
+      "prompt": "Use case: stylized-concept. Asset type: one finished square game sprite painting of a single hostile machine, full body, centered with 10 percent padding, on a flat uniform very dark charcoal backdrop with no floor and no cast shadow, ready to be cut out. FAULTLINE, a ruined orbital cathedral network tactics card game. Subject: Gate Warden, a walking fragment of an ancient copper gate: a tall rectangular iron lock plate with an ornate keyhole for a face, verdigris copper filigree at its edges, two short heavy brass legs, one small green gate lamp glowing above the keyhole. It looks torn from a larger gate and animated by duty. Painterly premium oil concept art, corroded iron, verdigris copper, dramatic amber rim light, restrained green glow at the lamp. Strong tall silhouette, no backgrounds, no frames, no UI, no text, no watermark.",
+      "file": "artifacts/v4-bodies-20-adds/gate-warden@240923190.png",
+      "sha256": "7e7d2b028f26ab082a071f43bb0824ac700e0bfacf734e0f3f1c8c48e57d79cf",
+      "rejected": [
+        {
+          "seed": 240923112,
+          "why": "good, but thinner filigree and a smaller keyhole than 240923190 at sprite size"
+        }
+      ],
+      "referenceSha256": "bcf213b262aae198b20bde6b72616922871e63aa1a9c1e76b9eef40aa98c6251"
+    },
+    {
+      "id": "chorister",
+      "name": "Chorister",
+      "effect": "Add of the Hollow Choir: one sealed voice that keeps the Choir plated.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923193,
+      "reference": "docs/art-refs/hostile-anchor-choir.png",
+      "referenceStrength": 0.6,
+      "postprocess": "cutout",
+      "sheet": {
+        "file": "public/art/hostiles-adds.png",
+        "columns": 3,
+        "rows": 1,
+        "index": 1
+      },
+      "prompt": "Use case: stylized-concept. Asset type: one finished square game sprite painting of a single hostile object, full body, centered with 10 percent padding, on a flat uniform very dark charcoal backdrop with no floor and no cast shadow, ready to be cut out. FAULTLINE, a ruined orbital cathedral network tactics card game. Subject: Chorister, a small glass cathedral bell on a slender tarnished brass stand, its open mouth sealed shut with a chipped ivory cap bound by wire, pale violet light trapped inside and leaking through one vertical crack, a faint face in the glass. A voice kept from escaping. Painterly premium oil concept art, glass painted with solid opaque edges for cut-out, brass and ivory, dramatic amber rim light, violet emissive inside. Strong silhouette, no backgrounds, no frames, no UI, no text, no watermark.",
+      "file": "artifacts/v4-bodies-21-chorister/chorister@240923193.png",
+      "sha256": "749626a7b9d8e98ec5304bec4ace31702e4507cb8f622efe7458b69a35b48823",
+      "anchorNote": "The Chorister is anchored to the Hollow Choir cell of hostiles-expedition.png (512 x 512 at x 0, y 512, hostile-anchor-choir.png) so the add reads as one of the Choir own bells.",
+      "rejected": [
+        {
+          "seeds": [
+            240923113,
+            240923191,
+            240923194,
+            240923195
+          ],
+          "reference": "docs/art-refs/hostile-anchor-drone.png",
+          "why": "plain table lamps or wrapped jars that do not read as the Choir bells"
+        },
+        {
+          "seed": 240923113,
+          "reference": "docs/art-refs/hostile-anchor-choir.png",
+          "why": "a lantern cage rather than a bell"
+        }
+      ],
+      "referenceSha256": "acf4e2842c57646713ffcf51f8c1f81b4d99e379e09b51195d4444cc400c7e63"
+    },
+    {
+      "id": "quarantine-drone",
+      "name": "Quarantine Drone",
+      "effect": "Add of the Blackout Core: quarantine machinery that plants Jammers.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923114,
+      "reference": "docs/art-refs/hostile-anchor-drone.png",
+      "referenceStrength": 0.6,
+      "postprocess": "cutout",
+      "sheet": {
+        "file": "public/art/hostiles-adds.png",
+        "columns": 3,
+        "rows": 1,
+        "index": 2
+      },
+      "prompt": "Use case: stylized-concept. Asset type: one finished square game sprite painting of a single hostile machine, full body, centered with 10 percent padding, on a flat uniform very dark charcoal backdrop with no floor and no cast shadow, ready to be cut out. FAULTLINE, a ruined orbital cathedral network tactics card game. Subject: Quarantine Drone, a floating ivory ceramic sphere banded with worn red-and-ivory hazard stripes, four folding brass clamp arms tucked against its body, a small copper jammer coil on its crown and a single red seal lamp at its front like a closed eye. Clinical, final, the machinery that keeps a door shut. Painterly premium oil concept art, chipped ceramic and brass, dramatic amber rim light, restrained red glow at the lamp and coil. Strong silhouette, no backgrounds, no frames, no UI, no text, no watermark.",
+      "file": "artifacts/v4-bodies-19-adds/quarantine-drone.png",
+      "sha256": "6a9e2f8ab5f1c3ec82d6684efa849d23f5d6766d3c81f351234452b7586a39ea",
+      "rejected": [
+        {
+          "seed": 240923192,
+          "why": "near-identical alternative; 240923114 has the clearer clamp arms"
+        }
+      ],
+      "referenceSha256": "bcf213b262aae198b20bde6b72616922871e63aa1a9c1e76b9eef40aa98c6251"
+    },
+    {
+      "id": "crate",
+      "name": "Crate",
+      "effect": "Crate reveal plate and reward screen: a sealed hazard crate opening.",
+      "engine": "local-krea-2-turbo",
+      "seed": 240923115,
+      "reference": "docs/art-refs/card-anchor.png",
+      "referenceStrength": 0.8,
+      "postprocess": null,
+      "sheet": null,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference. A sealed heavy brass supply crate banded with worn red-and-ivory hazard stripes standing on a dark scarred table inside a ruined orbital cathedral, its riveted lid lifting a hand's width on stiff hinges, warm amber light spilling out from inside across the table and the broken seal, dust drifting in the beam. One clear object centered with room around it, a reward about to be opened. Chipped brass, cracked ivory fittings, dark cables, deep indigo shadows. Rich layered oil-paint brushwork, softly broken painted edges, muted colours, dramatic shadow. No photography, smooth studio-product rendering, text, labels, border or interface.",
+      "file": "public/art/crate.png",
+      "sha256": "79cd7131766d2e25c96cc245942a9e5adc52a61b1d0ee02f7188e90ddc4154d4",
+      "candidate": "artifacts/v4-crate-01/crate.png",
+      "referenceSha256": "57421017ba1144d899ba2872c27e41bef2a34cb82bdba6c6cd8fe873a64db414"
+    }
+  ]
+}

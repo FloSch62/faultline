@@ -830,3 +830,394 @@ dialog .game-card > .card-heading::before, dialog .game-card > .card-heading::af
 @container game (max-width: 600px) {
   .is-battle .enemy-plate .intent-description { display: none; }
 }
+
+/* The bottom row's controls render after the hand (keyboard order, design 13.8) in #battle-foot,
+   a layer shaped like #battle-hud just beneath it: the stacking is today's (plates and docks over the
+   row and its shade, the hand over everything); only the Tab order changes. */
+#battle-foot { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
+#battle-foot button { pointer-events: auto; }
+.game-root:not(.is-battle) #battle-foot { display: none; }
+.is-battle .battle-bottom.battle-controls { background: none; }
+
+/* ============================================================ v4 · Under Quarantine: the far rail
+   One hostile keeps today's plate. A pack turns the top of the plate into the port strip
+   (phase order, one iron row per port) and the rest into the chosen port's detail; the
+   deliveries ledger closes the plate. Selection is light: the chosen row carries an ember
+   marker, the focus row a lit brass rim and the crest. Budget at 1280 × 720: strip 3 × 26 px,
+   detail ≈ 140 px, ledger ≈ 70 px inside the painted frame. */
+.is-battle { --channel-primary: #f2c46d; --channel-bandwidth: #6fe0f0; --fray: #d08a52; --coral: #ef8f86; --teal: #8fd9c0; --install: #e5a8f7; }
+
+/* ---- designation ribbon: an engraved band with a swallowtail end */
+.designation-ribbons { display: flex; flex-wrap: wrap; gap: 3px 8px; margin: 3px 0 7px; }
+.designation-ribbon {
+  position: relative; display: inline-flex; align-items: center; gap: 5px; max-width: 100%;
+  padding: 1px 14px 1px 2px; font: 700 11px/1.35 var(--label); letter-spacing: .12em;
+  color: #f6b9ae; text-shadow: 0 1px 0 #000;
+  background: linear-gradient(90deg, #5a2622e6, #2a1414d9 70%, #2a141400);
+  border-top: 1px solid #ef8f8666; border-bottom: 1px solid #ef8f8633;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 7px) 50%, 100% 100%, 0 100%);
+  cursor: var(--cursor-default);
+}
+.designation-ribbon b { font: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.designation-ribbon.good { color: #b6ecdb; background: linear-gradient(90deg, #1d4a40e6, #10261fd9 70%, #10261f00); border-color: #8fd9c066; }
+.designation-ribbon.unknown {
+  color: #c9ccc6; letter-spacing: .14em;
+  background: repeating-linear-gradient(0deg, #ffffff0f 0 1px, transparent 1px 3px), linear-gradient(90deg, #34383ae6, #1b1e20d9 70%, #1b1e2000);
+  border-color: #9a9d9855;
+}
+.designation-ribbon:focus-visible { outline: 1px solid var(--brass-hi); outline-offset: 2px; }
+/* The reveal: static clears from the band and the glyph strikes, once. */
+.designation-ribbon.is-revealing::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, #d9ddd633 0 1px, transparent 1px 2px), #262a2cee;
+  animation: ribbon-static .95s steps(8, end) .15s both;
+}
+.designation-ribbon.is-revealing svg { animation: ribbon-strike .5s ease-out .5s both; }
+@keyframes ribbon-static { 0% { opacity: 1; transform: translateX(0); } 60% { opacity: .75; transform: translateX(2px); } 100% { opacity: 0; transform: translateX(-100%); } }
+@keyframes ribbon-strike { 0% { filter: brightness(2.6) drop-shadow(0 0 6px #fff4d0); transform: scale(1.35); } 100% { filter: none; transform: none; } }
+.reduced-motion .designation-ribbon.is-revealing::after, .reduced-motion .designation-ribbon.is-revealing svg { animation: none; display: none; }
+.reduced-motion .designation-ribbon.is-revealing svg { display: inline; }
+@media (prefers-reduced-motion: reduce) { .designation-ribbon.is-revealing::after { display: none; } .designation-ribbon.is-revealing svg { animation: none; } }
+
+/* ---- escalation gauge: three diamonds beside the pressure warning */
+.escalation-gauge { display: inline-flex; align-items: center; gap: 4px; padding: 0 2px; cursor: var(--cursor-default); }
+.escalation-gauge i { width: 7px; height: 7px; transform: rotate(45deg); border: 1px solid #b0786680; background: #140c0e; }
+.escalation-gauge i.on { border-color: #ffc2b2; background: linear-gradient(135deg, #ffd6c6, var(--coral) 55%, #9b3a2e); box-shadow: 0 0 6px #ef8f8699; }
+.escalation-gauge:focus-visible { outline: 1px solid var(--brass-hi); outline-offset: 3px; }
+.intent-description .escalation-next { color: var(--coral); font-style: italic; }
+
+/* ---- medallion kinds */
+.intent-medallion.intent-install .intent-emblem { color: var(--install); border-color: #b57ad08c; background: radial-gradient(#7a3a8a55, transparent); }
+.intent-medallion.intent-install:not(.lethal) strong { color: #f3d2fb; }
+.intent-medallion.intent-overload .intent-emblem { color: var(--fray); border-color: #d08a528c; background: radial-gradient(#8a4a2255, transparent); }
+.intent-medallion.intent-overload:not(.lethal) strong { color: #ffd2ad; }
+.intent-medallion.intent-dormant { opacity: .78; }
+.intent-medallion.intent-dormant strong small { font: italic 14px/1.2 var(--text); color: #aaa498; }
+.intent-medallion.is-small .intent-emblem { width: 30px; height: 30px; flex-basis: 30px; }
+.intent-medallion.is-spiteful strong::after { content: ""; }
+.hazard-caption.is-install, .hazard-caption.is-infect { color: #e5a8f7; }
+.hazard-caption.is-wear { color: #f0b98a; }
+.hazard-caption.is-crate { color: #e3c68b; }
+.hazard-caption.is-spite { color: var(--coral); }
+.hazard-caption.is-signal { color: #bfe2f0; }
+.hazard-caption.is-signal.bad { color: #f4b3a4; }
+.hazard-caption.is-arrival { color: #ffb096; }
+.hazard-caption svg { flex: none; }
+
+/* ---- the port strip */
+.port-strip { display: grid; gap: 3px; margin: 0 0 7px; }
+.port-row-slot { position: relative; }
+.port-row {
+  position: relative; display: flex; align-items: center; gap: 4px;
+  width: 100%; height: 28px; padding: 0 6px 3px 4px; text-align: left; color: #eadcc0;
+  background: linear-gradient(170deg, #211c20f2, #100e12f4 72%);
+  border: 1px solid #6e4f3e; box-shadow: inset 0 0 0 1px #07060a, inset 0 1px 0 #f3dca014, 0 3px 8px #0008;
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  transition: border-color .18s, box-shadow .18s, filter .18s;
+}
+.port-row:hover, .port-row:focus-visible { border-color: #c9a263; box-shadow: inset 0 0 0 1px #07060a, inset 0 1px 0 #f3dca026, inset 0 0 16px #ffb04a14, 0 3px 8px #0008; outline: none; }
+.port-row.is-focus { border-color: var(--brass-hi); box-shadow: inset 0 0 0 1px #07060a, inset 0 1px 0 #f3dca033, inset 0 0 18px #ffb04a1f, 0 0 12px #ffb04a33; }
+/* The chosen row: an ember stone on its left edge. */
+.port-row-slot.is-selected::before {
+  content: ""; position: absolute; z-index: 2; left: -4px; top: 50%; width: 8px; height: 8px;
+  transform: translateY(-50%) rotate(45deg); background: linear-gradient(135deg, #fff4d0, var(--ember) 55%, #9b5a18);
+  box-shadow: 0 0 0 1px #0b0906, 0 0 10px var(--ember); pointer-events: none;
+}
+.port-letter {
+  display: grid; flex: none; place-items: center; width: 14px; height: 14px; border-radius: 50%;
+  font: 700 9px/1 var(--label); letter-spacing: 0; color: #d9c08a;
+  background: radial-gradient(circle at 50% 35%, #2e2417, #0f0c08 72%); box-shadow: inset 0 0 0 1px #8a6a3a;
+}
+.port-row.is-focus .port-letter { color: #fff0cc; box-shadow: inset 0 0 0 1px var(--brass-hi), 0 0 6px #ffb04a55; }
+/* A crate rides on this hostile: its port stud is a small strapped crate instead of a round stud. */
+.port-letter.has-crate {
+  border-radius: 1px; color: #ffe6b0;
+  background: linear-gradient(#e3c68b 0 0) 0 30% / 100% 1px no-repeat, linear-gradient(#e3c68b 0 0) 0 70% / 100% 1px no-repeat, linear-gradient(#4a3620, #1c140b);
+  box-shadow: inset 0 0 0 1px #e3c68b, 0 0 5px #e3c68b55;
+}
+/* The name takes every pixel the numerals leave; a name that still does not fit (Demolition
+   Engine, Quarantine Drone on a 720p table) folds onto a second line instead of losing letters. */
+.port-name { display: flex; flex: 1 1 auto; align-items: center; gap: 4px; min-width: 0; font: 600 12.5px/1 var(--title); letter-spacing: 0; text-shadow: 0 1px 0 #000; }
+.port-name > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; min-width: 0; overflow: hidden; line-height: 1.02; overflow-wrap: normal; }
+.port-name > span.is-folded { font-size: 11.5px; line-height: 1; }
+.port-name > b { flex: none; margin-left: auto; font: 600 12.5px/1 var(--title); font-variant-numeric: tabular-nums; color: #f3dca0; }
+.port-name .row-crate { display: inline-grid; flex: none; color: #e3c68b; }
+.port-name .row-ribbon { display: inline-flex; flex: none; gap: 1px; }
+.row-intent { display: inline-flex; flex: none; align-items: center; gap: 3px; color: #efbfa8; }
+.row-intent svg { color: #e1a78d; }
+.row-intent b { font: 600 14px/1 var(--title); font-variant-numeric: tabular-nums; color: #f6d2bb; }
+.row-level { display: inline-flex; flex: none; gap: 2px; margin-right: -1px; }
+.row-level i { width: 4px; height: 4px; transform: rotate(45deg); border: 1px solid #b07866; }
+.row-level i.on { background: var(--coral); border-color: #ffc2b2; }
+.row-state { flex: none; font: italic 11px/1 var(--text); white-space: nowrap; }
+.row-state.is-dormant { color: #8f8a82; }
+.row-state.is-cancelled { font: 700 9.5px/1 var(--label); letter-spacing: .08em; font-style: normal; color: #f6d38a; text-shadow: 0 0 8px #ffb04a66; }
+.row-state.is-arrival { font: 700 9.5px/1 var(--label); letter-spacing: .06em; font-style: normal; color: #ffb096; }
+.row-spite { position: absolute; right: 7px; bottom: 4px; font: 700 7.5px/1 var(--label); letter-spacing: .08em; font-style: normal; color: var(--coral); }
+.port-row.state-dormant { color: #a7a097; }
+.port-row.state-dormant .port-name { font-style: italic; }
+.port-row.state-dormant .port-name > b { color: #b9ab8a; }
+.port-row.state-cancelled { border-color: #c9a26399; }
+.port-row.state-cancelled .row-intent, .port-row.state-cancelled .port-name > span { opacity: .8; }
+.port-row.state-arrival { padding-right: 8px; color: #b69a8a; border-style: dashed; border-color: #a0756580; background: repeating-linear-gradient(135deg, #1a1416e6 0 6px, #140f12e6 6px 12px); cursor: var(--cursor-default); }
+.port-row.state-arrival .port-letter { color: #ffb096; box-shadow: inset 0 0 0 1px #a8604c; }
+/* An arrival behind a hostile that falls this transmission: a slimmer dashed row under it, tied to it. */
+.port-row-slot.is-following { margin: -1px 0 0 18px; }
+.port-row-slot.is-following .port-row { height: 20px; padding-bottom: 1px; }
+.port-row-slot.is-following .port-letter { display: none; }
+.port-row-slot.is-following::before { content: ""; position: absolute; left: -11px; top: -3px; width: 9px; height: 13px; border: solid #a0756580; border-width: 0 0 1px 1px; pointer-events: none; }
+.boss-window.charging { color: #f2cd86; border-color: #c9a26359; }
+.port-bar { position: absolute; left: 6px; right: 6px; bottom: 2px; height: 2px; overflow: hidden; background: #07090d; }
+.port-bar > i:first-child { display: block; height: 100%; background: linear-gradient(90deg, #9d534b, #ce9c7f); transition: width .35s; }
+.port-bar .health-risk { position: absolute; top: 0; height: 100%; background: repeating-linear-gradient(135deg, #ba755b 0 2px, #f7c4a7 2px 4px); }
+.port-row.is-lethal .port-bar .health-risk { background: repeating-linear-gradient(135deg, #d6a24a 0 2px, #ffe9a8 2px 4px); }
+/* The crest: the port's stud turned into a brass diamond engraved with its letter. Lit on the
+   focus row; dim on a selected row, where a click (or F) makes that port the focus. */
+.port-row.has-crest .port-letter { visibility: hidden; }
+.port-crest {
+  position: absolute; z-index: 2; left: 3px; top: calc(50% - 1.5px); transform: translateY(-50%); display: grid; place-items: center;
+  width: 18px; height: 18px; padding: 0; color: #d9c08a; background: none; border: 0;
+  transition: color .18s, filter .18s;
+}
+.port-crest::before {
+  content: ""; position: absolute; inset: 3px; transform: rotate(45deg);
+  background: radial-gradient(circle at 50% 35%, #2e2417, #0f0c08 72%); box-shadow: inset 0 0 0 1px #9b7a45, 0 1px 3px #000c;
+}
+.port-crest > b { position: relative; font: 700 9px/1 var(--label); letter-spacing: 0; }
+.port-crest:hover, .port-crest:focus-visible { color: #fff3d0; filter: drop-shadow(0 0 5px #ffb04a88); outline: none; }
+.port-crest:hover::before, .port-crest:focus-visible::before { box-shadow: inset 0 0 0 1px var(--brass-hi), 0 1px 3px #000c; }
+.port-crest.is-on { color: #2a1605; filter: drop-shadow(0 0 5px #ffb04a99); animation: crest-pulse 2.6s ease-in-out infinite; }
+.port-crest.is-on::before { background: linear-gradient(135deg, #fff2c9, #e8c47c 45%, #9b7424); box-shadow: 0 0 0 1px #0b0906, inset 0 0 0 1px #fff4d0aa; }
+@keyframes crest-pulse { 50% { filter: drop-shadow(0 0 9px #ffb04acc); } }
+.reduced-motion .port-crest.is-on { animation: none; }
+@media (prefers-reduced-motion: reduce) { .port-crest.is-on { animation: none; } }
+
+/* ---- the chosen port's detail (packs) */
+.enemy-plate.is-pack .pack-identity { min-height: 0; margin-bottom: 6px; }
+.port-detail-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
+.port-detail-head h2 { flex: 0 1 auto; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 17px/1.15 var(--title); color: #f0e2c0; text-shadow: 0 1px 0 #000, 0 0 12px #000; }
+/* The name wins the head: the trait badge's word gives way first (it stays in its tooltip). */
+.is-battle .enemy-plate .port-detail-head .trait-badge { flex: 1 1 0; justify-content: flex-end; width: auto; min-width: 16px; display: inline-flex; align-items: center; gap: 4px; margin: 0; padding: 0; max-width: 55%; font: 700 10px var(--label); letter-spacing: .06em; }
+.port-detail-head .trait-badge span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.port-detail-head .trait-badge svg { flex: none; }
+.enemy-plate.is-pack .designation-ribbons { margin: 3px 0 4px; }
+.enemy-plate.is-pack .intent-heading { padding-top: 6px; margin-top: 2px; }
+.enemy-plate.is-pack .intent-medallion { margin: 6px 0; }
+.enemy-plate.is-pack .intent-emblem { width: 36px; height: 36px; flex-basis: 36px; }
+.enemy-plate.is-pack .intent-emblem svg { width: 24px; height: 24px; }
+.is-battle .enemy-plate.is-pack .intent-medallion strong { font-size: 25px; }
+.is-battle .enemy-plate.is-pack .intent-medallion small { font-size: 14px; }
+.is-battle .enemy-plate.is-pack .intent-medallion.lethal strong { font-size: 16px; }
+.is-battle .enemy-plate.is-pack .intent-description { margin-bottom: 6px; line-height: 1.38; }
+
+/* ---- deliveries ledger */
+.deliveries { margin-top: 6px; padding-top: 5px; border-top: 1px solid #b894752e; }
+.deliveries-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; font: 700 10.5px/1.2 var(--label); letter-spacing: .08em; color: #c8ab8e; }
+.deliveries-keys { display: inline-flex; gap: 2px; }
+.deliveries-keys kbd { min-width: 13px; padding: 0 2px; font-size: 8.5px; line-height: 1.35; }
+.delivery-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 7px; height: 21px; padding: 0 1px 0 6px; }
+.delivery-row + .delivery-row { border-top: 1px solid #b894751a; }
+.delivery-row.is-selected::before {
+  content: ""; position: absolute; left: -3px; top: 50%; width: 6px; height: 6px; transform: translateY(-50%) rotate(45deg);
+  background: linear-gradient(135deg, #fff4d0, var(--ember) 55%, #9b5a18); box-shadow: 0 0 0 1px #0b0906, 0 0 8px var(--ember);
+}
+.delivery-mark { display: flex; align-items: center; gap: 5px; min-width: 0; font: 700 10.5px/1 var(--label); letter-spacing: .04em; color: #cbbd9e; cursor: var(--cursor-default); }
+.delivery-mark > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.delivery-mark svg { flex: none; color: var(--channel-bandwidth); filter: drop-shadow(0 0 3px #6fe0f088); }
+.delivery-row.is-primary .delivery-mark svg { color: var(--channel-primary); filter: drop-shadow(0 0 3px #f2c46d88); }
+.delivery-amount { min-width: 17px; text-align: right; font: 600 15px/1 var(--title); font-variant-numeric: tabular-nums; color: #f3dca0; text-shadow: 0 1px 0 #000; }
+.delivery-studs { display: inline-flex; gap: 3px; }
+.port-stud {
+  display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border-radius: 50%;
+  font: 700 9px/1 var(--label); letter-spacing: 0; color: #b69a6a;
+  background: radial-gradient(circle at 50% 35%, #2e2417, #0f0c08 72%);
+  box-shadow: inset 0 0 0 1px #7b5a2c, inset 0 0 0 2px #0f0c08, 0 1px 3px #000a;
+  transition: color .15s, box-shadow .15s;
+}
+.port-stud:hover:not(:disabled), .port-stud:focus-visible { color: #fff3d0; outline: none; box-shadow: inset 0 0 0 1px var(--brass-hi), inset 0 0 0 2px #0f0c08, 0 0 10px var(--ember-glow); }
+.port-stud.is-current { color: #2a1605; background: radial-gradient(circle at 45% 35%, #fff2c9, var(--ember) 55%, #9b5a18); box-shadow: 0 0 0 1px #0b0906, 0 0 10px #ffb04a99; }
+.port-stud:disabled { color: #4f4636; box-shadow: inset 0 0 0 1px #3a2d1a; background: #0c0a08; }
+/* The totals line: each port's landing under its stud column, gold when lethal. */
+.deliveries-foot { display: grid; margin-top: 2px; padding: 2px 1px 0 6px; border-top: 1px solid #b894751a; font: 700 10px/1.3 var(--label); letter-spacing: .04em; color: #b9a790; cursor: var(--cursor-default); }
+.deliveries-foot .foot-overflow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f0c79a; }
+.deliveries-foot .foot-totals { display: flex; align-items: center; justify-content: space-between; gap: 7px; }
+.deliveries-foot .foot-label { color: #9d8b74; }
+.deliveries-foot .foot-cells { display: inline-flex; gap: 3px; }
+.deliveries-foot .foot-cells b { width: 18px; text-align: center; font: 600 13px/1.1 var(--title); font-variant-numeric: tabular-nums; color: #e6d2a8; text-shadow: 0 1px 0 #000; }
+.deliveries-foot .foot-cells b.is-empty { color: #4f4636; }
+.deliveries-foot .foot-cells b.is-lethal { color: #ffe29a; text-shadow: 0 0 6px #ffb04a88; }
+
+/* ---- transmit dial: a second small line when the packet is split or ends the fight */
+.is-battle .transmit-button .transmit-note { display: block; margin-top: 1px; font: 700 10px/1.1 var(--label); letter-spacing: .08em; color: #e9cf95; text-shadow: 0 1px 2px #000; }
+.is-battle .transmit-button.is-finishing .transmit-note { color: #ffe29a; text-shadow: 0 0 8px #ffb04a88; }
+@container game (min-width: 901px) {
+  .is-battle .transmit-button.has-note .transmit-label { top: 139px; }
+  .is-battle .transmit-button.has-note .transmit-shortcut { top: 178px; }
+}
+
+/* ---- the table front in the target dock and the ledger */
+.target-options .dock-break { flex-basis: 100%; height: 0; }
+/* The table-front plates close with a round brass stud on their corner (Esc). */
+.target-options:has(> .plate-close) { position: relative; padding-right: 26px; }
+.target-options > .plate-close {
+  position: absolute; top: -9px; right: -9px; display: grid; place-items: center; width: 22px; height: 22px; padding: 0;
+  border: 0; border-radius: 50%; color: #d9c290; background: radial-gradient(circle at 50% 35%, #33291b, #0f0c08 72%);
+  box-shadow: inset 0 0 0 1px #9b7a45, inset 0 0 0 2px #0f0c08, 0 2px 5px #000b;
+}
+.target-options > .plate-close:hover { color: #fff3d0; border: 0; background: radial-gradient(circle at 50% 35%, #33291b, #0f0c08 72%); box-shadow: inset 0 0 0 1px var(--brass-hi), inset 0 0 0 2px #0f0c08, 0 0 12px var(--ember-glow), 0 2px 5px #000b; }
+.target-options > span svg { vertical-align: -2px; color: #c9a263; }
+.target-options .plate-pips { font-style: normal; letter-spacing: .08em; color: #f3dca0; }
+.target-options .plate-pips.is-worn { color: var(--fray); }
+.target-options .plate-count { font: 600 14px/1 var(--title); font-style: normal; color: #ffe29a; text-shadow: 0 0 8px #ffb04a88; }
+.target-options .device-threat, .target-options .installation-effect { font: italic 12px/1.3 var(--text) !important; letter-spacing: 0 !important; color: #d7c8ad !important; }
+.target-options .device-threat { margin-left: 6px; padding-left: 8px; border-left: 1px solid #7b5a2c; color: #f0b98a !important; }
+.target-options.installation-controls { border-color: #9a6aa8; }
+.target-options.installation-controls > span:first-child b { color: #f3d2fb; }
+.target-options.installation-controls .plate-pips { color: #f0c4ff; }
+.target-options .scrub-button { color: #f3d2fb; border-color: #9a6aa8; }
+.target-options .scrub-button:hover:not(:disabled) { border-color: #f0b6ff; box-shadow: inset 0 1px 0 #f3dca033, inset 0 0 0 2px #0c0906, inset 0 0 14px #d07ae822, 0 0 14px #d07ae833; }
+.target-options .repair-button svg, .target-options .scrub-button svg { flex: none; }
+.target-options.installation-targets { border-color: #9a6aa8; }
+.target-options.installation-targets button { color: #f3d2fb; }
+.network-ledger .ledger-chip .tag-pips { font-style: normal; letter-spacing: .04em; color: #f0c4ff; }
+.network-ledger .ledger-chip .tag-count { display: inline-grid; place-items: center; min-width: 15px; height: 15px; font: 600 12px/1 var(--title); font-style: normal; color: #ffe29a; border-radius: 50%; background: #0b0706; box-shadow: inset 0 0 0 1px #d6a24a, 0 0 6px #ffb04a66; }
+.network-ledger .ledger-chip .tag-name, .network-ledger .ledger-chip .tag-extra { font-style: normal; }
+/* A crowded ledger keeps one line by folding, step by step (main.ts fitLedger): installation
+   names, then per-tag costs and tighter tags, then the terrain and online tags. Every folded word
+   stays in the tag's tooltip and aria-label. Only then does it wrap, lifting the log line above it. */
+.is-battle .network-ledger.tight-1 .ledger-chip.is-installation .tag-name, .is-battle .network-ledger.tight-1 .ledger-chip .tag-extra { display: none; }
+.is-battle .network-ledger.tight-2 { gap: 4px; }
+.is-battle .network-ledger.tight-2 .ledger-chip { gap: 4px; padding-inline: 9px; }
+.is-battle .network-ledger.tight-2 .ledger-chip.is-installation em { display: none; }
+.is-battle .network-ledger.tight-3 .ledger-chip.is-terrain, .is-battle .network-ledger.tight-3 .ledger-chip.is-online { display: none; }
+@container game (min-width: 901px) {
+  .is-battle .network-ledger.is-wrapping { flex-wrap: wrap; row-gap: 4px; }
+  .is-battle .network-ledger.is-wrapping + .combat-log { transform: translate(-50%, -28px); }
+}
+.network-ledger .ledger-chip.is-installation.is-selected { border-color: #f0b6ff; box-shadow: inset 0 1px 0 #f0c4ff2e, 0 0 18px #d07ae866, 0 3px 8px #000a; }
+.network-ledger .ledger-chip.is-installation.is-target { border-color: #ffd0a0; box-shadow: 0 0 14px #ffb04a55, 0 3px 8px #000a; animation: seal-ready 1.8s ease-in-out infinite; }
+/* Wear: an iron tag in the fray colour; each worn device inside it repairs on click. */
+.network-ledger .ledger-chip.is-wear {
+  color: #f3cfb0; border-color: #a8683acc;
+  background: radial-gradient(circle at 5px 50%, #ffd0a0 0 1.2px, #6b3a1a 1.8px, transparent 2.4px), radial-gradient(circle at calc(100% - 5px) 50%, #ffd0a0 0 1.2px, #6b3a1a 1.8px, transparent 2.4px), linear-gradient(#2c1c12f2, #150d08f2);
+}
+.network-ledger .ledger-chip.is-wear svg { color: var(--fray); }
+.network-ledger .ledger-chip.is-wear .is-worn {
+  display: inline-flex; align-items: center; gap: 4px; padding: 0 5px; font: 700 11px/1.3 var(--label); letter-spacing: .05em; color: #ffe2c6;
+  background: none; border: 0; border-left: 1px solid #a8683a66; pointer-events: auto; transition: color .15s, text-shadow .15s;
+}
+.network-ledger .ledger-chip.is-wear .is-worn .tag-pips { margin-left: 3px; font-style: normal; color: var(--fray); }
+.network-ledger .ledger-chip.is-wear .is-worn:hover:not(:disabled) { color: #fff3e0; text-shadow: 0 0 8px #ffb04a88; }
+.network-ledger .ledger-chip.is-wear .is-worn:disabled { opacity: .55; }
+.network-ledger .ledger-chip.is-wear em { display: inline-flex; align-items: center; gap: 2px; padding-left: 6px; font-style: normal; border-left: 1px solid #a8683a66; }
+.network-ledger .ledger-chip.is-installation em { margin-left: 1px; padding-left: 6px; }
+.field-seal .band-meta .band-installs { display: inline-flex; align-items: center; gap: 3px; color: #e5b4f7; }
+.field-seal .band-meta .band-installs svg { color: #d58aeb; }
+.field-seal .anchor-mark { display: inline-grid; vertical-align: -2px; color: #f0c4ff; font-style: normal; }
+
+/* ---- packs on shorter tables: the identity line gives way to the strip, the ribbon rides
+   beside the name as glyphs, the description keeps two lines (the rest in its tooltip) and
+   the ledger drops its heading. The plate may start higher: its crest clears the header. */
+.detail-marks { display: none; }
+.designation-ribbon-mark { display: inline-grid; flex: none; cursor: var(--cursor-default); }
+.designation-ribbon-mark:focus-visible { outline: 1px solid var(--brass-hi); outline-offset: 1px; }
+.port-detail-head .trait-badge span { display: none; }
+@container game (min-width: 1650px) and (min-height: 950px) {
+  .port-detail-head .trait-badge span { display: inline; }
+}
+@container game (min-width: 901px) and (max-height: 900px) {
+  .enemy-plate.is-pack .pack-identity { margin-bottom: 4px; }
+  .enemy-plate.is-pack .port-detail > .designation-ribbons { display: none; }
+  .enemy-plate.is-pack .detail-marks { display: inline-flex; gap: 2px; margin-right: auto; }
+  .enemy-plate.is-pack .port-detail-head h2 { font-size: 16px; }
+  .enemy-plate.is-pack .wide-only { display: none; }
+  .port-strip { gap: 2px; margin-bottom: 5px; }
+  .port-row { height: 26px; }
+  .port-name .row-ribbon, .port-row .row-level, .port-row .wide-only { display: none; }
+  .enemy-plate.is-pack .intent-heading { padding-top: 4px; margin-top: 3px; }
+  .enemy-plate.is-pack .intent-medallion { margin: 4px 0; gap: 9px; }
+  .enemy-plate.is-pack .intent-emblem { width: 32px; height: 32px; flex-basis: 32px; }
+  .enemy-plate.is-pack .intent-emblem svg { width: 21px; height: 21px; }
+  .is-battle .enemy-plate.is-pack .intent-medallion strong { font-size: 22px; }
+  .is-battle .enemy-plate.is-pack .intent-medallion small { font-size: 13px; margin-top: 1px; }
+  .is-battle .enemy-plate.is-pack .intent-description { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 4px; font-size: 10.5px; line-height: 1.3; }
+  .enemy-plate.is-pack .boss-window { padding: 4px 0; margin-bottom: 4px; }
+  .enemy-plate.is-pack .boss-window > strong { font-size: 14px; }
+  .enemy-plate.is-pack .deliveries { margin-top: 4px; padding-top: 3px; }
+  .enemy-plate.is-pack .deliveries-head { display: none; }
+  .delivery-row { height: 19px; }
+  .port-stud, .deliveries-foot .foot-cells b { width: 17px; }
+  .port-stud { height: 17px; }
+}
+@container game (min-width: 901px) and (max-height: 800px) {
+  .is-battle .battle-plate.enemy-plate.is-pack { top: 90px; }
+}
+/* Folds added by main.ts when a long forecast would reach the Transmit dial. The folded
+   sentences stay in the medallion's and the description's tooltips, and in Details. */
+.is-battle .enemy-plate.fold-1 .intent-description { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; -webkit-line-clamp: 2; }
+.is-battle .enemy-plate.is-pack.fold-1 .intent-description { -webkit-line-clamp: 1; }
+.is-battle .enemy-plate.fold-2 .deliveries-foot { display: none; }
+.is-battle .enemy-plate.fold-2:not(.is-pack) .trait-badge { margin-block: 4px; }
+.is-battle .enemy-plate.fold-2:not(.is-pack) .designation-ribbons { margin: 0 0 4px; }
+.is-battle .enemy-plate.fold-3 .intent-description { display: none; }
+.is-battle .enemy-plate.fold-4 .hazard-caption.is-echo { display: none; }
+.is-battle .enemy-plate.fold-4 .intent-extras { gap: 2px 8px; }
+/* A guardian with its adds on a 720p table: the add rule leaves the window (the meter keeps one
+   segment per add, the tooltip and Details keep the words), then the rows close up. */
+.is-battle .enemy-plate.fold-5 .boss-window .break-adds { display: none; }
+.is-battle .enemy-plate.fold-5 .boss-window { padding-block: 3px; }
+.is-battle .enemy-plate.is-pack.fold-6 .port-strip { gap: 1px; margin-bottom: 3px; }
+.is-battle .enemy-plate.is-pack.fold-6 .port-row { height: 24px; }
+.is-battle .enemy-plate.is-pack.fold-6 .delivery-row { height: 17px; }
+.is-battle .enemy-plate.is-pack.fold-6 .intent-medallion { margin-block: 2px; }
+.is-battle .enemy-plate.fold-7 .boss-window > span { display: none; }
+/* A pack's intent heading keeps one line: an enraged hostile drops the word "Next" for its states. */
+.enemy-plate.is-pack .intent-heading { flex-wrap: nowrap; align-items: center; }
+.enemy-plate.is-pack .intent-heading .intent-states { flex-wrap: nowrap; gap: 5px; min-width: 0; letter-spacing: .04em; }
+.enemy-plate.is-pack .intent-heading:has(.enrage-warning) > span:first-child { display: none; }
+.enemy-plate.is-pack .intent-heading .intent-states > * { white-space: nowrap; }
+
+/* ---- the guardian's window with adds: one meter segment per add, lit while it stands */
+.boss-window .break-adds { display: block; margin-top: 1px; font: 700 10px/1.2 var(--label); letter-spacing: .06em; color: #d9a88c; }
+.boss-window.has-adds .break-meter { position: relative; height: 6px; overflow: visible; }
+.boss-window.has-adds .break-meter > i { position: relative; z-index: 1; opacity: .9; }
+.break-segments { position: absolute; inset: 0; display: flex; pointer-events: none; }
+.break-segments b { height: 100%; border-right: 1px solid #0b0706; }
+.break-segments b + b { background: repeating-linear-gradient(135deg, #3a2320 0 2px, #1a100f 2px 4px); }
+.break-segments b.is-lit { background: linear-gradient(#f3c6a866, #b8664e66); box-shadow: inset 0 0 0 1px #f3c6a8cc, 0 0 6px #e7a87e55; }
+.break-mark { position: absolute; z-index: 2; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: #fff0cc; box-shadow: 0 0 6px #ffb04a; }
+@container game (min-width: 901px) and (max-height: 900px) {
+  .enemy-plate.is-pack .boss-window > span { font-size: 10px; }
+  .enemy-plate.is-pack .boss-window > strong { font-size: 14px; margin-top: 1px; }
+}
+
+/* Reduced motion: the table front and the rail rest; state is carried by colour and pips alone. */
+.reduced-motion .port-bar > i, .reduced-motion .port-row, .reduced-motion .port-stud { transition: none; }
+.reduced-motion .network-ledger .ledger-chip.is-installation.is-target { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .port-bar > i, .port-row, .port-stud { transition: none; }
+  .network-ledger .ledger-chip.is-installation.is-target { animation: none; }
+}
+
+/* Wide tables (≥ 1650 × 950 container px): a pack's plate reaches down to the dock row, so the docks
+   line up with the field seals' outer edges, clear of both painted frames. */
+@container game (min-width: 1650px) and (min-height: 950px) {
+  .command-left { left: calc(var(--rail) + 44px); }
+  .command-right { right: calc(var(--rail) + 50px); }
+  .is-battle .target-hint { left: calc(var(--rail) + var(--dock-width) + 56px); right: calc(var(--rail) + var(--dock-width) + 62px); }
+}
+
+/* A device's or an installation's plate sits on the field seals' row (the seals dim beneath it), so
+   it never covers the hardware it describes. */
+.is-battle #target-dock.is-front { bottom: calc(var(--field-bottom) + 4px); }
+.is-battle:has(#target-dock.is-front:not(:empty)) .field-strip { opacity: .28; transition: opacity .15s; }
+.is-battle #target-dock .device-controls > span:first-child { flex-basis: auto; margin-bottom: 0; }
+/* Relocation and repair travel together: one row on a wide table, a second row on a narrow one. */
+.target-options .dock-actions { display: inline-flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 7px; margin: 0; }
+.target-options .dock-actions > .dock-label { font: 700 11.5px var(--label); letter-spacing: .06em; color: #dbc9a0; margin-right: 2px; }
+.target-options .dock-actions > .dock-label svg { vertical-align: -2px; color: #c9a263; }
+.is-battle #target-dock .device-controls > span:first-child { margin-right: 12px; }
+.is-battle .enemy-plate .port-detail-head h2.is-long { font-size: 14px; letter-spacing: -.01em; }
+/* The plates take the pointer: their rules, ribbons and gauges answer hover with their tooltips, and a
+   lesson can spotlight a reading (the guardian's window) that a click acknowledges. */
+.is-battle .battle-plate { pointer-events: auto; }

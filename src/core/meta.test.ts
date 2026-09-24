@@ -1,13 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { newExpedition, parseExpedition } from "./expedition.ts";
+import { createMap } from "./map.ts";
 import { CARDS, RELICS, baseCard, isUpgraded } from "./cards.ts";
 import {
   chooseRoom, chooseCardReward, chooseRelic, chooseForge, upgradeDeckCard, removeDeckCard,
   buyCard, buyRelic, shopRemoveCard, shopUpgradeCard, leaveShop, grantVictory, cardRewards,
   repairAmount, CARD_PRICES, REMOVE_PRICE, UPGRADE_PRICE, ROUTER_PRICE, SALVAGE_COST, openShop,
 } from "./meta.ts";
-import type { Archetype, RoomType, RunState } from "./types.ts";
+import { planEncounter } from "./encounter.ts";
+import { RULES } from "./cards.ts";
+import type { Archetype, MapRoom, RoomType, RunState } from "./types.ts";
 
 /** Enters the first room of a type on the current stage, jumping to its floor. */
 function enter(run: RunState, type: RoomType): RunState {
@@ -18,6 +21,7 @@ function enter(run: RunState, type: RoomType): RunState {
   return run;
 }
 const fresh = (archetype: Archetype = "architect", seed = 11, ascension = 0) => newExpedition(archetype, seed, false, ascension).run;
+const createStageMap = (run: RunState, stage: number) => createMap(stage, run.seed, run.ascension);
 
 test("victories pay seeded credits by room type, with Credit Line and ascension", () => {
   for (let seed = 1; seed <= 30; seed++) {
@@ -28,16 +32,120 @@ test("victories pay seeded credits by room type, with Credit Line and ascension"
     assert.equal(r.creditsEarned, r.credits);
     assert.equal(r.cardRewards.length, 3);
   }
+  const planned = (run: RunState) => planEncounter(run, run.map.find(room => room.id === run.currentRoom)!).credits.reduce((sum, line) => sum + line.amount, 0);
   const elite = enter(fresh("warden", 3), "elite");
+  const eliteBonus = planned(elite);
   grantVictory(elite);
-  assert.equal(elite.credits, 30);
+  assert.equal(elite.credits, 30 + eliteBonus);
   const boss = enter(fresh("ghost", 3), "boss");
   boss.relics.push("credit-line");
   grantVictory(boss);
   assert.equal(boss.credits, 50 + 15);
+  assert.deepEqual(boss.creditLedger, [{ label: "guardian", amount: 50 }, { label: "credit line", amount: 15 }]);
   const lean = enter(fresh("warden", 3, 7), "elite");
+  const leanBonus = planned(lean);
   grantVictory(lean);
-  assert.equal(lean.credits, 27);
+  assert.equal(lean.credits, 27 + leanBonus);
+});
+
+/** Stands in a fight room without starting the fight: grantVictory only reads the room and the ledger. */
+function standIn(run: RunState, match: (room: MapRoom) => boolean): MapRoom {
+  const room = run.map.find(match)!;
+  run.currentRoom = room.id;
+  run.floor = room.floor;
+  run.phase = "battle";
+  return room;
+}
+
+test("the victory ledger itemises room, pack, designation, reinforcement, crates and messages", () => {
+  let packs = 0, designations = 0, reinforced = 0;
+  for (let seed = 1; seed <= 120; seed++) {
+    const run = fresh("architect", seed);
+    run.stage = 2;
+    run.map = createStageMap(run, 2);
+    const room = standIn(run, item => item.type === "battle" && !!item.pack);
+    const plan = planEncounter(run, room);
+    // Crates and messages bank their credits during the fight; the victory pays them.
+    run.creditLedger = [{ label: "crates", amount: 12 }, { label: "message", amount: 11 }, { label: "crates", amount: 9 }];
+    run.offers = [{ kind: "crate-card", cards: ["quorum", "bulkhead"] }, { kind: "message", sender: "Relay Seven", text: "Landed safe.", options: [{ id: "restore", amount: 2 }, { id: "purge" }] }];
+    const before = run.credits;
+    grantVictory(run);
+    const ledger = run.creditLedger!;
+    const labels = ledger.map(line => line.label);
+    assert.equal(labels[0], "room");
+    assert.ok(ledger[0].amount >= 14 + 3 * 2 && ledger[0].amount <= 18 + 3 * 2);
+    assert.deepEqual(ledger.find(line => line.label === "pack"), { label: "pack", amount: RULES.packCredits });
+    assert.deepEqual(ledger.find(line => line.label === "crates"), { label: "crates", amount: 21 }, "crate lines merge");
+    assert.deepEqual(ledger.find(line => line.label === "message"), { label: "message", amount: 11 });
+    for (const line of plan.credits) assert.deepEqual(ledger.find(item => item.label === line.label), line);
+    const total = ledger.reduce((sum, line) => sum + line.amount, 0);
+    assert.equal(run.credits, before + total);
+    assert.equal(run.creditsEarned, total);
+    assert.deepEqual(run.offers.map(offer => offer.kind), ["message"], "crate cards fade with the fight; messages wait on the reward screen");
+    packs++;
+    if (labels.includes("designation")) designations++;
+    if (labels.includes("reinforced")) reinforced++;
+  }
+  assert.equal(packs, 120);
+  assert.ok(designations > 20 && reinforced > 5, `${designations} designated, ${reinforced} reinforced`);
+  // Ascension 7 applies to every line.
+  const lean = fresh("architect", 5, 7);
+  lean.stage = 1;
+  lean.map = createStageMap(lean, 1);
+  standIn(lean, item => item.type === "elite");
+  grantVictory(lean);
+  assert.deepEqual(lean.creditLedger!.slice(0, 2), [{ label: "elite", amount: Math.round(35 * 0.9) }, { label: "pack", amount: Math.round(RULES.packCredits * 0.9) }]);
+});
+
+test("leaving a room clears every v4 encounter field", () => {
+  const run = fresh("ghost", 14);
+  const room = standIn(run, item => item.type === "battle" && item.floor === 0);
+  run.enemies = planEncounter(run, room).enemies;
+  run.installations = [{ id: "i1", kind: "jammer", x: 1, z: 1, integrity: 2, activeFrom: 1, owner: "h1" }];
+  run.faultNodes = ["router1"]; run.faultLinks = ["alpha::router1"];
+  run.focus = "centre"; run.aims = { router1: "centre" }; run.enemyPhase = 3; run.hostileActions = 4;
+  run.reinforcement = { enemyId: "splicer", after: 1, hp: 10, crate: { kind: "empty" } };
+  run.signal = { id: "surge", firesOnTurn: 3, resolved: false };
+  run.offers = [{ kind: "crate-card", cards: ["quorum", "bulkhead"] }];
+  run.encounterCards = ["quorum"];
+  run.turnEffects = { everyPort: 2 }; run.lingeringJams = { router1: 1 }; run.frayedByCut = ["alpha::router1"]; run.repairsThisTurn = 1;
+  run.creditLedger = [{ label: "crates", amount: 9 }];
+  grantVictory(run);
+  chooseCardReward(run, null);
+  assert.equal(run.phase, "map");
+  assert.deepEqual([run.enemies, run.installations, run.faultNodes, run.faultLinks, run.focus, run.aims, run.enemyPhase, run.hostileActions,
+    run.reinforcement, run.signal, run.offers, run.encounterCards], [[], [], [], [], null, {}, 0, 0, null, null, [], []]);
+  assert.deepEqual([run.turnEffects, run.lingeringJams, run.frayedByCut, run.repairsThisTurn, run.creditLedger], [undefined, undefined, undefined, undefined, undefined]);
+});
+
+test("relic offers include the v4 commons after elites and the v4 boss relics after guardians", () => {
+  const commons = new Set<string>(), bosses = new Set<string>();
+  for (let seed = 1; seed <= 150; seed++) {
+    const elite = enter(fresh("architect", seed), "elite");
+    grantVictory(elite);
+    chooseCardReward(elite, null);
+    elite.relicRewards.forEach(id => commons.add(id));
+    const boss = enter(fresh("warden", seed), "boss");
+    grantVictory(boss);
+    chooseCardReward(boss, null);
+    boss.relicRewards.forEach(id => bosses.add(id));
+  }
+  for (const id of ["round-robin", "ingress-filter", "priority-queue", "reinforced-frame", "field-engineer", "bill-of-lading"]) assert.ok(commons.has(id), id);
+  for (const id of ["storm-control", "scorched-earth"]) assert.ok(bosses.has(id), id);
+});
+
+test("entering a fight room begins the planned encounter; the next stage's chart carries the ascension", () => {
+  const run = fresh("warden", 61, 9);
+  const room = run.map.find(item => item.type === "battle" && item.floor === 0)!;
+  const plan = planEncounter(run, room);
+  enter(run, "battle");
+  assert.deepEqual(run.enemies.map(enemy => [enemy.id, enemy.hp]), plan.enemies.map(enemy => [enemy.id, enemy.hp]));
+  const boss = enter(fresh("warden", 61, 9), "boss");
+  grantVictory(boss);
+  chooseCardReward(boss, null);
+  chooseRelic(boss, boss.relicRewards[0]);
+  assert.equal(boss.stage, 1);
+  assert.deepEqual(boss.map, createMap(1, boss.seed, 9), "advanceRoom passes the ascension to the chart");
 });
 
 test("caches grant credits and a card choice; rewards respect the archetype and never offer junk", () => {
@@ -171,7 +279,7 @@ test("the market sells priced cards and relics, and removes or upgrades once per
   assert.ok(shopUpgradeCard(r, router).ok);
   assert.equal(r.deck[router], "router+");
   assert.equal(shopUpgradeCard(r, r.deck.indexOf("pulse")).ok, false, "one upgrade per visit");
-  assert.ok(parseExpedition(JSON.stringify({ version: 3, run: r, archetype: "architect", daily: false, startedAt: 1, recorded: false })));
+  assert.ok(parseExpedition(JSON.stringify({ version: 4, run: r, archetype: "architect", daily: false, startedAt: 1, recorded: false })));
   assert.ok(leaveShop(r).ok);
   assert.equal(r.phase, "map");
   assert.equal(r.shop, null);

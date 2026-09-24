@@ -8,17 +8,30 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { FXAAShader } from "three/addons/shaders/FXAAShader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { linkKey } from "../core/graph.ts";
 import { wreckCrossings } from "../core/terrain.ts";
-import type { Enemy, Malware, NetworkNode, Role, Terrain, Topology, Zone, ZoneEffect } from "../core/types.ts";
-import type { Intent } from "../core/run.ts";
+import { conditionOf, maxConditionOf } from "../core/combat/board.ts";
+import type {
+  Enemy, Installation, InstallationKind, IntentKind, NetworkNode, Port, Role, Terrain, Topology, Zone, ZoneEffect,
+} from "../core/types.ts";
 import { ENEMIES } from "../core/enemies.ts";
 import { STAGES } from "../core/stages.ts";
 import { EnemyActor } from "./EnemyActor.ts";
-import { cylinder, glow, mat, ring } from "./materials.ts";
+import { cylinder, dashedRing, glow, mat, ring } from "./materials.ts";
 import { COLORS, addRoleBody, addSalvageScrap, animateDevice, newDeviceGroup, type DeviceGroup } from "./devices.ts";
-import { deviceModelsSettled, loadDeviceModels } from "./models.ts";
-import { MALWARE_COLOR, animateProp, buildDebris, buildMalware, buildMalwareGhost, type PropGroup } from "./props.ts";
+import {
+  INSTALLATION_COLORS, animateModelBody, deviceModelsSettled, installationModelsSettled, loadDeviceModels, loadInstallationModels,
+  loadPropModels, propModelsSettled,
+} from "./models.ts";
+import { MALWARE_COLOR, TABLE_Y, animateProp, buildDebris, type PropGroup } from "./props.ts";
+import {
+  BLAST_COLOR, REACH, REACH_KINDS, buildInstallation, buildInstallationGhost, buildTableProp, refreshInstallation, segmentedRing,
+  type InstallationGroup,
+} from "./front.ts";
+import {
+  brassRingTexture, crestTexture, drawRailPlate, makeLabel, packetTexture, railPlateSprite, TABLE_LABEL_ORDER, type RailPlateData,
+} from "./plates.ts";
 
 export type WorldPoint = { x: number; z: number };
 export type BoardZone = Zone;
@@ -27,11 +40,60 @@ export interface WorldCallbacks {
   onNode: (id: string) => void;
   onLink: (key: string) => void;
   onMove: (id: string, point: WorldPoint | null, finished: boolean) => void;
-  /** A planted malware node was clicked (scrub it). */
-  onMalware?: (id: string) => void;
+  /** A hostile's sprite or rail plate was clicked: select that port (selection never focuses). */
+  onPort?: (port: Port) => void;
+  /** A packet glyph was dropped on a port. */
+  onAim?: (channelKey: string, port: Port | null) => void;
+  /** An installation was clicked: its plate, or a Demolition Charge's target. */
+  onInstallation?: (id: string) => void;
 }
-/** Anything that may appear in an enemy intent, including kinds added by later rules. */
-type ActionKind = Intent["kind"] | "infect";
+/** Anything that may appear in an enemy intent, including the v3 name of an install. */
+export type ActionKind = IntentKind | "infect";
+
+/** What a rail plate reads for its port this phase, all from the forecast. */
+export interface RailReadout {
+  hpAfter: number;
+  damage: number;
+  overflowIn: number;
+  lethal: boolean;
+  intent: IntentKind | null;
+  amount: number;
+  state: RailPlateData["state"];
+  /** Leaders: escalation level (0–3); null for escorts, adds and singles. */
+  escalation: number | null;
+}
+export interface RailState {
+  focus: Port | null;
+  /** The port the right plate shows (a dimmer crest when it is not the focus). */
+  selected: Port | null;
+  readouts: Partial<Record<Port, RailReadout>>;
+}
+/** One delivery of this transmission, as the table shows it. */
+export interface DeliveryView {
+  key: string;
+  primary: boolean;
+  path: string[];
+  port: Port;
+  aimed: boolean;
+  amount: number;
+}
+/** What the table front forecasts: the next installations (ghosts) and each installation's effect. */
+export interface TableForecast {
+  installs: { kind: InstallationKind; x: number; z: number; destroyed?: boolean; boosts?: string; absorbed?: string }[];
+}
+/** One installation effect as the playback shows it (the forecast's record). */
+export interface InstallationEffectView {
+  id: string;
+  kind: InstallationKind;
+  effect: "jam" | "wear" | "tick" | "detonate" | "idle" | "anchor" | "siphon";
+  target: string | null;
+  countdown?: number;
+  decoyed?: boolean;
+  absorbed?: boolean;
+  cancelled?: boolean;
+  destroyed?: boolean;
+}
+
 interface FlyingPacket {
   mesh: THREE.Group;
   routes: THREE.Curve<THREE.Vector3>[];
@@ -58,6 +120,39 @@ interface Bolt {
   duration: number;
   done: () => void;
 }
+/** A straight glowing beam between two points that fades out (quarantine, jam, wear). */
+interface Beam {
+  mesh: THREE.Group;
+  materials: THREE.MeshBasicMaterial[];
+  start: number;
+  duration: number;
+}
+/** Something leaving the table: its materials fade while it lifts (scrub dissolve, phantom fade). */
+interface Fading {
+  object: THREE.Object3D;
+  materials: { material: THREE.Material; opacity: number }[];
+  start: number;
+  duration: number;
+  rise: number;
+  baseY: number;
+}
+/** A crate or a message fragment in flight, landing, opening and fading. */
+interface TableProp {
+  group: THREE.Group;
+  body: ReturnType<typeof buildTableProp>["body"];
+  lid: THREE.Object3D | null;
+  curve: THREE.Curve<THREE.Vector3> | null;
+  start: number;
+  flight: number;
+  hold: number;
+  landed: boolean;
+  opened: boolean;
+  onLand: () => void;
+  done: () => void;
+  float: boolean;
+  /** How long the lid takes to open (ms). */
+  open?: number;
+}
 interface CableVisual {
   body: THREE.MeshPhysicalMaterial;
   filament: THREE.MeshBasicMaterial;
@@ -66,11 +161,71 @@ interface CableVisual {
   faulty: boolean;
   source: string;
 }
+interface EnemyAction {
+  kind: ActionKind;
+  start: number;
+  duration: number;
+  effect: THREE.Group;
+  target: THREE.Vector3;
+  origin: THREE.Vector3;
+  impacted: boolean;
+  color: number;
+  done: () => void;
+  onImpact: () => void;
+}
+/** One stand on the far rail: its sprite rig, embers, light, rail plate and crest. */
+interface PortVisual {
+  port: Port;
+  group: THREE.Group;
+  actor: EnemyActor;
+  light: THREE.PointLight;
+  under: THREE.PointLight | null;
+  enemy: Enemy | null;
+  uid: string | null;
+  /** `${file}:${index}` of the bound cell; the port's own clone of the sheet texture. */
+  art: string;
+  texture: THREE.Texture | null;
+  placeholder: boolean;
+  size: number;
+  drop: number;
+  boss: boolean;
+  hitAt: number;
+  /** Its death transition finished: hidden until a newcomer takes the port. */
+  dead: boolean;
+  dying: boolean;
+  /** Waiting for its sheet: not drawn yet. */
+  ready: boolean;
+  dimFrom: number;
+  dimUntil: number;
+  action: EnemyAction | null;
+  state: string;
+  plate: THREE.Sprite;
+  plateCanvas: HTMLCanvasElement;
+  plateKey: string;
+  crest: THREE.Sprite;
+  highlight: THREE.Sprite;
+  hit: THREE.Sprite;
+  readout: RailReadout | null;
+  /** A mid-playback health (the packet landed; the rules advance at the end). */
+  shownHp: number | null;
+}
+interface DeliveryGlyph {
+  view: DeliveryView;
+  glyph: THREE.Sprite;
+  line: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+  base: THREE.Vector3;
+  toward: THREE.Vector3;
+  phase: number;
+}
 
 /** Primary route is gold; every other independent channel is cyan. */
 export const CHANNEL_COLORS = { primary: 0xf2c46d, secondary: 0x6fe0f0 } as const;
-/** Unarmored cable crossing wreckage. */
+/** Unarmored cable crossing wreckage, and a worn device's rim. */
 const FRAYED_COLOR = 0xd08a52;
+const REPAIR_COLOR = 0x83eec7;
+const BRASS_COLOR = 0xe2bd76;
+const SHELTER_COLOR = 0xb5cf7a;
+const BITE_COLOR = 0x8fd49f;
 /** Cable spans arc over the table; the xz projection stays linear in t, so a
  * span fraction from the rules maps straight onto the curve. */
 function cableCurve(from: WorldPoint, to: WorldPoint) {
@@ -84,7 +239,39 @@ function cableCurve(from: WorldPoint, to: WorldPoint) {
  * crown reaches the header band. Sized so the head stays on screen from 1280×720 up. */
 const ENEMY_HOME = new THREE.Vector3(0, 0.7, -10.6);
 const enemyHome = (size: number) => ENEMY_HOME.clone().setY(ENEMY_HOME.y - (size - 10.5) * 0.3);
+export const PORT_ORDER: readonly Port[] = ["left", "centre", "right"];
+/** Escorts and adds stand at x ±6.6, one unit nearer the table so they read in front of the
+ * leader's shoulders; their feet hide behind the same far rail. */
+const SIDE_X = 6.6;
+const SIDE_Z = -9.6;
+function portHome(port: Port, size: number) {
+  if (port === "centre") return enemyHome(size);
+  return new THREE.Vector3(port === "left" ? -SIDE_X : SIDE_X, -1.55 + size * 0.3, SIDE_Z);
+}
+/** Rail plates hang just behind the far rail, under their hostile as the default camera sees it. */
+const PLATE_Z = -6.1;
+const PLATE_SIZE = { leader: [5.4, 1.6875], side: [4.3, 1.34375] } as const;
+/** Plates hang with their foot on the far rail, in front of their hostile's lower body. */
+const PLATE_FOOT = 0.06;
+const CAMERA_HOME = new THREE.Vector3(0, 12.8, 18.8);
+const plateX = (port: Port) => port === "centre" ? 0 : (port === "left" ? -SIDE_X : SIDE_X) * (CAMERA_HOME.z - PLATE_Z) / (CAMERA_HOME.z - SIDE_Z);
 const snap = (n: number) => Math.round(n * 2) / 2;
+/** The v4 art sheets may still be in the paint shop: a stand-in cell of a kindred body is tinted
+ * toward the hostile's colour until the painted cell lands. */
+const STAND_INS: Record<string, { file: string; columns: number; rows: number; index: number }> = {
+  foreman: { file: "hostiles-zones", columns: 3, rows: 1, index: 2 },
+  nest: { file: "hostiles-zones", columns: 3, rows: 1, index: 1 },
+  demolition: { file: "hostiles-expedition", columns: 3, rows: 2, index: 2 },
+  blight: { file: "hostiles-expedition", columns: 3, rows: 2, index: 0 },
+  "gate-warden": { file: "hostiles", columns: 3, rows: 1, index: 1 },
+  chorister: { file: "hostiles-expedition", columns: 3, rows: 2, index: 3 },
+  "quarantine-drone": { file: "hostiles", columns: 3, rows: 1, index: 2 },
+};
+const STAND_IN_DEFAULT = { file: "hostiles", columns: 3, rows: 1, index: 0 };
+/** Sheets the table uses from the first battle on; the v4 leaders and adds load on demand. */
+const PRELOADED_SHEETS = ["hostiles", "hostiles-alpha", "hostiles-zones", "hostiles-expedition", "stage-guardians", "hostiles-escorts"];
+const ZONE_OF = (z: number): Zone => z < -1.3 ? "north" : z > 1.3 ? "south" : "center";
+const ZONE_Z: Record<Zone, number> = { north: -3.25, center: 0, south: 3.25 };
 
 export class World {
   readonly scene = new THREE.Scene();
@@ -97,27 +284,11 @@ export class World {
   private lastFrame = 0;
   private readonly antialias: ShaderPass;
   private readonly environment: THREE.WebGLRenderTarget;
-  private readonly enemyActor = new EnemyActor();
-  private readonly enemySprite = this.enemyActor.mesh;
-  private enemyTexture!: THREE.Texture;
-  private enemyAlphaTexture!: THREE.Texture;
-  private enemyFieldTexture!: THREE.Texture;
-  private enemyExpeditionTexture!: THREE.Texture;
-  private guardianTexture!: THREE.Texture;
+  private readonly sheets = new Map<string, { texture: THREE.Texture; status: "loading" | "ready" | "missing"; waiters: (() => void)[] }>();
+  private readonly ports: PortVisual[];
+  private readonly rail = new THREE.Group();
   private readonly stageBackdrops = new Map<string, THREE.Texture>();
   private backdropPath = "";
-  private enemyLight!: THREE.PointLight;
-  private enemyUnderLight!: THREE.PointLight;
-  private enemySize = 10.5;
-  /** World units the hostile sinks behind the far rail so its head stays in frame. */
-  private enemyDrop = 0;
-  private enemyBoss = false;
-  private enemyHitAt = 0;
-  private enemyAction: {
-    kind: ActionKind; start: number; duration: number;
-    effect: THREE.Group; target: THREE.Vector3; origin: THREE.Vector3;
-    impacted: boolean; done: () => void; onImpact: () => void;
-  } | null = null;
   private readonly canvas: HTMLCanvasElement;
   private readonly callbacks: WorldCallbacks;
   private readonly raycaster = new THREE.Raycaster();
@@ -128,16 +299,17 @@ export class World {
   private readonly board = new THREE.Group();
   private readonly dynamic = new THREE.Group();
   private readonly terrainGroup = new THREE.Group();
-  private readonly malwareGroup = new THREE.Group();
-  private readonly enemyGroup = new THREE.Group();
+  private readonly frontGroup = new THREE.Group();
+  private readonly ghostGroup = new THREE.Group();
+  private readonly deliveryGroup = new THREE.Group();
   private readonly ambiance = new THREE.Group();
   private motes!: THREE.Points;
   private readonly shafts: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>[] = [];
   private readonly hitObjects: THREE.Object3D[] = [];
-  private readonly malwareHits: THREE.Object3D[] = [];
   private readonly devices = new Map<string, DeviceGroup>();
   private readonly cableCurves = new Map<string, THREE.Curve<THREE.Vector3>>();
   private readonly cableVisuals = new Map<string, CableVisual>();
+  private readonly cableGroups = new Map<string, THREE.Group>();
   /** linkKey → { travel direction source, channel index (0 = primary) } */
   private readonly channelSources = new Map<string, { source: string; channel: number }>();
   private readonly channelNodes = new Map<string, number>();
@@ -145,14 +317,27 @@ export class World {
   private routeSignature = "";
   private online: Set<string> | null = null;
   private terrainSignature = "";
-  private malwareSignature = "";
   private terrain: Terrain | null = null;
-  private malware: Malware[] = [];
-  private malwareForecast: { x: number; z: number } | null = null;
-  /** Last known malware positions, so a scrub effect can play after removal. */
-  private readonly malwareSpots = new Map<string, WorldPoint>();
-  private forecastTarget: string | null = null;
-  private readonly forecastMarker = new THREE.Group();
+  // ---- the table front
+  private readonly installations = new Map<string, InstallationGroup>();
+  private installationList: Installation[] = [];
+  /** Highest integrity seen per installation: spent points show as hollow pips. */
+  private readonly pipMax = new Map<string, number>();
+  private readonly phantomMax = new Map<string, number>();
+  private ghostSignature = "";
+  private ghostSockets: { kind: InstallationKind; x: number; z: number }[] = [];
+  /** Last known installation positions, so an effect can play after removal. */
+  private readonly installationSpots = new Map<string, WorldPoint>();
+  private selectedInstallation: string | null = null;
+  private targetingInstallations = false;
+  private readonly frontLights: THREE.PointLight[] = [];
+  private readonly tethers = new THREE.Group();
+  private hoverRing!: THREE.Group;
+  private selectRing!: THREE.Group;
+  private hovered: { kind: "node" | "installation"; id: string } | null = null;
+  // ---- forecast
+  private forecastTargets: string[] = [];
+  private readonly forecastMarkers: THREE.Group[] = [];
   private readonly zoneVisuals = new Map<BoardZone, {
     fill: THREE.MeshBasicMaterial;
     label: THREE.MeshBasicMaterial;
@@ -183,12 +368,22 @@ export class World {
   private sparks: Spark[] = [];
   private pulses: SignalPulse[] = [];
   private bolts: Bolt[] = [];
+  private beams: Beam[] = [];
+  private fading: Fading[] = [];
+  private props: TableProp[] = [];
   private readonly deviceStates = new Map<string, string>();
   private battleIdentity: string | null = null;
   private topology: Topology = { nodes: [], links: [] };
-  private enemy: Enemy | null = null;
-  private faultNode: string | null = null;
-  private faultLink: string | null = null;
+  /** Every hostile on the rail (the dead included until a newcomer takes the port). */
+  private enemies: Enemy[] = [];
+  private pack = false;
+  private railState: RailState = { focus: null, selected: null, readouts: {} };
+  private deliveries: DeliveryView[] = [];
+  private selectedDelivery: string | null = null;
+  private readonly glyphs: DeliveryGlyph[] = [];
+  private deliverySignature = "";
+  private faultNodes: string[] = [];
+  private faultLinks: string[] = [];
   private selected: string | null = null;
   private placementRole: Role | null = null;
   private linkSource: string | null = null;
@@ -204,6 +399,8 @@ export class World {
     y: number;
     moved: boolean;
   } | null = null;
+  /** A packet glyph being dragged toward a port. */
+  private aimDrag: { key: string; pointerId: number; x: number; y: number; moved: boolean; over: Port | null } | null = null;
   private active = true;
   private visible = true;
   private frame = 0;
@@ -216,7 +413,7 @@ export class World {
     this.callbacks = callbacks;
     this.setStage(0);
     this.scene.backgroundIntensity = 0.62;
-    this.camera.position.set(0, 12.8, 18.8);
+    this.camera.position.copy(CAMERA_HOME);
     this.camera.lookAt(0, 0.2, -0.4);
     // Browser tests set __faultlineTestRender: the same scene and rules, drawn without bloom,
     // shadows or full resolution at 20 fps, so a software-rendered suite can run in parallel.
@@ -277,16 +474,32 @@ export class World {
     this.light = new THREE.PointLight(0x4be7cf, 24, 18, 2);
     this.light.position.set(0, 3.2, 0);
     this.scene.add(this.light);
+    // Two fixed table-front lights (never added or removed, so no shader rebuilds when
+    // installations come and go): they glow under the first two installations.
+    for (let i = 0; i < 2; i++) {
+      const glowLight = new THREE.PointLight(MALWARE_COLOR, 0, 3.2, 2);
+      this.frontLights.push(glowLight);
+      this.scene.add(glowLight);
+    }
     this.buildTable();
     this.buildAmbiance();
     this.placement = this.buildPlacement();
     this.scene.add(this.placement);
-    this.buildForecastMarker();
-    this.scene.add(this.forecastMarker);
     this.scene.add(this.terrainGroup);
-    this.scene.add(this.malwareGroup);
+    this.scene.add(this.frontGroup);
+    this.scene.add(this.ghostGroup);
+    this.scene.add(this.tethers);
     this.scene.add(this.dynamic);
-    this.buildEnemy();
+    this.scene.add(this.deliveryGroup);
+    this.hoverRing = dashedRing(REACH, 0.034, MALWARE_COLOR, 0.24, 0.85, 32);
+    this.selectRing = dashedRing(REACH, 0.038, MALWARE_COLOR, 0.25, 0.95, 32);
+    for (const reach of [this.hoverRing, this.selectRing]) {
+      reach.visible = false;
+      this.scene.add(reach);
+    }
+    for (const file of PRELOADED_SHEETS) this.sheet(file);
+    this.ports = PORT_ORDER.map(port => this.buildPort(port));
+    this.scene.add(this.rail);
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(canvas.parentElement ?? canvas);
     this.resize();
@@ -296,10 +509,14 @@ export class World {
     canvas.addEventListener("pointercancel", this.onPointerCancel);
     canvas.addEventListener("pointerleave", this.onPointerLeave);
     this.tick();
-    // Blender device bodies stream in; anything built before they land is rebuilt once.
+    // Blender bodies stream in; anything built before they land is rebuilt once.
     if (!deviceModelsSettled())
       void loadDeviceModels().then((loaded) => {
         if (loaded && this.active) this.rebuildDevices();
+      });
+    if (!installationModelsSettled() || !propModelsSettled())
+      void Promise.all([loadInstallationModels(), loadPropModels()]).then(([loaded]) => {
+        if (loaded && this.active) this.rebuildInstallations();
       });
   }
 
@@ -623,7 +840,9 @@ export class World {
     return group;
   }
 
-  private buildForecastMarker() {
+  /** Static segmented coral marker: distinct from a fault that has already happened. */
+  private forecastMarker(): THREE.Group {
+    const marker = new THREE.Group();
     for (let index = 0; index < 4; index++) {
       const arc = new THREE.Mesh(
         new THREE.TorusGeometry(1.07, 0.037, 6, 24, Math.PI / 3),
@@ -634,113 +853,263 @@ export class World {
       arc.material.toneMapped = false;
       arc.material.depthTest = false;
       arc.renderOrder = 3;
-      this.forecastMarker.add(arc);
+      marker.add(arc);
     }
-    this.forecastMarker.visible = false;
+    marker.visible = false;
+    this.scene.add(marker);
+    return marker;
   }
 
-  private buildEnemy() {
-    this.enemyGroup.position.copy(ENEMY_HOME);
-    this.enemyTexture = new THREE.TextureLoader().load(
-      `${import.meta.env.BASE_URL}art/hostiles.png`,
-    );
-    this.enemyTexture.colorSpace = THREE.SRGBColorSpace;
-    this.enemyTexture.repeat.set(1 / 3, 1);
-    this.enemyTexture.offset.set(0, 0);
-    this.enemyAlphaTexture = new THREE.TextureLoader().load(
-      `${import.meta.env.BASE_URL}art/hostiles-alpha.png`,
-    );
-    this.enemyAlphaTexture.colorSpace = THREE.SRGBColorSpace;
-    this.enemyAlphaTexture.repeat.set(1 / 2, 1);
-    this.enemyAlphaTexture.offset.set(0, 0);
-    this.enemyFieldTexture = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}art/hostiles-zones.png`);
-    this.enemyFieldTexture.colorSpace = THREE.SRGBColorSpace;
-    this.enemyFieldTexture.repeat.set(1 / 3, 1);
-    this.enemyExpeditionTexture = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}art/hostiles-expedition.png`);
-    this.enemyExpeditionTexture.colorSpace = THREE.SRGBColorSpace;
-    this.guardianTexture = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}art/stage-guardians.png`);
-    this.guardianTexture.colorSpace = THREE.SRGBColorSpace;
-    for (const texture of [this.enemyTexture, this.enemyAlphaTexture, this.enemyFieldTexture, this.enemyExpeditionTexture, this.guardianTexture])
-      texture.anisotropy = 4;
-    this.enemySprite.material.map = this.enemyTexture;
-    this.enemySprite.scale.setScalar(this.enemySize);
-    this.enemyGroup.add(this.enemySprite);
-    this.enemyGroup.add(this.enemyActor.embers);
-    // A coloured spill across the far rail, and a low glow that lifts the body from below.
-    this.enemyLight = new THREE.PointLight(0xe9a05c, 26, 13, 1.6);
-    this.enemyLight.position.set(0, 0.2, 3.8);
-    this.enemyGroup.add(this.enemyLight);
-    this.enemyUnderLight = new THREE.PointLight(0xe9a05c, 18, 8, 2);
-    this.enemyUnderLight.position.set(0, -1.6, 1.4);
-    this.enemyGroup.add(this.enemyUnderLight);
-    this.scene.add(this.enemyGroup);
-    this.enemyGroup.visible = false;
-  }
+  // ================================================================ the far rail
 
-  /** A device nameplate: an iron tag with clipped corners, a rim in the device's
-   * colour, a brass hairline inside it and the name in Grenze, sized to fit. */
-  private makeLabel(name: string, color: number): THREE.Sprite {
-    const canvas = document.createElement("canvas");
-    canvas.width = 1024;
-    canvas.height = 224;
-    const context = canvas.getContext("2d")!;
-    context.scale(2, 2);
-    const plate = (inset: number) => {
-      const [l, t, r, b, c] = [22 + inset, 22 + inset, 490 - inset, 90 - inset, 12];
-      context.beginPath();
-      context.moveTo(l + c, t);
-      context.lineTo(r - c, t);
-      context.lineTo(r, t + c);
-      context.lineTo(r, b - c);
-      context.lineTo(r - c, b);
-      context.lineTo(l + c, b);
-      context.lineTo(l, b - c);
-      context.lineTo(l, t + c);
-      context.closePath();
+  /** An art sheet, loaded once; a sheet that fails (not painted yet) is "missing". */
+  private sheet(file: string) {
+    let entry = this.sheets.get(file);
+    if (entry) return entry;
+    const created: { texture: THREE.Texture; status: "loading" | "ready" | "missing"; waiters: (() => void)[] } = {
+      texture: null as unknown as THREE.Texture, status: "loading", waiters: [],
     };
-    const fill = context.createLinearGradient(0, 22, 0, 90);
-    fill.addColorStop(0, "rgba(34, 30, 24, .95)");
-    fill.addColorStop(0.55, "rgba(13, 15, 17, .95)");
-    fill.addColorStop(1, "rgba(20, 20, 20, .95)");
-    plate(0);
-    context.fillStyle = fill;
-    context.fill();
-    context.strokeStyle = `#${color.toString(16).padStart(6, "0")}`;
-    context.lineWidth = 3;
-    context.stroke();
-    plate(6);
-    context.strokeStyle = "rgba(201, 162, 99, .38)";
-    context.lineWidth = 1.2;
-    context.stroke();
-    const text = name.slice(0, 26);
-    let size = 56;
-    context.font = `600 ${size}px Grenze, serif`;
-    while (context.measureText(text).width > 424 && size > 30) context.font = `600 ${(size -= 2)}px Grenze, serif`;
-    context.textAlign = "center";
-    context.textBaseline = "middle";
-    context.lineJoin = "round";
-    context.lineWidth = 4;
-    context.strokeStyle = "rgba(0, 0, 0, .7)";
-    context.strokeText(text, 256, 58);
-    context.fillStyle = "#f6eedb";
-    context.fillText(text, 256, 58);
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.anisotropy = 4;
-    const sprite = new THREE.Sprite(
-      new THREE.SpriteMaterial({
-        map: texture,
-        transparent: true,
-        depthWrite: false,
-      }),
-    );
-    sprite.scale.set(2.5, 0.57, 1);
-    return sprite;
+    const settle = (status: "ready" | "missing") => {
+      created.status = status;
+      for (const waiter of created.waiters.splice(0)) waiter();
+    };
+    created.texture = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}art/${file}.png`, () => settle("ready"), undefined, () => {
+      console.info(`Hostile sheet ${file}.png is not available yet; a stand-in body is shown.`);
+      settle("missing");
+    });
+    created.texture.colorSpace = THREE.SRGBColorSpace;
+    created.texture.anisotropy = 4;
+    this.sheets.set(file, created);
+    entry = created;
+    return entry;
   }
+
+  private buildPort(port: Port): PortVisual {
+    const centre = port === "centre";
+    const actor = new EnemyActor(centre ? 0 : 1);
+    const group = new THREE.Group();
+    group.position.copy(centre ? ENEMY_HOME : portHome(port, 7.14));
+    group.add(actor.mesh);
+    group.add(actor.embers);
+    // A coloured spill across the far rail, and (the leader) a low glow that lifts the body from below.
+    const light = new THREE.PointLight(0xe9a05c, centre ? 26 : 0, centre ? 13 : 10, 1.6);
+    light.position.set(0, 0.2, centre ? 3.8 : 3.2);
+    if (centre) group.add(light);
+    let under: THREE.PointLight | null = null;
+    if (centre) {
+      under = new THREE.PointLight(0xe9a05c, 18, 8, 2);
+      under.position.set(0, -1.6, 1.4);
+      group.add(under);
+    }
+    group.visible = false;
+    this.scene.add(group);
+    const { sprite: plate, canvas: plateCanvas } = railPlateSprite();
+    const [width, height] = centre ? PLATE_SIZE.leader : PLATE_SIZE.side;
+    plate.scale.set(width, height, 1);
+    plate.position.set(plateX(port), PLATE_FOOT + height / 2, PLATE_Z);
+    plate.userData.port = port;
+    plate.visible = false;
+    const crest = new THREE.Sprite(new THREE.SpriteMaterial({ map: crestTexture(), transparent: true, depthWrite: false, depthTest: false }));
+    crest.renderOrder = 41;
+    crest.scale.setScalar(centre ? 1.35 : 1.1);
+    crest.position.set(plate.position.x, plate.position.y + height / 2 + 0.4 + crest.scale.y * 0.3, PLATE_Z + 0.05);
+    crest.visible = false;
+    const highlight = new THREE.Sprite(new THREE.SpriteMaterial({ map: brassRingTexture(), transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending }));
+    highlight.renderOrder = 39;
+    highlight.scale.set(width * 1.28, height * 2.1, 1);
+    highlight.position.copy(plate.position);
+    highlight.visible = false;
+    const hit = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, opacity: 0 }));
+    hit.visible = false;
+    hit.userData.port = port;
+    this.rail.add(plate, crest, highlight, hit);
+    // Escort lights live on the always-visible rail: the light count never changes when a pack
+    // arrives, so no material has to recompile mid-fight.
+    if (!centre) this.rail.add(light);
+    return {
+      port, group, actor, light, under, enemy: null, uid: null, art: "", texture: null, placeholder: false,
+      size: centre ? 10.5 : 7.14, drop: 0, boss: false, hitAt: 0, dead: false, dying: false, ready: false,
+      dimFrom: 0, dimUntil: 0, action: null, state: "idle",
+      plate, plateCanvas, plateKey: "", crest, highlight, hit, readout: null, shownHp: null,
+    };
+  }
+
+  private portOf(port: Port | null | undefined): PortVisual | null {
+    return port ? this.ports[PORT_ORDER.indexOf(port)] ?? null : null;
+  }
+  /** The port whose state the canvas reports and whose light sets the room: the centre hostile,
+   * else the first standing one. */
+  private leaderPort(): PortVisual {
+    const standing = (visual: PortVisual) => !!visual.enemy && !visual.dead;
+    return [this.ports[1], this.ports[0], this.ports[2]].find(visual => standing(visual) && visual.enemy!.hp > 0)
+      ?? [this.ports[1], this.ports[0], this.ports[2]].find(standing) ?? this.ports[1];
+  }
+
+  /** Binds a port's sheet cell (a clone of the sheet texture, so ports never share an offset). */
+  private bindArt(visual: PortVisual, enemy: Enemy, entering: boolean) {
+    const uid = enemy.uid;
+    const apply = () => {
+      if (visual.uid !== uid || !this.active) return;
+      let art = ENEMIES[enemy.id]?.art ?? STAND_IN_DEFAULT;
+      let stand = false;
+      if (this.sheet(art.file).status === "missing") {
+        art = STAND_INS[enemy.id] ?? STAND_IN_DEFAULT;
+        stand = true;
+      }
+      const entry = this.sheet(art.file);
+      if (entry.status === "loading") { entry.waiters.push(apply); return; }
+      const key = `${art.file}:${art.index}`;
+      if (visual.art !== key) {
+        visual.texture?.dispose();
+        const texture = entry.texture.clone();
+        texture.repeat.set(1 / art.columns, 1 / art.rows);
+        texture.offset.set((art.index % art.columns) / art.columns, 1 - (Math.floor(art.index / art.columns) + 1) / art.rows);
+        texture.needsUpdate = true;
+        visual.texture = texture;
+        visual.art = key;
+        visual.actor.mesh.material.map = texture;
+        visual.actor.mesh.material.needsUpdate = true;
+      }
+      visual.placeholder = stand;
+      visual.actor.stand = stand ? 0.4 : 0;
+      if (!visual.ready || entering) {
+        visual.ready = true;
+        visual.actor.enter(enemy.id, !!ENEMIES[enemy.id]?.boss);
+      }
+      visual.group.visible = this.showPort(visual);
+      visual.plateKey = "";
+      this.refreshRail();
+    };
+    visual.ready = false;
+    visual.group.visible = false;
+    apply();
+  }
+  private showPort(visual: PortVisual) {
+    return !!visual.enemy && visual.ready && !visual.dead;
+  }
+
+  /** Hostile sizes: the leader keeps today's; escorts 0.68 ×, adds 0.6 × the leader's sprite. */
+  private sizeOf(enemy: Enemy, leaderSize: number) {
+    const definition = ENEMIES[enemy.id];
+    if (enemy.role === "escort") return leaderSize * 0.68;
+    if (enemy.role === "add") return leaderSize * 0.6;
+    return definition?.boss ? 11.6 : enemy.id === "storm" || enemy.id === "moth" ? 10.9 : 10.5;
+  }
+
+  private syncRail(roster: readonly Enemy[], sameBattle: boolean) {
+    this.enemies = roster.map(enemy => ({ ...enemy }));
+    this.pack = roster.length > 1;
+    const centre = roster.find(enemy => enemy.port === "centre" && (enemy.role === "leader" || enemy.role === "single"));
+    const leaderSize = centre ? this.sizeOf(centre, 10.5) : 10.5;
+    for (const visual of this.ports) {
+      const here = roster.filter(enemy => enemy.port === visual.port);
+      const enemy = here.find(item => item.hp > 0) ?? here[here.length - 1] ?? null;
+      if (!enemy) {
+        visual.enemy = null;
+        visual.uid = null;
+        visual.group.visible = false;
+        visual.readout = null;
+        visual.light.intensity = 0;
+        continue;
+      }
+      const newcomer = visual.uid !== enemy.uid;
+      visual.enemy = { ...enemy };
+      visual.boss = !!ENEMIES[enemy.id]?.boss;
+      visual.size = this.sizeOf(enemy, leaderSize);
+      visual.light.color.setHex(enemy.color);
+      visual.under?.color.setHex(enemy.color);
+      if (enemy.hp <= 0 && !visual.dying) {
+        visual.dead = true;
+        visual.group.visible = false;
+      }
+      if (newcomer || !sameBattle) {
+        const arriving = sameBattle && newcomer && enemy.hp > 0;
+        visual.uid = enemy.uid;
+        visual.dead = enemy.hp <= 0;
+        visual.dying = false;
+        visual.action = null;
+        visual.shownHp = null;
+        this.bindArt(visual, enemy, true);
+        if (arriving) this.arrivalFlourish(visual);
+      } else visual.group.visible = this.showPort(visual);
+      this.frameEnemy(visual);
+    }
+    const leader = this.leaderPort();
+    const lead = leader.enemy;
+    if (lead) {
+      this.scene.backgroundIntensity = leader.boss ? 0.48 : 0.6;
+      for (const shaft of this.shafts) shaft.material.color.setHex(lead.color).lerp(new THREE.Color(0xffe3b0), 0.6);
+      (this.scanMaterial.uniforms.uThreat.value as THREE.Color).setHex(lead.color).multiplyScalar(leader.boss ? 0.075 : 0.05);
+    } else (this.scanMaterial.uniforms.uThreat.value as THREE.Color).setHex(0x000000);
+    this.canvas.dataset.ports = this.ports.filter(visual => visual.enemy && visual.enemy.hp > 0).map(visual => visual.port).join(",");
+    this.refreshRail();
+  }
+
+  /** A reinforcement or an add takes its port: a pulse on the rail and embers (reduced motion: the pulse). */
+  private arrivalFlourish(visual: PortVisual) {
+    if (!this.visible || !visual.enemy) return;
+    const x = visual.port === "centre" ? 0 : plateX(visual.port);
+    this.pulseAt(x, -5.4, visual.enemy.color, 2.2);
+    this.burst(new THREE.Vector3(x, 1.2, -6), visual.enemy.color, 22, 3.2);
+  }
+
+  /** Rail plates, crests and focus (packs only: a single hostile is today's rail, untouched). */
+  setRail(state: RailState) {
+    this.railState = { focus: state.focus, selected: state.selected, readouts: { ...state.readouts } };
+    for (const visual of this.ports) {
+      visual.readout = state.readouts[visual.port] ?? null;
+      visual.shownHp = null;
+    }
+    this.canvas.dataset.focus = state.focus ?? "";
+    this.refreshRail();
+  }
+  /** A packet landed mid-playback: the plate shows the new health before the rules advance. */
+  setPortHealth(port: Port, hp: number) {
+    const visual = this.portOf(port);
+    if (!visual) return;
+    visual.shownHp = hp;
+    this.refreshRail();
+  }
+  private refreshRail() {
+    for (const visual of this.ports) {
+      const enemy = visual.enemy;
+      const show = this.pack && !!enemy && this.visible && (!visual.dead || visual.dying) && visual.ready;
+      visual.plate.visible = show;
+      visual.crest.visible = show && this.railState.focus === visual.port && enemy!.hp > 0 && !visual.dying;
+      const selectedCrest = show && this.railState.selected === visual.port && this.railState.selected !== this.railState.focus && enemy!.hp > 0;
+      if (selectedCrest) visual.crest.visible = true;
+      visual.crest.userData.dim = selectedCrest;
+      if (!show || !enemy) continue;
+      const readout = visual.readout;
+      const hp = visual.shownHp ?? enemy.hp;
+      const midPlayback = visual.shownHp !== null;
+      const data: RailPlateData = {
+        name: enemy.name, color: enemy.color, hp, maxHp: enemy.maxHp,
+        hpAfter: midPlayback ? hp : readout?.hpAfter ?? hp,
+        damage: midPlayback ? 0 : readout?.damage ?? 0,
+        overflowIn: midPlayback ? 0 : readout?.overflowIn ?? 0,
+        lethal: !midPlayback && !!readout?.lethal,
+        intent: enemy.hp > 0 && !visual.dying ? readout?.intent ?? null : null,
+        amount: readout?.amount ?? 0,
+        state: enemy.hp <= 0 || visual.dying ? "dead" : readout?.state ?? "acts",
+        escalation: readout?.escalation ?? null,
+        placeholder: visual.placeholder,
+      };
+      const key = JSON.stringify(data);
+      if (key === visual.plateKey) continue;
+      visual.plateKey = key;
+      drawRailPlate(visual.plateCanvas, data);
+      (visual.plate.material.map as THREE.CanvasTexture).needsUpdate = true;
+      visual.plate.material.opacity = data.state === "dormant" ? 0.8 : data.state === "dead" ? 0.62 : 1;
+    }
+  }
+
+  // ================================================================ devices and cables
 
   private isOnline(node: NetworkNode) {
     // A honeypot works offline: any cable makes it a live decoy.
     if (node.role === "honeypot") return this.isCabled(node);
+    if (node.role === "rack" || node.role === "phantom") return true;
     return node.fixed || !this.online || this.online.has(node.id);
   }
 
@@ -748,9 +1117,27 @@ export class World {
     return this.topology.links.some((link) => link.a === node.id || link.b === node.id);
   }
 
+  /** Condition pips for wearable hardware (a Phantom Node shows the absorptions it has left). */
+  private pipsOf(node: NetworkNode): { filled: number; total: number; color?: string } | undefined {
+    if (node.fixed) return undefined;
+    if (node.role === "phantom") {
+      const left = node.absorbs ?? 1;
+      const total = Math.max(left, this.phantomMax.get(node.id) ?? left);
+      this.phantomMax.set(node.id, total);
+      return total > 0 && total <= 3 ? { filled: left, total, color: "#9ff5ea" } : undefined;
+    }
+    const total = maxConditionOf(node);
+    if (total > 3 || total < 1) return undefined;
+    return { filled: Math.max(0, Math.min(total, conditionOf(node))), total };
+  }
+  private isWorn(node: NetworkNode) {
+    return !node.fixed && node.role !== "phantom" && maxConditionOf(node) <= 3 && conditionOf(node) < maxConditionOf(node);
+  }
+
   private deviceLabel(node: NetworkNode): THREE.Sprite {
     const online = this.isOnline(node);
-    const jammed = node.id === this.faultNode;
+    const jammed = this.faultNodes.includes(node.id);
+    const worn = this.isWorn(node);
     const status = jammed ? " · JAMMED"
       : !online && node.salvage ? " · SALVAGE"
       : node.role === "honeypot" ? online ? " · DECOY" : " · UNCABLED"
@@ -758,9 +1145,10 @@ export class World {
       : node.upgraded ? " · UPGRADED"
       : node.amplified ? " · AMPLIFIED"
       : node.stateful ? " · STATEFUL"
+      : node.sentry ? " · SENTRY"
       : node.shielded ? " · GUARDED" : "";
-    const color = jammed ? 0xff6880 : !online ? node.salvage ? 0xc9874a : 0x7f898d : COLORS[node.role];
-    const label = this.makeLabel(`${node.id.toUpperCase()}${status}`, color);
+    const color = jammed ? 0xff6880 : worn ? FRAYED_COLOR : !online ? node.salvage ? 0xc9874a : 0x7f898d : COLORS[node.role];
+    const label = makeLabel(`${node.id.toUpperCase()}${status}`, color, { pips: this.pipsOf(node) });
     label.position.y = node.role === "client" ? 3.0 : node.role === "power" ? 3.05 : 2.86;
     if (!online) label.material.opacity = 0.78;
     return label;
@@ -777,34 +1165,39 @@ export class World {
       color,
       0.5,
     );
-    const base = cylinder(
-      node.fixed ? 0.95 : 0.79,
-      node.fixed ? 1.03 : 0.87,
-      0.22,
-      10,
-      dark,
-      0.75,
-    );
-    group.add(base);
-    group.add(
-      cylinder(
-        node.fixed ? 0.76 : 0.65,
-        node.fixed ? 0.8 : 0.68,
-        0.08,
+    // A Phantom Node floats bare: no plinth, skirt or aura (it is a decoy, not hardware).
+    const phantom = node.role === "phantom";
+    let skirt: THREE.Mesh | null = null;
+    if (!phantom) {
+      const base = cylinder(
+        node.fixed ? 0.95 : 0.79,
+        node.fixed ? 1.03 : 0.87,
+        0.22,
         10,
-        trim,
-        0.91,
-      ),
-    );
-    const skirt = ring(node.fixed ? 0.98 : 0.81, 0.028, color, 0.78, 0.8);
-    group.add(skirt);
-    group.userData.rings.push(skirt);
-    const aura = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.91, 1.12, 0.7, 20, 1, true),
-      glow(color, 0.06),
-    );
-    aura.position.y = 0.78;
-    group.add(aura);
+        dark,
+        0.75,
+      );
+      group.add(base);
+      group.add(
+        cylinder(
+          node.fixed ? 0.76 : 0.65,
+          node.fixed ? 0.8 : 0.68,
+          0.08,
+          10,
+          trim,
+          0.91,
+        ),
+      );
+      skirt = ring(node.fixed ? 0.98 : 0.81, 0.028, color, 0.78, 0.8);
+      group.add(skirt);
+      group.userData.rings.push(skirt);
+      const aura = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.91, 1.12, 0.7, 20, 1, true),
+        glow(color, 0.06),
+      );
+      aura.position.y = 0.78;
+      group.add(aura);
+    }
 
     addRoleBody(group, node, { color, dark, trim, luminous });
 
@@ -835,7 +1228,7 @@ export class World {
       group.userData.rings.push(amplifier);
     }
     if (node.salvage) addSalvageScrap(group);
-    if (node.id === this.faultNode) {
+    if (this.faultNodes.includes(node.id)) {
       const warning = ring(1.07, 0.055, 0xff526b, 0.68, 1);
       group.add(warning);
       const red = new THREE.PointLight(0xff4366, 9, 3, 2);
@@ -858,6 +1251,8 @@ export class World {
     const label = this.deviceLabel(node);
     group.add(label);
     group.userData.label = label;
+    group.userData.worn = this.isWorn(node);
+    group.userData.nextSpark = 0;
     const hit = new THREE.Mesh(
       new THREE.CylinderGeometry(0.94, 0.94, 1.85, 12),
       new THREE.MeshBasicMaterial({
@@ -930,13 +1325,14 @@ export class World {
   }
 
   private refreshSkirt(group: DeviceGroup) {
+    if (group.userData.role === "phantom") return;
     const skirt = group.userData.rings[0] as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | undefined;
     if (!skirt) return;
     const id = group.userData.nodeId;
     const active = id === this.selected || id === this.linkSource;
     const channel = this.channelNodes.get(id);
     const color = channel === undefined || group.userData.role === "client"
-      ? group.userData.skirtColor
+      ? group.userData.worn ? FRAYED_COLOR : group.userData.skirtColor
       : channel === 0 ? CHANNEL_COLORS.primary : CHANNEL_COLORS.secondary;
     skirt.material.color.setHex(color);
     skirt.scale.setScalar(active ? 1.15 : 1);
@@ -950,7 +1346,7 @@ export class World {
     const curve = cableCurve(from, to);
     const key = linkKey(a, b);
     const link = this.topology.links.find((edge) => linkKey(edge.a, edge.b) === key);
-    const faulty = key === this.faultLink;
+    const faulty = this.faultLinks.includes(key);
     const crossings = link && !link.armored && this.terrain ? wreckCrossings(from, to, this.terrain.debris) : [];
     const color = faulty ? 0xec755d : link?.boosted ? 0x8ce6ef : link?.armored ? 0xf5d196 : crossings.length ? FRAYED_COLOR : 0xe4c58f;
     const cable = new THREE.Group();
@@ -1000,6 +1396,7 @@ export class World {
     }
     this.cableCurves.set(key, curve);
     this.cableVisuals.set(key, { body: body.material, filament: filament.material, haze: haze.material, color, faulty, source: a });
+    this.cableGroups.set(key, cable);
     this.dynamic.add(cable);
   }
 
@@ -1071,24 +1468,45 @@ export class World {
     this.canvas.dataset.backdrop = path;
   }
 
+  /**
+   * The table and the rail. `enemies` is every hostile of the encounter in port order (the fallen
+   * included until a newcomer takes their port); faults are every jammed node and cut cable.
+   * Legacy single-hostile calls (a drag preview passing only the leader) keep the current rail.
+   */
   setBattle(
     topology: Topology,
-    enemy: Enemy | null,
-    faultNode: string | null,
-    faultLink: string | null,
+    enemies: readonly Enemy[] | Enemy | null,
+    faultNodes: readonly string[] | string | null = [],
+    faultLinks: readonly string[] | string | null = [],
   ) {
-    const identity = enemy ? `${enemy.id}:${enemy.maxHp}` : null;
-    const sameBattle = this.battleIdentity === identity && enemy !== null;
-    const previousFault = this.faultNode;
+    const single = enemies !== null && "uid" in enemies ? enemies as Enemy : null;
+    const list: readonly Enemy[] = enemies === null ? [] : single ? [single] : enemies as readonly Enemy[];
+    const keepRail = !!single && this.enemies.length > 1 && this.enemies.some(enemy => enemy.uid === single.uid);
+    const roster = keepRail ? this.enemies : list;
+    const first = roster.find(enemy => enemy.uid === "h1") ?? roster[0];
+    const identity = first ? `${first.id}:${first.maxHp}` : null;
+    const sameBattle = this.battleIdentity === identity && identity !== null;
+    const previousFaults = new Set(this.faultNodes);
     if (!sameBattle) {
       this.deviceStates.clear();
       this.online = null;
+      this.pipMax.clear();
+      this.phantomMax.clear();
     }
     this.battleIdentity = identity;
     this.topology = topology;
-    this.enemy = enemy;
-    this.faultNode = faultNode;
-    this.faultLink = faultLink;
+    this.faultNodes = faultNodes === null ? [] : typeof faultNodes === "string" ? [faultNodes] : [...faultNodes];
+    this.faultLinks = faultLinks === null ? [] : typeof faultLinks === "string" ? [faultLinks] : [...faultLinks];
+    this.rebuildTable(sameBattle, previousFaults);
+    if (!keepRail) this.syncRail(roster, sameBattle);
+    this.refreshSelection();
+    this.refreshSignalRoute();
+    this.refreshForecastTargets();
+    this.refreshDeliveries(true);
+  }
+
+  private rebuildTable(sameBattle: boolean, previousFaults: Set<string>) {
+    const topology = this.topology;
     for (const item of [...this.dynamic.children]) {
       this.dynamic.remove(item);
       this.disposeObject(item);
@@ -1097,6 +1515,7 @@ export class World {
     this.devices.clear();
     this.cableCurves.clear();
     this.cableVisuals.clear();
+    this.cableGroups.clear();
     this.cableBeads.length = 0;
     this.frayEmbers.length = 0;
     this.showLinkGhost(null);
@@ -1105,47 +1524,31 @@ export class World {
       const group = this.createDevice(node);
       this.devices.set(node.id, group);
       this.dynamic.add(group);
-      const state = `${Boolean(node.shielded)}:${Boolean(node.upgraded)}:${Boolean(node.amplified)}`;
+      const state = `${Boolean(node.shielded)}:${Boolean(node.upgraded)}:${Boolean(node.amplified)}:${conditionOf(node)}`;
       const previous = this.deviceStates.get(node.id);
       if (sameBattle && previous === undefined && !node.fixed)
         this.pulseAt(node.x, node.z, COLORS[node.role]);
-      else if (sameBattle && previous !== undefined && previous !== state)
-        this.pulseAt(node.x, node.z, node.upgraded ? 0xffd590 : 0x8ce6ef);
-      if (sameBattle && node.id === faultNode && node.id !== previousFault)
+      else if (sameBattle && previous !== undefined && previous !== state) {
+        const [, , , condition] = previous.split(":");
+        const repaired = conditionOf(node) > Number(condition);
+        this.pulseAt(node.x, node.z, repaired ? REPAIR_COLOR : node.upgraded ? 0xffd590 : 0x8ce6ef);
+      }
+      if (sameBattle && this.faultNodes.includes(node.id) && !previousFaults.has(node.id))
         this.pulseAt(node.x, node.z, 0xff7869);
       this.deviceStates.set(node.id, state);
     }
     for (const id of this.deviceStates.keys())
       if (!topology.nodes.some((node) => node.id === id)) this.deviceStates.delete(id);
-    this.enemyGroup.visible = Boolean(enemy);
-    if (enemy) {
-      const { art, boss } = ENEMIES[enemy.id];
-      if (!sameBattle) this.enemyActor.enter(enemy.id, !!boss);
-      const texture = ({ "hostiles": this.enemyTexture, "hostiles-alpha": this.enemyAlphaTexture,
-        "hostiles-zones": this.enemyFieldTexture, "hostiles-expedition": this.enemyExpeditionTexture,
-        "stage-guardians": this.guardianTexture })[art.file]!;
-      texture.repeat.set(1 / art.columns, 1 / art.rows);
-      texture.offset.set((art.index % art.columns) / art.columns, 1 - (Math.floor(art.index / art.columns) + 1) / art.rows);
-      if (this.enemySprite.material.map !== texture) {
-        this.enemySprite.material.map = texture;
-        this.enemySprite.material.needsUpdate = true;
-      }
-      this.enemyBoss = !!boss;
-      // Hostiles loom over the far rail; guardians fill the hall.
-      this.enemySize = boss ? 11.6 : enemy.id === "storm" || enemy.id === "moth" ? 10.9 : 10.5;
-      this.enemySprite.scale.setScalar(this.enemySize);
-      this.frameEnemy();
-      this.enemyLight.color.setHex(enemy.color);
-      this.enemyUnderLight.color.setHex(enemy.color);
-      this.scene.backgroundIntensity = boss ? 0.48 : 0.6;
-      for (const shaft of this.shafts) shaft.material.color.setHex(enemy.color).lerp(new THREE.Color(0xffe3b0), 0.6);
-      (this.scanMaterial.uniforms.uThreat.value as THREE.Color).setHex(enemy.color).multiplyScalar(boss ? 0.075 : 0.05);
-    } else {
-      (this.scanMaterial.uniforms.uThreat.value as THREE.Color).setHex(0x000000);
-    }
+  }
+
+  /** A drag preview: the table with one device moved; the rail and the front are untouched. */
+  previewTopology(topology: Topology) {
+    this.topology = topology;
+    this.rebuildTable(true, new Set(this.faultNodes));
     this.refreshSelection();
     this.refreshSignalRoute();
-    this.refreshForecastTarget();
+    this.refreshForecastTargets();
+    this.refreshDeliveries(true);
   }
 
   /** Emphasizes the forecast's chosen routes without rebuilding cable geometry. */
@@ -1219,46 +1622,189 @@ export class World {
   setTerrain(terrain: Terrain | null) {
     const signature = JSON.stringify(terrain?.debris ?? null);
     this.terrain = terrain;
+    // Tests read the table through these attributes instead of the scene graph.
+    this.canvas.dataset.wrecks = String(terrain?.debris.length ?? 0);
     if (signature === this.terrainSignature) return;
     this.terrainSignature = signature;
     for (const item of [...this.terrainGroup.children]) {
       this.terrainGroup.remove(item);
       this.disposeObject(item);
     }
-    terrain?.debris.forEach((spot, index) => this.terrainGroup.add(buildDebris(spot.x, spot.z, index + 1 + Math.round(spot.x * 7 + spot.z * 13))));
+    terrain?.debris.forEach((spot, index) => this.terrainGroup.add(buildDebris(spot.x, spot.z, index + 1 + Math.round(spot.x * 7 + spot.z * 13),
+      spot.fresh ? { color: spot.role ? COLORS[spot.role] : null } : undefined)));
   }
 
-  /** Planted malware and the forecast socket where the enemy will plant next. */
-  setMalware(malware: Malware[], forecast: { x: number; z: number } | null) {
-    const signature = JSON.stringify([malware, forecast]);
-    if (signature === this.malwareSignature) return;
-    const previous = new Set(this.malware.map((item) => item.id));
-    this.malwareSignature = signature;
-    this.malware = malware.map((item) => ({ ...item }));
-    this.malwareForecast = forecast ? { ...forecast } : null;
-    for (const item of [...this.malwareGroup.children]) {
-      this.malwareGroup.remove(item);
-      this.disposeObject(item);
+  // ================================================================ the table front
+
+  /** Planted installations (integrity pips, countdowns, blast rings) and the forecast ghosts of the
+   * next plantings. A v3 caller may pass the single malware socket ({x, z}) as the forecast. */
+  setInstallations(list: readonly Installation[], forecast: TableForecast | WorldPoint | null = null) {
+    const previous = new Set(this.installations.keys());
+    this.installationList = list.map(item => ({ ...item }));
+    const live = new Set(list.map(item => item.id));
+    for (const [id, group] of this.installations) {
+      if (live.has(id)) continue;
+      this.installations.delete(id);
+      this.frontGroup.remove(group);
+      this.dissolve(group, 0.6);
     }
-    this.malwareHits.length = 0;
-    for (const item of malware) {
-      this.malwareSpots.set(item.id, { x: item.x, z: item.z });
-      const { group, hit } = buildMalware(item.x, item.z, item.id, this.makeLabel("MALWARE · SCRUB", MALWARE_COLOR));
-      this.malwareGroup.add(group);
-      this.malwareHits.push(hit);
+    for (const item of list) {
+      this.installationSpots.set(item.id, { x: item.x, z: item.z });
+      const pips = Math.min(3, Math.max(item.integrity, this.pipMax.get(item.id) ?? 0, this.basePips(item.kind)));
+      this.pipMax.set(item.id, pips);
+      const existing = this.installations.get(item.id);
+      if (existing) {
+        const before = existing.userData.installation.countdown;
+        refreshInstallation(existing, item, pips, object => this.disposeObject(object));
+        if (before !== null && item.countdown !== undefined && item.countdown !== before && !this.reducedMotion())
+          this.pulseAt(item.x, item.z, BLAST_COLOR, 1.2);
+        continue;
+      }
+      const group = buildInstallation(item, pips);
+      this.frontGroup.add(group);
+      this.installations.set(item.id, group);
       if (this.visible && this.battleIdentity && !previous.has(item.id)) {
-        this.pulseAt(item.x, item.z, MALWARE_COLOR, 1.6);
-        this.burst(new THREE.Vector3(item.x, 1, item.z), MALWARE_COLOR, 14, 3);
+        const color = item.kind === "tap" ? MALWARE_COLOR : INSTALLATION_COLORS[item.kind];
+        this.pulseAt(item.x, item.z, color, 1.6);
+        this.burst(new THREE.Vector3(item.x, 1, item.z), color, 14, 3);
       }
     }
-    if (forecast) this.malwareGroup.add(buildMalwareGhost(forecast.x, forecast.z));
+    this.frontLights.forEach((light, index) => {
+      const item = list[index];
+      light.intensity = item ? 7 : 0;
+      if (item) {
+        light.color.setHex(item.kind === "tap" ? MALWARE_COLOR : INSTALLATION_COLORS[item.kind]);
+        light.position.set(item.x, 0.9, item.z);
+      }
+    });
+    const sockets = !forecast ? [] : "installs" in forecast
+      ? forecast.installs.filter(item => !item.boosts && !item.absorbed && !item.destroyed).map(({ kind, x, z }) => ({ kind, x, z }))
+      : [{ kind: "tap" as InstallationKind, x: forecast.x, z: forecast.z }];
+    const signature = JSON.stringify(sockets);
+    if (signature !== this.ghostSignature) {
+      this.ghostSignature = signature;
+      this.ghostSockets = sockets;
+      for (const item of [...this.ghostGroup.children]) {
+        this.ghostGroup.remove(item);
+        this.disposeObject(item);
+      }
+      for (const socket of sockets) this.ghostGroup.add(buildInstallationGhost(socket.kind, socket.x, socket.z));
+    }
+    this.refreshTethers();
+    this.refreshInstallationFocus();
+    this.declutterTags();
+    this.canvas.dataset.installations = String(list.length);
+    this.canvas.dataset.ghosts = String(this.ghostSockets.length);
+  }
+  /** A tag that lands on a device nameplate slides sideways, away from it, until both read (at most
+   * 1.6 units, so it stays over its own body). Screen space from the resting camera. */
+  private declutterTags() {
+    if (!this.installations.size || !this.devices.size) return;
+    this.camera.updateMatrixWorld();
+    const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0);
+    const up = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1);
+    const centre = new THREE.Vector3(), scale = new THREE.Vector3();
+    // The iron plate fills 91 % of a label canvas's width and 61 % of its height.
+    const rect = (label: THREE.Sprite) => {
+      label.updateWorldMatrix(true, false);
+      label.getWorldPosition(centre);
+      label.getWorldScale(scale);
+      const a = centre.clone().addScaledVector(right, -scale.x * .455).addScaledVector(up, scale.y * .305).project(this.camera);
+      const b = centre.clone().addScaledVector(right, scale.x * .455).addScaledVector(up, -scale.y * .305).project(this.camera);
+      return { l: a.x, r: b.x, t: a.y, b: b.y, width: scale.x * .91 };
+    };
+    const plates = [...this.devices.values()].map(group => group.userData.label as THREE.Sprite | undefined).filter((label): label is THREE.Sprite => !!label).map(rect);
+    const gap = 0.012;
+    for (const group of this.installations.values()) {
+      const label = group.userData.installation.label;
+      label.position.x = 0;
+      for (let pass = 0; pass < 3; pass++) {
+        const own = rect(label);
+        const hit = plates.find(other => own.l < other.r && own.r > other.l && own.b < other.t && own.t > other.b);
+        if (!hit) break;
+        const push = (own.l + own.r) / 2 >= (hit.l + hit.r) / 2 ? hit.r - own.l + gap : hit.l - own.r - gap;
+        const next = label.position.x + push * own.width / Math.max(1e-4, own.r - own.l);
+        if (Math.abs(next) > 1.6) break;
+        label.position.x = next;
+      }
+    }
+  }
+  /** v3 name, kept for callers that have not moved yet. */
+  setMalware(list: readonly Installation[], forecast: WorldPoint | null) {
+    this.setInstallations(list, forecast);
+  }
+  private basePips(kind: InstallationKind) {
+    return ({ tap: 1, jammer: 2, spike: 2, anchor: 3, breaker: 1 } as Record<InstallationKind, number>)[kind];
+  }
+  /** Rebuilds every body once the Blender installations land. */
+  private rebuildInstallations() {
+    for (const [id, group] of this.installations) {
+      this.frontGroup.remove(group);
+      this.disposeObject(group);
+      this.installations.delete(id);
+    }
+    const list = this.installationList;
+    this.installationList = [];
+    const ghosts = this.ghostSockets;
+    this.ghostSignature = "";
+    const identity = this.battleIdentity;
+    this.battleIdentity = null;
+    this.setInstallations(list, { installs: ghosts });
+    this.battleIdentity = identity;
+  }
+  /** The installation whose plate is open (its reach ring), and Demolition Charge targeting. */
+  setInstallationFocus(selected: string | null, targeting: boolean) {
+    this.selectedInstallation = selected;
+    this.targetingInstallations = targeting;
+    this.refreshInstallationFocus();
+  }
+  private refreshInstallationFocus() {
+    const item = this.installationList.find(entry => entry.id === this.selectedInstallation);
+    this.selectRing.visible = !!item;
+    this.canvas.dataset.selectedInstallation = item?.id ?? "";
+    if (item) {
+      this.selectRing.position.set(item.x, 0.25, item.z);
+      this.tintRing(this.selectRing, MALWARE_COLOR);
+    }
+    for (const group of this.installations.values()) {
+      const data = group.userData.installation;
+      const lit = this.targetingInstallations || data.id === this.selectedInstallation;
+      data.pulse.scale.setScalar(lit ? 1.25 : 1);
+      data.pulse.material.color.setHex(this.targetingInstallations ? BLAST_COLOR : data.kind === "tap" ? MALWARE_COLOR : INSTALLATION_COLORS[data.kind]);
+    }
+  }
+  private tintRing(reach: THREE.Group, color: number) {
+    reach.traverse(child => {
+      if (child instanceof THREE.Mesh) (child.material as THREE.MeshBasicMaterial).color.setHex(color);
+    });
+  }
+  /** Anchors pin their band's hostile field: a violet tether from the lantern to the band's inscription. */
+  private tetherSignature = "";
+  private refreshTethers() {
+    const signature = JSON.stringify(this.installationList.filter(item => item.kind === "anchor").map(item => [item.x, item.z]));
+    if (signature === this.tetherSignature) return;
+    this.tetherSignature = signature;
+    for (const item of [...this.tethers.children]) {
+      this.tethers.remove(item);
+      this.disposeObject(item);
+    }
+    for (const item of this.installationList) {
+      if (item.kind !== "anchor") continue;
+      const from = new THREE.Vector3(item.x, 1.35, item.z);
+      const to = new THREE.Vector3(-7.22, 0.3, ZONE_Z[ZONE_OF(item.z)]);
+      const curve = new THREE.QuadraticBezierCurve3(from, from.clone().lerp(to, 0.5).setY(1.9), to);
+      const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 36, 0.018, 5, false), glow(INSTALLATION_COLORS.anchor, 0.45));
+      tube.renderOrder = 3;
+      this.tethers.add(tube);
+    }
   }
 
-  /** Static segmented coral marker: distinct from a fault that has already happened. */
-  setForecastTarget(target: string | null) {
-    if (target === this.forecastTarget) return;
-    this.forecastTarget = target;
-    this.refreshForecastTarget();
+  /** Static segmented coral markers on every forecast disruption target (a device or a cable). */
+  setForecastTarget(target: string | readonly string[] | null) {
+    const list = target === null ? [] : typeof target === "string" ? [target] : [...new Set(target)];
+    if (JSON.stringify(list) === JSON.stringify(this.forecastTargets)) return;
+    this.forecastTargets = list;
+    this.refreshForecastTargets();
   }
 
   /** Marks the announced storm band without motion or geometry replacement. */
@@ -1300,20 +1846,23 @@ export class World {
     }
   }
 
-  private refreshForecastTarget() {
-    this.forecastMarker.visible = false;
-    if (!this.forecastTarget || !this.enemy) return;
-    const device = this.topology.nodes.find((node) => node.id === this.forecastTarget);
-    const cable = this.cableCurves.get(this.forecastTarget);
-    if (device) {
-      this.forecastMarker.position.set(device.x, 0.3, device.z);
-      this.forecastMarker.scale.setScalar(1);
-    } else if (cable) {
-      this.forecastMarker.position.copy(cable.getPoint(0.5));
-      this.forecastMarker.position.y += 0.12;
-      this.forecastMarker.scale.setScalar(0.5);
-    } else return;
-    this.forecastMarker.visible = true;
+  private refreshForecastTargets() {
+    const spots: { position: THREE.Vector3; scale: number }[] = [];
+    if (this.enemies.length)
+      for (const target of this.forecastTargets) {
+        const device = this.topology.nodes.find((node) => node.id === target);
+        const cable = this.cableCurves.get(target);
+        if (device) spots.push({ position: new THREE.Vector3(device.x, 0.3, device.z), scale: 1 });
+        else if (cable) spots.push({ position: cable.getPoint(0.5).add(new THREE.Vector3(0, 0.12, 0)), scale: 0.5 });
+      }
+    while (this.forecastMarkers.length < spots.length) this.forecastMarkers.push(this.forecastMarker());
+    this.forecastMarkers.forEach((marker, index) => {
+      const spot = spots[index];
+      marker.visible = !!spot;
+      if (!spot) return;
+      marker.position.copy(spot.position);
+      marker.scale.setScalar(spot.scale);
+    });
   }
 
   private reducedMotion() {
@@ -1360,22 +1909,59 @@ export class World {
       this.shake = { until: now + milliseconds, power: Math.max(power, now < this.shake.until ? this.shake.power : 0), duration: milliseconds };
   }
 
+  /** A glowing beam between two points that fades (quarantine, jam, the Spike's wear). */
+  private beam(from: THREE.Vector3, to: THREE.Vector3, color: number, duration = 560, width = 0.075) {
+    const group = new THREE.Group();
+    const length = from.distanceTo(to);
+    const core = glow(0xffffff, 0.95);
+    core.transparent = true;
+    const halo = glow(color, 0.45);
+    halo.blending = THREE.AdditiveBlending;
+    halo.toneMapped = false;
+    const coreMesh = new THREE.Mesh(new THREE.CylinderGeometry(width * 0.4, width * 0.4, length, 6, 1, true), core);
+    const haloMesh = new THREE.Mesh(new THREE.CylinderGeometry(width * 2.4, width * 2.4, length, 8, 1, true), halo);
+    group.add(coreMesh, haloMesh);
+    group.position.copy(from).lerp(to, 0.5);
+    group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize());
+    group.renderOrder = 4;
+    this.scene.add(group);
+    this.beams.push({ mesh: group, materials: [core, halo], start: performance.now(), duration: this.reducedMotion() ? 260 : duration });
+  }
+
+  /** Fades an object out as it lifts, then disposes it (scrub dissolve, phantom fade). */
+  private dissolve(object: THREE.Object3D, seconds: number, rise = 0.5) {
+    const materials: Fading["materials"] = [];
+    const seen = new Set<THREE.Material>();
+    object.traverse(child => {
+      if (!(child instanceof THREE.Mesh || child instanceof THREE.Sprite || child instanceof THREE.Points)) return;
+      for (const material of Array.isArray(child.material) ? child.material : [child.material]) {
+        if (seen.has(material)) continue;
+        seen.add(material);
+        material.transparent = true;
+        materials.push({ material, opacity: material.opacity });
+      }
+    });
+    if (!object.parent) this.scene.add(object);
+    this.fading.push({ object, materials, start: performance.now(), duration: (this.reducedMotion() ? 0.2 : seconds) * 1000, rise, baseY: object.position.y });
+  }
+
   pulseNetwork(effect: "shield" | "repair" | "surge") {
     const color = effect === "shield" ? 0xffd590 : effect === "repair" ? 0x83eec7 : 0x8ce6ef;
     for (const node of this.topology.nodes) this.pulseAt(node.x, node.z, color);
   }
 
   /**
-   * Local event on one device (or a malware id for "scrub"):
-   * - trap: a honeypot absorbed a disruption; an amber bolt strikes the hostile.
+   * Local event on one device (or an installation id for "scrub"):
+   * - trap: a honeypot absorbed a disruption; an amber bolt strikes the hostile (at `port`).
    * - trigger: an armed protocol fired from this device.
-   * - scrub: malware dissolves.
+   * - scrub: an installation loses a point (it dissolves when the last goes).
+   * - repair: a condition point is restored.
    */
-  pulseNode(id: string, kind: "trap" | "trigger" | "scrub") {
+  pulseNode(id: string, kind: "trap" | "trigger" | "scrub" | "repair", port?: Port) {
     const node = this.topology.nodes.find((item) => item.id === id);
-    const spot = node ? { x: node.x, z: node.z } : this.malwareSpots.get(id);
+    const spot = node ? { x: node.x, z: node.z } : this.installationSpots.get(id);
     if (!spot) return;
-    const color = { trap: 0xffa640, trigger: 0x9ff3ff, scrub: 0xb8ffd9 }[kind];
+    const color = { trap: 0xffa640, trigger: 0x9ff3ff, scrub: 0xb8ffd9, repair: REPAIR_COLOR }[kind];
     const origin = new THREE.Vector3(spot.x, 1.3, spot.z);
     if (kind === "trigger") {
       // A hexagonal protocol seal expands twice.
@@ -1387,18 +1973,24 @@ export class World {
       this.pulseAt(spot.x, spot.z, MALWARE_COLOR, 0.9, 0.1);
       this.burst(origin, color, 20, 3.2);
       this.burst(origin, MALWARE_COLOR, 10, 2.2);
+    } else if (kind === "repair") {
+      // Ratchet and settle: two tight rings and a few warm motes.
+      this.pulseAt(spot.x, spot.z, color, 1.1);
+      this.pulseAt(spot.x, spot.z, 0xe7fff4, 0.8, 0.14);
+      this.burst(origin, color, 8, 1.6);
     } else {
       this.pulseAt(spot.x, spot.z, color, 1.6);
       this.pulseAt(spot.x, spot.z, 0xffe0a0, 1.1, 0.14);
       this.burst(origin, color, 16, 3);
-      this.launchBolt(origin, color, () => this.impact(color, 16));
+      const target = this.portOf(port) ?? this.leaderPort();
+      this.launchBolt(origin, color, () => this.impact(color, 16, target.port), target);
     }
   }
 
-  /** An arcing projectile from the table into the hostile's body. */
-  private launchBolt(from: THREE.Vector3, color: number, done: () => void) {
-    if (this.reducedMotion() || !this.enemy) { done(); return; }
-    const to = this.enemyGroup.position.clone().add(new THREE.Vector3(0, this.enemySize * 0.08, 0));
+  /** An arcing projectile from the table into a hostile's body. */
+  private launchBolt(from: THREE.Vector3, color: number, done: () => void, visual: PortVisual = this.leaderPort()) {
+    if (this.reducedMotion() || !visual.enemy) { done(); return; }
+    const to = visual.group.position.clone().add(new THREE.Vector3(0, visual.size * 0.08, 0));
     const middle = from.clone().lerp(to, 0.5);
     middle.y += 4.5;
     const mesh = new THREE.Group();
@@ -1408,6 +2000,89 @@ export class World {
     this.scene.add(mesh);
     this.bolts.push({ mesh, curve: new THREE.QuadraticBezierCurve3(from, middle, to), start: performance.now(), duration: 520, done });
   }
+
+  // ================================================================ deliveries
+
+  /** Packet glyphs parked at each channel's OMEGA end with a faint dashed line to their port's rail
+   * plate (packs with two or more standing hostiles; otherwise every delivery goes to the one). */
+  setDeliveries(list: readonly DeliveryView[], selected: string | null = null) {
+    this.deliveries = list.map(item => ({ ...item, path: [...item.path] }));
+    this.selectedDelivery = selected;
+    this.refreshDeliveries(false);
+  }
+  private refreshDeliveries(force: boolean) {
+    const standing = this.ports.filter(visual => visual.enemy && visual.enemy.hp > 0).length;
+    const show = this.pack && standing > 1;
+    const signature = JSON.stringify([show, this.deliveries, this.selectedDelivery, this.routeSignature]);
+    if (!force && signature === this.deliverySignature) return;
+    this.deliverySignature = signature;
+    for (const glyph of this.glyphs) {
+      this.deliveryGroup.remove(glyph.glyph, glyph.line);
+      glyph.line.geometry.dispose();
+      glyph.line.material.dispose();
+      glyph.glyph.material.dispose();
+    }
+    this.glyphs.length = 0;
+    this.canvas.dataset.deliveries = show ? String(this.deliveries.length) : "0";
+    if (!show) return;
+    const lastSpan = new Map<string, number>();
+    this.deliveries.forEach((view, index) => {
+      const path = view.path;
+      if (path.length < 2) return;
+      const key = linkKey(path[path.length - 2], path[path.length - 1]);
+      const curve = this.cableCurves.get(key);
+      const end = this.topology.nodes.find(node => node.id === path[path.length - 1]);
+      const before = this.topology.nodes.find(node => node.id === path[path.length - 2]);
+      if (!curve || !end || !before) return;
+      // Several channels may share the last span: fan their glyphs out along it.
+      const shared = lastSpan.get(key) ?? 0;
+      lastSpan.set(key, shared + 1);
+      // The curve runs from the link's first device; the glyph sits toward OMEGA's end of the span.
+      const startsAtEnd = Math.hypot(end.x - curve.getPoint(0).x, end.z - curve.getPoint(0).z) < 0.01;
+      const t = Math.max(0.3, 0.6 - shared * 0.18);
+      const base = curve.getPoint(startsAtEnd ? 1 - t : t).add(new THREE.Vector3(0, 0.42, 0));
+      const plate = this.portOf(view.port)!.plate.position;
+      const toward = new THREE.Vector3(plate.x - base.x, 0, plate.z - base.z).normalize();
+      const color = view.primary ? CHANNEL_COLORS.primary : CHANNEL_COLORS.secondary;
+      const selectedGlyph = view.key === this.selectedDelivery;
+      const glyph = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: packetTexture(view.primary), color, transparent: true, depthWrite: false, toneMapped: false,
+      }));
+      glyph.scale.setScalar(selectedGlyph ? 1.25 : 0.98);
+      glyph.position.copy(base);
+      // Over the table's labels and the rail plates it drifts toward (still hidden by nearer hardware).
+      glyph.renderOrder = TABLE_LABEL_ORDER + 3;
+      glyph.userData.deliveryKey = view.key;
+      const line = this.aimLine(base, new THREE.Vector3(plate.x, plate.y - 0.35, plate.z + 0.05), color, selectedGlyph ? 0.95 : view.aimed ? 0.7 : 0.5);
+      this.deliveryGroup.add(glyph, line);
+      this.glyphs.push({ view, glyph, line, base, toward, phase: index * 1.7 });
+    });
+  }
+  /** A faint dashed arc from a packet glyph up to its port's rail plate (one draw call). */
+  private aimLine(from: THREE.Vector3, to: THREE.Vector3, color: number, opacity: number) {
+    const middle = from.clone().lerp(to, 0.5);
+    middle.y += 1.6 + from.distanceTo(to) * 0.08;
+    const curve = new THREE.QuadraticBezierCurve3(from, middle, to);
+    const dashes: THREE.BufferGeometry[] = [];
+    const count = 16;
+    for (let i = 0; i < count; i++) {
+      const a = i / count, b = a + 0.55 / count;
+      const piece = new THREE.CatmullRomCurve3([curve.getPoint(a), curve.getPoint((a + b) / 2), curve.getPoint(b)]);
+      dashes.push(new THREE.TubeGeometry(piece, 3, 0.04, 5, false));
+    }
+    const geometry = mergeGeometries(dashes)!;
+    for (const dash of dashes) dash.dispose();
+    const material = glow(color, opacity);
+    material.transparent = true;
+    material.depthWrite = false;
+    material.toneMapped = false;
+    material.blending = THREE.AdditiveBlending;
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.renderOrder = 11;
+    return mesh;
+  }
+
+  // ================================================================ input
 
   setPlacement(role: Role | null, linkSource: string | null = null, linkArmored = false) {
     if (linkSource !== this.linkSource || linkArmored !== this.linkArmored) this.showLinkGhost(null);
@@ -1452,13 +2127,17 @@ export class World {
     if (Math.abs(position.x) > 7.35 || Math.abs(position.z) > 4.85) return null;
     return { x: snap(position.x), z: snap(position.z) };
   }
-  /** Mirrors the placement rules: device spacing 1.55, wreckage and malware 1.3. */
+  /** Mirrors the placement rules: device spacing 1.55, wreckage and installations 1.3. */
   private socketBlocked(point: WorldPoint) {
     return this.topology.nodes.some((node) => Math.hypot(node.x - point.x, node.z - point.z) < 1.55) ||
       (this.terrain?.debris ?? []).some((spot) => Math.hypot(spot.x - point.x, spot.z - point.z) < 1.3) ||
-      this.malware.some((item) => Math.hypot(item.x - point.x, item.z - point.z) < 1.3);
+      this.installationList.some((item) => Math.hypot(item.x - point.x, item.z - point.z) < 1.3);
   }
   previewAt(clientX: number, clientY: number) {
+    if (this.aimDrag) {
+      this.highlightPort(this.portAt({ clientX, clientY }));
+      return;
+    }
     const point = this.pointFromScreen(clientX, clientY);
     this.placement.visible = Boolean(this.placementRole && point);
     if (point) {
@@ -1467,19 +2146,53 @@ export class World {
       for (const material of this.placementMaterials) material.color.setHex(blocked ? 0xf07a64 : 0x80ffe6);
     }
   }
+  /** The standing port under the pointer (its sprite or its rail plate). */
+  private portAt(event: { clientX: number; clientY: number }): Port | null {
+    this.updateRay(event);
+    const targets: THREE.Object3D[] = [];
+    for (const visual of this.ports) {
+      if (!visual.enemy || visual.enemy.hp <= 0 || visual.dead || !visual.ready) continue;
+      if (visual.plate.visible) targets.push(visual.plate);
+      // The body's hit area: the upper, painted part of the sprite (not its transparent margin).
+      const home = visual.group.position;
+      visual.hit.position.set(home.x, home.y + visual.size * 0.14 + visual.actor.mesh.position.y, home.z + 0.2);
+      visual.hit.scale.set(visual.size * 0.5, visual.size * 0.62, 1);
+      visual.hit.updateMatrixWorld();
+      targets.push(visual.hit);
+    }
+    const hit = this.raycaster.intersectObjects(targets, false)[0]?.object;
+    return (hit?.userData.port as Port | undefined) ?? null;
+  }
+  private highlightPort(port: Port | null) {
+    if (this.aimDrag) this.aimDrag.over = port;
+    for (const visual of this.ports) visual.highlight.visible = visual.port === port && visual.plate.visible;
+    if (this.aimDrag) this.canvas.dataset.cursor = port ? "target" : "grabbing";
+  }
   private hit(event: PointerEvent) {
     this.updateRay(event);
-    const object = this.raycaster.intersectObjects([...this.malwareHits, ...this.hitObjects], false)[0]
+    const glyphs = this.glyphs.map(item => item.glyph);
+    const fronts = [...this.installations.values()].map(group => group.userData.installation.hit);
+    const object = this.raycaster.intersectObjects([...glyphs, ...fronts, ...this.hitObjects], false)[0]
       ?.object;
+    const port = object ? null : this.portAt(event);
     return {
       node: object?.userData.nodeId as string | undefined,
       link: object?.userData.linkKey as string | undefined,
-      malware: object?.userData.malwareId as string | undefined,
+      installation: object?.userData.installationId as string | undefined,
+      delivery: object?.userData.deliveryKey as string | undefined,
+      port: port ?? undefined,
     };
   }
   private onPointerDown = (event: PointerEvent) => {
     if (event.button !== 0) return;
     const hit = this.hit(event);
+    if (hit.delivery && !this.placementRole && !this.linkSource && this.callbacks.onAim) {
+      this.aimDrag = { key: hit.delivery, pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false, over: null };
+      this.controls.enabled = false;
+      this.canvas.setPointerCapture(event.pointerId);
+      this.canvas.dataset.cursor = "grabbing";
+      return;
+    }
     this.pointerDown = {
       id: hit.node ?? null,
       pointerId: event.pointerId,
@@ -1493,6 +2206,21 @@ export class World {
     }
   };
   private onPointerMove = (event: PointerEvent) => {
+    if (this.aimDrag) {
+      if (Math.hypot(event.clientX - this.aimDrag.x, event.clientY - this.aimDrag.y) > 5) this.aimDrag.moved = true;
+      const glyph = this.glyphs.find(item => item.view.key === this.aimDrag!.key);
+      if (glyph && this.aimDrag.moved) {
+        // The glyph follows the pointer over the table, lifted toward the rail.
+        // Over the table it rides a hand above the deck; past the far rail it hangs in front of the plates.
+        this.updateRay(event);
+        const point = new THREE.Vector3();
+        const deck = this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.1), point);
+        if (!deck || point.z < -5.6) this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), 5.6), point);
+        glyph.glyph.position.set(THREE.MathUtils.clamp(point.x, -9, 9), THREE.MathUtils.clamp(point.y, 0.6, 6), THREE.MathUtils.clamp(point.z, -5.6, 5));
+      }
+      this.highlightPort(this.portAt(event));
+      return;
+    }
     if (this.targetingZone) {
       const point = this.pointFromScreen(event.clientX,event.clientY);
       this.setZonePreview(point ? point.z < -1.3 ? "north" : point.z > 1.3 ? "south" : "center" : null);
@@ -1517,6 +2245,7 @@ export class World {
         const point = this.pointFromScreen(event.clientX, event.clientY);
         this.callbacks.onMove(this.pointerDown.id, point, false);
         this.canvas.dataset.cursor = "grabbing";
+        this.hover(null);
       }
       return;
     }
@@ -1526,9 +2255,33 @@ export class World {
       this.showLinkGhost(target && target !== this.linkSource ? target : null);
     } else if (!this.placementRole) {
       const hit = this.hit(event);
-      this.canvas.dataset.cursor = hit.node || hit.malware ? "pointer" : "grab";
+      this.canvas.dataset.cursor = hit.delivery ? "grab"
+        : hit.installation && this.targetingInstallations ? "target"
+        : hit.node || hit.installation || hit.port ? "pointer" : "grab";
+      this.hover(hit.installation ? { kind: "installation", id: hit.installation } : hit.node ? { kind: "node", id: hit.node } : null);
     }
   };
+  /** Hover reach rings: an installation's reach (magenta), a firewall's quarantine reach (brass),
+   * a Server Rack's shelter (sage), a cabled Honeypot's bite (green). Static under reduced motion. */
+  private hover(target: { kind: "node" | "installation"; id: string } | null) {
+    if (target?.id === this.hovered?.id && target?.kind === this.hovered?.kind) return;
+    this.hovered = target;
+    let spot: WorldPoint | null = null, color = MALWARE_COLOR;
+    if (target?.kind === "installation") {
+      const item = this.installationList.find(entry => entry.id === target.id);
+      if (item && REACH_KINDS.has(item.kind) && item.kind !== "breaker") spot = item;
+    } else if (target?.kind === "node") {
+      const node = this.topology.nodes.find(entry => entry.id === target.id);
+      if (node?.role === "firewall") { spot = node; color = BRASS_COLOR; }
+      else if (node?.role === "rack") { spot = node; color = SHELTER_COLOR; }
+      else if (node?.role === "honeypot" && this.isCabled(node)) { spot = node; color = BITE_COLOR; }
+    }
+    this.hoverRing.visible = !!spot;
+    if (spot) {
+      this.hoverRing.position.set(spot.x, 0.24, spot.z);
+      this.tintRing(this.hoverRing, color);
+    }
+  }
 
   /** Previews the pending cable to `target`: cyan when clean, amber with an
    * ember at each wreck it would fray over. Existing cables show nothing. */
@@ -1554,6 +2307,18 @@ export class World {
     this.scene.add(ghost);
   }
   private onPointerUp = (event: PointerEvent) => {
+    const aim = this.aimDrag;
+    if (aim) {
+      this.aimDrag = null;
+      this.controls.enabled = true;
+      if (this.canvas.hasPointerCapture(aim.pointerId)) this.canvas.releasePointerCapture(aim.pointerId);
+      const port = aim.moved ? this.portAt(event) : null;
+      this.highlightPort(null);
+      this.canvas.dataset.cursor = "grab";
+      this.refreshDeliveries(true);
+      if (port) this.callbacks.onAim?.(aim.key, port);
+      return;
+    }
     const down = this.pointerDown;
     this.pointerDown = null;
     this.controls.enabled = true;
@@ -1564,9 +2329,10 @@ export class World {
     }
     if (!down || (down.moved && !down.id)) return;
     const hit = this.hit(event);
-    if (hit.malware && !this.placementRole && !this.linkSource && this.callbacks.onMalware) this.callbacks.onMalware(hit.malware);
+    if (hit.installation && !this.placementRole && !this.linkSource && this.callbacks.onInstallation) this.callbacks.onInstallation(hit.installation);
     else if (hit.node) this.callbacks.onNode(hit.node);
     else if (hit.link && !this.targetingZone) this.callbacks.onLink(hit.link);
+    else if (hit.port && !this.placementRole && !this.linkSource && this.callbacks.onPort) this.callbacks.onPort(hit.port);
     else {
       const point = this.pointFromScreen(event.clientX, event.clientY);
       if (point) this.callbacks.onGround(point);
@@ -1576,22 +2342,42 @@ export class World {
     this.cancelInteraction();
   };
 
-  /** Ends an interrupted drag without committing a placement or movement. */
+  /** Ends an interrupted drag without committing a placement, movement or aim. */
   cancelInteraction() {
-    const pointerId = this.pointerDown?.pointerId;
+    const pointerId = this.pointerDown?.pointerId ?? this.aimDrag?.pointerId;
+    const aimed = !!this.aimDrag;
     this.pointerDown = null;
+    this.aimDrag = null;
     this.controls.enabled = true;
     this.placement.visible = false;
     this.canvas.dataset.cursor = "grab";
+    for (const visual of this.ports) visual.highlight.visible = false;
+    if (aimed) this.refreshDeliveries(true);
     if (pointerId !== undefined && this.canvas.hasPointerCapture(pointerId))
       this.canvas.releasePointerCapture(pointerId);
   }
   private onPointerLeave = () => {
     this.placement.visible = false;
     this.showLinkGhost(null);
+    this.hover(null);
   };
 
-  playPacket(path: string[], onDone?: () => void, color = 0x8affea, count?: number) {
+  // ================================================================ playback primitives
+
+  /** Where a port's hostile is on screen (client pixels), for numbers that rise over it. */
+  portScreen(port: Port): { x: number; y: number } | null {
+    const visual = this.portOf(port);
+    if (!visual?.enemy) return null;
+    const rect = this.canvas.getBoundingClientRect();
+    const point = (this.pack && visual.plate.visible ? visual.plate.position.clone().setY(visual.plate.position.y + 1.4)
+      : visual.group.position.clone().add(new THREE.Vector3(0, visual.size * 0.12, 0))).project(this.camera);
+    return { x: rect.left + (point.x + 1) / 2 * rect.width, y: rect.top + (1 - point.y) / 2 * rect.height };
+  }
+  private portTarget(visual: PortVisual) {
+    return visual.group.position.clone().add(new THREE.Vector3(0, visual.size * 0.08, 1.2));
+  }
+
+  playPacket(path: string[], onDone?: () => void, color = 0x8affea, count?: number, air?: THREE.Vector3) {
     if (!this.active) return;
     const routes: THREE.Curve<THREE.Vector3>[] = [];
     for (let i = 0; i < path.length - 1; i++) {
@@ -1612,6 +2398,13 @@ export class World {
     if (!routes.length) {
       onDone?.();
       return;
+    }
+    if (air) {
+      // Across the air to its port: a high arc from OMEGA into the hostile.
+      const from = routes[routes.length - 1].getPoint(1);
+      const middle = from.clone().lerp(air, 0.5);
+      middle.y += 3.4;
+      routes.push(new THREE.QuadraticBezierCurve3(from, middle, air));
     }
     const reduced = this.reducedMotion();
     const total = reduced ? 1 : count ?? 4;
@@ -1651,26 +2444,63 @@ export class World {
       this.playPacket(path, finished, channel === 0 ? CHANNEL_COLORS.primary : CHANNEL_COLORS.secondary, channel === 0 ? 4 : 3));
   }
 
-  impact(color = 0xff7c91, count = 28) {
-    this.enemyHitAt = performance.now();
+  /**
+   * A split transmission: each delivery runs its channel, then crosses the air to its port.
+   * `onPort` fires when the last packet of a port lands (its impact); `done` after every port.
+   */
+  playTransmission(deliveries: readonly { path: string[]; port: Port; primary: boolean }[], onPort: (port: Port) => void, done: () => void) {
+    const live = deliveries.filter(delivery => delivery.path.length > 1);
+    if (!live.length || !this.active) { done(); return; }
+    const remaining = new Map<Port, number>();
+    for (const delivery of live) remaining.set(delivery.port, (remaining.get(delivery.port) ?? 0) + 1);
+    let ports = remaining.size;
+    for (const delivery of live) {
+      const visual = this.portOf(delivery.port)!;
+      this.playPacket(delivery.path, () => {
+        const left = (remaining.get(delivery.port) ?? 1) - 1;
+        remaining.set(delivery.port, left);
+        if (left > 0) return;
+        onPort(delivery.port);
+        if (--ports === 0) done();
+      }, delivery.primary ? CHANNEL_COLORS.primary : CHANNEL_COLORS.secondary, delivery.primary ? 4 : 3, this.portTarget(visual));
+    }
+  }
+
+  /** Overflow: the surplus leaps from one hostile to the next port. */
+  playOverflow(from: Port, to: Port, done: () => void) {
+    const source = this.portOf(from), target = this.portOf(to);
+    if (!source || !target || this.reducedMotion()) { done(); return; }
+    const start = this.portTarget(source), end = this.portTarget(target);
+    const middle = start.clone().lerp(end, 0.5);
+    middle.y += 2.2;
+    const mesh = new THREE.Group();
+    mesh.add(new THREE.Mesh(new THREE.OctahedronGeometry(0.14), glow(0xfff1d0)));
+    mesh.add(new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 10), glow(CHANNEL_COLORS.primary, 0.3)));
+    mesh.position.copy(start);
+    this.scene.add(mesh);
+    this.bolts.push({ mesh, curve: new THREE.QuadraticBezierCurve3(start, middle, end), start: performance.now(), duration: 420, done });
+  }
+
+  impact(color = 0xff7c91, count = 28, port?: Port) {
+    const visual = this.portOf(port) ?? this.leaderPort();
+    visual.hitAt = performance.now();
     if (this.reducedMotion()) {
-      this.pulseAt(0, -5.4, color, 1.7);
+      this.pulseAt(visual.port === "centre" ? 0 : plateX(visual.port), -5.4, color, 1.7);
       return;
     }
-    const origin = this.enemyGroup.position
-      .clone()
-      .add(new THREE.Vector3(0, this.enemySize * 0.08, 1.2));
-    for (let i = 0; i < count; i++) {
+    const origin = this.portTarget(visual);
+    const scale = visual.size / 10.5;
+    for (let i = 0; i < Math.round(count * (0.6 + scale * 0.4)); i++) {
       const mesh = new THREE.Mesh(
-        new THREE.TetrahedronGeometry(0.05 + Math.random() * 0.09),
+        new THREE.TetrahedronGeometry((0.05 + Math.random() * 0.09) * Math.max(0.75, scale)),
         glow(color),
       );
       mesh.position.copy(origin);
       this.scene.add(mesh);
       const velocity = new THREE.Vector3(
-        (Math.random() - 0.5) * 9,
-        (Math.random() - 0.5) * 7,
-        (Math.random() - 0.3) * 7,
+        (Math.random() - 0.5) * 9 * scale,
+        (Math.random() - 0.5) * 7 * scale,
+        (Math.random() - 0.3) * 7 * scale,
       );
       this.sparks.push({ mesh, velocity, life: 0.55 + Math.random() * 0.45 });
     }
@@ -1683,30 +2513,50 @@ export class World {
     for (const node of this.topology.nodes)
       if (node.fixed) this.pulseAt(node.x, node.z, 0xff7869, 1.4);
   }
+  /** A dormant escort's phase passes: it dims for a beat. */
+  dimPort(port: Port, milliseconds = 700) {
+    const visual = this.portOf(port);
+    if (!visual) return;
+    visual.dimFrom = performance.now();
+    visual.dimUntil = visual.dimFrom + milliseconds;
+  }
+
   /** A wind-up, an action-specific projectile, and an impact at the real target. */
-  playEnemyAction(kind: ActionKind, targetId: string | null, zone: Zone | null, done: () => void, quick = false, onImpact: () => void = () => {}) {
-    if (this.enemyAction) return;
+  playEnemyAction(kind: ActionKind, targetId: string | null, zone: Zone | null, done: () => void, quick = false, onImpact: () => void = () => {},
+    options: { port?: Port; point?: WorldPoint | null; color?: number } = {}) {
+    const visual = this.portOf(options.port) ?? this.leaderPort();
+    if (visual.action) return;
+    if (!visual.enemy || !visual.ready || visual.dead) {
+      // Nothing drawn at that port (its sheet is still loading): the beat still lands.
+      onImpact();
+      window.setTimeout(done, quick ? 80 : 300);
+      return;
+    }
     const targetNode = this.topology.nodes.find(node => node.id === targetId);
     const cable = targetId ? this.cableCurves.get(targetId) : undefined;
+    const socket = options.point ?? (kind === "infect" || kind === "install" ? this.ghostSockets[0] ?? null : null);
     const target = cable ? cable.getPoint(.5) : targetNode ? new THREE.Vector3(targetNode.x, 1.2, targetNode.z)
-      : kind === "infect" && this.malwareForecast ? new THREE.Vector3(this.malwareForecast.x, 1.2, this.malwareForecast.z)
+      : socket ? new THREE.Vector3(socket.x, 1.2, socket.z)
       : kind === "strike" || kind === "breach" ? new THREE.Vector3(kind === "breach" ? 6 : -6, 1.2, 0)
       : zone ? new THREE.Vector3(0, .8, zone === "north" ? -2.5 : zone === "south" ? 2.5 : 0)
       : new THREE.Vector3(0, 1.2, 0);
-    const colors: Record<string, number> = { strike: 0xf0ad76, breach: 0xf57968, sever: 0xf1d5a0, jam: 0xb59cec, corrupt: 0xb980c6, charge: 0xf6c486, infect: MALWARE_COLOR };
-    const color = colors[kind] ?? 0xf0ad76;
+    const colors: Record<string, number> = {
+      strike: 0xf0ad76, breach: 0xf57968, sever: 0xf1d5a0, jam: 0xb59cec, corrupt: 0xb980c6, charge: 0xf6c486,
+      infect: MALWARE_COLOR, install: MALWARE_COLOR, overload: FRAYED_COLOR,
+    };
+    const color = options.color ?? colors[kind] ?? 0xf0ad76;
     const effect = new THREE.Group();
     if (kind === "sever") {
       for (const angle of [-.65, .65]) {
         const blade = new THREE.Mesh(new THREE.BoxGeometry(.1, 2.2, .08), glow(color));
         blade.rotation.z = angle; effect.add(blade);
       }
-    } else if (kind === "jam" || kind === "corrupt" || kind === "charge") {
+    } else if (kind === "jam" || kind === "corrupt" || kind === "charge" || kind === "overload") {
       for (let i = 0; i < 3; i++) {
-        const halo = new THREE.Mesh(new THREE.TorusGeometry(.26 + i * .16, .03, 6, 40), glow(color, .85));
+        const halo = new THREE.Mesh(new THREE.TorusGeometry(.26 + i * .16, .03, kind === "overload" ? 3 : 6, 40), glow(color, .85));
         halo.rotation.set(i * .6, i * .7, 0); effect.add(halo);
       }
-    } else if (kind === "infect") {
+    } else if (kind === "infect" || kind === "install") {
       const shell = new THREE.MeshBasicMaterial({ color, toneMapped: false });
       const a = new THREE.Mesh(new THREE.TetrahedronGeometry(.3), shell);
       const b = new THREE.Mesh(new THREE.TetrahedronGeometry(.3), shell);
@@ -1720,133 +2570,360 @@ export class World {
         trail.position.z = i * .26; effect.add(trail);
       }
     }
-    const origin = this.enemyGroup.position.clone(); origin.y += this.enemySize * .06; origin.z += 1.4;
+    const origin = visual.group.position.clone(); origin.y += visual.size * .06; origin.z += 1.4;
     if (kind === "charge") target.copy(origin);
     effect.position.copy(origin); effect.visible = false;
+    effect.scale.setScalar(visual.size / 10.5);
     this.scene.add(effect);
-    this.enemyAction = { kind, target, origin, effect, start: performance.now(), duration: quick || this.reducedMotion() ? 160 : kind === "breach" ? 1150 : 920, impacted: false, done, onImpact };
-    this.canvas.dataset.enemyAction = kind;
+    visual.action = { kind, target, origin, effect, color, start: performance.now(), duration: quick || this.reducedMotion() ? 160 : kind === "breach" ? 1150 : 920, impacted: false, done, onImpact };
+    this.canvas.dataset.enemyAction = kind === "infect" ? "install" : kind;
   }
 
-  private animateEnemy(now: number, time: number, reduced: boolean) {
-    const action = this.enemyAction;
-    const hurt = this.enemyHitAt ? Math.max(0, 1 - (now - this.enemyHitAt) / 420) : 0;
+  private animatePorts(now: number, time: number, reduced: boolean) {
+    for (const visual of this.ports) this.animatePort(visual, now, time, reduced);
+    const report = this.ports.find(visual => visual.actor.transitioning() && visual.enemy)
+      ?? this.ports.find(visual => visual.action)
+      ?? this.leaderPort();
+    const state = report.enemy ? report.state : "idle";
+    if (this.visible && this.canvas.dataset.enemyState !== state) this.canvas.dataset.enemyState = state;
+    const enraged = this.ports.some(visual => visual.enemy && this.enraged(visual));
+    if (enraged && !this.canvas.dataset.enemyEnraged) this.canvas.dataset.enemyEnraged = "true";
+    else if (!enraged && this.canvas.dataset.enemyEnraged) delete this.canvas.dataset.enemyEnraged;
+  }
+  private enraged(visual: PortVisual) {
+    const enemy = visual.enemy;
+    return !!enemy && !!ENEMIES[enemy.id]?.enrages && enemy.hp <= enemy.maxHp / 2 && enemy.hp > 0;
+  }
+
+  private animatePort(visual: PortVisual, now: number, time: number, reduced: boolean) {
+    const enemy = visual.enemy;
+    if (!enemy || !visual.ready || (visual.dead && !visual.dying)) {
+      visual.state = "idle";
+      visual.light.intensity = 0;
+      if (visual.under) visual.under.intensity = 0;
+      return;
+    }
+    const action = visual.action;
+    const hurt = visual.hitAt ? Math.max(0, 1 - (now - visual.hitAt) / 420) : 0;
     const attack = action ? Math.min(1, (now - action.start) / action.duration) : null;
-    const enraged = !!this.enemy && !!ENEMIES[this.enemy.id].enrages && this.enemy.hp <= this.enemy.maxHp / 2;
-    this.enemyGroup.position.copy(enemyHome(this.enemySize));
-    this.enemyGroup.position.y -= this.enemyDrop;
-    if (!reduced) this.enemyGroup.position.z -= hurt * .7;
-    const state = this.enemyActor.update(this.camera, now, time, reduced, this.enemySize,
-      this.enemy?.color ?? 0xffffff, enraged, hurt, attack, action?.kind);
-    if (this.visible) this.canvas.dataset.enemyState = state;
-    if (enraged) this.canvas.dataset.enemyEnraged = "true";
-    else delete this.canvas.dataset.enemyEnraged;
-    // A slow heartbeat in its light; guardians beat harder.
-    const heartbeat = reduced ? 0 : Math.pow(Math.max(0, Math.sin(time * (this.enemyBoss ? 1.6 : 1.3))), 8);
-    this.enemyLight.intensity = (this.enemyBoss ? 34 : 24) * (1 + heartbeat * .6 + (enraged ? .35 : 0));
-    this.enemyUnderLight.intensity = (this.enemyBoss ? 26 : 18) * (1 + heartbeat * .4);
+    const enraged = this.enraged(visual);
+    const centre = visual.port === "centre";
+    visual.group.position.copy(portHome(visual.port, visual.size));
+    if (!centre) visual.light.position.copy(visual.group.position).add(new THREE.Vector3(0, 0.2, 3.2));
+    visual.group.position.y -= visual.drop;
+    if (!reduced) visual.group.position.z -= hurt * .7;
+    const dim = visual.dimUntil > now ? Math.sin(Math.min(1, (now - visual.dimFrom) / (visual.dimUntil - visual.dimFrom)) * Math.PI) : 0;
+    visual.actor.dim = dim;
+    visual.state = visual.actor.update(this.camera, now, time, reduced, visual.size,
+      enemy.color, enraged, hurt, attack, action?.kind);
+    // A slow heartbeat in its light; guardians beat harder. Escorts carry a smaller spill.
+    const heartbeat = reduced ? 0 : Math.pow(Math.max(0, Math.sin(time * (visual.boss ? 1.6 : 1.3) + (centre ? 0 : visual.port === "left" ? 1.1 : 2.3))), 8);
+    const strength = centre ? 1 : 0.5;
+    visual.light.intensity = (visual.boss ? 34 : 24) * strength * (1 + heartbeat * .6 + (enraged ? .35 : 0)) * (1 - dim * .5);
+    if (visual.under) visual.under.intensity = (visual.boss ? 26 : 18) * (1 + heartbeat * .4);
     if (!action) return;
     const t = Math.min(1, (now - action.start) / action.duration);
     const charge = Math.sin(Math.min(1, t / .5) * Math.PI / 2);
     // Anticipation: it rears back and rises before committing.
     const rear = Math.sin(Math.min(1, t / .36) * Math.PI);
     const lunge = Math.sin(Math.max(0, (t - .36) / .64) * Math.PI);
+    const size = visual.size / 10.5;
     if (!reduced) {
       const heavy = action.kind === "breach" ? 1.35 : 1;
-      this.enemyGroup.position.z -= rear * .9 * heavy;
-      this.enemyGroup.position.y += rear * .45 * heavy;
+      visual.group.position.z -= rear * .9 * heavy * size;
+      visual.group.position.y += rear * .45 * heavy * size;
       if (action.kind === "strike" || action.kind === "breach") {
-        this.enemyGroup.position.z += lunge * (action.kind === "breach" ? 3.4 : 2.5);
-        this.enemyGroup.position.y -= lunge * .55;
+        visual.group.position.z += lunge * (action.kind === "breach" ? 3.4 : 2.5) * size;
+        visual.group.position.y -= lunge * .55 * size;
       } else if (action.kind === "sever") {
-        this.enemyGroup.position.z += lunge * 1.6;
-        this.enemyGroup.position.x += Math.sin(Math.max(0, (t - .36) / .64) * Math.PI * 2) * .7;
-      } else this.enemyGroup.position.y += Math.sin(t * Math.PI) * .6;
+        visual.group.position.z += lunge * 1.6 * size;
+        visual.group.position.x += Math.sin(Math.max(0, (t - .36) / .64) * Math.PI * 2) * .7 * size;
+      } else visual.group.position.y += Math.sin(t * Math.PI) * .6 * size;
       action.effect.visible = t > .28 && t < .86;
       action.effect.position.lerpVectors(action.origin, action.target, Math.min(1, Math.max(0, (t - .28) / .5)));
       action.effect.rotation.set(t * 5, t * 7, action.kind === "sever" ? t * 2 : t * 6);
-      action.effect.scale.setScalar(.6 + charge * .8);
+      action.effect.scale.setScalar((.6 + charge * .8) * Math.max(0.7, size));
     }
-    this.enemySprite.material.color.lerp(new THREE.Color(this.enemy?.color ?? 0xff9999), Math.sin(t * Math.PI) * .3);
+    visual.actor.mesh.material.color.lerp(new THREE.Color(enemy.color), Math.sin(t * Math.PI) * .3);
     if (t >= .78 && !action.impacted) {
       action.impacted = true;
       action.onImpact();
       if (action.kind !== "charge") {
-        this.pulseAt(action.target.x, action.target.z, this.enemy?.color ?? 0xff9999, action.kind === "breach" ? 2 : 1.4);
-        this.burst(action.target.clone(), ({ strike: 0xf0ad76, breach: 0xf57968 } as Record<string, number>)[action.kind] ?? this.enemy?.color ?? 0xff9999, action.kind === "breach" ? 18 : 10, 2.6);
+        this.pulseAt(action.target.x, action.target.z, enemy.color, action.kind === "breach" ? 2 : 1.4);
+        this.burst(action.target.clone(), ({ strike: 0xf0ad76, breach: 0xf57968 } as Record<string, number>)[action.kind] ?? action.color ?? enemy.color, action.kind === "breach" ? 18 : 10, 2.6);
       }
       if (action.kind === "strike" || action.kind === "breach") this.shakeCamera(action.kind === "breach" ? .2 : .12, action.kind === "breach" ? 420 : 280);
       if (action.kind === "corrupt" && this.forecastZone) this.pulseZone(this.forecastZone, "corrupt");
     }
     if (t >= 1) {
       this.scene.remove(action.effect); this.disposeObject(action.effect);
-      this.enemyAction = null;
-      delete this.canvas.dataset.enemyAction;
+      visual.action = null;
+      if (!this.ports.some(other => other.action)) delete this.canvas.dataset.enemyAction;
       action.done();
     }
   }
-  playEnemyTransition(kind: "enrage" | "death" | "break", done: () => void, quick = false) {
-    if (!this.enemy) { done(); return; }
+  playEnemyTransition(kind: "enrage" | "death" | "break", done: () => void, quick = false, port?: Port) {
+    const visual = this.portOf(port) ?? this.leaderPort();
+    const enemy = visual.enemy;
+    if (!enemy || !visual.ready) {
+      if (kind === "death") { visual.dead = true; visual.group.visible = false; this.refreshRail(); }
+      done();
+      return;
+    }
     this.canvas.dataset.enemyState = kind;
-    this.pulseAt(0, -5.3, this.enemy.color, kind === "death" ? 3.4 : 2.4);
+    const x = visual.port === "centre" ? 0 : plateX(visual.port);
+    this.pulseAt(x, -5.3, enemy.color, (kind === "death" ? 3.4 : 2.4) * (visual.size / 10.5));
     if (kind === "enrage") this.shakeCamera(.14, 600);
     if (kind === "death") {
+      visual.dying = true;
       this.shakeCamera(.1, 500);
-      this.burst(this.enemyGroup.position.clone().add(new THREE.Vector3(0, this.enemySize * .1, 1)), this.enemy.color, 36, 4);
+      this.burst(visual.group.position.clone().add(new THREE.Vector3(0, visual.size * .1, 1)), enemy.color, 36, 4);
     }
-    this.enemyActor.transitionTo(kind, done, quick || this.reducedMotion());
+    visual.actor.transitionTo(kind, () => {
+      if (kind === "death") {
+        visual.dying = false;
+        visual.dead = true;
+        visual.group.visible = false;
+        this.refreshRail();
+        this.refreshDeliveries(true);
+      }
+      done();
+    }, quick || this.reducedMotion());
+    this.refreshRail();
   }
+  /** A reinforcement or an add takes its port now (the playback's arrival beat). */
+  arrive(enemy: Enemy) {
+    const visual = this.portOf(enemy.port);
+    if (!visual) return;
+    const roster = this.enemies.filter(other => other.port !== enemy.port).concat({ ...enemy });
+    roster.sort((a, b) => PORT_ORDER.indexOf(a.port) - PORT_ORDER.indexOf(b.port));
+    this.syncRail(roster, true);
+    this.refreshDeliveries(true);
+  }
+
+  /** Trap phase: a firewall's quarantine beam (from a Sentry's searchlight) into an installation. */
+  playQuarantine(firewallId: string, installationId: string, destroys: boolean) {
+    const firewall = this.devices.get(firewallId);
+    const spot = this.installationSpots.get(installationId);
+    if (!firewall || !spot) return;
+    const lens = firewall.getObjectByName("sentry_beam");
+    const from = new THREE.Vector3();
+    if (lens) lens.getWorldPosition(from);
+    else from.set(firewall.position.x, 1.95, firewall.position.z);
+    const to = new THREE.Vector3(spot.x, 1.0, spot.z);
+    this.beam(from, to, BRASS_COLOR, 680, 0.09);
+    this.pulseAt(spot.x, spot.z, BRASS_COLOR, destroys ? 1.6 : 1.1);
+    this.burst(to, destroys ? 0xffe0a0 : BRASS_COLOR, destroys ? 18 : 8, 2.4);
+  }
+
+  /** One installation effect of the enemy phase, in placement order. */
+  playInstallationEffect(effect: InstallationEffectView) {
+    const spot = this.installationSpots.get(effect.id);
+    if (!spot) return;
+    const target = effect.target ? this.topology.nodes.find(node => node.id === effect.target) : undefined;
+    const color = INSTALLATION_COLORS[effect.kind];
+    if (effect.effect === "jam" && target) {
+      const from = new THREE.Vector3(spot.x, 1.55, spot.z), to = new THREE.Vector3(target.x, 1.35, target.z);
+      this.beam(from, to, effect.cancelled ? 0x9ff3ff : color, 640, 0.08);
+      this.pulseAt(target.x, target.z, effect.decoyed ? 0xffa640 : effect.cancelled ? 0x9ff3ff : 0xb59cec, 1.2);
+      if (effect.decoyed || effect.cancelled) this.pulseAt(spot.x, spot.z, 0xffa640, 1.2, 0.12);
+    } else if (effect.effect === "wear" && target) {
+      this.playWear(target.id, spot);
+    } else if (effect.effect === "tick") {
+      if (!this.reducedMotion()) this.pulseAt(spot.x, spot.z, BLAST_COLOR, 1.3);
+      const group = this.installations.get(effect.id);
+      const item = this.installationList.find(entry => entry.id === effect.id);
+      if (group && item && effect.countdown !== undefined)
+        refreshInstallation(group, { ...item, countdown: effect.countdown }, group.userData.installation.pips, object => this.disposeObject(object));
+    } else if (effect.effect === "detonate") this.playDetonation(effect.id);
+  }
+  /** Wear: a fray-coloured pulse on the device (from a Spike, a travelling spark). */
+  playWear(nodeId: string, from?: WorldPoint) {
+    const node = this.topology.nodes.find(entry => entry.id === nodeId);
+    if (!node) return;
+    if (from && !this.reducedMotion()) this.beam(new THREE.Vector3(from.x, 1.1, from.z), new THREE.Vector3(node.x, 1.2, node.z), INSTALLATION_COLORS.spike, 460, 0.06);
+    this.pulseAt(node.x, node.z, FRAYED_COLOR, 1.25, from ? 0.15 : 0);
+    this.burst(new THREE.Vector3(node.x, 1.4, node.z), 0xffa05a, 8, 1.8);
+  }
+  /** Breakdown: a coral pulse and a heavy burst; the device and its cables leave the table. */
+  playBreakdown(nodeId: string) {
+    const node = this.topology.nodes.find(entry => entry.id === nodeId);
+    const group = this.devices.get(nodeId);
+    if (!node || !group) return;
+    this.pulseAt(node.x, node.z, 0xf27a64, 1.8);
+    this.pulseAt(node.x, node.z, COLORS[node.role], 1.2, 0.12);
+    this.burst(new THREE.Vector3(node.x, 1.3, node.z), COLORS[node.role], 26, 3.6);
+    this.burst(new THREE.Vector3(node.x, 1.0, node.z), 0xffa05a, 16, 2.6);
+    this.shakeCamera(0.08, 260);
+    this.devices.delete(nodeId);
+    const stale = this.hitObjects.findIndex(hit => hit.parent === group);
+    if (stale >= 0) this.hitObjects.splice(stale, 1);
+    this.dynamic.remove(group);
+    this.dissolve(group, 0.45, -0.2);
+    for (const [key, cable] of this.cableGroups)
+      if (key.split("::").includes(nodeId)) {
+        this.cableGroups.delete(key);
+        this.dynamic.remove(cable);
+        this.dissolve(cable, 0.35, 0);
+      }
+  }
+  /** A Phantom Node absorbs a disruption: it flickers, and fades when its last absorption is spent. */
+  playPhantom(nodeId: string, fades: boolean) {
+    const node = this.topology.nodes.find(entry => entry.id === nodeId);
+    const group = this.devices.get(nodeId);
+    if (!node || !group) return;
+    this.pulseAt(node.x, node.z, COLORS.phantom, 1.4);
+    this.burst(new THREE.Vector3(node.x, 1.6, node.z), COLORS.phantom, 12, 2);
+    if (!fades) return;
+    this.devices.delete(nodeId);
+    this.dynamic.remove(group);
+    this.dissolve(group, 0.9, 0.6);
+  }
+  /** A Breaker Charge reaches zero: a flash, the blast ring expanding, a heavy shake. */
+  playDetonation(id: string) {
+    const spot = this.installationSpots.get(id);
+    if (!spot) return;
+    const origin = new THREE.Vector3(spot.x, 0.9, spot.z);
+    this.pulseAt(spot.x, spot.z, 0xffd2a0, 2.9);
+    this.pulseAt(spot.x, spot.z, BLAST_COLOR, 3.2, 0.1);
+    this.burst(origin, 0xffc27a, 34, 4.6);
+    this.burst(origin, BLAST_COLOR, 18, 3.2);
+    this.light.color.setHex(0xffa060);
+    this.light.position.set(spot.x, 2.4, spot.z);
+    this.light.intensity = 110;
+    this.impactEndsAt = performance.now() + 360;
+    this.shakeCamera(0.24, 520);
+    const group = this.installations.get(id);
+    if (group) {
+      this.installations.delete(id);
+      this.frontGroup.remove(group);
+      this.dissolve(group, 0.25, 0.3);
+    }
+  }
+  /** An installation arrives at its socket (the hostile's projectile landed): the body appears now. */
+  plantInstallation(item: Installation) {
+    if (this.installations.has(item.id)) return;
+    this.setInstallations([...this.installationList, item], { installs: this.ghostSockets.filter(socket => socket.x !== item.x || socket.z !== item.z) });
+  }
+  /** Quarantine or a bite takes points mid-playback (the pips update before the rules advance). */
+  damageInstallation(id: string, integrity: number) {
+    const item = this.installationList.find(entry => entry.id === id);
+    if (!item) return;
+    if (integrity <= 0) {
+      this.pulseNode(id, "scrub");
+      this.setInstallations(this.installationList.filter(entry => entry.id !== id), { installs: this.ghostSockets });
+      return;
+    }
+    this.setInstallations(this.installationList.map(entry => entry.id === id ? { ...entry, integrity } : entry), { installs: this.ghostSockets });
+  }
+
+  /**
+   * A crate drops from a fallen escort's port onto the table, lands with a burst, and opens.
+   * `onOpen` fires when the lid lifts (the toast and the cue); the crate fades after a beat.
+   * Reduced motion: it appears in place with a single pulse.
+   */
+  dropCrate(port: Port, spot: WorldPoint, onOpen: () => void, done: () => void = () => {}, fast = false) {
+    const visual = this.portOf(port);
+    const { group, body, lid } = buildTableProp("crate");
+    const scale = 1.35;
+    group.scale.setScalar(scale);
+    const reduced = this.reducedMotion();
+    // Scaled about the group origin: sink it so the crate still stands on the deck.
+    const land = new THREE.Vector3(spot.x, -0.42 - TABLE_Y * (scale - 1), spot.z);
+    const from = visual ? visual.group.position.clone().add(new THREE.Vector3(0, visual.size * 0.1, 1.5)) : land.clone().setY(4);
+    group.position.copy(reduced ? land : from);
+    this.scene.add(group);
+    const middle = from.clone().lerp(land, 0.5);
+    middle.y += 3.2;
+    this.props.push({
+      group, body, lid, curve: reduced ? null : new THREE.QuadraticBezierCurve3(from, middle, land),
+      // Quick transmissions keep the arc but halve it, so the crate opens inside the phase's beat.
+      start: performance.now(), flight: reduced ? 0 : fast ? 380 : 760, hold: 2400, landed: false, opened: false, float: false, open: fast ? 240 : 520,
+      onLand: () => {
+        this.pulseAt(spot.x, spot.z, 0xe0b872, 1.5);
+        this.burst(new THREE.Vector3(spot.x, 0.5, spot.z), 0xffd290, 14, 2.4);
+        if (!reduced) this.shakeCamera(0.05, 160);
+      },
+      done: () => { onOpen(); done(); },
+    });
+  }
+  /** A message fragment hovers over the fallen port for one beat (then the dialog opens). */
+  dropFragment(port: Port, done: () => void = () => {}) {
+    const visual = this.portOf(port);
+    const { group, body } = buildTableProp("fragment");
+    const x = visual ? (visual.port === "centre" ? 0 : plateX(visual.port)) : 0;
+    group.position.set(x, 1.6, -5.2);
+    group.scale.setScalar(1.6);
+    this.scene.add(group);
+    this.pulseAt(x, -5.2, 0xffe0a0, 1.4);
+    this.props.push({
+      group, body, lid: null, curve: null, start: performance.now(), flight: 0, hold: this.reducedMotion() ? 500 : 1200,
+      landed: true, opened: true, float: true, onLand: () => {}, done,
+    });
+  }
+
   setVisible(visible: boolean) {
     if (this.visible && !visible) {
       this.clearTransientEffects();
       this.battleIdentity = null;
     }
     this.visible = visible;
+    this.refreshRail();
   }
 
   private clearTransientEffects() {
-    if (this.enemyAction) {
-      this.scene.remove(this.enemyAction.effect);
-      this.disposeObject(this.enemyAction.effect);
-      this.enemyAction = null;
+    for (const visual of this.ports) {
+      if (visual.action) {
+        this.scene.remove(visual.action.effect);
+        this.disposeObject(visual.action.effect);
+        visual.action = null;
+      }
+      visual.hitAt = 0;
+      visual.dying = false;
+      visual.dimUntil = 0;
+      visual.actor.clear();
     }
     delete this.canvas.dataset.enemyAction;
-    this.enemyHitAt = 0;
-    this.enemyActor.clear();
     delete this.canvas.dataset.enemyState;
     delete this.canvas.dataset.enemyEnraged;
-    for (const effect of [...this.packets, ...this.sparks, ...this.pulses, ...this.bolts]) {
+    for (const effect of [...this.packets, ...this.sparks, ...this.pulses, ...this.bolts, ...this.beams]) {
       this.scene.remove(effect.mesh);
       this.disposeObject(effect.mesh);
     }
+    for (const item of this.fading) { item.object.removeFromParent(); this.disposeObject(item.object); }
+    for (const item of this.props) { this.scene.remove(item.group); this.disposeObject(item.group); }
     // Abandon callbacks with their encounter; they must not fire in a later battle.
     this.packets = [];
     this.sparks = [];
     this.pulses = [];
     this.bolts = [];
+    this.beams = [];
+    this.fading = [];
+    this.props = [];
     this.impactEndsAt = 0;
     this.shake = { until: 0, power: 0, duration: 1 };
     this.light.color.setHex(0x4be7cf);
     this.light.intensity = 24;
+    this.light.position.set(0, 3.2, 0);
   }
   resetCamera() {
-    this.camera.position.set(0, 12.8, 18.8);
+    this.camera.position.copy(CAMERA_HOME);
     this.controls.target.set(0, 0.15, -0.3);
     this.controls.update();
   }
 
   /** Short, wide tables crop the top of the canvas (it starts above the viewport and
-   * under the header). Lower the hostile just enough that its head stays visible. */
-  private frameEnemy() {
+   * under the header). Lower a hostile just enough that its head stays visible. */
+  private frameEnemy(visual: PortVisual) {
     const rect = this.canvas.getBoundingClientRect();
     if (!rect.height) return;
     const limit = Math.max(0, -rect.top) / rect.height + 0.06;
-    const home = enemyHome(this.enemySize);
-    const crown = home.y + this.enemySize * 0.44;
+    const home = portHome(visual.port, visual.size);
+    const crown = home.y + visual.size * 0.44;
     this.camera.updateMatrixWorld();
-    const at = (y: number) => (1 - new THREE.Vector3(0, y, home.z).project(this.camera).y) / 2;
+    const at = (y: number) => (1 - new THREE.Vector3(home.x, y, home.z).project(this.camera).y) / 2;
     const top = at(crown), perUnit = at(crown - 1) - top;
-    this.enemyDrop = top >= limit || perUnit <= 0 ? 0 : Math.min(2.6, (limit - top) / perUnit);
+    visual.drop = top >= limit || perUnit <= 0 ? 0 : Math.min(2.6, (limit - top) / perUnit);
   }
 
   private resize() {
@@ -1858,13 +2935,74 @@ export class World {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height, false);
     this.composer.setSize(width, height);
-    this.frameEnemy();
+    for (const visual of this.ports) this.frameEnemy(visual);
+    this.declutterTags();
     const ratio = this.renderer.getPixelRatio();
     this.antialias.material.uniforms.resolution.value.set(
       1 / (width * ratio),
       1 / (height * ratio),
     );
   }
+
+  private animateFront(time: number, motion: number, reduced: boolean) {
+    for (const group of this.installations.values()) {
+      animateProp(group, time, motion, reduced);
+      const body = group.userData.installation.body;
+      if (body) animateModelBody(body, time, motion, reduced);
+    }
+    for (const group of this.ghostGroup.children) animateProp(group as PropGroup, time, motion, reduced);
+    for (const reach of [this.hoverRing, this.selectRing]) if (reach.visible) reach.rotation.y += motion * 0.18;
+    // Worn hardware throws a sparse burst of three embers every few seconds.
+    if (!reduced)
+      for (const group of this.devices.values()) {
+        if (!group.userData.worn) continue;
+        if (!group.userData.nextSpark) group.userData.nextSpark = time + 1 + Math.random() * 3;
+        if (time < group.userData.nextSpark) continue;
+        group.userData.nextSpark = time + 2.6 + Math.random() * 2.4;
+        this.burst(new THREE.Vector3(group.position.x, 1.5, group.position.z), 0xffa05a, 3, 0.9);
+      }
+    const glyphPulse = reduced ? 1 : 0.85 + 0.15 * Math.sin(time * 3);
+    for (const item of this.glyphs) {
+      if (this.aimDrag?.key === item.view.key && this.aimDrag.moved) continue;
+      // Each glyph drifts a hand's width toward its port and eases back (static under reduced motion).
+      const drift = reduced ? 0 : (0.5 - 0.5 * Math.cos(time * 1.3 + item.phase)) * 0.42;
+      item.glyph.position.copy(item.base).addScaledVector(item.toward, drift);
+      item.glyph.material.opacity = glyphPulse;
+    }
+    for (const visual of this.ports) {
+      if (!visual.crest.visible) continue;
+      const dim = visual.crest.userData.dim as boolean;
+      visual.crest.material.opacity = (dim ? 0.45 : 1) * (reduced ? 1 : 0.8 + 0.2 * Math.sin(time * 1.6));
+    }
+  }
+
+  private animateProps(now: number, time: number, motion: number, reduced: boolean) {
+    for (let i = this.props.length - 1; i >= 0; i--) {
+      const item = this.props[i];
+      const elapsed = now - item.start;
+      if (item.body) animateModelBody(item.body, time, motion, reduced);
+      if (!item.landed) {
+        const t = item.flight ? Math.min(1, elapsed / item.flight) : 1;
+        if (item.curve) item.group.position.copy(item.curve.getPoint(t * t));
+        item.group.rotation.y = reduced ? 0 : t * 4.2;
+        if (t >= 1) { item.landed = true; item.onLand(); }
+        continue;
+      }
+      const after = elapsed - item.flight;
+      if (item.float) item.group.position.y = 1.6 + (reduced ? 0 : Math.sin(time * 2.4) * 0.12);
+      if (!item.opened && item.lid) {
+        const open = Math.min(1, after / (reduced ? 1 : item.open ?? 520));
+        item.lid.rotation.x = -1.9 * (1 - Math.pow(1 - open, 3));
+        if (open >= 1) { item.opened = true; item.done(); }
+      } else if (!item.opened) { item.opened = true; item.done(); }
+      else if (item.float && after >= item.hold && !item.group.userData.finished) { item.group.userData.finished = true; item.done(); }
+      if (after >= item.hold + (item.float ? 0 : 200)) {
+        this.props.splice(i, 1);
+        this.dissolve(item.group, 0.5, item.float ? 0.4 : 0.1);
+      }
+    }
+  }
+
   private tick = () => {
     if (!this.active) return;
     this.frame = requestAnimationFrame(this.tick);
@@ -1878,6 +3016,7 @@ export class World {
       this.impactEndsAt = 0;
       this.light.color.setHex(0x4be7cf);
       this.light.intensity = 24;
+      this.light.position.set(0, 3.2, 0);
     }
     if (!this.visible || document.hidden) return;
     const time = this.clock.elapsedTime;
@@ -1888,7 +3027,7 @@ export class World {
     this.placement.rotation.y += motion * 0.55;
     for (const group of this.devices.values()) animateDevice(group, time, motion, reducedMotion);
     for (const group of this.terrainGroup.children) animateProp(group as PropGroup, time, motion, reducedMotion);
-    for (const group of this.malwareGroup.children) animateProp(group as PropGroup, time, motion, reducedMotion);
+    this.animateFront(time, motion, reducedMotion);
     for (const { material, phase, base } of this.frayEmbers)
       material.opacity = base * (reducedMotion ? 1 : 0.4 + 0.6 * Math.abs(Math.sin(time * 6 + phase) * Math.sin(time * 17 + phase * 2)));
     for (const item of this.cableBeads) {
@@ -1904,7 +3043,9 @@ export class World {
     this.shafts.forEach((shaft, index) => {
       shaft.material.opacity = reducedMotion ? 0.06 : 0.045 + Math.sin(time * 0.23 + index * 2.1) * 0.02;
     });
-    this.animateEnemy(performance.now(), time, reducedMotion);
+    const now = performance.now();
+    this.animatePorts(now, time, reducedMotion);
+    this.animateProps(now, time, motion, reducedMotion);
     for (let i = this.pulses.length - 1; i >= 0; i--) {
       const pulse = this.pulses[i];
       if (pulse.delay > 0) {
@@ -1924,7 +3065,7 @@ export class World {
     }
     for (let i = this.packets.length - 1; i >= 0; i--) {
       const packet = this.packets[i];
-      const elapsed = (performance.now() - packet.start) / 1000;
+      const elapsed = (now - packet.start) / 1000;
       if (elapsed < 0) continue;
       const position = elapsed * packet.speed;
       const step = Math.floor(position);
@@ -1941,7 +3082,7 @@ export class World {
     }
     for (let i = this.bolts.length - 1; i >= 0; i--) {
       const bolt = this.bolts[i];
-      const t = Math.min(1, (performance.now() - bolt.start) / bolt.duration);
+      const t = Math.min(1, (now - bolt.start) / bolt.duration);
       bolt.mesh.position.copy(bolt.curve.getPoint(t * t));
       bolt.mesh.rotation.y += dt * 9;
       if (t >= 1) {
@@ -1949,6 +3090,29 @@ export class World {
         this.disposeObject(bolt.mesh);
         this.bolts.splice(i, 1);
         bolt.done();
+      }
+    }
+    for (let i = this.beams.length - 1; i >= 0; i--) {
+      const beam = this.beams[i];
+      const t = Math.min(1, (now - beam.start) / beam.duration);
+      const fade = t < 0.2 ? t / 0.2 : 1 - (t - 0.2) / 0.8;
+      beam.materials[0].opacity = 0.95 * fade;
+      beam.materials[1].opacity = 0.45 * fade;
+      if (t >= 1) {
+        this.scene.remove(beam.mesh);
+        this.disposeObject(beam.mesh);
+        this.beams.splice(i, 1);
+      }
+    }
+    for (let i = this.fading.length - 1; i >= 0; i--) {
+      const item = this.fading[i];
+      const t = Math.min(1, (now - item.start) / item.duration);
+      for (const entry of item.materials) entry.material.opacity = entry.opacity * (1 - t);
+      item.object.position.y = item.baseY + item.rise * t;
+      if (t >= 1) {
+        item.object.removeFromParent();
+        this.disposeObject(item.object);
+        this.fading.splice(i, 1);
       }
     }
     for (let i = this.sparks.length - 1; i >= 0; i--) {
@@ -1964,7 +3128,6 @@ export class World {
       }
     }
     // Camera shake is an offset applied only for this frame's render.
-    const now = performance.now();
     const shaking = !reducedMotion && now < this.shake.until;
     if (shaking) {
       const fall = (this.shake.until - now) / this.shake.duration;
@@ -1988,25 +3151,27 @@ export class World {
     this.canvas.removeEventListener("pointercancel", this.onPointerCancel);
     this.canvas.removeEventListener("pointerleave", this.onPointerLeave);
     this.clearTransientEffects();
-    // Both atlases are owned by World, including whichever is not currently bound.
-    this.enemySprite.material.map = null;
-    this.enemyTexture.dispose();
-    this.enemyAlphaTexture.dispose();
-    this.enemyFieldTexture.dispose();
-    this.enemyExpeditionTexture.dispose();
-    this.guardianTexture.dispose();
-    this.enemyGroup.remove(this.enemySprite, this.enemyActor.embers);
-    this.enemyActor.dispose();
+    // Every sheet and each port's clone are owned by World.
+    for (const visual of this.ports) {
+      visual.actor.mesh.material.map = null;
+      visual.texture?.dispose();
+      visual.group.remove(visual.actor.mesh, visual.actor.embers);
+      visual.actor.dispose();
+    }
+    for (const entry of this.sheets.values()) entry.texture.dispose();
+    this.sheets.clear();
     this.disposeObject(this.scene);
     this.scene.clear();
     this.hitObjects.length = 0;
-    this.malwareHits.length = 0;
+    this.installations.clear();
     this.devices.clear();
     this.deviceStates.clear();
     this.cableCurves.clear();
     this.cableVisuals.clear();
+    this.cableGroups.clear();
     this.cableBeads.length = 0;
     this.frayEmbers.length = 0;
+    this.glyphs.length = 0;
     this.linkGhost = null;
     this.zoneVisuals.clear();
     this.environment.dispose();

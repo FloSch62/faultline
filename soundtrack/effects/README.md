@@ -9,7 +9,7 @@ FAULTLINE's effects use Kenney's [Impact Sounds](https://kenney.nl/assets/impact
 recordings and each pack's license are retained in `sources/`. None of the packs'
 retro laser or tonal confirmation bleeps are used. The nine music tracks are unchanged.
 
-Reproduce all 75 stereo Ogg masters for 44 cues:
+Reproduce all 98 stereo Ogg masters for 58 cues:
 
 ```sh
 uv run scripts/build_effects.py
@@ -19,7 +19,9 @@ The script has pinned Python dependencies. If the sources are absent, it fetches
 the official Kenney archives and retains only the files the recipes use (unused
 recordings are pruned). Production needs neither Python nor a network connection
 to an asset service. The browser loads the finished `public/audio/effects/*.ogg`
-files after the first interaction. The bank is approximately 1 MiB.
+files after the first interaction. The bank is approximately 1.3 MiB. A rebuild
+keeps every master whose decoded audio is unchanged byte for byte (libsndfile
+gives each Ogg stream a random serial), so only cues whose recipe changed differ.
 
 ## One cue per game moment
 
@@ -47,8 +49,22 @@ CUE GUIDE that states when each one plays. The palette is material:
 | Market, credits | `coins` | coins and chips |
 | Card upgraded | `upgrade` | anvil strike with rising glass sparkle |
 | Unknown signal | `event` | creak, radio static, reversed bell |
-| Malware planted / scrubbed | `malware` / `scrub` | wet glitch / blade wipe and glass |
+| Siphon Tap planted / installation scrubbed | `malware` / `scrub` | wet glitch / blade wipe and glass |
 | Junk shuffled in | `junk` | shoved cards and a glitch |
+| Escort, reinforcement or add takes a port | `arrive` | heavy metal engage, short field swell |
+| Escort dormant for the phase | `dormant` | soft relay click, falling hum |
+| Channel aimed, focus changed | `aim` | glass tick with a brass detent |
+| Jammer, Spike, Anchor, Breaker Charge planted | `install` | iron driven into a plate, electric settle |
+| Device loses a condition point | `wear` | stressed metal creak, glass crack |
+| Device breaks, wreckage remains | `breakdown` | metal collapse, glass shatter, debris tail |
+| Condition point restored | `repair` | ratchet turns, soft power-up, seated click |
+| Firewall quarantine ticks | `quarantine` | brief hard beam, metal tick |
+| Breaker Charge reaches zero | `detonate` | low explosion with metal debris |
+| Crate opens (credits / anything else) | `crate` | wood-and-metal thud, latch, coins / paper |
+| Message drops, choice resolves | `message` | capsule crack, paper unrolling, reversed bell |
+| Hidden designation revealed | `reveal` | static clearing into an engraved plate strike |
+| Reinforcement announced | `warning` | two low plate strikes over a short alarm bed |
+| Mid-fight signal fires | `signal` | radio static resolving into a bell |
 
 Hostile actions (`strike`, `breach`, `sever`, `jam`, `corrupt`, `charge`) land on
 the animation's contact frame; `hit`, `hurt`, `block`, `boss`, `enrage`, `death`

@@ -216,7 +216,8 @@ test("the fourteen v4 cards: cost, rarity, target, pool, upgrade, values and ins
   assert.deepEqual(CARDS["broadcast-storm"].values, { everyPort: 2 });
   assert.deepEqual(CARDS["packet-storm+"].values, { everyPort: 7 });
   assert.deepEqual(CARDS["flood-fill+"].values, { perChannelEveryPort: 2 });
-  assert.deepEqual(CARDS["traffic-shaping"].values, { focusBonus: 1, draw: 1 });
+  assert.deepEqual(CARDS["traffic-shaping"].values, { focusBonus: 2, draw: 1 });
+  assert.deepEqual(CARDS["traffic-shaping+"].values, { focusBonus: 4, draw: 1 });
   assert.deepEqual(CARDS["demolition-charge+"].values, { focusBonus: 4 });
   assert.deepEqual(CARDS.quorum.values, { block: 3, perHostile: 2, draw: 1 });
   assert.deepEqual(CARDS.bulkhead.values, { block: 3, firewallBonus: 1 });

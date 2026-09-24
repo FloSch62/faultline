@@ -1,5 +1,5 @@
 import { CARDS, RULES, STARTER_DECK, baseCard, type CardDefinition } from "./cards.ts";
-import { canLink, cableable, channelKey, initialTopology, linkKey, paths } from "./graph.ts";
+import { canLink, cableable, initialTopology, linkKey, paths } from "./graph.ts";
 import { createMap } from "./map.ts";
 import { grantVictory } from "./meta.ts";
 import { random, shuffle, log } from "./util.ts";
@@ -112,9 +112,9 @@ function guaranteedDraw(run: RunState, match: (id: CardId) => boolean) {
 }
 
 /** Every encounter-scoped v4 field at its empty value. */
-function freshEncounter(): Pick<RunState, "enemies" | "faultNodes" | "faultLinks" | "installations" | "focus" | "aims" | "enemyPhase" | "hostileActions" | "reinforcement" | "signal" | "offers" | "encounterCards"> {
+function freshEncounter(): Pick<RunState, "enemies" | "faultNodes" | "faultLinks" | "installations" | "focus" | "enemyPhase" | "hostileActions" | "reinforcement" | "signal" | "offers" | "encounterCards"> {
   return {
-    enemies: [], faultNodes: [], faultLinks: [], installations: [], focus: null, aims: {}, enemyPhase: 0, hostileActions: 0,
+    enemies: [], faultNodes: [], faultLinks: [], installations: [], focus: null, enemyPhase: 0, hostileActions: 0,
     reinforcement: null, signal: null, offers: [], encounterCards: [],
   };
 }
@@ -229,29 +229,15 @@ export function beginBattle(run: RunState, room: MapRoom) {
   for (const line of plan.entrance) log(run, line);
 }
 
-// ------------------------------------------------------------------ focus and aim
+// ------------------------------------------------------------------ the target
 
-/** Rule 15: set the port every unaimed delivery goes to and overflow lands on. Free. */
+/** Rule 15: set the target (the rules' focus), the port every delivery lands on. Free. */
 export function setFocus(run: RunState, port: Port): ActionResult {
-  if (run.phase !== "battle") return { ok: false, message: "Set the focus during an encounter." };
+  if (run.phase !== "battle") return { ok: false, message: "Choose a target during an encounter." };
   const enemy = enemyAt(run, port);
   if (!enemy) return { ok: false, message: "No living hostile stands at that port." };
   run.focus = port;
-  return { ok: true, message: `Focus · ${port.toUpperCase()} · ${enemy.name}.` };
-}
-/** Rule 16–17: aim a live channel's delivery at a port (null follows the focus). Free. */
-export function aimChannel(run: RunState, key: string, port: Port | null): ActionResult {
-  if (run.phase !== "battle") return { ok: false, message: "Aim deliveries during an encounter." };
-  const channels = analyze(run, run.faultNodes, run.faultLinks).channels.map(route => channelKey(route.path));
-  if (!channels.includes(key)) return { ok: false, message: "That channel is not live." };
-  if (port === null) {
-    delete run.aims[key];
-    return { ok: true, message: "Delivery follows the focus." };
-  }
-  const enemy = enemyAt(run, port);
-  if (!enemy) return { ok: false, message: "No living hostile stands at that port." };
-  run.aims[key] = port;
-  return { ok: true, message: `Delivery aimed at ${port.toUpperCase()} · ${enemy.name}.` };
+  return { ok: true, message: `Target · ${port.toUpperCase()} · ${enemy.name}.` };
 }
 
 // ------------------------------------------------------------------ hand
@@ -612,10 +598,7 @@ export function playInstant(run: RunState, index: number, installationId?: strin
     // ---- v4 cards (values from content's definitions, design defaults as fallbacks)
     if (base === "broadcast-storm" || base === "packet-storm") effects(run).everyPort = (run.turnEffects!.everyPort ?? 0) + (values.everyPort ?? 2);
     if (base === "flood-fill") effects(run).everyPort = (run.turnEffects!.everyPort ?? 0) + (values.perChannelEveryPort ?? 1) * network.channelCount;
-    if (base === "traffic-shaping") {
-      effects(run).forceFocus = true;
-      run.turnEffects!.focusBonus = (run.turnEffects!.focusBonus ?? 0) + (values.focusBonus ?? 1);
-    }
+    if (base === "traffic-shaping") effects(run).focusBonus = (run.turnEffects!.focusBonus ?? 0) + (values.focusBonus ?? 2);
     if (base === "demolition-charge") {
       effects(run).focusBonus = (run.turnEffects!.focusBonus ?? 0) + (values.focusBonus ?? 2);
       if (demolish) {
@@ -808,7 +791,6 @@ export function damageFromPath(run: RunState, signal: string[]): number {
   const sim = simulationOf(run);
   sim.buffering = false;
   const leader = leaderOf(sim);
-  sim.aims = {};
   sim.focus = leader?.port ?? null;
   // Promote the chosen route by fencing off every stronger one: evaluate it alone.
   const forecast = resolveTurn(sim).preview;
@@ -816,7 +798,6 @@ export function damageFromPath(run: RunState, signal: string[]): number {
   const route = network.routes[index];
   const lone = simulationOf(run);
   lone.topology.links = lone.topology.links.filter(link => route.path.some((id, i) => i > 0 && linkKey(route.path[i - 1], id) === linkKey(link.a, link.b)));
-  lone.aims = {};
   return Math.max(0, resolveTurn(lone).preview.packetDamage);
 }
 
@@ -1017,9 +998,7 @@ export function endTurn(run: RunState): TurnResult {
   run.turnEffects = {};
   run.reclaim = 0;
   run.repairsThisTurn = 0;
-  // Rule 17 and 49: a channel that no longer exists loses its aim; the focus follows rule 15.
-  const live = new Set(analyze(run, run.faultNodes, run.faultLinks).channels.map(route => channelKey(route.path)));
-  for (const key of Object.keys(run.aims)) if (!live.has(key) || !enemyAt(run, run.aims[key])) delete run.aims[key];
+  // Rule 15: a dead target moves on.
   run.focus = effectiveFocus(run);
   for (const held of run.hand.splice(0))
     (baseCard(held) === "packet-loss" ? run.exhaustPile : run.discardPile).push(held);

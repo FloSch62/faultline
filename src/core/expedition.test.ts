@@ -3,7 +3,7 @@ import test from "node:test";
 import { ARCHETYPES, newExpedition, parseExpedition, dailySeed, starterDeck, type Expedition } from "./expedition.ts";
 import { ASCENSION_LEVELS, MAX_ASCENSION } from "./ascension.ts";
 import { CARDS, STARTER_DECK } from "./cards.ts";
-import { chooseRoom } from "./run.ts";
+import { chooseRoom, combatPreview } from "./run.ts";
 import { createMap } from "./map.ts";
 import { messageOffer, planEncounter } from "./encounter.ts";
 import type { CardId, MapRoom, RunState } from "./types.ts";
@@ -74,7 +74,7 @@ test("daily expeditions repeat card draws and threats for the same date and load
 });
 
 /** A mid-fight v4 state with every new field in use: three hostiles, four installations,
- * worn devices, aims, a pending message, an arrival, a signal and banked credits. */
+ * worn devices, a target, a pending message, an arrival, a signal and banked credits. */
 function fullBattle(seed = 555): ReturnType<typeof newExpedition> {
   const e = newExpedition("architect", seed);
   const r = e.run;
@@ -108,7 +108,6 @@ function fullBattle(seed = 555): ReturnType<typeof newExpedition> {
   r.faultNodes = ["switch2"];
   r.faultLinks = ["alpha::router1"];
   r.focus = "centre";
-  r.aims = { "router1|switch2": "left", router1: "centre" };
   r.enemyPhase = 4;
   r.hostileActions = 7;
   r.reinforcement = { enemyId: "ward-node", after: 1, hp: 11, crate: { kind: "credits", amount: 12, message: true } };
@@ -117,7 +116,7 @@ function fullBattle(seed = 555): ReturnType<typeof newExpedition> {
   r.encounterCards = ["zero-day"];
   r.creditLedger = [{ label: "crates", amount: 12 }];
   r.terrain = { name: "Collapsed rack row", description: "Wreckage blocks the north aisle.", debris: [{ x: 1, z: -3 }, { x: -4.1, z: 2.4, fresh: true, role: "router" }] };
-  r.turnEffects = { everyPort: 2, forceFocus: true, discounted: ["router"] };
+  r.turnEffects = { everyPort: 2, focusBonus: 2, discounted: ["router"] };
   r.lingeringJams = { switch2: 1 };
   r.frayedByCut = ["router1::switch2"];
   r.repairsThisTurn = 1;
@@ -134,6 +133,24 @@ test("a v4 battle state survives the save round trip exactly", () => {
   duo.run.map[0] = { ...duo.run.map[0], pack: ["spark-mite", "splicer"] };
   delete duo.run.map[0].enemyId;
   assert.ok(parseExpedition(JSON.stringify(duo)));
+});
+
+test("a v4 save from before aiming was removed loads: its channel aims and Traffic Shaping's redirect are dropped", () => {
+  const e = fullBattle();
+  const old = JSON.parse(JSON.stringify(e)) as { run: Record<string, unknown> & { turnEffects: Record<string, unknown> } };
+  old.run.aims = { "router1|switch2": "left", router1: "centre", "router1|ghost9": "up" };
+  old.run.turnEffects.forceFocus = true;
+  const parsed = parseExpedition(JSON.stringify(old));
+  assert.ok(parsed, "an old save is not refused");
+  assert.deepEqual(parsed, e);
+  assert.ok(!("aims" in parsed.run));
+  assert.ok(!("forceFocus" in parsed.run.turnEffects!));
+  // Every delivery of the loaded fight lands on its target.
+  const p = combatPreview(parsed.run);
+  assert.ok(p.deliveries.every(delivery => delivery.port === parsed.run.focus));
+  // A malformed old flag is still refused.
+  old.run.turnEffects.forceFocus = "yes";
+  assert.equal(parseExpedition(JSON.stringify(old)), null);
 });
 
 test("a v3 save migrates in memory: the hostile stands at the centre, malware becomes Taps, faults become lists", () => {
@@ -154,7 +171,7 @@ test("a v3 save migrates in memory: the hostile stands at the centre, malware be
     ...e, version: 3,
     run: {
       ...Object.fromEntries(Object.entries(r).filter(([key]) =>
-        !["enemies", "faultNodes", "faultLinks", "installations", "focus", "aims", "enemyPhase", "hostileActions", "reinforcement", "signal", "offers", "encounterCards"].includes(key))),
+        !["enemies", "faultNodes", "faultLinks", "installations", "focus", "enemyPhase", "hostileActions", "reinforcement", "signal", "offers", "encounterCards"].includes(key))),
       enemy: { id: "leech", name: "PACKET LEECH", title: "Feeds on lost traffic", color: 0x6ee4d4, hp: 15, maxHp: 21, turn: 4 },
       malware: [{ id: "malware1", x: 0, z: 2.4 }, { id: "malware2", x: 2.5, z: 2.4 }],
       faultNode: "router1",
@@ -173,8 +190,8 @@ test("a v3 save migrates in memory: the hostile stands at the centre, malware be
   assert.deepEqual([m.faultNodes, m.faultLinks], [["router1"], ["alpha::router1"]]);
   assert.deepEqual(m.topology.nodes.map(node => [node.id, node.condition]),
     [["alpha", undefined], ["omega", undefined], ["router1", 2], ["switch2", 1]], "deployed devices 2, salvage 1, terminals none");
-  assert.deepEqual([m.focus, m.aims, m.enemyPhase, m.hostileActions, m.reinforcement, m.signal, m.offers, m.encounterCards],
-    ["centre", {}, 4, 4, null, null, [], []]);
+  assert.deepEqual([m.focus, m.enemyPhase, m.hostileActions, m.reinforcement, m.signal, m.offers, m.encounterCards],
+    ["centre", 4, 4, null, null, [], []]);
   for (const key of ["enemy", "malware", "faultNode", "faultLink"]) assert.ok(!(key in m), `${key} is gone`);
   // A v3 save between rooms migrates to an empty rail; malformed v3 values are still rejected.
   const between = { ...v3, run: { ...v3.run, phase: "map", currentRoom: null, enemy: null, malware: [], faultNode: null, faultLink: null } };
@@ -261,8 +278,6 @@ test("invalid, tampered and pre-redesign saves fall back to a fresh menu", () =>
   bad("a fractional condition", r => { r.topology.nodes.find(node => node.id === "router1")!.condition = 1.5; });
   bad("a terminal with condition", r => { r.topology.nodes[0].condition = 2; });
   bad("an unknown role", r => { r.topology.nodes.find(node => node.id === "rack3")!.role = "tower" as never; });
-  bad("an aim naming a missing device", r => { r.aims = { "router1|ghost9": "left" }; });
-  bad("an aim at no port", r => { (r.aims as Record<string, string>).router1 = "up"; });
   bad("a jam on a missing device", r => { r.faultNodes = ["ghost9"]; });
   bad("a focus that is not a port", r => { (r as unknown as Record<string, unknown>).focus = "middle"; });
   bad("seven wrecks", r => { r.terrain!.debris = Array.from({ length: 7 }, (_, i) => ({ x: -6 + 2 * i, z: 4 })); });

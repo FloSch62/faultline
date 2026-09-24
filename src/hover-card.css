@@ -1,0 +1,22 @@
+/* The table's hover card (hover-card.ts): the same engraved plate as #game-tooltip, a little
+ * wider, placed beside the pointer instead of under a control. Content classes live with their
+ * owners: table-ux.css (devices, cables, installations) and targeting.css (hostiles, deliveries). */
+#hover-card {
+  position: absolute;
+  z-index: 149;
+  width: max-content;
+  min-width: 220px;
+  max-width: 320px;
+  padding: 11px 15px 12px;
+  font: 15px/1.45 var(--text);
+  color: #e6dac0;
+  background: linear-gradient(170deg, #182029f7, #0c1016f7 70%);
+  border: 1px solid #8a6a3a;
+  box-shadow: inset 0 0 0 1px #05070a, inset 0 1px 0 #f3dca01f, 0 10px 26px #000c;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+#hover-card.visible {
+  opacity: 1;
+}

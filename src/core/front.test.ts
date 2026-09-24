@@ -3,7 +3,7 @@
  * the fourteen v4 cards and eight v4 relics. */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { RULES } from "./cards.ts";
+import { CARDS, RULES } from "./cards.ts";
 import { makeEnemy } from "./encounter.ts";
 import { newExpedition } from "./expedition.ts";
 import {
@@ -397,7 +397,7 @@ test("a Phantom Node absorbs the next disruption or installation in port order, 
 
 // ------------------------------------------------------------------ cards
 
-test("Broadcast Storm, Packet Storm and Flood Fill hit every port; Traffic Shaping sends everything to the focus", () => {
+test("Broadcast Storm, Packet Storm and Flood Fill hit every port; Traffic Shaping adds to the target's packet and draws", () => {
   const r = pack([["relay-drone", "left", "escort", 60], ["prophet", "centre", "leader", 60]]);
   route(r, "r1", 0);
   route(r, "r2", 2.5);
@@ -412,15 +412,24 @@ test("Broadcast Storm, Packet Storm and Flood Fill hit every port; Traffic Shapi
   const s = pack([["relay-drone", "left", "escort", 60], ["prophet", "centre", "leader", 60]]);
   route(s, "r1", 0);
   route(s, "r2", 2.5);
-  s.aims[combatPreview(s).deliveries[1].channelKey] = "left";
   s.hand = ["traffic-shaping"];
+  const drawn = s.drawPile.length;
   playInstant(s, 0);
+  assert.equal(s.hand.length, 1, "it replaces itself");
+  assert.equal(s.drawPile.length, drawn - 1);
+  assert.deepEqual(s.exhaustPile, ["traffic-shaping"]);
   p = combatPreview(s);
   assert.equal(p.ports.left!.packet, 0);
-  assert.equal(p.ports.centre!.packet, RULES.baseRouteDamage + RULES.bandwidthPerChannel + 1);
+  assert.equal(p.ports.centre!.packet, RULES.baseRouteDamage + RULES.bandwidthPerChannel + CARDS["traffic-shaping"].values!.focusBonus!);
+  assert.ok(p.damageTerms.some(term => term.label === "CENTRE · target packet"));
+  // It follows the target.
+  setFocus(s, "left");
+  p = combatPreview(s);
+  assert.equal(p.ports.left!.packet, RULES.baseRouteDamage + RULES.bandwidthPerChannel + CARDS["traffic-shaping"].values!.focusBonus!);
+  assert.equal(p.ports.centre!.packet, 0);
 });
 
-test("Demolition Charge adds to the focus packet and destroys the chosen installation", () => {
+test("Demolition Charge adds to the target's packet and destroys the chosen installation", () => {
   const r = pack([["prophet", "centre", "single", 60, 1]]);
   route(r, "r1", 0);
   install(r, "tap", -6, 4.2);
@@ -524,7 +533,7 @@ test("Scorched Earth: the planter of a destroyed installation takes 4 (the focus
   assert.equal(r.enemies[0].hp, 30 - RULES.scorchedEarthDamage);
   install(r, "tap", -6, 4.2, { owner: "h9" });
   assert.ok(scrubInstallation(r, r.installations[0].id).ok);
-  assert.equal(r.enemies[1].hp, 60 - RULES.scorchedEarthDamage, "a dead or missing planter: the focus takes it");
+  assert.equal(r.enemies[1].hp, 60 - RULES.scorchedEarthDamage, "a dead or missing planter: the target takes it");
 });
 
 test("Racks count as hardware for clusters; installations block sockets", () => {

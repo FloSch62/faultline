@@ -48,7 +48,7 @@ export interface LessonDefinition {
   goals: LessonGoal[];
   /** Shown when the lesson is complete: why this matters in a real expedition. */
   takeaway: string;
-  /** Goals follow the board: an undone aim reopens its step (Z never strands the drill).
+  /** Goals follow the board: an undone target reopens its step (Z never strands the drill).
    * Only `sticky` goals stay done once met. Without `live`, every goal is sticky. */
   live?: boolean;
   sticky?: readonly string[];
@@ -92,6 +92,8 @@ export interface LessonProgress {
   /** CSS selector of the on-screen control the current step needs, or "". Every match glows.
    * `A || B` is a fallback: B is used only while nothing matching A is on screen. */
   focus: string;
+  /** The spotlight spans every visible match of `focus` (a row of hostile badges), not just the first. */
+  spread?: boolean;
   /** The current step is met by reading: the panel shows "Got it". */
   reading: boolean;
   /** A figure the coach draws for the step (the break meter), when the step needs one. */
@@ -130,13 +132,13 @@ export const LESSONS: readonly LessonDefinition[] = [
   {
     id: "reroute", chapter: 3, kind: "battle", icon: "link", minutes: 3,
     title: "When the Line Is Cut", kicker: "REROUTING & BANDWIDTH",
-    summary: "A cut on your only route silences it. Build a second channel, arm a failover, patch.",
+    summary: "A cut on your only route silences it. Build a second channel through its own router, arm a failover, patch.",
     goals: [
-      { id: "channel", label: "Build a second, independent channel" },
+      { id: "channel", label: "Build a second channel through a new router" },
       { id: "survive", label: "Transmit — keep a live route through the enemy's cut" },
       { id: "restore", label: "Restore full bandwidth (clear the cut or keep both channels)" },
     ],
-    takeaway: "Channels are routes that share no device. Each extra channel adds bandwidth damage and survives a cut on the other. When a line does fall: Hot Patch reconnects it, a Failover Policy cancels the cut in advance, and relocating a device (1 energy) can reroute around a jam.",
+    takeaway: "Every device carries one channel: two routes through the same router or switch count as one channel. Each extra channel adds bandwidth and survives a cut on the other. When a line does fall: Hot Patch reconnects it, a Failover Policy cancels the cut in advance, and relocating a device (1 energy) can reroute around a jam.",
   },
   {
     id: "online", chapter: 4, kind: "battle", icon: "shield", minutes: 3,
@@ -227,18 +229,19 @@ export const LESSONS: readonly LessonDefinition[] = [
     takeaway: "Every room is a trade: risk for power, credits for cards, integrity for relics. Plan a route on the chart that feeds the deck you are building.",
   },
   {
+    // The id predates the title: completed lessons are stored by id.
     id: "aim-signal", chapter: 10, kind: "battle", icon: "sword", minutes: 3,
-    title: "Aim the Signal", kicker: "PORTS · FOCUS · AIM",
-    summary: "A Relay Drone feeds the Leech. Aim one channel at it, then move the focus.",
-    live: true, sticky: ["select"],
+    title: "Choose the Target", kicker: "PORTS · TARGET · OVERFLOW",
+    summary: "Three hostiles, three ports. Choose the target, transmit, and watch the surplus overflow to the next.",
+    live: true, sticky: ["read"], reading: ["read"],
     goals: [
-      { id: "select", label: "Select the left port" },
-      { id: "aim", label: "Aim channel 2 at the Relay Drone" },
-      { id: "strike", label: "Transmit: the Drone falls" },
-      { id: "focus", label: "Focus the new Drone with F" },
-      { id: "transmit", label: "Transmit: the overflow carries on" },
+      { id: "read", label: "Read the three ports" },
+      { id: "target", label: "Target the Relay Drone" },
+      { id: "strike", label: "Transmit: the Drone falls, the surplus overflows" },
+      { id: "retarget", label: "Target the Spark Mite: it bites next" },
+      { id: "overflow", label: "Transmit: the Mite falls, the surplus overflows" },
     ],
-    takeaway: "Every channel is a delivery. The focus sets where all of them go; aim moves one. A kill's surplus overflows to the focus or the next port, so nothing is wasted. Kill the escort that makes the leader stronger.",
+    takeaway: "Click a hostile to target it: every channel lands there as one packet, and its armor is paid once. What a kill does not need overflows to the next hostile, so nothing is wasted. Choose the order: first the escort that feeds the leader, then the one about to act.",
   },
   {
     id: "clear-ground", chapter: 11, kind: "battle", icon: "cleanse", minutes: 3,
@@ -261,12 +264,12 @@ export const LESSONS: readonly LessonDefinition[] = [
     live: true, sticky: ["read"], reading: ["read"],
     goals: [
       { id: "read", label: "Read the break meter" },
-      { id: "aim", label: "Aim both bandwidth channels at the left Warden" },
+      { id: "target", label: "Target the left Warden" },
       { id: "prepare", label: "Prepare Packet Burst (P)" },
       { id: "charge", label: "Transmit: the Warden falls" },
       { id: "break", label: "Break Crownfall on the ultimate turn" },
     ],
-    takeaway: "Adds raise the threshold while they live: kill one on the charge turn and the break comes back within reach. Spread your channels on the charge turn, or brace for the blow. A prepared burst is the difference.",
+    takeaway: "Adds raise the threshold while they live: target one on the charge turn, it falls and its surplus overflows into the guardian, and the break comes back within reach. Or brace for the blow. A prepared burst is the difference.",
   },
 ];
 
@@ -366,7 +369,6 @@ function buildRun(setup: LessonSetup): RunState {
   (setup.escorts ?? []).forEach((escort, i) => run.enemies.push(makeEnemy(escort.id, `h${i + 2}`, escort.port, "escort", escort.hp)));
   run.enemies.sort(portOrder);
   run.focus = "centre";
-  run.aims = {};
   // No rolled surprises in a drill: every arrival is placed by the lesson itself.
   run.reinforcement = null;
   run.signal = null;
@@ -539,28 +541,30 @@ export function createLessonRun(id: LessonId): RunState {
         nextNodeId: 3,
       });
     }
-    case "aim-signal":
+    case "aim-signal": {
+      // A full rail: the Relay Drone (left) feeds the leader's strikes, the leader holds the centre
+      // (a strike now, a breach next: nothing that changes the board) and a Spark Mite rests at the
+      // right until the second phase. Escorts take turns: left on odd phases, right on even ones.
+      const leader = findIntentSequence(["strike", "breach"], ["prophet", "colossus", "sentinel"], step => !step.field && !step.junk);
       return buildRun({
-        enemy: { id: "leech", turn: 0, hp: 24, title: "A drill in divided fire" },
-        escorts: [{ id: "relay-drone", port: "left", hp: 1 }],
+        enemy: { ...leader, hp: 26, title: "A drill in chosen fire" },
+        escorts: [{ id: "relay-drone", port: "left", hp: 6 }, { id: "spark-mite", port: "right", hp: 3 }],
         // North and Center routers: two channels without the separated-circuit shield, so the
         // Drone's uplink shows in full on the incoming number.
         nodes: [device("router1", "router", 0, -2.4), device("router2", "router", 0, 0.6)],
         links: [cable("alpha", "router1"), cable("router1", "omega"), cable("alpha", "router2"), cable("router2", "omega")],
-        hand: ["guard", "pulse", "fiber", "patch"],
+        hand: ["guard", "pulse", "fiber"],
         draw: ["guard", "fiber", "pulse", "fiber", "guard", "patch"],
         nextNodeId: 3,
         finish: run => {
-          const [primary, second] = combatPreview(run).deliveries;
-          // Channel 2 alone is exactly lethal to the Drone; the Drone the Leech calls next needs
-          // both deliveries, and what is left of them overflows into the Leech.
-          setHealth(run.enemies.find(enemy => enemy.id === "relay-drone"), second.amount);
-          run.reinforcement = {
-            enemyId: "relay-drone", after: 1, crate: { kind: "empty" },
-            hp: Math.max(second.amount + 1, Math.min(second.amount + 2, primary.amount + second.amount - 1)),
-          };
+          // The whole packet downs the Drone with 2 to spare, and the Mite with more: both spares
+          // overflow into the leader, the next standing port. Read from the forecast, however balance tunes it.
+          const packet = combatPreview(run).deliveries.reduce((sum, item) => sum + item.amount, 0);
+          setHealth(run.enemies.find(enemy => enemy.id === "relay-drone"), packet - 2);
+          setHealth(run.enemies.find(enemy => enemy.id === "spark-mite"), Math.max(1, Math.min(3, packet - 3)));
         },
       });
+    }
     case "clear-ground": {
       // The router is one wear from breaking; the Nest seeded a Jammer at the first reach socket
       // (north of it) and a Spike beside it, both in NORTH, where its next Jammer lands too.
@@ -600,10 +604,11 @@ export function createLessonRun(id: LessonId): RunState {
           // The crown is announced: two Gate Wardens stand at the outer ports (RISING until the ultimate).
           raiseAdds(run);
           run.enemies.sort(portOrder);
-          // Both bandwidth deliveries together are enough for the left Warden, however balance tunes them.
-          const bandwidth = combatPreview(run).deliveries.filter(item => !item.primary).reduce((sum, item) => sum + item.amount, 0);
+          // The whole packet downs the left Warden with some to spare (it overflows into the Regent),
+          // however balance tunes them.
+          const packet = combatPreview(run).deliveries.reduce((sum, item) => sum + item.amount, 0);
           const left = run.enemies.find(enemy => enemy.port === "left" && enemy.role === "add");
-          if (left && left.hp > bandwidth) setHealth(left, bandwidth);
+          if (left && left.hp > packet - 2) setHealth(left, packet - 2);
         },
       });
     }
@@ -636,14 +641,16 @@ const transmitted = (run: RunState, times = 1) => run.turn > times;
 const isCard = (id: CardId | null | undefined, base: string) => !!id && CARDS[id]?.base === base;
 
 // ---- the table-front drills (chapters 10–12): what their steps read from the board
-/** The v4 drills: packs, the table front and the charge turn. Their rails also guard aim,
- * focus, scrub and repair, and they never cable, deploy or relocate. */
+/** The v4 drills: packs, the table front and the charge turn. Their rails also guard the
+ * target, scrub and repair, and they never cable, deploy or relocate. */
 const FRONT_LESSONS: readonly LessonId[] = ["aim-signal", "clear-ground", "wardens"];
-/** The bandwidth deliveries (every channel after the primary). */
-const bandwidthOf = (preview: Preview | null) => preview?.deliveries.filter(item => !item.primary) ?? [];
 const livingAt = (run: RunState, port: Port) => run.enemies.some(enemy => enemy.port === port && enemy.hp > 0);
-/** The living Relay Drone (the first, then the one the Leech calls in). */
+/** The Choose the Target drill: the Relay Drone (targeted first), then the Spark Mite (targeted next). */
 const droneOf = (run: RunState) => run.enemies.find(enemy => enemy.id === "relay-drone" && enemy.hp > 0);
+const miteOf = (run: RunState) => run.enemies.find(enemy => enemy.id === "spark-mite" && enemy.hp > 0);
+/** Where a hostile stands, for the spotlight: its intent badge over the rail, else its row on the
+ * enemy plate. */
+const hostileAt = (port: Port) => `#intent-layer .hostile-intent[data-port="${port}"] || .port-row[data-port="${port}"]`;
 /** The installation the Clear the Ground drill scrubs: the standing Jammer. */
 const jammerOf = (run: RunState) => run.installations.find(item => item.kind === "jammer");
 /** The Wardens drill: the guardian, its adds, and the threshold of its coming ultimate. */
@@ -661,13 +668,13 @@ function goalChecks(id: LessonId, ctx: Context): Record<string, boolean> {
   const { run, preview, last, view } = ctx;
   switch (id) {
     case "aim-signal": {
-      const second = bandwidthOf(preview)[0];
+      const drone = droneOf(run), mite = miteOf(run);
       return {
-        select: view.port === "left" || transmitted(run),
-        aim: transmitted(run) || (!!second && second.aimed && second.port === "left"),
+        read: !!view.read?.includes("read") || transmitted(run),
+        target: transmitted(run) || (!!drone && run.focus === drone.port),
         strike: transmitted(run),
-        focus: transmitted(run, 2) || (run.turn === 2 && !!droneOf(run) && run.focus === droneOf(run)!.port),
-        transmit: transmitted(run, 2),
+        retarget: transmitted(run, 2) || (transmitted(run) && !!mite && run.focus === mite.port),
+        overflow: transmitted(run, 2),
       };
     }
     case "clear-ground": {
@@ -682,10 +689,9 @@ function goalChecks(id: LessonId, ctx: Context): Record<string, boolean> {
       };
     }
     case "wardens": {
-      const bandwidth = bandwidthOf(preview);
       return {
         read: !!view.read?.includes("read") || transmitted(run),
-        aim: transmitted(run) || (bandwidth.length >= 2 && bandwidth.every(item => item.aimed && item.port === "left")),
+        target: transmitted(run) || (livingAt(run, "left") && run.focus === "left"),
         prepare: transmitted(run) || isCard(run.preparedCard, "pulse"),
         charge: transmitted(run),
         break: transmitted(run, 2) && !!last?.interrupted,
@@ -781,6 +787,8 @@ interface Coach {
   warning?: string;
   /** CSS selector of the control this step is about; the UI spotlights it. */
   focus?: string;
+  /** The spotlight spans every match of `focus` (see LessonProgress.spread). */
+  spread?: boolean;
   /** A reading step: the panel offers "Got it". */
   read?: boolean;
   meter?: LessonMeter;
@@ -791,60 +799,89 @@ const TRANSMIT = ".transmit-button";
 const CONSOLE = ".console-button";
 
 const TRANSMIT_HINT = "Press Transmit or the Space bar.";
-const stud = (key: string, port: Port) => `[data-aim="${key}"][data-aim-port="${port}"]`;
+/** A relocation away from `from`: the move's confirm plate once it asks, else a band button of the
+ * selected device (the table itself has no DOM to point at). */
+const RELOCATE = (from: Zone) => `#relocate-confirm || #target-dock [data-relocate-zone]:not([data-relocate-zone="${from}"])`;
+/** A hostile's announced move in coach words: "strikes for 3", "rests this phase". */
+function moveOf(item: Preview["hostiles"][number]): string {
+  if (item.state === "dormant" || !item.intent) return "rests this phase";
+  const verbs: Record<string, string> = { strike: "strikes", breach: "breaches", jam: "jams a device", sever: "cuts a cable", overload: "wears a device down", corrupt: "poisons a band", charge: "gathers power", install: "plants an installation" };
+  const verb = verbs[item.intent.kind] ?? item.intent.label.toLowerCase();
+  return item.intent.kind === "strike" || item.intent.kind === "breach" ? `${verb} for ${item.raw}` : verb;
+}
+/** "a, b and c". */
+const listOf = (items: readonly string[]) => items.length > 1 ? `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}` : items[0] ?? "";
 const sumOf = (items: readonly { amount: number }[]) => items.reduce((sum, item) => sum + item.amount, 0);
 
 /** Coach lines of the table-front drills. Every number is read from the forecast or RULES. */
 function frontCoach(id: LessonId, ctx: Context, done: Record<string, boolean>): Coach {
   const { run, preview } = ctx;
   const ports = preview?.ports;
-  const left = ports?.left, centre = ports?.centre;
+  const left = ports?.left;
   switch (id) {
     case "aim-signal": {
-      const drone = droneOf(run);
-      const leech = preview?.hostiles.find(item => item.id === "leech");
-      const [primary, second] = preview?.deliveries ?? [];
-      if (!done.select) return {
-        coach: "Select the **left port**: click the **Relay Drone**'s row on the enemy plate.",
-        detail: `Two hostiles, two ports. While the Drone lives, its uplink adds +${RULES.uplinkBonus} to every strike the Leech makes: ${leech?.raw ?? 0} this phase instead of ${Math.max(0, (leech?.raw ?? 0) - RULES.uplinkBonus)}. Selecting a port only reads it; nothing changes.`,
-        hint: "The rows on the enemy plate are the ports in phase order: L, C, R. Click L, or the Drone on the far rail.",
-        focus: `.port-row[data-port="left"]`,
+      const drone = droneOf(run), mite = miteOf(run);
+      const leader = preview?.hostiles.find(item => item.role === "leader");
+      const lead = leader ? hostileName(leader.id).replace(/^The /, "") : "leader";
+      const deliveries = preview?.deliveries ?? [];
+      const total = sumOf(deliveries);
+      const sum = deliveries.length > 1 ? `${deliveries.map(item => item.amount).join(" + ")} = ${total}` : String(total);
+      /** The spare of a kill and where it goes, in coach words. */
+      const spill = (port: Port | undefined) => {
+        const at = port ? ports?.[port] : null;
+        return { packet: at?.packet ?? 0, out: at?.overflowOut ?? 0, to: at?.overflowTo ?? null };
       };
-      if (!done.aim) return {
-        coach: "Aim **channel 2** at the Drone: click the **L** stud on its delivery row.",
-        detail: `Every channel is a delivery, and right now both go to the focus, the Leech: the primary's ${primary?.amount ?? 0} and channel 2's ${second?.amount ?? 0}. Channel 2 alone matches the Drone's ${drone?.hp ?? 0} integrity; the primary keeps its ${primary?.amount ?? 0} on the Leech.`,
-        hint: "The Deliveries ledger sits under the enemy plate. On the Ch 2 row, click L. Keyboard: ] steps through the rows, T moves the chosen one to the next port.",
-        focus: second ? stud(second.channelKey, "left") : "",
-      };
-      if (!done.strike) {
-        const arrival = preview?.arrivals;
+      if (!done.read) {
+        // The spotlit badges carry each move; the note stays short enough to sit under Got it.
+        const moves = (preview?.hostiles ?? []).filter(item => item.state !== "cancelled")
+          .map(item => `the ${hostileName(item.id).replace(/^The /, "")} ${moveOf(item)}`);
         return {
-          coach: "**Transmit**: channel 2 downs the Drone, the primary strikes the Leech.",
-          detail: `Forecast: LEFT ${left?.packet ?? 0}${left?.lethal ? " (lethal)" : ""}, CENTRE ${centre?.packet ?? 0}. The Drone falls before it acts, so the Leech strikes for ${leech?.raw ?? 0}: a dead hostile does nothing, and neither does its uplink.${arrival ? ` Signal detected: another ${hostileName(arrival.enemyId)} arrives after this action.` : ""}`,
-          hint: TRANSMIT_HINT,
-          focus: TRANSMIT,
+          coach: "Three ports: **LEFT**, **CENTRE**, **RIGHT**. Each hostile shows its **next move**.",
+          detail: "They act left to right after your transmission. Escorts take turns.",
+          hint: `Each hostile's next move stands above it on the rail, and on its row in the enemy plate: ${listOf(moves)}. Press Got it when you have read them.`,
+          focus: `#intent-layer .hostile-intent || .port-strip`,
+          spread: true,
+          read: true,
         };
       }
-      if (!done.focus) {
+      if (!done.target) {
         const port = drone?.port ?? "left";
-        const kept = !!second && second.aimed && second.port === port;
         return {
-          coach: `A second **Relay Drone** holds the ${port} port. Put the **focus** on it: press **F**.`,
-          detail: `The focus sets the default: every delivery you have not aimed goes there, and overflow lands there. ${kept ? `Your aim stayed on the ${port} port, so channel 2 already hits the new Drone for ${second.amount}` : `Channel 2 hits the Leech`}, short of its ${drone?.hp ?? 0}. Focus it and the primary's ${primary?.amount ?? 0} joins.`,
-          hint: "F cycles the focus through the living ports. Or select the Drone's row and click the crest at its right edge.",
-          focus: `[data-focus-port="${port}"] || .port-row[data-port="${port}"]`,
+          coach: "Click the **Relay Drone** to **target** it.",
+          detail: `Every channel lands on your target as one packet: ${sum} against the Drone's ${drone?.hp ?? 0}. While it lives, the Drone feeds the ${lead}: +${RULES.uplinkBonus} on every strike, ${leader?.raw ?? 0} instead of ${Math.max(0, (leader?.raw ?? 0) - RULES.uplinkBonus)}.`,
+          hint: `Click the Drone on the far rail, or its ${port.toUpperCase()} row on the enemy plate. Keyboard: F moves the target.`,
+          focus: hostileAt(port),
         };
       }
-      if (!done.transmit) {
-        const port = drone ? ports?.[drone.port] : null;
+      if (!done.strike) {
+        const { packet, out, to } = spill(drone?.port);
         return {
-          coach: "**Transmit**: the Drone falls and the surplus flows on to the Leech.",
-          detail: `Forecast: ${drone?.port.toUpperCase() ?? "LEFT"} ${port?.packet ?? 0} against ${drone?.hp ?? 0}${port?.overflowOut ? `, overflow ${port.overflowOut} → ${port.overflowTo?.toUpperCase()}` : ""}. Overflow still pays the receiving port's armor; nothing else is lost.`,
+          coach: `**Transmit**: the Drone falls, and the spare **${out}** overflows${to ? ` to the **${to.toUpperCase()}**` : ""}.`,
+          detail: `${(drone?.port ?? "left").toUpperCase()} ${packet} against its ${drone?.hp ?? 0}: it falls before its turn, and its uplink with it. Damage a kill does not need is never wasted: it overflows to the first standing hostile from the left, here the ${lead}.`,
           hint: TRANSMIT_HINT,
           focus: TRANSMIT,
         };
       }
-      return { coach: "Aimed, focused, overflowed. The Leech fights alone now.", hint: "" };
+      if (!done.retarget) {
+        const port = mite?.port ?? "right";
+        const bite = preview?.hostiles.find(item => item.uid === mite?.uid);
+        return {
+          coach: "Now click the **Spark Mite** to **target** it: it bites this phase.",
+          detail: `The Drone fell, so your target moved to the leader, the ${lead}. But the Mite acts this phase and bites for ${bite?.raw ?? 0}; your ${total} downs its ${mite?.hp ?? 0} before it acts.`,
+          hint: `Click the Spark Mite on the far rail, or its ${port.toUpperCase()} row on the enemy plate. Keyboard: F moves the target.`,
+          focus: hostileAt(port),
+        };
+      }
+      if (!done.overflow) {
+        const { packet, out, to } = spill(mite?.port);
+        return {
+          coach: `**Transmit**: the Mite falls, and the spare **${out}** overflows into the ${lead}.`,
+          detail: `${(mite?.port ?? "right").toUpperCase()} ${packet} against the Mite's ${mite?.hp ?? 0}${out && to ? `: overflow ${out} → ${to.toUpperCase()}` : ""}. What a kill does not need flows on to the first standing hostile from the left.`,
+          hint: TRANSMIT_HINT,
+          focus: TRANSMIT,
+        };
+      }
+      return { coach: "Targeted, transmitted, overflowed. The leader fights alone now.", hint: "" };
     }
     case "clear-ground": {
       const jammer = jammerOf(run);
@@ -908,28 +945,23 @@ function frontCoach(id: LessonId, ctx: Context, done: Record<string, boolean>): 
       const now = base + standing * bonus;
       const after = nextThreshold(run, preview);
       const deliveries = preview?.deliveries ?? [];
-      const bandwidth = bandwidthOf(preview);
-      const primary = deliveries.find(item => item.primary);
       const total = sumOf(deliveries);
       const burst = CARDS[run.preparedCard ?? run.hand.find(card => isCard(card, "pulse")) ?? "pulse"]?.values.burst ?? CARDS.pulse.values.burst ?? 0;
       const warden = run.enemies.find(enemy => enemy.port === "left" && enemy.role === "add" && enemy.hp > 0);
       if (!done.read) return {
         coach: `Read the **break meter**: each living Warden adds **${bonus}** to it.`,
-        detail: `Next turn Crownfall breaks at ${now}: ${base}, plus ${bonus} for each Warden. The Regent is charging: THE CROWN RISES. ${standing === 2 ? "Both Gate Wardens hold" : `${standing} Gate Warden${standing === 1 ? " holds" : "s hold"}`} the outer ports, rising: they act from the ultimate turn. All your channels together deal ${total}, short of ${now}. Every Warden that falls takes ${bonus} off the threshold.`,
+        detail: `Crownfall lands next turn and breaks at ${now}: your ${total} falls short. Each Warden you down takes ${bonus} off.`,
         hint: "Click the break meter, or Got it in this panel, once you have read it.",
         focus: `.boss-window || .coach-break || .port-row[data-port="${regent?.port ?? "centre"}"]`,
         read: true,
         meter: { base, bonus, adds: run.enemies.filter(enemy => enemy.role === "add").length, standing, packet: total, add: "Warden" },
       };
-      if (!done.aim) {
-        const next = bandwidth.find(item => !(item.aimed && item.port === "left"));
-        return {
-          coach: `Aim **channel ${(next?.index ?? 1) + 1}** at the left **Gate Warden**: its **L** stud.`,
-          detail: `Channels ${bandwidth.map(item => item.index + 1).join(" and ")} carry ${bandwidth.map(item => item.amount).join(" + ")} = ${sumOf(bandwidth)}, and the Warden has ${warden?.hp ?? 0}. The primary keeps its ${primary?.amount ?? 0} on the Regent.`,
-          hint: "In the Deliveries ledger, click L on each bandwidth row (Ch 2, then Ch 3). Keyboard: ] steps through the rows, T moves the chosen one.",
-          focus: next ? stud(next.channelKey, "left") : "",
-        };
-      }
+      if (!done.target) return {
+        coach: "Click the left **Gate Warden** to **target** it.",
+        detail: `Every channel lands on your target: ${deliveries.map(item => item.amount).join(" + ")} = ${total} against the Warden's ${warden?.hp ?? 0}. It falls, and the spare overflows into the Regent. The right Warden is still rising.`,
+        hint: "Click the left Gate Warden on the far rail, or its LEFT row on the enemy plate. Keyboard: F moves the target.",
+        focus: hostileAt("left"),
+      };
       if (!done.prepare) return {
         coach: "Prepare **Packet Burst**: press **P**, or click **+ PREPARE** at the bottom left.",
         detail: `A prepared card skips this turn and waits in next turn's hand. With the Warden gone the break is ${after}, and your channels deal ${total} to the Regent: the burst's +${burst} is the difference.`,
@@ -938,7 +970,7 @@ function frontCoach(id: LessonId, ctx: Context, done: Record<string, boolean>): 
       };
       if (!done.charge) return {
         coach: `**Transmit**: the Warden falls, and the break drops to **${after}**.`,
-        detail: `Forecast: LEFT ${left?.packet ?? 0}${left?.lethal ? " (lethal)" : ""}, CENTRE ${centre?.packet ?? 0}. The Regent only gathers power this turn, and the right Warden is still rising.`,
+        detail: `Forecast: LEFT ${Math.max(0, (left?.packet ?? 0) - (left?.overflowOut ?? 0))}${left?.lethal ? " (lethal)" : ""}${left?.overflowOut && left.overflowTo ? `, overflow ${left.overflowOut} → ${left.overflowTo.toUpperCase()}` : ""}. The Regent only gathers power this turn, and the right Warden is still rising.`,
         hint: TRANSMIT_HINT,
         focus: TRANSMIT,
       };
@@ -1029,20 +1061,20 @@ function coachFor(id: LessonId, ctx: Context, done: Record<string, boolean>): Co
       return { coach: "Clean exchange: damage out, nothing in. That is the rhythm of every fight.", hint: "" };
     case "reroute":
       if (!done.channel) return {
-        coach: "Build a **second channel**: deploy the new **Core Router**, then fiber **ALPHA → router → OMEGA**.",
-        detail: `The hostile will CUT a cable on your only route — a broken route deals nothing. Channels share no device, and each extra one adds +${RULES.bandwidthPerChannel} bandwidth damage.`,
-        hint: "Deploy the Core Router (the South band is open), then Fiber ALPHA → router and router → OMEGA.",
+        coach: "Build a **second channel**: deploy the new **Core Router**, then fiber **ALPHA → new router → OMEGA**.",
+        detail: `The hostile will CUT a cable on your only route, and a broken route deals nothing. Every device carries one channel: two routes through the same router or switch count as one channel, so the second one needs its own router. Each extra channel adds +${RULES.bandwidthPerChannel} bandwidth and survives a cut on the other.`,
+        hint: "Deploy the Core Router (the South band is open), then Fiber ALPHA → new router and new router → OMEGA. Don't cable it to your first router.",
         focus: run.topology.nodes.filter(node => node.role === "router").length < 2 ? card("router") : card("fiber"),
       };
       if (!run.protocols.length && !transmitted(run)) return {
         coach: "Optional: arm **Failover Policy**, then **Transmit**.",
-        detail: `Two channels (${channels(ctx)}): the cut can only take one, and bandwidth raised your damage to ${damage}. Protocols fire on their own — this one cancels the cut entirely.`,
+        detail: `${channels(ctx)} channels, each through its own router and each in its own colour on the table: the cut can only take one, and bandwidth raised your damage to ${damage}. Protocols fire on their own — this one cancels the cut entirely.`,
         hint: "Play Failover Policy to arm it, then Transmit.",
         focus: card("failover-policy"),
       };
       if (!done.survive) return {
         coach: "**Transmit** — your channels carry the signal.",
-        detail: "The enemy swings at a cable; the other channel keeps the route alive.",
+        detail: "The enemy cuts one cable. Your other channel runs through its own router, so it keeps the signal alive.",
         hint: "Press Transmit (Space).",
         focus: TRANSMIT,
       };
@@ -1080,9 +1112,10 @@ function coachFor(id: LessonId, ctx: Context, done: Record<string, boolean>): Co
       return { coach: "Online devices are your engine: firewall defending, cache drawing. A cut can take them offline — protect what matters.", hint: "" };
     case "bands":
       if (!done.suppression && !done.jam) return {
-        coach: "Move your **router** out of NORTH: drag it to CENTER, or click it and pick a band (1 energy).",
+        coach: "Drag your **router** out of NORTH into CENTER, then **confirm** the move (1 energy).",
         detail: "It sits under a Suppression field (−3 damage), and the storm will jam every unprotected device in NORTH next. One move answers both; Purge Field would only clear the suppression.",
-        hint: "Click your router on the table, then pick CENTER in the device bar — or drag it across the band line.",
+        hint: "Drag the router across the band line and confirm, or click it, pick CENTER in the device bar, then confirm.",
+        focus: RELOCATE("north"),
       };
       if (!done.suppression) return {
         coach: "Play **Purge Field** on NORTH — or move the hardware out.",
@@ -1091,9 +1124,10 @@ function coachFor(id: LessonId, ctx: Context, done: Record<string, boolean>): Co
         focus: card("purge-field"),
       };
       if (!done.jam) return {
-        coach: `Get your route out of **${String(preview?.hazardZone ?? "the marked band").toUpperCase()}** — or give it a second channel elsewhere.`,
+        coach: `Get your route out of **${String(preview?.hazardZone ?? "the marked band").toUpperCase()}**: drag the router to another band, then **confirm** — or give it a second channel elsewhere.`,
         detail: "The storm strikes every unprotected device in the band it marked.",
-        hint: "Relocate the router to another band for 1 energy.",
+        hint: "Drag the router into another band and confirm the move (1 energy).",
+        focus: RELOCATE(preview?.hazardZone ?? "north"),
       };
       if (!done.resonance) return {
         coach: "Play **Resonance Field** on the band your route crosses.",
@@ -1272,13 +1306,14 @@ export function lessonProgress(
   }
   // A defeated training enemy ends the drill: remaining transmit goals count as met.
   if (run.phase === "reward" || (run.enemies.length > 0 && run.enemies.every(enemy => enemy.hp <= 0))) {
-    for (const goal of lesson.goals) if (["transmit", "safe", "sprung", "charge"].includes(goal.id)) done[goal.id] = true;
+    for (const goal of lesson.goals) if (["transmit", "safe", "sprung", "charge", "overflow"].includes(goal.id)) done[goal.id] = true;
   }
   const goals = lesson.goals.map(goal => ({ ...goal, done: done[goal.id] }));
   const complete = lesson.kind === "battle" && goals.every(goal => goal.done);
   const coach = lesson.kind === "battle" ? coachFor(id, ctx, done) : { coach: "", hint: "" };
   let warning = coach.warning ?? "";
   if (!complete && run.phase === "lost") warning = "The drill signal went dark. Restart the lesson — nothing is lost.";
+  else if (!complete && lesson.kind === "battle" && run.phase !== "battle") warning = "The drill ended before its last step. Restart the lesson to play it through.";
   else if (!complete && !warning && preview && run.integrity - preview.incoming <= 4 && preview.incoming > 0)
     warning = `Low integrity: this transmission would leave you at ${run.integrity - preview.incoming}.`;
   const current = goals.findIndex(goal => !goal.done);
@@ -1291,6 +1326,7 @@ export function lessonProgress(
     hint: complete ? "" : coach.hint,
     warning,
     focus: complete ? "" : coach.focus ?? "",
+    ...(!complete && coach.spread ? { spread: true } : {}),
     reading: !complete && !!coach.read,
     ...(!complete && coach.meter ? { meter: coach.meter } : {}),
     complete,
@@ -1309,9 +1345,7 @@ export type LessonAction =
   | { kind: "move"; node: string; zone: Zone }
   | { kind: "prepare"; card: CardId }
   | { kind: "transmit" }
-  /** Re-aim one channel's delivery at a port (null: follow the focus). */
-  | { kind: "aim"; key: string; port: Port | null }
-  /** Make a port the focus. */
+  /** Make a port the target (the rules' focus). */
   | { kind: "focus"; port: Port }
   /** Restore one condition point of a device. */
   | { kind: "repair"; node: string }
@@ -1337,6 +1371,8 @@ const GOAL_CARDS: Partial<Record<LessonId, Record<string, readonly string[] | "a
   "clear-ground": { purge: ["purge-field"] },
   wardens: { break: ["pulse"] },
 };
+/** Every device carries one channel: a cable into the first route's router makes no second one. */
+const CHANNEL_OBJECTION = "Every device carries one channel: a route through your first router stays one channel. Cable ALPHA to the new router, then the new router to OMEGA.";
 /** Shield is an emergency exit: allowed whenever the coming hit would end the drill. */
 const DEFENSE = ["guard", "barrier"];
 
@@ -1365,7 +1401,7 @@ export function lessonGuard(id: LessonId, run: RunState, progress: LessonProgres
   }
 
   if (FRONT_LESSONS.includes(id)) return frontGuard(id, run, progress, action, preview);
-  if (action.kind === "aim" || action.kind === "focus" || action.kind === "repair") return null;
+  if (action.kind === "focus" || action.kind === "repair") return null;
   if (action.kind === "scrub") {
     const current = progress.goals[progress.current];
     return id !== "danger" || current?.id === "scrub" ? null : `Not now — the current step: ${current?.label ?? "finish the drill"}.`;
@@ -1384,7 +1420,7 @@ export function lessonGuard(id: LessonId, run: RunState, progress: LessonProgres
         if (id === "console-architect" && !done.channels) {
           const taken = new Set(signalPaths(run).flat());
           if ([action.a, action.b].some(end => taken.has(end) && !["alpha", "omega"].includes(end)))
-            return "An independent channel shares no device with your first route. Cable ALPHA to the new router, then the new router to OMEGA.";
+            return CHANNEL_OBJECTION;
         }
         return null;
       }
@@ -1392,7 +1428,7 @@ export function lessonGuard(id: LessonId, run: RunState, progress: LessonProgres
         if (done.channel) return null;
         const taken = new Set(signalPaths(run).flat());
         if ([action.a, action.b].some(end => taken.has(end) && !["alpha", "omega"].includes(end)))
-          return "An independent channel shares no device with your first route. Cable ALPHA to the new router, then the new router to OMEGA.";
+          return CHANNEL_OBJECTION;
         return null;
       }
       case "online":
@@ -1492,39 +1528,32 @@ function lethalTransmission(run: RunState, preview: Preview): string | null {
 }
 
 /** Rails of the table-front drills (chapters 10–12), for every move but cards: only the current
- * step's move is playable. Aim, focus, scrub and repair are free or cheap and always available
+ * step's move is playable. Target, scrub and repair are free or cheap and always available
  * while their step is open, so blocking the rest never strands the drill; each objection names
  * the way forward. Transmit is free once the step's goal is met. */
 function frontGuard(id: LessonId, run: RunState, progress: LessonProgress, action: LessonAction, preview: Preview): string | null {
   const step = progress.goals[progress.current];
   const now = step?.id ?? "";
   const next = `the current step: ${step?.label ?? "finish the drill"}.`;
-  const bandwidth = bandwidthOf(preview);
   switch (action.kind) {
-    case "aim": {
-      if (id === "aim-signal" && now === "aim") {
-        const second = bandwidth[0];
-        if (second && action.key === second.channelKey && action.port === "left") return null;
-        return second && action.key !== second.channelKey
-          ? "Leave the primary on the Leech. Aim channel 2, the second delivery row, at the Drone."
-          : "Channel 2 goes to the left port: the Relay Drone.";
-      }
-      if (id === "wardens" && now === "aim") {
-        const bandwidthKey = bandwidth.some(item => item.channelKey === action.key);
-        if (bandwidthKey && action.port === "left") return null;
-        return bandwidthKey ? "Both bandwidth channels go to the left port: the Gate Warden." : "Keep the primary on the Regent. The two bandwidth channels are enough for the Warden.";
-      }
-      return id === "aim-signal" && now === "focus"
-        ? "This time move them all: press F to put the focus on the new Drone."
-        : `Leave your deliveries where they are — ${next}`;
-    }
     case "focus": {
-      const drone = droneOf(run);
-      if (id === "aim-signal" && now === "focus" && drone && action.port === drone.port) return null;
-      if (id === "aim-signal" && now === "focus") return "Focus the new Relay Drone: it feeds the Leech again.";
-      return id === "aim-signal" && (now === "select" || now === "aim")
-        ? "Leave the focus on the Leech. Aim moves one delivery; this step needs only channel 2."
-        : `Leave the focus where it is — ${next}`;
+      if (id === "aim-signal") {
+        const drone = droneOf(run), mite = miteOf(run);
+        if (now === "target" && drone && action.port === drone.port) return null;
+        if (now === "retarget" && mite && action.port === mite.port) return null;
+        if (now === "read") return "First read the three ports: press Got it in the coach panel.";
+        if (now === "target") return "Target the Relay Drone, on the left: it feeds the leader's strikes.";
+        if (now === "retarget") return "Target the Spark Mite, on the right: it bites this phase.";
+        return `Keep your target where it is — ${next}`;
+      }
+      if (id === "wardens") {
+        if (now === "target" && action.port === "left") return null;
+        if (now === "read") return "First read the break meter: click it, or Got it in the coach panel.";
+        if (now === "target") return "Target the left Gate Warden: one Warden down brings the break within reach.";
+        if (now === "break") return "Keep your target on the Regent: the break counts only what lands on it.";
+        return `Keep your target on the left Warden — ${next}`;
+      }
+      return `Keep your target where it is — ${next}`;
     }
     case "scrub": {
       const item = run.installations.find(entry => entry.id === action.installation);
@@ -1563,9 +1592,9 @@ function frontGuard(id: LessonId, run: RunState, progress: LessonProgress, actio
   // Transmit: only when it is the step, or the step can no longer be made.
   switch (id) {
     case "aim-signal":
-      if ((now === "select" || now === "aim") && bandwidth.length && livingAt(run, "left"))
-        return "Not yet: aim channel 2 at the Drone first, or the whole transmission lands on the Leech.";
-      if (now === "focus" && droneOf(run)) return "Not yet: put the focus on the new Drone first (F).";
+      if (now === "read") return "Read the three ports first: press Got it in the coach panel.";
+      if (now === "target" && droneOf(run)) return "Not yet: target the Relay Drone first, or everything lands on the leader.";
+      if (now === "retarget" && miteOf(run)) return "Not yet: target the Spark Mite first. It bites this phase.";
       break;
     case "clear-ground":
       if ((now === "scrub1" || now === "scrub2") && jammerOf(run) && run.energy >= scrubCost(run))
@@ -1577,7 +1606,7 @@ function frontGuard(id: LessonId, run: RunState, progress: LessonProgress, actio
       break;
     case "wardens": {
       if (now === "read") return "Read the break meter first: click it, or Got it in the coach panel.";
-      if (now === "aim" && bandwidth.length >= 2 && livingAt(run, "left")) return "Aim both bandwidth channels at the left Warden first.";
+      if (now === "target" && livingAt(run, "left")) return "Target the left Warden first: the Regent's break is out of reach while both stand.";
       if (now === "prepare" && affordable(run, ["pulse"])) return "Prepare Packet Burst first (P): it arrives next turn, when it counts.";
       const regent = regentOf(run);
       const port = regent ? preview.ports[regent.port] : null;

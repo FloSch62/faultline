@@ -172,15 +172,6 @@
 .target-options { background: linear-gradient(120deg,#29372beb,#0f1c23f7); border: 1px solid #b5a56b88; box-shadow: 0 0 0 3px #0b141aaa,0 8px 22px #0009; padding: 10px 14px; }
 .target-options > span { font: 700 11.5px var(--label); letter-spacing: .06em; color: #dbc9a0; }
 .target-options button { font: 700 12px var(--label); letter-spacing: .05em; padding: 7px 12px; }
-#movement-preview { position: absolute; left: 50%; transform: translateX(-50%); top: 132px; width: 340px; z-index: 25; padding: 16px 20px; color: #c7d8c5; background: linear-gradient(140deg,#25352cf5,#0b1921fa); border: 1px solid #b1bf8688; box-shadow: 0 0 0 4px #0a171aaa,0 8px 30px #000b; pointer-events: none; text-align: center; }
-#movement-preview .move-caption { display: block; color: #bfc19c; font: 700 11px var(--label); letter-spacing: .08em; }
-#movement-preview > strong { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 10px 0; font: 600 20px var(--title); color: #e8dab0; }
-#movement-preview > span { font: 13px var(--text); }
-#movement-preview > div { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin: 12px 0; border-block: 1px solid #a4b47e30; padding: 10px 0; font: 700 11px var(--label); letter-spacing: .05em; }
-#movement-preview b { display: block; margin-top: 4px; font: 600 20px/1 var(--title); font-variant-numeric: tabular-nums; }
-#movement-preview > small { display: block; font: 11px/1.5 var(--text); color: #b9c8b6; }
-#movement-preview.blocked { border-color: #ce8475; }
-#movement-preview.blocked > span { color: #e0a794; }
 .game-root.in-market .scene-backdrop { background-image: url('/art/relay-bazaar.png'); filter: brightness(.65); }
 .game-root.in-market .scene-shade { background: linear-gradient(90deg,#070e19a0,#07101622); }
 .game-root.in-market .reward-screen { background: radial-gradient(ellipse at center,#0c172055,transparent 70%); }
@@ -313,7 +304,6 @@
   .is-battle .transmit-power small { display: none; }
   .is-battle .transmit-button .transmit-label { position: static; width: auto; font: 600 13px var(--display); }
   .is-battle #target-dock { bottom: calc(var(--field-bottom) + 65px); max-width: calc(100% - 30px); }
-  #movement-preview { top: 90px; width: min(340px,calc(100% - 30px)); }
 }
 @container game (max-width: 520px) {
   .is-battle { --rail: 155px; }

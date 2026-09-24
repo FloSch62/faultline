@@ -65,14 +65,8 @@ async function perform(command: BotAction) {
   } else if (command.kind === "repair") {
     await click(`[data-repair="${command.id}"]`);
   } else if (command.kind === "focus") {
-    // The port row opens the crest; the crest sets the focus (F on the keyboard).
+    // A hostile's row in the port strip targets it (F on the keyboard).
     await click(`.port-row[data-port="${command.port}"]`);
-    await click(`[data-focus-port="${command.port}"]`);
-  } else if (command.kind === "aim") {
-    const run = await read();
-    const port = command.port ?? run.focus ?? "centre";
-    await click(`.port-row[data-port="${port}"]`);
-    await click(`[data-aim="${command.key}"][data-aim-port="${port}"]`);
   } else {
     await page.keyboard.press(command.index === 9 ? "0" : String(command.index + 1));
     if (command.kind === "ground") await click(`#target-dock [data-deploy-zone="${zoneForNode(command)}"]`);

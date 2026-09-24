@@ -5,7 +5,7 @@ import { RULES } from "./cards.ts";
 import { makeEnemy } from "./encounter.ts";
 import { newExpedition } from "./expedition.ts";
 import {
-  aimChannel, chooseRoom, combatPreview, endTurn, escalationLevel, intentFor, playProtocol, scrubInstallation,
+  chooseRoom, combatPreview, endTurn, escalationLevel, intentFor, playProtocol, scrubInstallation, setFocus,
 } from "./run.ts";
 import type { HostileRole, NetworkNode, Port, RunState } from "./types.ts";
 
@@ -219,14 +219,16 @@ test("adds rise when the charge is announced, wait through the charge, then act 
   p = combatPreview(r);
   assert.deepEqual(p.hostiles.map(hostile => hostile.state), ["acts", "acts", "acts"]);
   assert.equal(p.ports.centre!.breakThreshold, 12 + 2 * RULES.addBreakBonus);
-  // Kill one Warden with an aimed delivery: the threshold falls by 3.
-  aimChannel(r, p.deliveries[1].channelKey, "left");
+  // Target one Warden and kill it: the threshold falls by 3.
+  assert.ok(setFocus(r, "left").ok);
   r.enemies.find(enemy => enemy.port === "left")!.hp = 2;
   p = combatPreview(r);
   assert.equal(p.ports.centre!.breakThreshold, 12 + RULES.addBreakBonus);
-  // An interrupt cancels only the guardian's action; the surviving add still strikes.
+  // The surplus overflows into the guardian, and there it counts toward the break. An interrupt
+  // cancels only the guardian's action; the surviving add still strikes.
   r.packetBoost = 30;
   p = combatPreview(r);
+  assert.equal(p.ports.left!.overflowTo, "centre");
   assert.ok(p.interrupted);
   assert.equal(p.hostiles.find(hostile => hostile.port === "right")!.state, "acts");
   assert.ok(p.incomingRaw >= 2);

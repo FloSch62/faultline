@@ -5,7 +5,7 @@ export function linkKey(a: string, b: string): string {
   return [a, b].sort().join("::");
 }
 
-/** Stable identity of a channel for delivery aims: its inner device ids (terminals
+/** Stable identity of a channel (its delivery in the forecast): its inner device ids (terminals
  * excluded), sorted and joined by "|". It survives re-enumeration while the channel's
  * device set exists; a channel that changes its devices is a new channel. */
 export function channelKey(path: readonly string[]): string {
@@ -225,6 +225,54 @@ export function maximumChannels<T extends { mask: number }>(
   };
   search(0, start);
   return required ? [required, ...best] : best;
+}
+
+/**
+ * Where routes merge, so they count as one channel: the devices of a smallest set that every
+ * route passes through. On ordinary tables its size is the channel count (Menger); it only grows
+ * past `from` (the channel count) on contrived meshes where every two routes meet but no one
+ * device carries them all. Among smallest sets, those
+ * that the most routes pass through win, and every device of a winning set is kept: two equal
+ * bottlenecks in a row are both marked, a dense mesh behind one hub marks only the hub. Only
+ * devices that two or more routes pass through are returned. `masks` are route device masks
+ * (terminals included); the result is ordered by bit, i.e. by topology order.
+ */
+export function mergePoints(masks: readonly number[], terminals: number, from: number): { bit: number; routes: number }[] {
+  const through = new Int32Array(31);
+  const inner: number[] = [];
+  for (const mask of masks) {
+    const devices = mask & ~terminals;
+    if (!devices) continue;
+    inner.push(devices);
+    for (let m = devices, bit = 0; m; m >>>= 1, bit++) if (m & 1) through[bit]++;
+  }
+  if (!inner.length) return [];
+  // Hitting every inclusion-minimal route hits every route.
+  const least = minimal(inner.map((mask) => ({ mask }))).map((item) => item.mask);
+  let pool = 0;
+  for (const mask of least) pool |= mask;
+  const bits: number[] = [];
+  for (let bit = 0; bit < 31; bit++) if (pool & (1 << bit)) bits.push(bit);
+  const n = bits.length;
+  for (let size = Math.max(1, from); size <= n; size++) {
+    let best = -1, union = 0;
+    for (let pick = (1 << size) - 1; pick < 1 << n; ) {
+      let set = 0, score = 0;
+      for (let m = pick, i = 0; m; m >>>= 1, i++) if (m & 1) { set |= 1 << bits[i]; score += through[bits[i]]; }
+      if (score >= best && least.every((mask) => mask & set)) {
+        if (score > best) { best = score; union = set; } else union |= set;
+      }
+      // Gosper's hack: the next larger subset of the same size.
+      const low = pick & -pick, ripple = pick + low;
+      pick = ((((ripple ^ pick) >>> 2) / low) | 0) | ripple;
+    }
+    if (best >= 0) {
+      const found: { bit: number; routes: number }[] = [];
+      for (const bit of bits) if (union & (1 << bit) && through[bit] >= 2) found.push({ bit, routes: through[bit] });
+      return found;
+    }
+  }
+  return [];
 }
 
 /** Whether two routes that share no intermediate device satisfy the predicates. */

@@ -201,6 +201,9 @@ test("relocation moves a device to another band for its cost, and undo restores 
   await page.locator('[data-action="devices"]').click();
   await page.locator('[data-manage-node="router1"]').click();
   await page.locator('[data-relocate-zone="north"]').click();
+  // The band only proposes: the relocation plate asks before the energy is spent.
+  expect(await saved(page)).toEqual(before);
+  await page.locator("#relocate-confirm [data-relocate-confirm]").click();
   const moved = await saved(page);
   expect(moved.topology.nodes.find(n => n.id === "router1")!.z).toBeLessThan(-1.3);
   expect(moved.energy).toBe(5 - RULES.relocateCost);

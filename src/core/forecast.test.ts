@@ -7,7 +7,7 @@ import test from "node:test";
 import { RULES } from "./cards.ts";
 import { makeEnemy } from "./encounter.ts";
 import { newExpedition } from "./expedition.ts";
-import { aimChannel, chooseRoom, combatPreview, endTurn } from "./run.ts";
+import { chooseRoom, combatPreview, endTurn, setFocus } from "./run.ts";
 import type { CardId, DesignationId, InstallationKind, NetworkNode, Port, RelicId, RunState, SignalId } from "./types.ts";
 
 const LEADERS = ["leech", "wraith", "storm", "sentinel", "prophet", "widow", "colossus", "serpent", "moth", "marshal", "choir", "weaver", "reaver", "foreman", "nest", "demolition", "blight"];
@@ -94,10 +94,11 @@ function board(trial: number, rand: () => number): RunState {
     run.signal = { id: pick(SIGNALS), firesOnTurn: 3, resolved: false };
     if (run.turn === 2) Object.assign(run.signal, { announced: true, text: "NEXT TURN", zone: "center", socket: { x: 2.5, z: 4.2 }, nodeId: "d2", enemyUid: "h1", role: "cache" });
   }
-  // Aim a bandwidth delivery somewhere now and then.
+  // Target another hostile now and then: every delivery follows the target (the draws are the
+  // ones the per-channel aims used, so the boards stay the same).
   const preview = combatPreview(run);
   const living = run.enemies.filter(enemy => enemy.hp > 0).map(enemy => enemy.port);
-  if (preview.deliveries[1] && rand() < 0.5) aimChannel(run, preview.deliveries[1].channelKey, pick(living));
+  if (preview.deliveries[1] && rand() < 0.5) setFocus(run, pick(living));
   return run;
 }
 

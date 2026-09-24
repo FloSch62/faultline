@@ -16,14 +16,12 @@ import { CARDS } from "./core/cards.ts";
 import { ENEMIES } from "./core/enemies.ts";
 import { crateText } from "./core/encounter.ts";
 import type { Enemy, Port, RunState } from "./core/types.ts";
-import type { ActionKind, RailReadout, RailState, World, WorldPoint } from "./three/World.ts";
+import type { ActionKind, RailState, World, WorldPoint } from "./three/World.ts";
 
 /** The hud's view state the table mirrors (main.ts worldView()). */
 export interface WorldView {
-  /** The port whose details the right plate shows (a dimmer crest when it is not the focus). */
+  /** The port the player last targeted (the table marks only the target itself). */
   selectedPort: Port | null;
-  /** The delivery row selected with [ ] (its packet glyph and aim line brighten). */
-  selectedDelivery: string | null;
   /** The installation whose plate is open (its reach ring shows). */
   selectedInstallation: string | null;
   /** An installation-target card is selected (Demolition Charge): installations light as targets. */
@@ -41,14 +39,13 @@ export function syncWorld(world: World | null, run: RunState, preview: CombatPre
   world.setInstallations(run.installations, { installs: preview.installTargets });
   world.setInstallationFocus(view.selectedInstallation, view.targetingInstallation);
   world.setOnline(preview.online);
-  world.setChannels(preview.channelPaths);
+  // One colour per delivering channel (a primary route outside the maximum set lists one path more).
+  world.setChannels(preview.channelPaths.slice(0, preview.channels));
+  world.setShared(preview.sharedDevices);
   world.setForecastTarget(tableTargets(preview));
   world.setForecastZone(preview.hazardZone);
   world.setZoneEffects(run.zoneEffects);
-  world.setRail(options.debrief ? { focus: null, selected: null, readouts: {} } : railState(run, preview, view));
-  world.setDeliveries(preview.deliveries.map(delivery => ({
-    key: delivery.channelKey, primary: delivery.primary, path: delivery.path, port: delivery.port, aimed: delivery.aimed, amount: delivery.amount,
-  })), view.selectedDelivery);
+  world.setRail(options.debrief ? { focus: null, selected: null } : railState(run, preview, view));
 }
 
 /** Every forecast disruption target: each hostile's jams, cuts and overload, and each Jammer's jam. */
@@ -61,27 +58,9 @@ function tableTargets(preview: CombatPreview): string[] {
   return [...forecastTargets(preview), ...jammers];
 }
 
-/** What each rail plate reads: the damage it takes, LETHAL, overflow, this phase's intent. */
-export function railState(run: RunState, preview: CombatPreview, view: WorldView): RailState {
-  const readouts: Partial<Record<Port, RailReadout>> = {};
-  for (const hostile of preview.hostiles) {
-    const port = preview.ports[hostile.port];
-    const enemy = run.enemies.find(item => item.uid === hostile.uid);
-    if (!enemy) continue;
-    const intent = hostile.intent;
-    const leads = hostile.role === "leader" || hostile.role === "single";
-    readouts[hostile.port] = {
-      hpAfter: port?.hpAfter ?? enemy.hp,
-      damage: port ? Math.max(0, port.packet - port.overflowOut) : 0,
-      overflowIn: port?.overflowIn ?? 0,
-      lethal: !!port?.lethal,
-      intent: hostile.state === "dormant" ? "dormant" : intent?.kind ?? null,
-      amount: hostile.state === "dormant" ? 0 : hostile.raw || intent?.amount || 0,
-      state: hostile.state,
-      escalation: leads ? hostile.escalation : null,
-    };
-  }
-  return { focus: preview.focus, selected: view.selectedPort, readouts };
+/** The rail's target and the HUD's selected port (the plates themselves are DOM, hostile-cards.ts). */
+export function railState(_run: RunState, preview: CombatPreview, view: WorldView): RailState {
+  return { focus: preview.focus, selected: view.selectedPort };
 }
 
 // ------------------------------------------------------------------ playback
@@ -177,7 +156,6 @@ export function playTurn(p: Playback) {
     hooks.floatText(`−${own}`, true, "", port);
     const hp = hpAt(port, "own");
     hooks.showPortHit(port, hp, enemy.maxHp);
-    world?.setPortHealth(port, hp);
   };
   /** Today's single-hostile contact frame: one impact, the total, the plate's health. */
   const singleHit = () => {
@@ -190,7 +168,6 @@ export function playTurn(p: Playback) {
         if (!entry || !enemy) continue;
         const hp = Math.max(0, enemy.hp - (result.portDamage[port] ?? 0));
         hooks.showPortHit(port, hp, enemy.maxHp);
-        world?.setPortHealth(port, hp);
       }
     }
   };
@@ -243,7 +220,6 @@ export function playTurn(p: Playback) {
         hooks.floatText(`+${amount} overflow`, true, "burst", to);
         if (enemy) {
           hooks.showPortHit(to, hpAt(to, "final"), enemy.maxHp);
-          world?.setPortHealth(to, hpAt(to, "final"));
         }
         proceed();
       };

@@ -10,7 +10,7 @@ import type { TurnResult } from "../core/run.ts";
 import { esc } from "../ui.ts";
 import {
   DEV_CHECKPOINT, DEV_SETTINGS, DEFAULT_SETTINGS, DEFAULT_SETUP, SCENARIOS,
-  cleanAims, clearFaults, clearTable, createSandbox, finishSandboxTurn, giveCard,
+  clearFaults, clearTable, createSandbox, finishSandboxTurn, giveCard,
   inspectChannels, loadScenario, refillSandbox, removeDevice, repairAll, skipSector, toggleRelic,
   type EncounterSetup, type SandboxSettings,
 } from "./sandbox.ts";
@@ -346,7 +346,6 @@ export function mountDevTools(api: PlaygroundApi): DevTools {
           }
           default: throw new Error("Unknown playground control.");
         }
-        cleanAims(run);
       }, `${control.textContent?.trim()} applied.`);
       if (ok) status(`${control.textContent?.trim()} applied. Channel analysis is live.`);
     } catch (error) { api.notify((error as Error).message); }

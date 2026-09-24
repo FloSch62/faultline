@@ -147,7 +147,7 @@ for (const archetype of archetypes) {
     const income: number[][] = [[], [], []];
     const ledger: Record<string, number> = {};
     const messages: Record<string, number> = {};
-    /** Tactical tools the policy used: focus and aims, scrubs, repairs, moves out of reach, v4 cards. */
+    /** Tactical tools the policy used: targets, scrubs, repairs, moves out of reach, v4 cards. */
     const tools: Record<string, number> = {};
     const V4_TOOLS = new Set(["phantom-node", "server-rack", "redundant-psu", "field-repair", "demolition-charge", "broadcast-storm", "packet-storm", "flood-fill", "traffic-shaping", "quorum", "bulkhead", "spearhead", "sentry-firewall", "rapid-redeploy", "patch", "reroute", "protocol"]);
     for (let seed = 1; seed <= seeds; seed++) {
@@ -223,7 +223,7 @@ for (const archetype of archetypes) {
             energy = r.energy;
             current.energy += spent;
             const card = action.card ? baseCard(action.card) : "";
-            const tool = action.kind === "move" ? (action.purpose ? "move:maintenance" : "") : ["focus", "aim", "scrub", "repair"].includes(action.kind) ? action.kind : V4_TOOLS.has(card) && action.kind !== "prepare" ? card : "";
+            const tool = action.kind === "move" ? (action.purpose ? "move:maintenance" : "") : ["focus", "scrub", "repair"].includes(action.kind) ? action.kind : V4_TOOLS.has(card) && action.kind !== "prepare" ? card : "";
             if (tool) tools[tool] = (tools[tool] ?? 0) + 1;
             const maintenance = action.kind === "scrub" || action.kind === "repair" || action.purpose === "maintenance" || MAINTENANCE_CARDS.has(card);
             if (maintenance) current.maintenance += spent;

@@ -1,0 +1,127 @@
+/* Relocation confirmation plate. */
+/* The relocation plate (main.ts) stands beside the device's new socket: first as the drag's reading
+   (#movement-preview), then, once dropped, asking before any energy is spent (#relocate-confirm).
+   The engraved brass of #game-tooltip; a diamond stud points at the device. */
+.relocate-plate {
+  position: absolute;
+  z-index: 27;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 236px;
+  max-width: 300px;
+  padding: 10px 14px 12px;
+  font: 15px/1.4 var(--text);
+  color: #e6dac0;
+  text-align: left;
+  background: linear-gradient(170deg, #1a2027f7, #0c1016f7 72%);
+  border: 1px solid #8a6a3a;
+  box-shadow: inset 0 0 0 1px #05070a, inset 0 1px 0 #f3dca01f, 0 10px 26px #000c;
+}
+#movement-preview.relocate-plate { pointer-events: none; }
+#relocate-confirm {
+  pointer-events: auto;
+  border-color: #a57f45;
+  box-shadow: inset 0 0 0 1px #05070a, inset 0 1px 0 #f3dca02e, 0 0 0 1px #05070a99, 0 12px 30px #000d;
+  animation: relocate-rise 0.16s ease-out;
+}
+.relocate-plate::before {
+  content: "";
+  position: absolute;
+  top: var(--stud, 50%);
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  transform: rotate(45deg);
+  background: linear-gradient(135deg, #f3dca0, #8a6a3a);
+  box-shadow: 0 0 0 1px #05070a;
+}
+.relocate-plate[data-side="east"]::before { left: -5px; }
+.relocate-plate[data-side="west"]::before { right: -5px; }
+.relocate-plate:not([data-side])::before { display: none; }
+
+/* ROUTER1 · North → South · 1 energy */
+.relocate-head { display: flex; align-items: center; gap: 10px; }
+.relocate-head > b { font: 600 18px/1.1 var(--title); letter-spacing: 0.01em; color: #f3dca0; }
+.relocate-head > span { display: inline-flex; align-items: center; gap: 5px; font: 700 13.5px/1 var(--label); color: #dcc79a; }
+.relocate-head > span svg { color: #c9a263; }
+.relocate-head > em {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  margin-left: auto;
+  font: 600 17px/1 var(--title);
+  font-style: normal;
+  color: #ffe29a;
+  text-shadow: 0 0 8px #ffb04a66;
+}
+.relocate-head > em svg { color: #ffc864; }
+
+/* Before → after, from the forecast: the after value lit by whether it helps. */
+.relocate-lines { display: flex; gap: 18px; margin-top: 8px; padding-top: 7px; border-top: 1px solid #8a6a3a59; }
+.relocate-lines > span { display: grid; gap: 1px; font: 13px/1.2 var(--text); color: #bfb49c; }
+.relocate-lines b { font: 600 18px/1.15 var(--title); font-variant-numeric: tabular-nums; color: #efe2c4; white-space: nowrap; }
+.relocate-lines b i { font-style: normal; }
+.relocate-lines .is-better b i { color: #b9e39f; text-shadow: 0 0 8px #7fd06a44; }
+.relocate-lines .is-worse b i { color: #f2a08a; text-shadow: 0 0 8px #e0604a44; }
+
+.relocate-hint { margin: 8px 0 0; font: italic 13.5px/1.3 var(--text); color: #d7c8ad; }
+.relocate-hint:first-child { margin: 0; }
+.relocate-plate > small { display: block; margin-top: 2px; font: 12.5px/1.35 var(--text); color: #a9a18e; }
+.relocate-plate.blocked { border-color: #b0703f; }
+.relocate-plate.blocked .relocate-hint { font-style: normal; color: #f0b98a; }
+
+/* Relocate is the answer the drop asked for: brighter brass, never a filled button. */
+.relocate-actions { display: flex; gap: 8px; margin-top: 10px; }
+.relocate-actions button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 7px 10px 6px;
+  font: 700 13px/1 var(--label);
+  letter-spacing: 0.05em;
+  color: #dcc79a;
+  background: linear-gradient(#1d1912, #110e0a);
+  border: 1px solid #7b5a2c;
+  box-shadow: inset 0 1px 0 #f3dca01f, inset 0 0 0 2px #0c0906;
+  cursor: var(--cursor-pointer);
+  transition: color 0.18s, border-color 0.18s, box-shadow 0.18s;
+}
+.relocate-actions [data-relocate-confirm] { color: #f3dca0; border-color: #a57f45; }
+.relocate-actions [data-relocate-cancel] { color: #b9ab8c; border-color: #5a4322; }
+.relocate-actions button:hover,
+.relocate-actions button:focus-visible {
+  color: #fff0cc;
+  border-color: var(--brass-hi);
+  outline: none;
+  box-shadow: inset 0 1px 0 #f3dca033, inset 0 0 0 2px #0c0906, inset 0 0 14px #ffb04a22, 0 0 14px #ffb04a33;
+}
+.relocate-actions kbd { min-width: 0; padding: 1px 5px 0; }
+
+@keyframes relocate-rise { from { opacity: 0; transform: translateY(3px); } }
+.reduced-motion #relocate-confirm { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  #relocate-confirm { animation: none; }
+}
+
+/* The ledger chips and the log line stand over the table's near band: while a move is read or asked,
+   they step aside (as for the device dock) so the device shows at its new socket. */
+.is-battle:has(#relocate-confirm, #movement-preview) .network-status,
+.is-battle:has(#relocate-confirm, #movement-preview) .combat-log { visibility: hidden; }
+
+/* The socket a pending move would leave: a faint dashed ring on the table (Cancel puts the device back). */
+#relocate-origin {
+  position: absolute;
+  z-index: 5;
+  box-sizing: border-box;
+  border: 1.5px dashed #f3dca08c;
+  border-radius: 50%;
+  box-shadow: 0 0 14px #ffb04a2e, inset 0 0 14px #ffb04a24;
+  pointer-events: none;
+  animation: relocate-rise 0.16s ease-out;
+}
+.reduced-motion #relocate-origin { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  #relocate-origin { animation: none; }
+}

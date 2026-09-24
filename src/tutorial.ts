@@ -10,10 +10,12 @@
  *                                           walkthrough ("expedition"): walkthroughMarkup(0) in the dialog
  *   - after every action / transmission  → progress = lessonProgress(id, run, lastResult, progress, view);
  *                                           #lesson-layer = lessonPanelMarkup(progress, { showHint, collapsed })
- *   - progress.complete (first time)     → markLessonComplete(id)
- *   - panel actions: lesson-restart · lesson-menu · lesson-exit · lesson-next · lesson-hint · lesson-collapse
+ *   - progress.complete (first time)     → markLessonComplete(id); the board freezes and, a beat later,
+ *                                           #lesson-layer adds lessonEndMarkup(progress, true)
+ *   - panel actions: lesson-restart · lesson-menu · lesson-exit · lesson-hint · lesson-collapse
  *                    · lesson-read (a reading step's "Got it")
- *   - walkthrough: [data-walkthrough="<page>"] · data-action="lesson-finish"
+ *   - completion plate: lesson-next · lesson-restart (Replay) · lesson-training (leave, then the menu)
+ *   - walkthrough: [data-walkthrough="<page>"] · data-action="lesson-finish" · "lesson-finish-next"
  *   - handbook: data-action="help" → handbookMarkup(); [data-handbook="<chapter>"] → handbookMarkup(chapter) */
 import "./tutorial.css";
 import { RULES } from "./core/cards.ts";
@@ -80,32 +82,52 @@ const readButton = (progress: LessonProgress) => progress.reading
   ? `<button class="plate-button training-read" data-action="lesson-read">${icon("check", 14)} Got it</button>`
   : "";
 
-/** The coach panel docked beside the table during a battle lesson (render into #lesson-layer). */
+/** The coach panel docked beside the table during a battle lesson (render into #lesson-layer).
+ * A finished lesson keeps only its lit head and the banner: the completion plate carries the way on. */
 export function lessonPanelMarkup(progress: LessonProgress, options: PanelOptions = {}): string {
   const lesson = lessonById(progress.id)!;
-  const next = nextLesson(lesson.id);
   const done = progress.goals.filter(goal => goal.done).length;
   const currentGoal = progress.goals[progress.current];
-  // On completion the way on comes first, even when the panel is folded.
-  const nextAction = `<div class="training-complete"><span class="training-banner">${icon("check", 16)} Lesson Complete</span><div class="training-actions">${next
-    ? `<button class="gold-button" data-action="lesson-next">Next Lesson<small>${esc(next.title)}</small></button>`
-    : `<button class="gold-button" data-action="lesson-exit">Return to the Expedition</button>`}</div></div>`;
+  const banner = `<div class="training-complete"><span class="training-banner">${icon("check", 16)} Lesson Complete</span></div>`;
   return `<aside class="training-panel ${progress.complete ? "is-complete" : ""} ${options.collapsed ? "is-collapsed" : ""}" aria-label="Field training: ${esc(lesson.title)}" style="--training-progress:${(done / progress.goals.length) * 100}%">
     <header class="training-head">
       <span class="training-seal" aria-hidden="true">${icon(progress.complete ? "check" : lesson.icon, 20)}</span>
       <div class="training-titles"><span class="training-kicker">Lesson ${lesson.chapter} of ${TOTAL_CHAPTERS}</span><h3>${esc(lesson.title)}</h3></div>
-      <button class="training-collapse" data-action="lesson-collapse" aria-expanded="${!options.collapsed}" aria-label="${options.collapsed ? "Expand" : "Minimise"} the lesson panel">${icon("chevron", 16)}</button>
+      ${progress.complete ? "" : `<button class="training-collapse" data-action="lesson-collapse" aria-expanded="${!options.collapsed}" aria-label="${options.collapsed ? "Expand" : "Minimise"} the lesson panel">${icon("chevron", 16)}</button>`}
     </header>
     <div class="training-meter" role="progressbar" aria-label="Lesson goals" aria-valuemin="0" aria-valuemax="${progress.goals.length}" aria-valuenow="${done}"><i></i></div>
-    ${options.collapsed
-      ? progress.complete ? nextAction : `<p class="training-current">${rich(progress.coach) || esc(currentGoal?.label ?? "")}</p>${meterMarkup(progress)}${readButton(progress)}`
-      : `${progress.complete ? nextAction : `<div class="training-progress"><ol class="training-goals" aria-label="Lesson steps">${progress.goals.map((goal, i) => `<li class="${goal.done ? "done" : i === progress.current ? "current" : "pending"}" data-tooltip="${esc(goal.label)}"><i aria-hidden="true"></i><span class="visually-hidden">${esc(goal.label)}${goal.done ? " (done)" : ""}</span></li>`).join("")}</ol><span class="training-count">Step <b>${progress.current + 1}</b> of ${progress.goals.length}</span></div>`}
-      <div class="training-coach" aria-live="polite">${progress.complete
-        ? `<strong class="training-label">Why this matters</strong><p class="coach-do">${rich(progress.coach)}</p>`
-        : `<div class="training-step"><strong class="training-label">${esc(currentGoal?.label ?? "Your next move")}</strong>${progress.hint && !options.showHint ? `<button class="training-hint-button" data-action="lesson-hint" aria-label="Show a hint" data-tooltip="Show a hint">${icon("hint", 16)}</button>` : ""}</div><p class="coach-do">${rich(progress.coach)}</p>${meterMarkup(progress)}${readButton(progress)}${options.showHint && progress.hint ? `<p class="training-hint">${icon("hint", 16)}<span><b>Hint.</b> ${esc(progress.hint)}</span></p>` : ""}${progress.detail ? `<p class="coach-why">${rich(progress.detail)}</p>` : ""}`}</div>
-      ${progress.warning ? `<p class="training-warning" role="alert">${icon("warning", 16)}<span>${esc(progress.warning)}</span></p>` : ""}
-      <footer class="training-foot"><button class="text-button" data-action="lesson-restart">${icon("undo", 14)} Restart</button><button class="text-button" data-action="lesson-menu">${icon("book", 14)} Lessons</button><button class="text-button" data-action="lesson-exit">${icon("close", 14)} Leave</button></footer>`}
+    ${progress.complete ? banner : options.collapsed
+      ? `<p class="training-current">${rich(progress.coach) || esc(currentGoal?.label ?? "")}</p>${meterMarkup(progress)}${readButton(progress)}`
+      : `<div class="training-progress"><ol class="training-goals" aria-label="Lesson steps">${progress.goals.map((goal, i) => `<li class="${goal.done ? "done" : i === progress.current ? "current" : "pending"}" data-tooltip="${esc(goal.label)}"><i aria-hidden="true"></i><span class="visually-hidden">${esc(goal.label)}${goal.done ? " (done)" : ""}</span></li>`).join("")}</ol><span class="training-count">Step <b>${progress.current + 1}</b> of ${progress.goals.length}</span></div>
+      <div class="training-coach" aria-live="polite"><div class="training-step"><strong class="training-label">${esc(currentGoal?.label ?? "Your next move")}</strong>${progress.hint && !options.showHint ? `<button class="training-hint-button" data-action="lesson-hint" aria-label="Show a hint" data-tooltip="Show a hint">${icon("hint", 16)}</button>` : ""}</div><p class="coach-do">${rich(progress.coach)}</p>${meterMarkup(progress)}${readButton(progress)}${options.showHint && progress.hint ? `<p class="training-hint">${icon("hint", 16)}<span><b>Hint.</b> ${esc(progress.hint)}</span></p>` : ""}${progress.detail ? `<p class="coach-why">${rich(progress.detail)}</p>` : ""}</div>`}
+    ${progress.warning ? `<p class="training-warning" role="alert">${icon("warning", 16)}<span>${esc(progress.warning)}</span></p>` : ""}
+    ${progress.complete ? "" : `<footer class="training-foot"><button class="text-button" data-action="lesson-restart">${icon("undo", 14)} Restart</button><button class="text-button" data-action="lesson-menu">${icon("book", 14)} Lessons</button><button class="text-button" data-action="lesson-exit">${icon("close", 14)} Leave</button></footer>`}
   </aside>`;
+}
+
+/** A finished lesson is over. The scrim takes every pointer from the frozen board at once; the plate
+ * (`shown`) rises a beat later with the takeaway and the three ways on: the next lesson, a replay from
+ * a fresh board, or the training menu (which leaves the lesson). */
+export function lessonEndMarkup(progress: LessonProgress, shown: boolean): string {
+  if (!progress.complete) return "";
+  const lesson = lessonById(progress.id)!;
+  const next = nextLesson(lesson.id);
+  const scrim = `<div class="lesson-end-scrim${shown ? " is-shown" : ""}" aria-hidden="true"></div>`;
+  if (!shown) return scrim;
+  const steps = progress.goals.map(goal => `<li>${icon("check", 13)}<span>${esc(goal.label)}</span></li>`).join("");
+  const menu = (primary: boolean) => `<button class="${primary ? "gold-button" : "plate-button"}" data-action="lesson-training"${primary ? " data-autofocus" : ""}>${icon("book", 15)} Training menu</button>`;
+  return `${scrim}<section class="lesson-end" role="dialog" aria-modal="true" aria-labelledby="lesson-end-title" aria-describedby="lesson-end-why">
+    <span class="lesson-end-seal" aria-hidden="true">${icon("check", 26)}</span>
+    <h2 id="lesson-end-title">${esc(lesson.title)}</h2>
+    <p class="lesson-end-note">Lesson ${lesson.chapter} of ${TOTAL_CHAPTERS} complete</p>
+    <ol class="lesson-end-steps" aria-label="What you did" style="--rows:${Math.ceil(progress.goals.length / 2)}">${steps}</ol>
+    <p class="lesson-end-why" id="lesson-end-why">${esc(lesson.takeaway)}</p>
+    <div class="lesson-end-actions">
+      ${next ? `<button class="gold-button" data-action="lesson-next" data-autofocus>Next lesson<small>${esc(next.title)}</small></button>` : menu(true)}
+      <button class="plate-button" data-action="lesson-restart">${icon("undo", 15)} Replay</button>
+      ${next ? menu(false) : ""}
+    </div>
+  </section>`;
 }
 
 function lessonCard(lesson: LessonDefinition, completed: Set<string>, recommended: string | undefined) {
@@ -205,10 +227,16 @@ export const WALKTHROUGH_PAGES: readonly WalkthroughPage[] = [
   },
   {
     title: "Before You Set Out", tagline: "Carry the signal home.", body: () => `
-      <ul class="walk-list"><li><b>Build first, then widen.</b> One route on turn one; a second channel as soon as you can (+${RULES.bandwidthPerChannel} and cut-proof).</li><li><b>Read, then spend.</b> Cover the forecast exactly; everything else goes into damage or network.</li><li><b>Answer in advance.</b> Arm protocols and prepare cards for the turn you can already see.</li><li><b>Keep the deck lean.</b> Skipping a reward is often the strongest pick.</li></ul>
+      <ul class="walk-list"><li><b>Build first, then widen.</b> One route on turn one; a second channel as soon as you can (+${RULES.bandwidthPerChannel}, and it survives a cut).</li><li><b>Read, then spend.</b> Cover the forecast exactly; everything else goes into damage or network.</li><li><b>Answer in advance.</b> Arm protocols and prepare cards for the turn you can already see.</li><li><b>Keep the deck lean.</b> Skipping a reward is often the strongest pick.</li></ul>
       <p class="walk-note">The Handbook holds every rule and number, including the Danger Playbook.</p>`,
   },
 ];
+
+/** The walkthrough's last page ends like a battle lesson: on to the next lesson, or back to the menu. */
+function walkEnd(): string {
+  const next = nextLesson(WALKTHROUGH_LESSON);
+  return `<span class="walk-end">${next ? `<button class="plate-button" data-action="lesson-finish">${icon("book", 15)} Training menu</button><button class="gold-button" data-action="lesson-finish-next">Next lesson<small>${esc(next.title)}</small></button>` : `<button class="gold-button" data-action="lesson-finish">${icon("check", 16)} Finish Training</button>`}</span>`;
+}
 
 /** Dialog content for the expedition walkthrough. Page buttons use data-walkthrough. */
 export function walkthroughMarkup(page = 0): string {
@@ -226,7 +254,7 @@ export function walkthroughMarkup(page = 0): string {
     <footer class="walk-nav">
       <button class="text-button walk-back" data-walkthrough="${index - 1}" ${index === 0 ? "disabled" : ""}>${icon("back", 15)} Back</button>
       <span class="walk-dots">${WALKTHROUGH_PAGES.map((_, i) => `<button data-walkthrough="${i}" class="${i === index ? "current" : i < index ? "seen" : ""}" aria-label="Page ${i + 1} of ${WALKTHROUGH_PAGES.length}" ${i === index ? 'aria-current="step"' : ""}></button>`).join("")}</span>
-      ${last ? `<button class="gold-button" data-action="lesson-finish">${icon("check", 16)} Finish Training</button>` : `<button class="gold-button" data-walkthrough="${index + 1}">Next ${icon("arrow", 16)}</button>`}
+      ${last ? walkEnd() : `<button class="gold-button" data-walkthrough="${index + 1}">Next ${icon("arrow", 16)}</button>`}
     </footer>
   </section>`;
 }

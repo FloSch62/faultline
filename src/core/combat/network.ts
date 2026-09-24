@@ -3,7 +3,7 @@
  * lists (packs and escalation disrupt several things at once) and a Server Rack counts
  * toward its band's cluster. */
 import { RULES } from "../cards.ts";
-import { disjointPair, maximumChannels, routes as enumerateRoutes, type Route } from "../graph.ts";
+import { disjointPair, maximumChannels, mergePoints, routes as enumerateRoutes, type Route } from "../graph.ts";
 import { frayedLinks } from "../terrain.ts";
 import type { NetworkNode, RunState, Zone } from "../types.ts";
 import { ZONES, fieldBands, has, zoneForNode } from "./board.ts";
@@ -16,6 +16,9 @@ export interface Network {
   primary: ScoredRoute | null;
   channels: ScoredRoute[];
   channelCount: number;
+  /** Devices where live routes merge and so count once (graph.mergePoints), with the number of
+   * routes through each. Empty in light mode and while every route is its own channel. */
+  shared: { id: string; routes: number }[];
   online: Set<string>;
   onlineNodes: NetworkNode[];
   clusters: Zone[];
@@ -86,6 +89,8 @@ export function analyze(run: RunState, faultNodes: readonly string[], faultLinks
     for (let m = route.mask & routerMask, i = 0; m; m >>= 1, i++) if (m & 1 && !nodes[i].fixed && zoneForNode(nodes[i]) === zone) return true;
     return false;
   };
+  const shared = light || ranked.length <= channelCount ? []
+    : mergePoints(ranked.map(route => route.mask), terminals, channelCount).map(({ bit, routes }) => ({ id: nodes[bit].id, routes }));
   const separated = !light && channelCount >= 2 && disjointPair(ranked.filter(route => routerIn(route, "north")), ranked.filter(route => routerIn(route, "south")), terminals);
-  return { routes: ranked, primary, channels, channelCount, online, onlineNodes, clusters, separated };
+  return { routes: ranked, primary, channels, channelCount, shared, online, onlineNodes, clusters, separated };
 }

@@ -4,7 +4,7 @@ import { analyze } from "../core/combat/network.ts";
 import { maxConditionOf } from "../core/combat/board.ts";
 import { ENEMIES } from "../core/enemies.ts";
 import { newExpedition, type Expedition } from "../core/expedition.ts";
-import { initialTopology, linkKey, maximumChannels, routes, channelKey } from "../core/graph.ts";
+import { initialTopology, linkKey, maximumChannels, routes } from "../core/graph.ts";
 import { createMap } from "../core/map.ts";
 import { chooseRoom, type TurnResult } from "../core/run.ts";
 import { advanceRoom, grantVictory } from "../core/meta.ts";
@@ -215,15 +215,10 @@ export function clearFaults(run: RunState) {
 }
 export function clearTable(run: RunState) {
   run.topology = initialTopology();
-  run.aims = {};
   run.installations = [];
   run.zoneEffects = [];
   run.terrain = null;
   clearFaults(run);
-}
-export function cleanAims(run: RunState) {
-  const live = new Set(analyze(run, run.faultNodes, run.faultLinks).channels.map(route => channelKey(route.path)));
-  for (const key of Object.keys(run.aims)) if (!live.has(key)) delete run.aims[key];
 }
 export function removeDevice(run: RunState, id: string) {
   const device = run.topology.nodes.find(item => item.id === id);
@@ -235,7 +230,6 @@ export function removeDevice(run: RunState, id: string) {
   const links = new Set(run.topology.links.map(link => linkKey(link.a, link.b)));
   run.faultLinks = run.faultLinks.filter(key => links.has(key));
   run.frayedByCut = run.frayedByCut?.filter(key => links.has(key));
-  cleanAims(run);
 }
 export function giveCard(run: RunState, id: CardId, destination: "hand" | "deck") {
   if (!Object.hasOwn(CARDS, id)) throw new Error("Choose a known card.");

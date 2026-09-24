@@ -125,15 +125,13 @@ test("chosen packs, keep-loadout and sector skipping use normal encounter and pr
   assert.ok(parseExpedition(JSON.stringify(boss)));
 });
 
-test("removing a device drops its cables, faults and aim and leaves the remaining channel", () => {
+test("removing a device drops its cables and faults and leaves the remaining channel", () => {
   const e = loadScenario("parallel"), r = e.run;
-  r.aims.r1 = "centre";
   r.faultNodes = ["r1"];
   r.faultLinks = [linkKey("alpha", "r1")];
   r.lingeringJams = { r1: 1 };
   removeDevice(r, "r1");
   assert.equal(inspectChannels(r).count, 1);
-  assert.deepEqual(r.aims, {});
   assert.deepEqual(r.faultNodes, []);
   assert.deepEqual(r.faultLinks, []);
   assert.deepEqual(r.lingeringJams, {});

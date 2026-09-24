@@ -50,18 +50,24 @@ export function routesDiagram(): string {
   ].join(""));
 }
 
-/** Two paths that share a device are one channel: a bottleneck. */
+/** Two routes through one device are one channel: the shared switch carries the table's brass
+ * junction seal (the merge glyph and the number of routes through it). */
 export function bottleneckDiagram(): string {
-  return svg("0 0 560 204", "Two paths share one switch, so they count as a single channel.", [
-    wire(70, 100, 190, 45, "primary"), wire(190, 45, 330, 100, "primary"),
-    wire(70, 100, 190, 155, "idle"), wire(190, 155, 330, 100, "idle"),
-    wire(330, 100, 490, 100, "primary"),
-    terminal(40, 100, "Alpha"), terminal(520, 100, "Omega"),
-    device(190, 45, "router", "primary"), device(190, 155, "router", "online"),
-    `<circle class="hb-warning-ring" cx="330" cy="100" r="24"/>`,
-    device(330, 100, "switch", "danger", "Shared"),
-    tag(280, 198, "One channel: cut the switch and both go dark", "danger"),
+  return svg("0 0 560 214", "Two routes pass through one switch: 2 routes, 1 channel. A brass seal on the switch shows the 2 routes that merge there.", [
+    wire(70, 104, 190, 48, "primary"), wire(190, 48, 330, 104, "primary"),
+    wire(70, 104, 190, 160, "idle"), wire(190, 160, 330, 104, "idle"),
+    wire(330, 104, 490, 104, "primary"),
+    terminal(40, 104, "Alpha"), terminal(520, 104, "Omega"),
+    device(190, 48, "router", "primary"), device(190, 160, "router", "online"),
+    device(330, 104, "switch", "primary", "Switch"),
+    junctionSeal(372, 72, 2),
+    tag(280, 18, "2 routes · 1 channel", "gold"),
+    tag(280, 206, "A device carries one channel: jam the switch and both routes go dark", "muted"),
   ].join(""));
+}
+/** The table's junction seal: a clipped brass tag with the merge glyph and a number. */
+function junctionSeal(x: number, y: number, routes: number) {
+  return `<g class="hb-junction" transform="translate(${x} ${y})"><path class="hb-junction-plate" d="M-21-13h42l5 5v16l-5 5h-42l-5-5v-16Z"/><path class="hb-junction-glyph" transform="translate(-23 -9) scale(0.75)" d="M3 6.5c4.5 0 6.5 5.5 10 5.5M3 17.5c4.5 0 6.5-5.5 10-5.5M13 12h8"/><text x="11" y="5.5">${routes}</text></g>`;
 }
 
 /** Online vs offline hardware. */
@@ -207,26 +213,31 @@ function packet(x: number, y: number, primary: boolean, amount: number) {
   return `<g class="hb-packet ${primary ? "primary" : "channel"}" transform="translate(${x} ${y})">${shape}<text y="24" text-anchor="middle">${amount}</text></g>`;
 }
 
-/** Packs & Ports: three channels become three deliveries; two merge on the focus. */
+/** Packs & Ports: three channels become three deliveries; all land on the target (the left escort)
+ * as one packet, and what its kill does not need overflows to the leader. */
 export function portsDiagram(): string {
   const primary = R.baseRouteDamage + R.switchDamage, band = R.bandwidthPerChannel;
+  const total = primary + 2 * band, health = Math.max(1, total - 4), spill = total - health;
   const flight = (d: string, kind: "primary" | "channel") => `<path class="hb-flight ${kind}" d="${d}"/>`;
-  return svg("0 0 600 300", `Three channels deliver to the ports. The primary delivery and one bandwidth delivery merge at the centre into one packet of ${primary + band}; the third delivery is aimed at the left escort.`, [
+  // Each delivery leaves OMEGA through its own packet, then all three converge on the target.
+  const via = (y: number) => `M322 150 C 340 150, 350 ${y}, 370 ${y} S 410 52, 426 52`;
+  return svg("0 0 600 300", `Three channels deliver to your target, the left escort: ${primary} + ${band} + ${band} land as one packet of ${total}, armor paid once. The escort has ${health} health; the ${spill} it does not need overflows to the leader at the centre.`, [
     wire(58, 150, 130, 72, "primary"), wire(130, 72, 212, 72, "primary"), wire(212, 72, 290, 150, "primary"),
     wire(58, 150, 175, 150, "channel"), wire(175, 150, 290, 150, "channel"),
     wire(58, 150, 175, 228, "channel"), wire(175, 228, 290, 150, "channel"),
     terminal(40, 150, "Alpha", true), terminal(304, 150, "Omega", true),
     device(130, 72, "router", "primary"), device(212, 72, "switch", "primary"),
     device(175, 150, "router", "channel"), device(175, 228, "router", "channel"),
-    flight("M322 142 C 350 100, 380 52, 426 52", "channel"), flight("M322 150 H 426", "primary"), flight("M322 158 C 350 200, 400 200, 426 166", "channel"),
-    packet(367, 81, false, band), packet(376, 150, true, primary), packet(375, 190, false, band),
-    port(52, "Left", "Escort · aimed", String(band)),
-    port(150, "Centre", "Leader · focus", `${primary} + ${band}`, "focus"),
+    flight(via(108), "channel"), flight(via(150), "primary"), flight(via(192), "channel"),
+    packet(370, 108, false, band), packet(370, 150, true, primary), packet(370, 192, false, band),
+    port(52, "Left", `Target · health ${health}`, String(total), "focus"),
+    port(150, "Centre", "Leader · overflow", `+${spill}`),
     port(248, "Right", "Escort · dormant", "—", "dormant"),
-    `<path class="hb-crest" d="M500 115 l6 6 -6 6 -6 -6Z"/>`,
+    `<path class="hb-crest" d="M500 16 l6 6 -6 6 -6 -6Z"/>`,
+    flight("M574 62 C 596 84, 596 118, 574 140", "primary"),
     tag(170, 22, `Primary delivery · ${R.baseRouteDamage} + ${R.switchDamage} switch`, "gold"),
     tag(170, 292, `Each further channel · +${band} bandwidth`, "cyan"),
-    tag(500, 292, `One packet of ${primary + band} · armor paid once`, "gold"),
+    tag(500, 292, `One packet on the target · overflow ${spill} →`, "gold"),
   ].join(""));
 }
 

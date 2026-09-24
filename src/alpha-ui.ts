@@ -20,6 +20,7 @@ import { asset, cardMarkup, esc, icon } from "./ui.ts";
 import { INTENT_ICONS, INTENT_NAMES } from "./battle-ui.ts";
 import { hostilePortrait, relicEmblem, sicon } from "./screens.ts";
 import { designationMark } from "./tutorial/icons.ts";
+import { channelCss } from "./channel-palette.ts";
 
 /* The field journal: every dialog body a player reads during an expedition.
    Titles name the thing (.panel-head), numbers are Grenze, reading text Alegreya. */
@@ -64,7 +65,7 @@ const GLYPHS: Record<string, [string, string]> = {
   anchor: ["-15 -15 30 30", '<circle cy="-10" r="3"/><path d="M0-7v19M-7-3h14M-11 3c1 6 5 9 11 9s10-3 11-9"/>'],
   breaker: ["-15 -15 30 30", '<circle cy="3" r="9"/><path d="M4-5 7-9M7-9c2-2 4-3 6-2"/><path d="M-4 1v4h4"/>'],
 };
-function glyph(name: string, size = 18) {
+export function glyph(name: string, size = 18) {
   const [box, path] = GLYPHS[name] ?? GLYPHS.router;
   const stroke = box.startsWith("-15") ? 1.9 : 1.5;
   return `<svg width="${size}" height="${size}" viewBox="${box}" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`;
@@ -96,12 +97,12 @@ function routeTrace(path: string[], label: string, primary: boolean, tail = "") 
 const hostileAt = (run: RunState, uid: string) => run.enemies.find(enemy => enemy.uid === uid);
 const nameOf = (run: RunState, uid: string) => named(hostileAt(run, uid)?.name ?? uid);
 
-/** Deliveries (13.7): one trace per channel with its port and amount, then each port's merged
- * packet and the overflow. Every number is a forecast field; nothing is added up here. */
+/** Deliveries (13.7): one trace per channel with its amount (every one lands on the target), then
+ * each port's merged packet and the overflow. Every number is a forecast field; nothing is added up here. */
 function deliveriesMarkup(run: RunState, p: CombatPreview) {
   if (!p.deliveries.length) return '<p class="route-trace is-offline"><b>Signal offline</b></p>';
   const traces = p.deliveries.map(delivery => routeTrace(delivery.path, delivery.primary ? "Primary" : `Channel ${delivery.index + 1}`, delivery.primary,
-    `<span class="route-port${delivery.aimed ? " is-aimed" : ""}" data-port="${delivery.port}"><small>${delivery.aimed ? "aimed" : "focus"}</small>${PORT_NAMES[delivery.port]}<b>${delivery.amount}</b></span>`)).join("");
+    `<span class="route-port" data-port="${delivery.port}"><small>target</small>${PORT_NAMES[delivery.port]}<b>${delivery.amount}</b></span>`)).join("");
   const lines = PORTS.map(port => {
     const forecast = p.ports[port];
     return forecast ? portLine(run, p, port, forecast) : "";
@@ -236,7 +237,7 @@ export function combatDetailsMarkup(run: RunState) {
     ? `${term("Buffer stored", run.buffer)}${p.buffering ? term(`Buffering this turn (×${RULES.bufferMultiplier})`, p.bufferGain) : p.bufferRelease ? term("Released this turn", p.bufferRelease) : ""}${p.bufferAtRisk && (run.buffer || p.buffering) ? `<p class="danger-note">${icon("warning", 15)} After this enemy action you would have no live route: the buffer would be lost at the start of your turn.</p>` : ""}`
     : run.archetype === "warden"
       ? `${term("Backpressure in this transmission", run.backpressure)}${term(`Stored for next turn (${Math.round(RULES.backpressureRatio * 100)}% of prevented)`, p.backpressureGain)}`
-      : term("Channels (routes sharing no device)", String(p.channels));
+      : `${term("Live routes", String(p.routeCount))}${term("Channels (routes through one device count once)", String(p.channels))}`;
   const spite = p.hostiles.some(hostile => hostile.state === "spiteful");
   const outcome = p.lethal && spite ? `Your transmission defeats ${pack ? "every hostile" : "the hostile"}, but a Spiteful action resolves anyway.`
     : p.lethal ? `Your transmission defeats ${pack ? "every hostile" : "the hostile"}, so no enemy action resolves.`
@@ -263,7 +264,7 @@ export function combatDetailsMarkup(run: RunState) {
     ? `${term("Incoming before shields", String(p.incomingRaw))}${packDefenses(run, p)}`
     : `${term("Incoming before shields", String(p.incomingRaw))}${p.incomingTerms.length ? `<div class="incoming-sources">${terms(p.incomingTerms)}</div>` : ""}${terms(p.shieldTerms)}`;
   return `${head("Forecast", sub)}
-    <div class="calculation-grid"><section class="ledger">${ledgerHead(icon("bolt", 17), "Signal Damage")}${terms(p.damageTerms)}${!p.signalPath.length ? '<p class="ledger-note">No live ALPHA → router → OMEGA route. Route bonuses cannot activate.</p>' : ""}<div class="calculation-total"><span>${p.buffering ? "Stored in the buffer" : pack ? "Damage to hostiles" : "Damage to hostile"}</span><strong>${p.buffering ? `+${p.bufferGain}` : p.packetDamage}</strong></div>${p.enemyDamage ? term("Traps during the enemy phase", p.enemyDamage, " trap-term") : ""}<h4 class="ledger-sub">Deliveries</h4>${deliveriesMarkup(run, p)}<p class="ledger-note">Your <b>primary route</b> is the strongest live route; only its devices add route damage. Every other <b>channel</b> (a route sharing no device with the others) delivers +${perChannel} bandwidth to the port it is aimed at. Deliveries on one port merge; armor is paid once per port.</p></section>
+    <div class="calculation-grid"><section class="ledger">${ledgerHead(icon("bolt", 17), "Signal Damage")}${terms(p.damageTerms)}${!p.signalPath.length ? '<p class="ledger-note">No live ALPHA → router → OMEGA route. Route bonuses cannot activate.</p>' : ""}<div class="calculation-total"><span>${p.buffering ? "Stored in the buffer" : pack ? "Damage to hostiles" : "Damage to hostile"}</span><strong>${p.buffering ? `+${p.bufferGain}` : p.packetDamage}</strong></div>${p.enemyDamage ? term("Traps during the enemy phase", p.enemyDamage, " trap-term") : ""}<h4 class="ledger-sub">Deliveries</h4>${deliveriesMarkup(run, p)}<p class="ledger-note">Your <b>primary route</b> is the strongest live route; only its devices add route damage. Every device carries one channel: routes through the same device are one <b>channel</b>. Every other channel delivers +${perChannel} bandwidth. Every channel lands on your <b>target</b> as one packet, so its armor is paid once; what a kill does not need <b>overflows</b> to the next hostile.</p></section>
     <section class="ledger">${ledgerHead(icon("shield", 17), "Defenses")}${defenses}${term("Total prevented", String(Math.min(p.incomingRaw, p.shield)))}<div class="calculation-total ${p.incoming ? "danger" : "safe"}"><span>Integrity lost</span><strong>${p.incoming}</strong></div>${p.protocolTriggers.map(t => `<p class="protocol-note">${icon("trigger", 15)} <span><b>${esc(t.name)}</b> fires: ${esc(t.effect)}</span></p>`).join("")}<p class="ledger-note">${outcome}</p></section></div>
     ${frontMarkup(run, p)}
     <div class="calculation-grid v3-grid"><section class="ledger">${ledgerHead(icon("console", 17), esc(c.name === engineName ? c.name : `${c.name} · ${engineName}`))}${engine}<p class="ledger-note">${esc(c.rules)}</p></section>
@@ -521,7 +522,7 @@ export function enemyDossierMarkup(run: RunState, port?: Port) {
 
 /* ------------------------------------------------------------------ devices */
 
-const ROLE_COPY: Record<string, [string, string]> = {
+export const ROLE_COPY: Record<string, [string, string]> = {
   client: ["Terminal", "Every route starts or ends here"],
   router: ["Router", "Every route needs one"],
   switch: ["Switch", `+${RULES.switchDamage} on the primary route`],
@@ -543,7 +544,8 @@ const INSTALLATION_COPY: Record<InstallationKind, string> = {
 function deviceTile(run: RunState, n: NetworkNode, p: CombatPreview) {
   const online = n.fixed || p.online.includes(n.id);
   const [role, ability] = ROLE_COPY[n.role] ?? [n.role, ""];
-  const mods = [n.shielded ? "Jam protected" : "", n.upgraded ? `Overclocked +${RULES.overclockDamage}` : "", n.configured ? `Startup Config +${RULES.configuredDamage}` : "", n.amplified ? `Compressed +${RULES.compressionDamage}` : "", n.stateful ? "Stateful · blocks double" : "", n.sentry ? `Sentry · quarantine ${R.sentryQuarantine}` : "", n.salvage ? "Salvaged" : "", n.role === "phantom" && n.absorbs ? `Absorbs ${n.absorbs}` : ""].filter(Boolean);
+  const shared = p.sharedDevices.find(item => item.id === n.id);
+  const mods = [n.shielded ? "Jam protected" : "", n.upgraded ? `Overclocked +${RULES.overclockDamage}` : "", n.configured ? `Startup Config +${RULES.configuredDamage}` : "", n.amplified ? `Compressed +${RULES.compressionDamage}` : "", n.stateful ? "Stateful · blocks double" : "", n.sentry ? `Sentry · quarantine ${R.sentryQuarantine}` : "", n.salvage ? "Salvaged" : "", n.role === "phantom" && n.absorbs ? `Absorbs ${n.absorbs}` : "", shared ? `Shared · ${shared.routes} routes, one channel` : ""].filter(Boolean);
   const state = n.fixed ? "Fixed" : online ? "Online" : "Offline";
   const wearable = !n.fixed && n.role !== "phantom";
   const condition = wearable ? conditionOf(n) : 0, max = wearable ? maxConditionOf(n) : 0;
@@ -581,7 +583,9 @@ export function devicesMarkup(run: RunState) {
     const a = run.topology.nodes.find(n => n.id === l.a)!, b = run.topology.nodes.find(n => n.id === l.b)!;
     const length = Math.hypot(a.x - b.x, a.z - b.z), worn = frayed.has(linkKey(l.a, l.b));
     const exposed = wraith && length > RULES.cableExposureLength && !l.armored;
-    const tags = [l.armored ? '<span class="cable-tag is-good">Cut-proof</span>' : "", l.boosted ? `<span class="cable-tag is-good">+${RULES.amplifiedCableDamage} signal</span>` : "", worn ? `<span class="cable-tag is-bad">Frayed −${RULES.frayedCableDamage}</span>` : "", wraith ? `<span class="cable-tag${exposed ? " is-bad" : ""}">Span ${length.toFixed(1)}${exposed ? " · exposed" : ""}</span>` : ""].join("");
+    // The channel it carries, in that channel's table colour.
+    const channel = p.channelPaths.slice(0, p.channels).findIndex(path => path.some((id, i) => i > 0 && linkKey(path[i - 1], id) === linkKey(l.a, l.b)));
+    const tags = [channel >= 0 ? `<span class="cable-tag is-channel" style="--channel:${channelCss(channel)}">${channel ? `Channel ${channel + 1}` : "Primary channel"}</span>` : "", l.armored ? '<span class="cable-tag is-good">Cut-proof</span>' : "", l.boosted ? `<span class="cable-tag is-good is-amplified">Amplified · violet fibre · +${RULES.amplifiedCableDamage} signal</span>` : "", worn ? `<span class="cable-tag is-bad">Frayed −${RULES.frayedCableDamage}</span>` : "", wraith ? `<span class="cable-tag${exposed ? " is-bad" : ""}">Span ${length.toFixed(1)}${exposed ? " · exposed" : ""}</span>` : ""].join("");
     return `<li><span class="cable-ends">${glyph("cable", 16)}${upper(l.a)}<i>↔</i>${upper(l.b)}</span>${tags ? `<span class="cable-tags">${tags}</span>` : ""}</li>`;
   }).join("");
   const scrub = scrubCost(run);

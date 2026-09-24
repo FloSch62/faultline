@@ -3,6 +3,9 @@ import "./alpha.css";
 import "./polish.css";
 import "./battle.css";
 import "./game-ui.css";
+import "./table-ux.css";
+import "./targeting.css";
+import "./relocate.css";
 import { Soundscape, type ScoreScene } from "./audio.ts";
 import type { EffectKind } from "./audio-effects.ts";
 import { ENEMIES } from "./core/enemies.ts";
@@ -48,7 +51,6 @@ import {
   livingEnemies,
   effectiveFocus,
   setFocus,
-  aimChannel,
   mostDangerous,
   isWorn,
   conditionOf,
@@ -63,11 +65,15 @@ import {
   cableFrays,
   laysArmoredCable,
   type ActionResult,
+  type CombatPreview,
   type TurnResult,
 } from "./core/run.ts";
 import type { CardId, Port, RelicId, RunState, Zone } from "./core/types.ts";
 import { chooseOffer } from "./core/encounter.ts";
-import { World, type WorldPoint } from "./three/World.ts";
+import { World, type TableHover, type WorldPoint } from "./three/World.ts";
+import { hideHoverCard, hoverCardKey, moveHoverCard, showHoverCard } from "./hover-card.ts";
+import * as tableCards from "./table-cards.ts";
+import * as hostileCards from "./hostile-cards.ts";
 import { playTurn, syncWorld } from "./battle-playback.ts";
 import { loadAllModels } from "./three/models.ts";
 import * as ui from "./ui.ts";
@@ -93,7 +99,7 @@ void loadAllModels();
 const faultKey = (state: RunState) => `${state.faultNodes.join(",")}|${state.faultLinks.join(",")}`;
 const installationPoints = (state: RunState) => state.installations.reduce((sum, item) => sum + item.integrity, 0);
 /** Controls whose hover deserves a whisper; icon buttons and toolbars stay silent. */
-const HOVER_CUES = ".game-card:not(.drag-ghost), .route-room:not([disabled]), .archetype, .relic-option, [data-forge], .transmit-button, .console-button, .title-menu button, .gold-button, .field-seal.targetable, .lesson-card, button.port-row, .port-stud";
+const HOVER_CUES = ".game-card:not(.drag-ghost), .route-room:not([disabled]), .archetype, .relic-option, [data-forge], .transmit-button, .console-button, .title-menu button, .gold-button, .field-seal.targetable, .lesson-card, button.port-row, .hostile-plate[data-plate]";
 let expedition: Expedition | null = null;
 let records: RunRecord[] = [];
 try {
@@ -113,8 +119,8 @@ let daily = false;
 let selected: number | null = null;
 let source: string | null = null;
 let selectedNode: string | null = null;
-/** Far rail and table-front selection (reading only; focus and aims live in the run). */
-const hud: battleUi.HudView = { port: null, delivery: null, installation: null, demolition: false };
+/** Far rail and table-front selection (reading only; the target lives in the run). */
+const hud: battleUi.HudView = { port: null, installation: null, demolition: false };
 /** Encounters whose hidden designation was already re-engraved, and arrivals already announced. */
 let revealedKey = "", announcedKey = "", hudRoom = "";
 let busy = false;
@@ -145,8 +151,14 @@ let practice: {
   collapsed: boolean;
   /** Reading steps the player acknowledged (Got it, or a click on the spotlit control). */
   read: string[];
+  /** The finished lesson's completion plate is up (it rises a beat after the last goal). */
+  plate: boolean;
 } | null = null;
 let hintTimer = 0;
+/** The beat between a lesson's last goal and its completion plate. */
+let lessonEndTimer = 0;
+/** The spotlight's hole follows moving targets (badges over the rail) frame by frame. */
+let spotlightFrame = 0;
 /** Patch Cable (Architect console) is choosing its two devices. */
 let consoleTargeting = false;
 /** The encounter whose terrain title card has already been shown. */
@@ -162,13 +174,16 @@ let cardDrag: {
 } | null = null;
 let ignoreClick = false;
 let deviceDragging = false;
+/** A relocation waiting on its plate: the table shows the device at (x, z); nothing is paid until Relocate. */
+let pendingMove: { id: string; x: number; z: number; origin: Zone; destination: Zone } | null = null;
+let relocateFrame = 0;
 const undoStack: RunState[] = [];
 /** The screen last shown, so a new one can fade up instead of swapping like a page. */
 let lastScreen = "";
 
 
 $("#app").innerHTML =
-  `<main class="game-root"><div class="scene-backdrop"></div><div class="scene-shade"></div><div class="motes" aria-hidden="true">${Array.from({ length: 22 }, (_, i) => `<i style="--x:${(i * 47) % 100}%;--duration:${14 + (i % 8) * 3}s;--delay:-${i * 2.7}s;--size:${(i % 3) + 1}px"></i>`).join("")}</div><div class="world-stage"><canvas id="world" aria-label="Network battlefield. Use cards and the device targeting controls to build your route."></canvas></div><div class="texture"></div><header id="header" class="game-header"></header><div id="screen"></div><div id="battle-hud"></div><div id="hand-zone"></div><div id="target-dock"></div><div id="battle-foot"></div><div id="lesson-spotlight" aria-hidden="true"><i></i></div><div id="lesson-layer"></div><div id="game-tooltip" role="tooltip"></div><div id="impact-layer" aria-hidden="true"></div><div id="battle-flash"></div><div id="toast" role="status" aria-live="polite"></div><div class="now-playing" id="now-playing"></div></main><dialog id="dialog" aria-label="Field journal"><button class="dialog-close" data-action="close" aria-label="Close dialog">${ui.icon("close", 16)}</button><div class="dialog-surface"><div id="dialog-content"></div></div></dialog>`;
+  `<main class="game-root"><div class="scene-backdrop"></div><div class="scene-shade"></div><div class="motes" aria-hidden="true">${Array.from({ length: 22 }, (_, i) => `<i style="--x:${(i * 47) % 100}%;--duration:${14 + (i % 8) * 3}s;--delay:-${i * 2.7}s;--size:${(i % 3) + 1}px"></i>`).join("")}</div><div class="world-stage"><canvas id="world" aria-label="Network battlefield. Use cards and the device targeting controls to build your route."></canvas></div><div id="intent-layer" aria-hidden="true"></div><div class="texture"></div><header id="header" class="game-header"></header><div id="screen"></div><div id="battle-hud"></div><div id="hand-zone"></div><div id="target-dock"></div><div id="battle-foot"></div><div id="lesson-spotlight" aria-hidden="true"><i></i></div><div id="lesson-layer"></div><div id="game-tooltip" role="tooltip"></div><div id="hover-card" role="tooltip" aria-hidden="true"></div><div id="impact-layer" aria-hidden="true"></div><div id="battle-flash"></div><div id="toast" role="status" aria-live="polite"></div><div class="now-playing" id="now-playing"></div></main><dialog id="dialog" aria-label="Field journal"><button class="dialog-close" data-action="close" aria-label="Close dialog">${ui.icon("close", 16)}</button><div class="dialog-surface"><div id="dialog-content"></div></div></dialog>`;
 const root = $(".game-root"),
   dialog = $<HTMLDialogElement>("#dialog");
 sound.update({});
@@ -239,9 +254,10 @@ function ensureWorld() {
       onNode,
       onLink: () => {},
       onMove,
-      onPort: selectPort,
-      onAim: aimDelivery,
+      onPort: clickHostile,
+      onFrame: placeIntents,
       onInstallation: selectInstallation,
+      onHover: hoverTable,
     });
     world.setBattle(run.topology, run.enemies, run.faultNodes, run.faultLinks);
   } catch (error) {
@@ -253,7 +269,23 @@ function ensureWorld() {
     );
   }
 }
+/** Test hooks: on the dev server, and on a production build under the browser suite's render flag. */
+const testHooks = import.meta.env.DEV || (globalThis as { __faultlineTestRender?: boolean }).__faultlineTestRender === true;
+/** Hover cards on the table: devices, cables and installations (table-cards.ts), hostiles
+ * (hostile-cards.ts). The same target only moves the card; render() hides it. */
+function hoverTable(target: TableHover | null, x: number, y: number) {
+  if (!target || view !== "run" || run.phase !== "battle" || dialog.open || pendingMove) { hideHoverCard(); return; }
+  const key = `${target.kind}:${target.id}`;
+  if (hoverCardKey() === key) { moveHoverCard(x, y); return; }
+  const preview = combatPreview(run);
+  const html = target.kind === "port" || target.kind === "delivery"
+    ? hostileCards.hoverMarkup(run, preview, target)
+    : tableCards.hoverMarkup(run, preview, target);
+  if (html) showHoverCard(key, html, x, y);
+  else hideHoverCard();
+}
 function clearSelection() {
+  dropRelocation();
   cancelDrag();
   selected = null;
   source = null;
@@ -268,11 +300,15 @@ function clearSelection() {
   document.getElementById("movement-preview")?.remove();
 }
 function playable() {
-  return view === "run" && run.phase === "battle" && !busy && !dialog.open;
+  // A finished lesson is over: its board stays on screen, frozen, until the player moves on.
+  return view === "run" && run.phase === "battle" && !busy && !dialog.open && !practice?.progress?.complete;
 }
 function interfaceScale() { return Number.parseFloat(getComputedStyle($("#app")).zoom) || 1; }
 function render(rebuild = true) {
-  // A finished training battle stays on its board: the coach panel carries the debrief.
+  // Numbers may have changed under the pointer: the next pointer move rebuilds the hover card.
+  hideHoverCard();
+  // A training battle that ended (every hostile down, or the drill lost) stays on its board, frozen:
+  // the completion plate or the coach's restart note carries the debrief.
   const debrief = !!practice && view === "run" && run.phase !== "battle" && run.enemies.length > 0;
   const battle = view === "run" && (run.phase === "battle" || debrief);
   root.dataset.view = view === "run" ? (debrief ? "battle" : run.phase) : view;
@@ -286,25 +322,26 @@ function render(rebuild = true) {
   root.classList.toggle("busy", busy);
   root.classList.toggle("is-practice", !!practice);
   root.dataset.training = practice ? practice.id : "";
-  patchLessonLayer(practice && battle && practice.progress
-    ? training.lessonPanelMarkup(practice.progress, { showHint: practice.showHint, collapsed: practice.collapsed })
-    : "");
+  root.classList.toggle("lesson-over", !!practice?.progress?.complete && battle);
+  patchLessonLayer(battle ? lessonMarkup() : "");
   $("#header").innerHTML = screens.headerMarkup(
     expedition,
     view === "title" || view === "select",
     sound.settings,
   );
+  settleHud();
   if (battle) {
     ensureWorld();
     const forecast = combatPreview(run);
     // The table and the rail mirror the run, its forecast and the HUD's selections (battle-playback.ts).
     syncWorld(world, run, forecast, worldView(), { rebuild, debrief });
+    renderIntents(debrief ? null : forecast);
     root.dataset.guardianWindow = forecast.lethal ? "" : forecast.interrupted ? "break" : forecast.intent?.ultimate ? "ultimate" : forecast.intent?.kind === "charge" ? "charge" : leaderOf(run)?.exposed ? "exposed" : "";
     root.classList.toggle("is-buffering", run.buffering);
     showTerrainTitle();
     announceArrival(forecast);
   }
-  if (!battle) delete root.dataset.guardianWindow;
+  if (!battle) { delete root.dataset.guardianWindow; renderIntents(null); }
   world?.setVisible(battle);
   let screen = "";
   if (debrief) screen = "";
@@ -337,7 +374,6 @@ function render(rebuild = true) {
       chart.scrollLeft = Math.max(0, nextRoom.offsetLeft - chart.clientWidth / 2);
     }
   }
-  settleHud();
   const revealing = battle && !debrief && revealDesignation();
   const hudMarkup = battle
     ? battleUi.battleMarkup(run, {
@@ -374,15 +410,17 @@ function render(rebuild = true) {
       );
   if (selected !== null) document.querySelector(`[data-hand="${selected}"]`)?.scrollIntoView({block:"nearest",inline:"nearest"});
   if (practice && battle) fitLesson();
+  renderTargetDock();
+  // After the dock: a step may point at one of its controls (a relocation band, a scrub plate).
   spotlightLesson();
   if (practice && battle) railHand();
-  renderTargetDock();
   if (selected !== null && run.hand[selected])
     world?.setPlacement(CARDS[run.hand[selected]].role ?? null, source, laysArmoredCable(run.hand[selected]));
   else if (consoleTargeting) world?.setPlacement(null, source);
   else world?.setPlacement(null);
   world?.setSelected(source ?? selectedNode);
   world?.setZoneTargeting(selected !== null && CARDS[run.hand[selected]]?.target === "zone");
+  showRelocation();
   const scene = audioScene();
   sound.setScene(scene, `${run.seed}:${run.stage}:${run.currentRoom}:${practice ? "practice" : "expedition"}`, view === "run" ? run.stage : null);
   renderTrack();
@@ -493,7 +531,7 @@ function fitLedger() {
 /** Encounter-scoped HUD moments: a hidden designation re-engraves once, an announced arrival rings once. */
 function revealDesignation(): boolean {
   const key = `${run.seed}:${run.stage}:${run.currentRoom}`;
-  if (key !== hudRoom) { hudRoom = key; hud.port = hud.delivery = hud.installation = null; hud.demolition = false; }
+  if (key !== hudRoom) { hudRoom = key; hud.port = hud.installation = null; hud.demolition = false; }
   const room = run.map.find(item => item.id === run.currentRoom);
   if (practice || revealedKey === key || !room?.designationHidden || run.turn !== 1 || run.cardsPlayed) return false;
   revealedKey = key;
@@ -595,7 +633,9 @@ function renderTargetDock() {
         const repairButton = wearable ? `<button class="repair-button" data-repair="${node.id}" ${reason ? "disabled" : ""} data-tooltip="${ui.esc(reason || `Restore one condition point for ${cost} energy.`)}" aria-label="${ui.esc(`Repair ${node.id.toUpperCase()}, ${cost} energy, condition ${condition} of ${max}${reason ? `. ${reason}` : ""}`)}">${battleUi.glyph("wrench", 14)} Repair · ${cost}${ui.icon("bolt", 12)} · ${pip(condition)} → ${pip(Math.min(max, condition + 1))} <kbd>R</kbd></button>` : "";
         const source = (text: string) => text.replace(/^([^·]+?)(?= ·|$)/, name => name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase()));
         // One row where it fits (who, what threatens it, relocation, repair), wrapping to two.
-        markup = `<div class="target-options device-controls"><span><b>${ui.esc(node.id.toUpperCase())}</b>${wearable ? ` <i class="plate-pips${worn ? " is-worn" : ""}" aria-label="condition ${condition} of ${max}">${pip(condition)}</i>` : ""} · ${bandName(zoneForNode(node))}${node.fixed ? "" : online ? " · online" : " · offline"}${worn ? " · worn" : ""}${node.configured ? " · configured" : ""}${node.upgraded ? " · overclocked" : ""}${node.shielded ? " · jam protected" : ""}${node.salvage ? " · salvaged" : ""}${threat ? ` <em class="device-threat">${ui.esc(`${source(threat.source)} ${threat.breaks ? "breaks it" : `wears it ${threat.from} → ${threat.to}`}${threat.sheltered ? ` (${threat.nodeId.toUpperCase()} shelters it)` : ""}`)}</em>` : ""}</span><button data-action="cancel" class="target-cancel plate-close" aria-label="Close · Esc" data-tooltip="Close · Esc">${ui.icon("close", 11)}</button>${node.fixed && !repairButton ? "" : `<span class="dock-actions">${node.fixed ? "" : `<span class="dock-label">Relocate · ${RULES.relocateCost}${ui.icon("bolt", 12)}</span>${(["north", "center", "south"] as const).map(zone => `<button data-relocate-zone="${zone}" ${run.energy < RULES.relocateCost ? "disabled" : ""}>${bandName(zone)}</button>`).join("")}`}${repairButton}</span>`}</div>`;
+        // A band awaiting its answer on the relocation plate stays lit.
+        const asking = (zone: Zone) => pendingMove?.id === node.id && pendingMove.destination === zone;
+        markup = `<div class="target-options device-controls"><span><b>${ui.esc(node.id.toUpperCase())}</b>${wearable ? ` <i class="plate-pips${worn ? " is-worn" : ""}" aria-label="condition ${condition} of ${max}">${pip(condition)}</i>` : ""} · ${bandName(zoneForNode(node))}${node.fixed ? "" : online ? " · online" : " · offline"}${worn ? " · worn" : ""}${node.configured ? " · configured" : ""}${node.upgraded ? " · overclocked" : ""}${node.shielded ? " · jam protected" : ""}${node.salvage ? " · salvaged" : ""}${threat ? ` <em class="device-threat">${ui.esc(`${source(threat.source)} ${threat.breaks ? "breaks it" : `wears it ${threat.from} → ${threat.to}`}${threat.sheltered ? ` (${threat.nodeId.toUpperCase()} shelters it)` : ""}`)}</em>` : ""}</span><button data-action="cancel" class="target-cancel plate-close" aria-label="Close · Esc" data-tooltip="Close · Esc">${ui.icon("close", 11)}</button>${node.fixed && !repairButton ? "" : `<span class="dock-actions">${node.fixed ? "" : `<span class="dock-label">Relocate · ${RULES.relocateCost}${ui.icon("bolt", 12)}</span>${(["north", "center", "south"] as const).map(zone => `<button data-relocate-zone="${zone}"${asking(zone) ? ` class="active" aria-pressed="true"` : ""} ${run.energy < RULES.relocateCost ? "disabled" : ""}>${bandName(zone)}</button>`).join("")}`}${repairButton}</span>`}</div>`;
       }
     }
     if (selected === null && !selectedNode && hud.installation) {
@@ -873,37 +913,109 @@ function journalAction(move: () => void) {
   if (surface) surface.scrollTop = scroll;
   if (again) dialog.querySelector<HTMLElement>(again)?.focus();
 }
-/** Rails for the v4 moves (aim, focus, repair, scrub): the lesson guard refuses them outside their step. */
-function lessonMove(action: Extract<training.LessonAction, { kind: "aim" | "focus" | "repair" | "scrub" }>): boolean {
+/** Rails for the v4 moves (target, repair, scrub): the lesson guard refuses them outside their step. */
+function lessonMove(action: Extract<training.LessonAction, { kind: "focus" | "repair" | "scrub" }>): boolean {
   return lessonBlocks(action);
 }
-/** Select a port (rail plate, sprite or strip row): the right plate shows its hostile.
- * Reading only: selection never changes a number. */
-function selectPort(port: Port) {
-  if (!playable() || !livingEnemies(run).some(enemy => enemy.port === port)) return;
-  const changed = hud.port !== port;
-  hud.port = port;
-  render(false);
-  if (changed) sound.effect("select");
+/** A click on a hostile (its body, rail plate, intent badge or port-strip row) targets it. */
+function clickHostile(port: Port) {
+  focusPort(port);
 }
-/** Make a port the focus: every unaimed delivery and all overflow go there (free, undoable). */
+/** Make a port the target (the rules' focus): every delivery lands there and overflow carries the
+ * surplus on (free, undoable). The right plate details the target. Targeting the target changes nothing. */
 function focusPort(port: Port) {
   if (!playable() || !livingEnemies(run).some(enemy => enemy.port === port)) return;
-  hud.port = port;
-  if (effectiveFocus(run) === port && run.focus === port) { render(false); return; }
+  if (effectiveFocus(run) === port && run.focus === port) { hud.port = port; render(false); return; }
   if (lessonMove({ kind: "focus", port })) return;
+  hud.port = port;
   playAction(() => setFocus(run, port), "aim");
 }
-/** Re-aim one delivery at a port (null follows the focus): ledger studs, T, and the table's packet glyphs. */
-function aimDelivery(channelKey: string, port: Port | null) {
-  if (!playable()) return;
-  const delivery = combatPreview(run).deliveries.find(item => item.channelKey === channelKey);
-  if (!delivery) return;
-  hud.delivery = channelKey;
-  if (port !== null && delivery.port === port && (delivery.aimed || effectiveFocus(run) === port)) { render(false); return; }
-  if (lessonMove({ kind: "aim", key: channelKey, port })) return;
-  playAction(() => aimChannel(run, channelKey, port), "aim");
+let intentMarkup = "";
+/** The rail's plates (hostile-cards.ts): content on render, position on every drawn frame. */
+function renderIntents(forecast: ReturnType<typeof combatPreview> | null) {
+  const layer = document.getElementById("intent-layer");
+  if (!layer) return;
+  // Without a table (WebGL unavailable) there are no portraits to hang plates under: the HUD reads.
+  const markup = world && forecast && view === "run" && run.phase === "battle" ? hostileCards.intentBadges(run, forecast) : "";
+  if (markup !== intentMarkup) {
+    intentMarkup = markup;
+    layer.innerHTML = markup;
+  }
+  measureRail();
+  placeIntents();
 }
+/** The rail's frame for the table (client pixels): the span between the side plates, the header's
+ * items the portraits stay clear of, and the plates' size (the tallest plate is reserved under every
+ * portrait, so all feet stand on one line). */
+function measureRail() {
+  const layer = document.getElementById("intent-layer");
+  if (!world || !layer || !root.classList.contains("is-battle")) return;
+  const scale = interfaceScale(), canvas = $("#world").getBoundingClientRect(), box = root.getBoundingClientRect();
+  const rect = (selector: string) => Array.from(document.querySelectorAll<HTMLElement>(selector)).map(el => el.getBoundingClientRect()).filter(item => item.width && item.height);
+  const left = Math.max(canvas.left, box.left, ...rect(".is-battle .battle-left, .is-practice #lesson-layer .training-panel").map(item => item.right)) + 10 * scale;
+  const right = Math.min(canvas.right, box.right, ...rect(".is-battle .battle-right").map(item => item.left)) - 10 * scale;
+  // The leader's plate is the widest; the side plates are narrower, so escorts stand nearer the
+  // middle, clear of the header's items. Both shrink together on a narrow rail.
+  const short = root.getBoundingClientRect().height / scale <= 760;
+  const gap = 7 * scale, fit = Math.min(1, (right - left - gap * 4) / ((short ? 200 + 2 * 170 : 216 + 2 * 182) * scale));
+  const width = Math.round((short ? 200 : 216) * scale * fit), side = Math.round((short ? 170 : 182) * scale * fit);
+  layer.style.setProperty("--plate", `${(width / scale).toFixed(1)}px`);
+  layer.style.setProperty("--plate-side", `${(side / scale).toFixed(1)}px`);
+  const plates = Array.from(layer.querySelectorAll<HTMLElement>(".hostile-plate"));
+  const height = Math.max(58 * scale, ...plates.map(plate => plate.getBoundingClientRect().height));
+  world.setRailFrame({
+    left, right, top: Math.max(canvas.top, box.top) + 6 * scale,
+    obstacles: rect(".game-header .run-stats, .game-header .header-controls, .is-battle .encounter-heading")
+      .map(item => ({ left: item.left, top: item.top, right: item.right, bottom: item.bottom })),
+    plate: { width, side, height: Math.ceil(height), gap },
+  });
+}
+addEventListener("resize", () => { measureRail(); placeIntents(); });
+// The plates' type may land after the first render: measure their height again once it has.
+void document.fonts?.ready.then(() => { measureRail(); placeIntents(); });
+/** Hangs each plate under its portrait (the table moves with the camera and the frame). Positions
+ * are client pixels, the layer lives inside #app's interface zoom. */
+function placeIntents() {
+  const layer = document.getElementById("intent-layer");
+  if (!layer?.firstElementChild || !world) return;
+  const scale = interfaceScale(), origin = root.getBoundingClientRect();
+  let shown = false;
+  for (const plate of Array.from(layer.children) as HTMLElement[]) {
+    const port = (plate.dataset.plate ?? plate.dataset.arrival) as Port;
+    const at = world.portAnchor(port, !!plate.dataset.arrival);
+    if (plate.hidden && at) shown = true;
+    plate.hidden = !at;
+    if (!at) continue;
+    const place = `translate(${((at.x - origin.left) / scale).toFixed(1)}px, ${((at.y - origin.top) / scale).toFixed(1)}px)`;
+    if (plate.dataset.place !== place) { plate.dataset.place = place; plate.style.transform = `${place} translateX(-50%)`; }
+  }
+  // Plates wait for their portraits (a hostile's entrance): a lesson spotlight that fell back to the
+  // port strip moves onto them as soon as they stand.
+  if (shown && practice) spotlightLesson();
+}
+/** Hover cards off the canvas: an intent badge or a port-strip row shows its hostile's card, a
+ * channel of the landing breakdown its channel's card (the canvas raises its own through hoverTable). */
+document.addEventListener("pointermove", event => {
+  const el = event.target as HTMLElement;
+  if (el.id === "world") return;
+  const spot = el.closest?.<HTMLElement>("[data-hover-port], [data-hover-delivery]");
+  if (!spot || view !== "run" || run.phase !== "battle" || dialog.open) {
+    if (hoverCardKey().startsWith("dom:")) hideHoverCard();
+    return;
+  }
+  const target: TableHover = spot.dataset.hoverPort ? { kind: "port", id: spot.dataset.hoverPort } : { kind: "delivery", id: spot.dataset.hoverDelivery! };
+  const key = `dom:${target.kind}:${target.id}`;
+  // A row of the right plate keeps its card beside the plate, clear of the rows it reads.
+  const plate = spot.closest(".battle-right")?.getBoundingClientRect();
+  const x = plate ? plate.left : event.clientX;
+  if (hoverCardKey() === key) { moveHoverCard(x, event.clientY); return; }
+  const html = hostileCards.hoverMarkup(run, combatPreview(run), target);
+  if (html) showHoverCard(key, html, x, event.clientY);
+  else hideHoverCard();
+});
+document.addEventListener("pointerout", event => {
+  if (!event.relatedTarget && hoverCardKey().startsWith("dom:")) hideHoverCard();
+});
 /** Select an installation (table click, ledger or journal): its scrub plate opens in the dock.
  * While Demolition Charge is choosing, the installation is its target instead. */
 function selectInstallation(id: string) {
@@ -931,20 +1043,21 @@ function mostWornDevice() {
   return run.topology.nodes.filter(isWorn)
     .sort((a, b) => conditionOf(a) - maxConditionOf(a) - (conditionOf(b) - maxConditionOf(b)) || Number(!primary.includes(a.id)) - Number(!primary.includes(b.id)))[0] ?? null;
 }
-/** The view the table mirrors: selected port, delivery and installation, and installation targeting. */
+/** The view the table mirrors: selected port and installation, and installation targeting. */
 function worldView() {
   return {
     selectedPort: hud.port,
-    selectedDelivery: hud.delivery,
     selectedInstallation: hud.installation,
     targetingInstallation: hud.demolition,
   };
 }
 // Browser tests reach the table's click targets without the canvas (dev server only).
-if (import.meta.env.DEV) (globalThis as { __faultlineHud?: unknown }).__faultlineHud = { selectPort, selectInstallation, aimDelivery, focusPort, selectNode: onNode };
+if (testHooks) (globalThis as { __faultlineHud?: unknown }).__faultlineHud = { selectPort: clickHostile, clickHostile, selectInstallation, focusPort, selectNode: onNode };
+// …and the rail's portraits: each painted box on screen (client pixels) as drawn this frame.
+if (testHooks) (globalThis as { __faultlineRail?: unknown }).__faultlineRail = { portrait: (port: Port) => world?.portraitRect(port) ?? null };
 /** Forget selections that no longer point at anything (a fallen hostile, a scrubbed installation). */
 function settleHud() {
-  if (view !== "run" || run.phase !== "battle") { hud.port = hud.delivery = hud.installation = null; hud.demolition = false; return; }
+  if (view !== "run" || run.phase !== "battle") { hud.port = hud.installation = null; hud.demolition = false; return; }
   if (hud.port && !livingEnemies(run).some(enemy => enemy.port === hud.port)) hud.port = null;
   if (hud.installation && !run.installations.some(item => item.id === hud.installation)) hud.installation = null;
   if (hud.demolition && (selected === null || baseCard(run.hand[selected] ?? "guard") !== "demolition-charge")) hud.demolition = false;
@@ -1021,56 +1134,201 @@ function onMove(id: string, point: WorldPoint | null, finished: boolean) {
     if (finished) { deviceDragging = false; clearSelection(); render(); }
     else {
       const preview=document.getElementById("movement-preview");
-      if(preview) { preview.className="blocked"; preview.textContent="Outside the build grid · release to cancel"; }
+      if (preview) { preview.className = "relocate-plate blocked"; preview.innerHTML = `<p class="relocate-hint">Outside the build grid · release to cancel</p>`; }
       world?.setZonePreview(null);
     }
     return;
   }
   if (finished) {
     deviceDragging = false;
-    const destination = zoneForNode(point), origin = zoneForNode(node);
-    if (lessonBlocks({ kind: "move", node: id, zone: destination })) { clearSelection(); render(); return; }
-    // One cue per drop: a real relocation slides the device; dropping it back in place is a soft return.
-    const moved = Math.hypot(node.x - point.x, node.z - point.z) >= .01;
-    if (!playAction(() => relocateNode(run, id, point.x, point.z), moved ? "move" : "undo")) { clearSelection(); render(); }
-    else if (origin !== destination) { world?.pulseZone(destination,"move"); toast(`${id.toUpperCase()} · ${origin.toUpperCase()} → ${destination.toUpperCase()} · ${RULES.relocateCost} energy`); }
+    // Dropped back in its own socket: nothing moves, nothing to ask (a soft return).
+    if (atHome(node, point)) { clearSelection(); render(); sound.effect("undo"); return; }
+    if (lessonBlocks({ kind: "move", node: id, zone: zoneForNode(point) })) { clearSelection(); render(); return; }
+    // The drop only proposes: the plate beside the device asks before any energy is spent.
+    clearSelection();
+    proposeRelocation(id, point);
     return;
   }
-  const blocked = run.energy < RULES.relocateCost ? "Not enough energy" : isBlocked(run, point.x, point.z, id) ?? "";
-  const origin = zoneForNode(node), destination = zoneForNode(point);
-  const next = structuredClone(run);
-  const nextNode = next.topology.nodes.find(n=>n.id===id)!;
-  nextNode.x=point.x; nextNode.z=point.z;
-  const before = combatPreview(run), after = combatPreview(next);
+  const home = atHome(node, point);
+  const blocked = home ? "" : run.energy < RULES.relocateCost ? "Not enough energy" : isBlocked(run, point.x, point.z, id) ?? "";
+  const next = home ? run : movedRun(id, point.x, point.z), destination = zoneForNode(home ? node : point);
   let preview = document.getElementById("movement-preview");
   if (!preview) { preview = document.createElement("div"); preview.id="movement-preview"; preview.setAttribute("role","status"); root.append(preview); }
-  preview.className=blocked ? "blocked" : "";
-  preview.innerHTML=`<span class="move-caption">RELOCATE ${ui.esc(id.toUpperCase())}</span><strong>${origin.toUpperCase()} ${ui.icon("arrow",16)} ${destination.toUpperCase()}</strong><span>${ui.esc(blocked || `Release to move · ${RULES.relocateCost} energy`)}</span><div><span>Damage <b>${before.packetDamage} → ${after.packetDamage}</b></span><span>Shield <b>${before.shield} → ${after.shield}</b></span><span>Life lost <b>${before.incoming} → ${after.incoming}</b></span>${after.channels !== before.channels ? `<span>Channels <b>${before.channels} → ${after.channels}</b></span>` : ""}</div><small>${ui.esc(zoneDescription(run,destination))}</small>`;
+  preview.className = `relocate-plate${blocked ? " blocked" : ""}`;
+  preview.innerHTML = relocationMarkup(id, zoneForNode(node), destination, combatPreview(run), combatPreview(next), true)
+    + `<p class="relocate-hint">${ui.esc(blocked || (home ? "Release to leave it in place" : "Release to choose this socket"))}</p><small>${ui.esc(zoneDescription(run, destination))}</small>`;
+  placeRelocationPlate(preview, point.x, point.z);
   world?.setZonePreview(destination, !!blocked);
   deviceDragging = true;
-  if (blocked) return;
-  // A drag previews geometry; only the drop pays energy and mutates the run.
-  deviceDragging = true;
-  const topology = structuredClone(run.topology);
-  const moved = topology.nodes.find(n => n.id === id)!;
-  moved.x = point.x; moved.z = point.z;
-  world?.previewTopology(topology);
+  // A drag previews geometry; only a confirmed drop pays energy and mutates the run.
+  if (!blocked) world?.previewTopology(next.topology);
 }
+/** Device dock bands: the same plate asks, with the chosen socket shown on the table. Choosing the
+ * band the device stands in withdraws a pending move. */
 function relocateToZone(zone: "north" | "center" | "south") {
   if (!selectedNode || !playable()) return;
   const id = selectedNode;
   const node = run.topology.nodes.find(n => n.id === id)!;
-  if (zoneForNode(node) === zone) { toast(`${id.toUpperCase()} is already in ${zone.toUpperCase()}.`); return; }
+  if (zoneForNode(node) === zone) {
+    if (pendingMove?.id === id) cancelRelocation();
+    else toast(`${id.toUpperCase()} is already in ${zone.toUpperCase()}.`);
+    return;
+  }
+  if (pendingMove?.id === id && pendingMove.destination === zone) { document.querySelector<HTMLElement>("[data-relocate-confirm]")?.focus({ preventScroll: true }); return; }
   if (lessonBlocks({ kind: "move", node: id, zone })) return;
   let spot: WorldPoint | undefined;
   for (const z of { north: [-2.5, -3.6, -1.8], center: [0, 0.9, -0.9], south: [2.5, 3.6, 1.8] }[zone])
     for (const x of [node.x, 0, -1.25, 1.25, -2.5, 2.5, -3.75, 3.75, -4.5, 4.5])
       if (!spot && !isBlocked(run, x, z, id)) spot = { x, z };
   if (!spot) { toast("No free socket in that band.", "error"); return; }
-  const { x, z } = spot;
-  if (!playAction(() => relocateNode(run, id, x, z), "move")) return;
-  world?.pulseZone(zone,"move");
-  toast(`${id.toUpperCase()} → ${zone.toUpperCase()} · ${RULES.relocateCost} energy · ${zoneDescription(run,zone)}`);
+  proposeRelocation(id, spot);
+}
+/** A drop on its own snap cell leaves a device where it stands: drops snap to half units, and a device
+ * placed off that grid (a band's socket at x 1.25, z 1.8) is up to half a cell's diagonal from it. */
+const atHome = (node: WorldPoint, point: WorldPoint) => Math.hypot(node.x - point.x, node.z - point.z) < .36;
+/** The run with one device standing at (x, z): what the drag and the plate preview. */
+function movedRun(id: string, x: number, z: number) {
+  const next = structuredClone(run);
+  const node = next.topology.nodes.find(n => n.id === id);
+  if (node) { node.x = x; node.z = z; }
+  return next;
+}
+/** The relocation plate's reading: the move, its cost, and before → after from the forecast. The drag
+ * lists shield and life lost even when they hold (it explores); the confirm plate keeps what changes. */
+function relocationMarkup(id: string, origin: Zone, destination: Zone, before: CombatPreview, after: CombatPreview, every: boolean) {
+  const line = (label: string, from: number, to: number, better: number, always = every) => always || from !== to
+    ? `<span class="${from === to ? "" : (to - from) * better > 0 ? "is-better" : "is-worse"}">${label}<b>${from} → <i>${to}</i></b></span>` : "";
+  const bands = origin === destination ? `${bandName(origin)} · new socket` : `${bandName(origin)} ${ui.icon("arrow", 13)} ${bandName(destination)}`;
+  return `<div class="relocate-head"><b>${ui.esc(id.toUpperCase())}</b><span>${bands}</span><em aria-label="${RULES.relocateCost} energy">${RULES.relocateCost}${ui.icon("bolt", 13)}</em></div>`
+    + `<div class="relocate-lines">${line("Damage", before.packetDamage, after.packetDamage, 1, true)}${line("Shield", before.shield, after.shield, 1)}${line("Life lost", before.incoming, after.incoming, -1)}${line("Channels", before.channels, after.channels, 1, false)}</div>`;
+}
+/** The plate stands beside the device's socket, on the side with room, inside the table's column (clear
+ * of the side plates, the header, the device dock and the hand); its stud points at the device. */
+function placeRelocationPlate(plate: HTMLElement, x: number, z: number) {
+  if (!world) return;
+  const scale = interfaceScale(), box = root.getBoundingClientRect();
+  const edge = (selector: string) => { const rect = document.querySelector(selector)?.getBoundingClientRect(); return rect?.width ? rect : null; };
+  const left = edge(".battle-left"), right = edge(".battle-right"), header = edge("#header");
+  const floor = edge("#target-dock:not(:empty)") ?? edge("#hand-zone .card-fan");
+  const width = plate.offsetWidth, height = plate.offsetHeight, gap = 46;
+  let minX = left ? (left.right - box.left) / scale + 10 : 10, maxX = (right ? (right.left - box.left) / scale : box.width / scale) - 10;
+  let minY = header ? (header.bottom - box.top) / scale + 8 : 10, maxY = (floor ? (floor.top - box.top) / scale : box.height / scale) - 10;
+  // A narrow layout stacks its plates: then the whole window is the room.
+  if (maxX - minX < width) { minX = 10; maxX = box.width / scale - 10; }
+  if (maxY - minY < height) { minY = 10; maxY = box.height / scale - 10; }
+  // The stud points at the device's body, a little above the table.
+  const at = world.screenFromPoint(x, z, .8), px = (at.x - box.left) / scale, py = (at.y - box.top) / scale;
+  const east = px + gap + width <= maxX || px - gap - width < minX;
+  const leftAt = Math.max(minX, Math.min(maxX - width, east ? px + gap : px - gap - width));
+  const topAt = Math.max(minY, Math.min(maxY - height, py - height / 2));
+  plate.dataset.side = east ? "east" : "west";
+  plate.style.left = `${Math.round(leftAt)}px`;
+  plate.style.top = `${Math.round(topAt)}px`;
+  plate.style.setProperty("--stud", `${Math.round(Math.max(14, Math.min(height - 14, py - topAt)))}px`);
+}
+/** Ask before a relocation. The rules vet it on a copy (energy, grid, wreckage), so a refused move never
+ * asks; an accepted one shows on the table beside its plate until Relocate or Cancel. */
+function proposeRelocation(id: string, spot: WorldPoint) {
+  const node = run.topology.nodes.find(n => n.id === id);
+  if (!node || !playable()) return;
+  const trial = relocateNode(structuredClone(run), id, spot.x, spot.z);
+  if (!trial.ok) {
+    dropRelocation();
+    toast(trial.message, "error");
+    sound.effect("error");
+    render();
+    return;
+  }
+  pendingMove = { id, x: spot.x, z: spot.z, origin: zoneForNode(node), destination: zoneForNode(spot) };
+  render(false);
+  document.querySelector<HTMLElement>("[data-relocate-confirm]")?.focus({ preventScroll: true });
+  sound.effect("select");
+}
+let relocationHtml = "";
+/** While a relocation waits, the table shows the run with the device moved (routes, channels, forecast
+ * marks), its band lights, and the plate asks beside it. render() calls this; it never half-keeps a move. */
+function showRelocation() {
+  const move = pendingMove;
+  if (!move) return;
+  if (!playable() || !run.topology.nodes.some(n => n.id === move.id)) { dropRelocation(); return; }
+  const next = movedRun(move.id, move.x, move.z), after = combatPreview(next);
+  if (world) { syncWorld(world, next, after, worldView(), { rebuild: true }); world.setZonePreview(move.destination); }
+  let plate = document.getElementById("relocate-confirm");
+  if (!plate) {
+    plate = document.createElement("div");
+    plate.id = "relocate-confirm";
+    plate.className = "relocate-plate";
+    plate.setAttribute("role", "dialog");
+    root.append(plate);
+  }
+  plate.setAttribute("aria-label", `Relocate ${move.id.toUpperCase()} from ${bandName(move.origin)} to ${bandName(move.destination)} for ${RULES.relocateCost} energy`);
+  const html = relocationMarkup(move.id, move.origin, move.destination, combatPreview(run), after, false)
+    + `<div class="relocate-actions"><button data-relocate-confirm>Relocate <kbd>Enter</kbd></button><button data-relocate-cancel>Cancel <kbd>Esc</kbd></button></div>`;
+  // Rewritten only when the reading changes, so a focused button keeps its focus.
+  if (html !== relocationHtml) { plate.innerHTML = html; relocationHtml = html; }
+  // A faint ring keeps the socket it would leave: Cancel puts it back there.
+  let mark = document.getElementById("relocate-origin");
+  if (!mark) { mark = document.createElement("div"); mark.id = "relocate-origin"; mark.setAttribute("aria-hidden", "true"); root.append(mark); }
+  const place = () => {
+    const from = run.topology.nodes.find(n => n.id === pendingMove?.id);
+    if (from) placeOriginMark(mark, from.x, from.z);
+    if (pendingMove) placeRelocationPlate(plate, pendingMove.x, pendingMove.z);
+  };
+  place();
+  // The plate follows its device while the camera settles or zooms.
+  if (!relocateFrame) {
+    const follow = () => {
+      if (!pendingMove || !plate.isConnected) { relocateFrame = 0; return; }
+      place();
+      relocateFrame = requestAnimationFrame(follow);
+    };
+    relocateFrame = requestAnimationFrame(follow);
+  }
+}
+/** The origin ring: the socket's footprint projected onto the table (a perspective ellipse). */
+function placeOriginMark(mark: HTMLElement, x: number, z: number) {
+  if (!world) return;
+  const scale = interfaceScale(), box = root.getBoundingClientRect(), r = .72;
+  const [west, east, north, south] = [[x - r, z], [x + r, z], [x, z - r], [x, z + r]].map(([px, pz]) => world!.screenFromPoint(px, pz, 0));
+  const width = Math.hypot(east.x - west.x, east.y - west.y) / scale, height = Math.abs(south.y - north.y) / scale;
+  mark.style.left = `${Math.round(((west.x + east.x) / 2 - box.left) / scale - width / 2)}px`;
+  mark.style.top = `${Math.round(((north.y + south.y) / 2 - box.top) / scale - height / 2)}px`;
+  mark.style.width = `${Math.round(width)}px`;
+  mark.style.height = `${Math.round(height)}px`;
+}
+function closeRelocationPlate() {
+  document.getElementById("relocate-confirm")?.remove();
+  document.getElementById("relocate-origin")?.remove();
+  relocationHtml = "";
+  cancelAnimationFrame(relocateFrame);
+  relocateFrame = 0;
+}
+/** Forget the pending relocation: the plate goes and the table shows the run again. */
+function dropRelocation() {
+  if (!pendingMove) return;
+  pendingMove = null;
+  closeRelocationPlate();
+  world?.setZonePreview(null);
+  if (world && view === "run" && run.phase === "battle") syncWorld(world, run, combatPreview(run), worldView(), { rebuild: true });
+}
+/** Cancel (Esc, Z, right-click, a click elsewhere): the device stays where it stood. */
+function cancelRelocation(audible = true) {
+  if (!pendingMove) return;
+  dropRelocation();
+  render(false);
+  if (audible) sound.effect("undo");
+}
+/** Relocate: the rules check the move again (energy included); it lands like any action — undoable,
+ * with the move cue, the band's pulse and the toast. */
+function confirmRelocation() {
+  const move = pendingMove;
+  if (!move || !playable()) return;
+  pendingMove = null;
+  closeRelocationPlate();
+  if (!playAction(() => relocateNode(run, move.id, move.x, move.z), "move")) { clearSelection(); render(); return; }
+  if (move.origin === move.destination) return;
+  world?.pulseZone(move.destination, "move");
+  toast(`${move.id.toUpperCase()} · ${move.origin.toUpperCase()} → ${move.destination.toUpperCase()} · ${RULES.relocateCost} energy · ${zoneDescription(run, move.destination)}`);
 }
 
 function autoPlace(zone?: "north" | "center" | "south") {
@@ -1173,7 +1431,7 @@ function transmit(instant = false) {
         number.style.marginLeft = `${-number.offsetWidth / 2}px`;
       },
       render: rebuild => render(rebuild),
-      showPortHit: battleUi.showPortHit,
+      showPortHit: (port, hp, maxHp) => { battleUi.showPortHit(port, hp, maxHp); hostileCards.showPlateHit(port, hp, maxHp); },
       data: (key, value) => { if (value === null) delete root.dataset[key]; else root.dataset[key] = value; },
       shake: () => {
         root.classList.remove("shake");
@@ -1223,7 +1481,6 @@ function devReplace(next: Expedition): boolean {
   revealedKey = "";
   announcedKey = "";
   hud.port = null;
-  hud.delivery = null;
   save();
   render();
   return true;
@@ -1291,15 +1548,20 @@ async function action(name: string) {
   if (name === "lesson-restart" && practice) { startLesson(practice.id); return; }
   if (name === "lesson-next" && practice) {
     const next = training.nextLesson(practice.id);
+    // A guide opens in the dialog: leave the finished board first, so nothing of it waits behind.
+    if (!next || next.kind === "walkthrough") finishPractice();
     if (next) openLesson(next.id);
-    else finishPractice();
     return;
   }
   if (name === "lesson-exit") { finishPractice(); return; }
-  if (name === "lesson-finish") {
+  // The completion plate's Training menu leaves the lesson; the menu opens over what was parked.
+  if (name === "lesson-training") { finishPractice(); openModal("training"); return; }
+  if (name === "lesson-finish" || name === "lesson-finish-next") {
     training.markLessonComplete(training.WALKTHROUGH_LESSON);
     sound.effect("reward");
-    openModal("training");
+    const next = name === "lesson-finish-next" ? training.nextLesson(training.WALKTHROUGH_LESSON) : undefined;
+    if (next) openLesson(next.id);
+    else openModal("training");
     return;
   }
   if (name === "inspect-back" && inspectReturn) {
@@ -1407,6 +1669,15 @@ document.addEventListener("click", (event) => {
   });
   const button = target.closest<HTMLButtonElement>("button");
   if (button?.disabled) return;
+  // The relocation plate answers its own buttons (and the dock's bands re-choose); any other click
+  // withdraws the pending move first, and a click on Undo only withdraws it, like Z. The table answers
+  // at pointerdown (below): the click that ends the drop itself must not cancel it.
+  if (target.closest("[data-relocate-confirm]")) { confirmRelocation(); return; }
+  if (target.closest("[data-relocate-cancel]")) { cancelRelocation(); return; }
+  if (pendingMove && !target.closest("#relocate-confirm, [data-relocate-zone], #world")) {
+    cancelRelocation(false);
+    if (target.closest('[data-action="undo"]')) return;
+  }
   const name = target.closest<HTMLElement>("[data-action]")?.dataset.action;
   if (name) {
     void action(name);
@@ -1441,16 +1712,10 @@ document.addEventListener("click", (event) => {
     sound.effect("select");
     return;
   }
-  // The far rail: the crest sets the focus, a row selects its port, a stud aims a delivery.
+  // The far rail: a hostile's plate or strip row targets it.
   if (!dialog.open) {
-    const crest = target.closest<HTMLElement>("[data-focus-port]")?.dataset.focusPort as Port | undefined;
-    if (crest) { focusPort(crest); return; }
-    const row = target.closest<HTMLElement>(".port-row[data-port]")?.dataset.port as Port | undefined;
-    if (row) { selectPort(row); return; }
-    const stud = target.closest<HTMLElement>("[data-aim][data-aim-port]");
-    if (stud) { aimDelivery(stud.dataset.aim!, stud.dataset.aimPort as Port); return; }
-    const delivery = target.closest<HTMLElement>(".delivery-row[data-delivery]")?.dataset.delivery;
-    if (delivery && playable()) { hud.delivery = delivery; render(false); sound.effect("select"); return; }
+    const hostile = (target.closest<HTMLElement>(".hostile-plate[data-plate]")?.dataset.plate ?? target.closest<HTMLElement>(".port-row[data-port]")?.dataset.port) as Port | undefined;
+    if (hostile) { clickHostile(hostile); return; }
     const demolishId = target.closest<HTMLElement>("[data-demolish]")?.dataset.demolish;
     if (demolishId) { selectInstallation(demolishId); return; }
   }
@@ -1621,6 +1886,14 @@ dialog.addEventListener("click", (event) => {
   const box = dialog.getBoundingClientRect();
   if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) closeModal();
 });
+// While the relocation plate asks, a press on the table (either button) answers "no" and starts nothing:
+// no second drag, click or orbit.
+document.addEventListener("pointerdown", (event) => {
+  if (!pendingMove || !(event.target as HTMLElement).closest?.("#world")) return;
+  event.stopPropagation();
+  event.preventDefault();
+  cancelRelocation();
+}, true);
 // Drag hardware cards directly onto the table; cables and upgrades use explicit targeting.
 document.addEventListener("pointerdown", (event) => {
   if (!playable() || event.button !== 0) return;
@@ -1669,7 +1942,7 @@ window.addEventListener("pointermove", (event) => {
 });
 function cancelDrag() {
   document.getElementById("movement-preview")?.remove();
-  world?.setZonePreview(null);
+  world?.setZonePreview(pendingMove?.destination ?? null);
   const restorePreview = deviceDragging;
   deviceDragging = false;
   cardDrag?.ghost?.remove();
@@ -1696,9 +1969,7 @@ window.addEventListener("pointerup", (event) => {
   setTimeout(() => (ignoreClick = false), 0);
 });
 document.addEventListener("keydown", (event) => {
-  // [ and ] need AltGr on some layouts (German): let exactly those through.
-  const altGraph = (event.key === "[" || event.key === "]") && event.getModifierState?.("AltGraph");
-  if (((event.ctrlKey || event.altKey) && !altGraph) || event.metaKey || event.repeat) return;
+  if (event.ctrlKey || event.altKey || event.metaKey || event.repeat) return;
   // A message waits for its answer: 1, 2, 3 choose.
   if (dialog.open && modal === "offer") {
     if (/^[1-9]$/.test(event.key) && dialog.querySelector(`[data-offer="${Number(event.key) - 1}"]`)) {
@@ -1708,6 +1979,15 @@ document.addEventListener("keydown", (event) => {
     return;
   }
   if (event.target instanceof HTMLInputElement || dialog.open) return;
+  // The relocation plate asks first: Enter relocates, Esc or Z cancels. A focused button keeps Enter and
+  // Space (the plate's own answer it); any other command key withdraws the move and goes on.
+  if (pendingMove) {
+    const key = event.key.toLowerCase(), el = event.target as HTMLElement;
+    if (key === "escape" || key === "z") { event.preventDefault(); cancelRelocation(); return; }
+    if (key === "enter" && !(el instanceof HTMLButtonElement)) { event.preventDefault(); confirmRelocation(); return; }
+    if ((key === "enter" || key === " ") && el.closest?.("#relocate-confirm")) return;
+    if (key === "enter" || key.length === 1) cancelRelocation(false);
+  }
   if (event.key.toLowerCase() === "i") {
     const card = ((event.target as HTMLElement).closest<HTMLElement>("[data-card-id]")?.dataset.cardId ?? (selected !== null ? run.hand[selected] : undefined)) as CardId | undefined;
     if (card) { event.preventDefault(); inspectCard(card); return; }
@@ -1779,36 +2059,17 @@ window.addEventListener("pagehide", (event) => {
   save();
   if (!event.persisted) world?.dispose();
 });
-/** Targeting and table-front keys (13.8): F focus, [ ] choose a delivery, T aim it, R repair, S scrub. */
+/** Targeting and table-front keys (13.8): F cycles the target, R repair, S scrub. */
 function tableKey(event: KeyboardEvent): boolean {
   const key = event.key.toLowerCase();
-  if (!["f", "[", "]", "t", "r", "s"].includes(key)) return false;
+  if (!["f", "r", "s"].includes(key)) return false;
   event.preventDefault();
   const living = livingEnemies(run).map(enemy => enemy.port);
   if (key === "f") {
-    if (hud.port && living.includes(hud.port) && hud.port !== effectiveFocus(run)) focusPort(hud.port);
-    else if (living.length > 1) {
+    if (living.length > 1) {
       const focus = effectiveFocus(run);
       focusPort(living[(living.indexOf(focus ?? living[0]) + 1) % living.length]);
     }
-    return true;
-  }
-  if (key === "[" || key === "]") {
-    const deliveries = combatPreview(run).deliveries;
-    if (!deliveries.length) return true;
-    const at = deliveries.findIndex(item => item.channelKey === hud.delivery);
-    const next = at < 0 ? (key === "]" ? 0 : deliveries.length - 1) : (at + (key === "]" ? 1 : -1) + deliveries.length) % deliveries.length;
-    hud.delivery = deliveries[next].channelKey;
-    render(false);
-    sound.effect("select");
-    document.querySelector<HTMLElement>(`.delivery-row[data-delivery="${CSS.escape(hud.delivery)}"] .port-stud.is-current`)?.focus({ preventScroll: true });
-    return true;
-  }
-  if (key === "t") {
-    const deliveries = combatPreview(run).deliveries;
-    const delivery = deliveries.find(item => item.channelKey === hud.delivery) ?? deliveries[0];
-    if (!delivery || living.length < 2) return true;
-    aimDelivery(delivery.channelKey, living[(living.indexOf(delivery.port) + 1) % living.length]);
     return true;
   }
   if (key === "r") {
@@ -1867,13 +2128,14 @@ function startLesson(id: training.LessonId) {
   modal = "";
   cancelDrag();
   clearTimeout(hintTimer);
+  clearTimeout(lessonEndTimer);
   const parked = practice
     ? { expedition: practice.expedition, run: practice.run, view: practice.view, undo: practice.undo }
     : { expedition, run, view, undo: undoStack.map(state => structuredClone(state)) };
   const lessonRun = training.createLessonRun(id);
   // Short screens start with the coach folded to its current goal; it expands on demand.
   const short = root.getBoundingClientRect().height / interfaceScale() < 780;
-  practice = { id, ...parked, progress: null, showHint: false, collapsed: practice?.collapsed ?? short, read: [] };
+  practice = { id, ...parked, progress: null, showHint: false, collapsed: practice?.collapsed ?? short, read: [], plate: false };
   expedition = { version: EXPEDITION_VERSION, run: lessonRun, archetype: lessonRun.archetype, daily: false, startedAt: Date.now(), recorded: true };
   run = lessonRun;
   view = "run";
@@ -1881,8 +2143,8 @@ function startLesson(id: training.LessonId) {
   battleGeneration++;
   undoStack.length = 0;
   clearSelection();
-  // A drill starts unread: no port or delivery carried over from another board.
-  hud.port = hud.delivery = null;
+  // A drill starts unread: no port carried over from another board.
+  hud.port = null;
   lessonViewKey = "";
   handKey = "";
   world?.resetCamera();
@@ -1895,6 +2157,7 @@ function finishPractice() {
   if (!practice) { if (dialog.open) closeModal(); return; }
   cancelDrag();
   clearTimeout(hintTimer);
+  clearTimeout(lessonEndTimer);
   const previous = practice;
   practice = null;
   expedition = previous.expedition;
@@ -1927,10 +2190,39 @@ function updateLesson() {
   if (progress.complete && !before?.complete) {
     training.markLessonComplete(practice.id);
     clearTimeout(hintTimer);
-    sound.effect("reward", { delay: .35 });
+    endLesson();
   }
 }
-/** What the lessons read beyond the run: the selected port and the reading steps acknowledged. */
+/** The last goal is met: the lesson is over. The board freezes at once (playable() refuses every
+ * move, the scrim takes the pointer, nothing can be undone into it), and after a beat, so the final
+ * transmission's numbers or the last card's effect can land, the completion plate rises. */
+function endLesson() {
+  if (!practice) return;
+  undoStack.length = 0;
+  root.classList.add("lesson-over");
+  sound.effect("reward", { delay: .35 });
+  const lesson = practice, generation = battleGeneration;
+  clearTimeout(lessonEndTimer);
+  lessonEndTimer = window.setTimeout(() => {
+    if (practice !== lesson || generation !== battleGeneration || !lesson.progress?.complete) return;
+    lesson.plate = true;
+    renderLesson();
+    document.querySelector<HTMLElement>(".lesson-end [data-autofocus]")?.focus({ preventScroll: true });
+  }, sound.settings.motion && !preferences.fast ? 1100 : 300);
+}
+/** The lesson layer: the coach panel, and once the lesson is over the scrim and its completion plate. */
+function lessonMarkup(): string {
+  if (!practice?.progress) return "";
+  return training.lessonPanelMarkup(practice.progress, { showHint: practice.showHint, collapsed: practice.collapsed })
+    + training.lessonEndMarkup(practice.progress, practice.plate);
+}
+// Browser tests read the drill's state (lesson runs are never saved). Dev server only.
+if (testHooks) (globalThis as { __faultlineLesson?: unknown }).__faultlineLesson = () => practice && {
+  id: practice.id, turn: run.turn, focus: effectiveFocus(run),
+  deliveries: run.phase === "battle" && run.enemies.length ? combatPreview(run).deliveries.map(item => ({ key: item.channelKey, port: item.port })) : [],
+  step: practice.progress?.current ?? 0, complete: !!practice.progress?.complete, plate: practice.plate,
+};
+/** What the lessons read beyond the run: the selected port, the lifted card and the reading steps acknowledged. */
 function lessonView(): training.LessonView {
   return { port: hud.port, read: practice?.read ?? [], selected: selected !== null ? run.hand[selected] ?? null : null };
 }
@@ -1944,8 +2236,7 @@ function syncLessonView() {
   lessonViewKey = key;
   const before = practice.progress;
   updateLesson();
-  if (practice.progress !== before && root.classList.contains("is-battle"))
-    patchLessonLayer(training.lessonPanelMarkup(practice.progress!, { showHint: practice.showHint, collapsed: practice.collapsed }));
+  if (practice.progress !== before && root.classList.contains("is-battle")) patchLessonLayer(lessonMarkup());
 }
 /** A reading step is done: "Got it" in the panel, or a click on the spotlit control. */
 function acknowledgeLesson() {
@@ -1958,10 +2249,15 @@ function acknowledgeLesson() {
   railHand();
   sound.effect("select");
 }
+// A click on the spotlit control of a reading step reads it, and does nothing else: captured before
+// the table's own handlers, so clicking a spotlit hostile never also tries to target it.
 document.addEventListener("click", event => {
   if (!practice?.progress?.reading || dialog.open || busy) return;
-  if ((event.target as HTMLElement).closest(".lesson-focus")) acknowledgeLesson();
-});
+  const target = event.target as HTMLElement;
+  if (!target.closest(".lesson-focus") || target.closest("#lesson-layer")) return;
+  event.stopPropagation();
+  acknowledgeLesson();
+}, { capture: true });
 /** Offer the hint after a stretch of inactivity (the lesson owns the delay). */
 function armHint() {
   clearTimeout(hintTimer);
@@ -1974,9 +2270,7 @@ function armHint() {
 }
 function renderLesson() {
   if (!practice?.progress) return;
-  patchLessonLayer(view === "run" && root.classList.contains("is-battle")
-    ? training.lessonPanelMarkup(practice.progress, { showHint: practice.showHint, collapsed: practice.collapsed })
-    : "");
+  patchLessonLayer(view === "run" && root.classList.contains("is-battle") ? lessonMarkup() : "");
   fitLesson();
   spotlightLesson();
 }
@@ -2012,6 +2306,15 @@ function morphChildren(from: ParentNode & Node, to: ParentNode) {
 }
 // Window size changes move the vitals card and the spotlit control.
 window.addEventListener("resize", () => { if (practice) { fitLesson(); spotlightLesson(); } });
+// A relocation's confirm plate is a step's control too (drag, then confirm): when it opens or
+// closes, the spotlight moves to it or back, whoever rendered it.
+let relocateAsking = false;
+new MutationObserver(() => {
+  const asking = !!document.getElementById("relocate-confirm");
+  if (asking === relocateAsking) return;
+  relocateAsking = asking;
+  if (practice) spotlightLesson();
+}).observe(root, { childList: true, subtree: true });
 /** The coach panel fills the left column down to the compact vitals card. */
 /** Field Training points at the control its current step needs (e.g. the Prepare slot).
  * `A || B` falls back to B while nothing matching A is on screen. */
@@ -2022,7 +2325,7 @@ function spotlightLesson() {
   try {
     for (const tier of focus.split("||").map(part => part.trim()).filter(Boolean)) {
       targets = Array.from(document.querySelectorAll(tier));
-      if (targets.some(el => el instanceof HTMLElement && el.offsetParent !== null)) break;
+      if (targets.some(onScreen)) break;
     }
   } catch { targets = []; /* A malformed selector must never break the lesson. */ }
   // Leave elements that keep the spotlight untouched: re-adding the class would not
@@ -2033,21 +2336,49 @@ function spotlightLesson() {
   // player is mid-action — targeting, dragging or reading a dialog — and glides when
   // the step moves on.
   const overlay = $("#lesson-spotlight"), hole = overlay.firstElementChild as HTMLElement;
-  const target = targets.find((el): el is HTMLElement => el instanceof HTMLElement && el.offsetParent !== null);
+  const shown = targets.filter(onScreen);
+  // One control, or (a spread step) every match: the three hostiles' badges in one band.
+  const lit = practice?.progress?.spread ? shown : shown.slice(0, 1);
+  const target = lit[0];
   // A lifted card rests the dimmer, unless the step points past the hand at what the card targets.
   const resting = (selected !== null && !!target?.closest("#hand-zone")) || consoleTargeting || !!cardDrag || deviceDragging || dialog.open;
+  cancelAnimationFrame(spotlightFrame);
   if (!target || resting) { overlay.classList.remove("active"); return; }
   const fresh = !overlay.classList.contains("active");
   if (fresh) hole.style.transition = "none";
-  const scale = interfaceScale(), origin = root.getBoundingClientRect(), rect = target.getBoundingClientRect();
-  // A tiny control (a delivery stud) still gets a hole the eye finds: at least 40 px a side.
-  const padX = Math.max(9, (40 - rect.width / scale) / 2), padY = Math.max(9, (40 - rect.height / scale) / 2);
-  hole.style.left = `${(rect.left - origin.left) / scale - padX}px`;
-  hole.style.top = `${(rect.top - origin.top) / scale - padY}px`;
-  hole.style.width = `${rect.width / scale + padX * 2}px`;
-  hole.style.height = `${rect.height / scale + padY * 2}px`;
+  placeSpotlight(hole, lit);
   if (fresh) { void hole.offsetWidth; hole.style.transition = ""; }
   overlay.classList.add("active");
+  // Badges over the rail follow the 3D table every frame; the hole follows them while they are lit.
+  if (lit.some(el => el.closest("#intent-layer"))) {
+    const follow = () => {
+      if (!overlay.classList.contains("active") || !lit.every(el => el.isConnected)) return;
+      placeSpotlight(hole, lit);
+      spotlightFrame = requestAnimationFrame(follow);
+    };
+    spotlightFrame = requestAnimationFrame(follow);
+  }
+}
+/** Laid out and visible (fixed-position overlays included, which have no offsetParent). */
+function onScreen(el: Element): el is HTMLElement {
+  return el instanceof HTMLElement && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
+}
+/** Cut the dimmer's hole around the lit controls (their joint box). */
+function placeSpotlight(hole: HTMLElement, lit: readonly HTMLElement[]) {
+  const scale = interfaceScale(), origin = root.getBoundingClientRect();
+  // A hostile's next move lights its whole plate (name and health with it).
+  const boxes = lit.map(el => (el.closest("#intent-layer .hostile-plate") ?? el).getBoundingClientRect());
+  const rect = {
+    left: Math.min(...boxes.map(box => box.left)), top: Math.min(...boxes.map(box => box.top)),
+    right: Math.max(...boxes.map(box => box.right)), bottom: Math.max(...boxes.map(box => box.bottom)),
+  };
+  const width = rect.right - rect.left, height = rect.bottom - rect.top;
+  // A tiny control still gets a hole the eye finds: at least 40 px a side.
+  const padX = Math.max(9, (40 - width / scale) / 2), padY = Math.max(9, (40 - height / scale) / 2);
+  hole.style.left = `${(rect.left - origin.left) / scale - padX}px`;
+  hole.style.top = `${(rect.top - origin.top) / scale - padY}px`;
+  hole.style.width = `${width / scale + padX * 2}px`;
+  hole.style.height = `${height / scale + padY * 2}px`;
 }
 /** In training, cards outside the current step rest visibly parked in the hand. */
 function railHand() {
@@ -2109,6 +2440,7 @@ document.addEventListener("contextmenu", event => {
   const target = event.target as HTMLElement;
   if (target.closest("input, textarea")) return;
   event.preventDefault();
+  cancelRelocation();
   const id = target.closest<HTMLElement>("[data-card-id]")?.dataset.cardId as CardId | undefined;
   if (id) inspectCard(id);
 });

@@ -8,7 +8,6 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { FXAAShader } from "three/addons/shaders/FXAAShader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { linkKey } from "../core/graph.ts";
 import { wreckCrossings } from "../core/terrain.ts";
 import { conditionOf, maxConditionOf } from "../core/combat/board.ts";
@@ -17,7 +16,7 @@ import type {
 } from "../core/types.ts";
 import { ENEMIES } from "../core/enemies.ts";
 import { STAGES } from "../core/stages.ts";
-import { EnemyActor } from "./EnemyActor.ts";
+import { EnemyActor, rigFloat } from "./EnemyActor.ts";
 import { cylinder, dashedRing, glow, mat, ring } from "./materials.ts";
 import { COLORS, addRoleBody, addSalvageScrap, animateDevice, newDeviceGroup, type DeviceGroup } from "./devices.ts";
 import {
@@ -30,52 +29,39 @@ import {
   type InstallationGroup,
 } from "./front.ts";
 import {
-  brassRingTexture, crestTexture, drawRailPlate, makeLabel, packetTexture, railPlateSprite, TABLE_LABEL_ORDER, type RailPlateData,
+  brassRingTexture, makeLabel, TABLE_LABEL_ORDER,
 } from "./plates.ts";
+import { AMPLIFIED_COLOR, channelColor } from "../channel-palette.ts";
+import { amplifiedWinding, junctionSeal } from "./junction.ts";
 
 export type WorldPoint = { x: number; z: number };
 export type BoardZone = Zone;
+/** What the pointer rests on over the table: a device, a cable (its linkKey), an installation or
+ * a hostile (its port). "delivery" (a channelKey) is raised by the HUD's landing breakdown. */
+export type TableHover = { kind: "node" | "link" | "installation" | "port" | "delivery"; id: string };
 export interface WorldCallbacks {
   onGround: (point: WorldPoint) => void;
   onNode: (id: string) => void;
   onLink: (key: string) => void;
   onMove: (id: string, point: WorldPoint | null, finished: boolean) => void;
-  /** A hostile's sprite or rail plate was clicked: select that port (selection never focuses). */
+  /** A hostile's sprite or rail plate was clicked: target it. */
   onPort?: (port: Port) => void;
-  /** A packet glyph was dropped on a port. */
-  onAim?: (channelKey: string, port: Port | null) => void;
+  /** After every drawn frame: DOM overlays that follow the table (the intent badges) re-anchor. */
+  onFrame?: () => void;
   /** An installation was clicked: its plate, or a Demolition Charge's target. */
   onInstallation?: (id: string) => void;
+  /** The pointer rests on something on the table (null: on nothing, dragging, placing or
+   * cabling). Client coordinates, for the hover card. */
+  onHover?: (target: TableHover | null, clientX: number, clientY: number) => void;
 }
 /** Anything that may appear in an enemy intent, including the v3 name of an install. */
 export type ActionKind = IntentKind | "infect";
 
-/** What a rail plate reads for its port this phase, all from the forecast. */
-export interface RailReadout {
-  hpAfter: number;
-  damage: number;
-  overflowIn: number;
-  lethal: boolean;
-  intent: IntentKind | null;
-  amount: number;
-  state: RailPlateData["state"];
-  /** Leaders: escalation level (0–3); null for escorts, adds and singles. */
-  escalation: number | null;
-}
 export interface RailState {
+  /** The target (canvas data-focus); its plate is lit in the DOM rail (#intent-layer). */
   focus: Port | null;
-  /** The port the right plate shows (a dimmer crest when it is not the focus). */
+  /** The port the right plate details (the table marks only the target). */
   selected: Port | null;
-  readouts: Partial<Record<Port, RailReadout>>;
-}
-/** One delivery of this transmission, as the table shows it. */
-export interface DeliveryView {
-  key: string;
-  primary: boolean;
-  path: string[];
-  port: Port;
-  aimed: boolean;
-  amount: number;
 }
 /** What the table front forecasts: the next installations (ghosts) and each installation's effect. */
 export interface TableForecast {
@@ -157,6 +143,10 @@ interface CableVisual {
   body: THREE.MeshPhysicalMaterial;
   filament: THREE.MeshBasicMaterial;
   haze: THREE.MeshBasicMaterial;
+  /** An amplified cable's violet winding: its own colour whatever channel carries the cable. */
+  winding: THREE.MeshBasicMaterial | null;
+  /** The cable's group (userData: kind "cable", key, channel, sheath, fibre, for the tests). */
+  group: THREE.Group;
   color: number;
   faulty: boolean;
   source: string;
@@ -173,7 +163,7 @@ interface EnemyAction {
   done: () => void;
   onImpact: () => void;
 }
-/** One stand on the far rail: its sprite rig, embers, light, rail plate and crest. */
+/** One stand on the far rail: its portrait (sprite rig, embers, light) and where its plate hangs. */
 interface PortVisual {
   port: Port;
   group: THREE.Group;
@@ -186,8 +176,19 @@ interface PortVisual {
   art: string;
   texture: THREE.Texture | null;
   placeholder: boolean;
+  /** The sprite's world size (layoutRail fits its painted box over the plate). */
   size: number;
-  drop: number;
+  /** The painted box of the bound cell. */
+  bounds: ArtBounds;
+  /** Where the portrait rests (layoutRail); animations move it from here. */
+  home: THREE.Vector3;
+  /** The plate's top centre: the portrait's painted foot never sinks below it. */
+  anchor: THREE.Vector3;
+  /** The table's far rail under this port (world x at the rail): pulses and fragments land there. */
+  railX: number;
+  /** Where layoutRail wants the portrait and its plate; home, anchor and size ease there (a
+   * newcomer or a resized table snaps). */
+  goal: { home: THREE.Vector3; anchor: THREE.Vector3; size: number; snap: boolean; at: number };
   boss: boolean;
   hitAt: number;
   /** Its death transition finished: hidden until a newcomer takes the port. */
@@ -199,27 +200,14 @@ interface PortVisual {
   dimUntil: number;
   action: EnemyAction | null;
   state: string;
-  plate: THREE.Sprite;
-  plateCanvas: HTMLCanvasElement;
-  plateKey: string;
-  crest: THREE.Sprite;
   highlight: THREE.Sprite;
   hit: THREE.Sprite;
-  readout: RailReadout | null;
-  /** A mid-playback health (the packet landed; the rules advance at the end). */
-  shownHp: number | null;
-}
-interface DeliveryGlyph {
-  view: DeliveryView;
-  glyph: THREE.Sprite;
-  line: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
-  base: THREE.Vector3;
-  toward: THREE.Vector3;
-  phase: number;
 }
 
-/** Primary route is gold; every other independent channel is cyan. */
-export const CHANNEL_COLORS = { primary: 0xf2c46d, secondary: 0x6fe0f0 } as const;
+/** v3 names for the first two channel colours; every channel has its own (channel-palette.ts). */
+export const CHANNEL_COLORS = { primary: channelColor(0), secondary: channelColor(1) } as const;
+/** A cable on a live route that no channel of the set claims: a dim neutral. */
+const CABLE_COLOR = 0xe4c58f;
 /** Unarmored cable crossing wreckage, and a worn device's rim. */
 const FRAYED_COLOR = 0xd08a52;
 const REPAIR_COLOR = 0x83eec7;
@@ -235,26 +223,64 @@ function cableCurve(from: WorldPoint, to: WorldPoint) {
   center.y += Math.min(0.38 + start.distanceTo(end) * 0.07, 1.13);
   return new THREE.QuadraticBezierCurve3(start, center, end);
 }
-/** The hostile rises from behind the far rail: the table hides its lower body and its
- * crown reaches the header band. Sized so the head stays on screen from 1280×720 up. */
-const ENEMY_HOME = new THREE.Vector3(0, 0.7, -10.6);
-const enemyHome = (size: number) => ENEMY_HOME.clone().setY(ENEMY_HOME.y - (size - 10.5) * 0.3);
 export const PORT_ORDER: readonly Port[] = ["left", "centre", "right"];
-/** Escorts and adds stand at x ±6.6, one unit nearer the table so they read in front of the
- * leader's shoulders; their feet hide behind the same far rail. */
-const SIDE_X = 6.6;
-const SIDE_Z = -9.6;
-function portHome(port: Port, size: number) {
-  if (port === "centre") return enemyHome(size);
-  return new THREE.Vector3(port === "left" ? -SIDE_X : SIDE_X, -1.55 + size * 0.3, SIDE_Z);
-}
-/** Rail plates hang just behind the far rail, under their hostile as the default camera sees it. */
-const PLATE_Z = -6.1;
-const PLATE_SIZE = { leader: [5.4, 1.6875], side: [4.3, 1.34375] } as const;
-/** Plates hang with their foot on the far rail, in front of their hostile's lower body. */
-const PLATE_FOOT = 0.06;
+/** Portraits stand in the band above the table, each over its plate (a DOM plate in #intent-layer):
+ * the leader behind the table's centre, escorts and adds one unit nearer at the sides. The rail is
+ * laid out in screen space for the resting camera (layoutRail); these are only the depths. */
+const PORT_DEPTH: Record<Port, number> = { left: -9.6, centre: -10.6, right: -9.6 };
+/** The table's far rail: the rail's plates stand on it, so nothing on the table hides under them. */
+const RAIL_EDGE = new THREE.Vector3(0, 0.47, -5.8);
+/** A far-row device's crown (world): the rail's plates stand just above this line, never over it. */
+const FAR_CROWN = new THREE.Vector3(0, 1.62, -3.5);
+/** Where a far-row nameplate hangs instead (in its device group): at its foot, before the plinth. */
+const LABEL_FOOT = { y: 0.8, z: 1.12 } as const;
 const CAMERA_HOME = new THREE.Vector3(0, 12.8, 18.8);
-const plateX = (port: Port) => port === "centre" ? 0 : (port === "left" ? -SIDE_X : SIDE_X) * (CAMERA_HOME.z - PLATE_Z) / (CAMERA_HOME.z - SIDE_Z);
+const CAMERA_TARGET = new THREE.Vector3(0, 0.15, -0.3);
+/** A cell's painted box, as fractions of the cell from its top-left corner. */
+interface ArtBounds { l: number; r: number; t: number; b: number }
+const FULL_CELL: ArtBounds = { l: 0.1, r: 0.9, t: 0.1, b: 0.9 };
+const artBounds = new Map<string, ArtBounds>();
+/** Reads the painted box of one sheet cell from its alpha, once per cell. */
+function boundsOf(image: unknown, art: { file: string; columns: number; rows: number; index: number }): ArtBounds {
+  const key = `${art.file}:${art.index}`;
+  const known = artBounds.get(key);
+  if (known) return known;
+  const source = image as { width?: number; height?: number } | null;
+  if (!source?.width || !source.height || typeof document === "undefined") return FULL_CELL;
+  const size = 96, canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) return FULL_CELL;
+  const width = source.width / art.columns, height = source.height / art.rows;
+  let bounds = FULL_CELL;
+  try {
+    context.drawImage(image as CanvasImageSource, (art.index % art.columns) * width, Math.floor(art.index / art.columns) * height, width, height, 0, 0, size, size);
+    const data = context.getImageData(0, 0, size, size).data;
+    let l = size, r = -1, t = size, b = -1;
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      if (data[(y * size + x) * 4 + 3] < 48) continue;
+      if (x < l) l = x;
+      if (x > r) r = x;
+      if (y < t) t = y;
+      if (y > b) b = y;
+    }
+    if (r >= l && b >= t) bounds = { l: l / size, r: (r + 1) / size, t: t / size, b: (b + 1) / size };
+  } catch { /* A tainted or undecodable sheet keeps the default box. */ }
+  artBounds.set(key, bounds);
+  return bounds;
+}
+/** The rail's frame in client pixels, measured from the HUD (main.ts): the span between the side
+ * plates, the header's items the portraits stay clear of, and each hostile's plate (its height is
+ * reserved under every portrait). */
+export interface RailFrame {
+  left: number;
+  right: number;
+  /** The highest a portrait may reach. */
+  top: number;
+  obstacles: readonly { left: number; top: number; right: number; bottom: number }[];
+  /** The leader's plate width, the side plates' width, the tallest plate and the gaps. */
+  plate: { width: number; side: number; height: number; gap: number };
+}
 const snap = (n: number) => Math.round(n * 2) / 2;
 /** The v4 art sheets may still be in the paint shop: a stand-in cell of a kindred body is tinted
  * toward the hostile's colour until the painted cell lands. */
@@ -301,7 +327,6 @@ export class World {
   private readonly terrainGroup = new THREE.Group();
   private readonly frontGroup = new THREE.Group();
   private readonly ghostGroup = new THREE.Group();
-  private readonly deliveryGroup = new THREE.Group();
   private readonly ambiance = new THREE.Group();
   private motes!: THREE.Points;
   private readonly shafts: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>[] = [];
@@ -315,6 +340,10 @@ export class World {
   private readonly channelNodes = new Map<string, number>();
   private channelPaths: string[][] = [];
   private routeSignature = "";
+  /** Devices where routes merge (forecast sharedDevices): id → routes through it. */
+  private shared = new Map<string, number>();
+  private sharedSignature = "";
+  private readonly seals = new WeakMap<DeviceGroup, THREE.Sprite>();
   private online: Set<string> | null = null;
   private terrainSignature = "";
   private terrain: Terrain | null = null;
@@ -377,11 +406,13 @@ export class World {
   /** Every hostile on the rail (the dead included until a newcomer takes the port). */
   private enemies: Enemy[] = [];
   private pack = false;
-  private railState: RailState = { focus: null, selected: null, readouts: {} };
-  private deliveries: DeliveryView[] = [];
-  private selectedDelivery: string | null = null;
-  private readonly glyphs: DeliveryGlyph[] = [];
-  private deliverySignature = "";
+  private railState: RailState = { focus: null, selected: null };
+  private railFrame: RailFrame | null = null;
+  /** The resting camera at this canvas's aspect: the rail is laid out for it (layoutRail). */
+  private readonly layoutCamera = new THREE.PerspectiveCamera(42, 1, 0.1, 140);
+  /** Client y of the table's far rail for the resting camera: far-row nameplates stay below it. */
+  private railFloor = 0;
+  private railShape = "";
   private faultNodes: string[] = [];
   private faultLinks: string[] = [];
   private selected: string | null = null;
@@ -399,8 +430,6 @@ export class World {
     y: number;
     moved: boolean;
   } | null = null;
-  /** A packet glyph being dragged toward a port. */
-  private aimDrag: { key: string; pointerId: number; x: number; y: number; moved: boolean; over: Port | null } | null = null;
   private active = true;
   private visible = true;
   private frame = 0;
@@ -414,7 +443,7 @@ export class World {
     this.setStage(0);
     this.scene.backgroundIntensity = 0.62;
     this.camera.position.copy(CAMERA_HOME);
-    this.camera.lookAt(0, 0.2, -0.4);
+    this.camera.lookAt(CAMERA_TARGET);
     // Browser tests set __faultlineTestRender: the same scene and rules, drawn without bloom,
     // shadows or full resolution at 20 fps, so a software-rendered suite can run in parallel.
     const cheap = (globalThis as { __faultlineTestRender?: boolean }).__faultlineTestRender === true;
@@ -447,7 +476,7 @@ export class World {
     this.controls.maxDistance = 31;
     this.controls.minPolarAngle = 0.45;
     this.controls.maxPolarAngle = 1.37;
-    this.controls.target.set(0, 0.15, -0.3);
+    this.controls.target.copy(CAMERA_TARGET);
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     if (!cheap) this.composer.addPass(
@@ -490,7 +519,6 @@ export class World {
     this.scene.add(this.ghostGroup);
     this.scene.add(this.tethers);
     this.scene.add(this.dynamic);
-    this.scene.add(this.deliveryGroup);
     this.hoverRing = dashedRing(REACH, 0.034, MALWARE_COLOR, 0.24, 0.85, 32);
     this.selectRing = dashedRing(REACH, 0.038, MALWARE_COLOR, 0.25, 0.95, 32);
     for (const reach of [this.hoverRing, this.selectRing]) {
@@ -888,7 +916,7 @@ export class World {
     const centre = port === "centre";
     const actor = new EnemyActor(centre ? 0 : 1);
     const group = new THREE.Group();
-    group.position.copy(centre ? ENEMY_HOME : portHome(port, 7.14));
+    group.position.set(0, 3, PORT_DEPTH[port]);
     group.add(actor.mesh);
     group.add(actor.embers);
     // A coloured spill across the far rail, and (the leader) a low glow that lifts the body from below.
@@ -903,34 +931,24 @@ export class World {
     }
     group.visible = false;
     this.scene.add(group);
-    const { sprite: plate, canvas: plateCanvas } = railPlateSprite();
-    const [width, height] = centre ? PLATE_SIZE.leader : PLATE_SIZE.side;
-    plate.scale.set(width, height, 1);
-    plate.position.set(plateX(port), PLATE_FOOT + height / 2, PLATE_Z);
-    plate.userData.port = port;
-    plate.visible = false;
-    const crest = new THREE.Sprite(new THREE.SpriteMaterial({ map: crestTexture(), transparent: true, depthWrite: false, depthTest: false }));
-    crest.renderOrder = 41;
-    crest.scale.setScalar(centre ? 1.35 : 1.1);
-    crest.position.set(plate.position.x, plate.position.y + height / 2 + 0.4 + crest.scale.y * 0.3, PLATE_Z + 0.05);
-    crest.visible = false;
+    // The drag-aim ring (a packet glyph held over this port), round the portrait's foot.
     const highlight = new THREE.Sprite(new THREE.SpriteMaterial({ map: brassRingTexture(), transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending }));
     highlight.renderOrder = 39;
-    highlight.scale.set(width * 1.28, height * 2.1, 1);
-    highlight.position.copy(plate.position);
     highlight.visible = false;
+    // The body's click target: the painted box (portAt), never drawn.
     const hit = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, opacity: 0 }));
     hit.visible = false;
     hit.userData.port = port;
-    this.rail.add(plate, crest, highlight, hit);
+    this.rail.add(highlight, hit);
     // Escort lights live on the always-visible rail: the light count never changes when a pack
     // arrives, so no material has to recompile mid-fight.
     if (!centre) this.rail.add(light);
     return {
       port, group, actor, light, under, enemy: null, uid: null, art: "", texture: null, placeholder: false,
-      size: centre ? 10.5 : 7.14, drop: 0, boss: false, hitAt: 0, dead: false, dying: false, ready: false,
-      dimFrom: 0, dimUntil: 0, action: null, state: "idle",
-      plate, plateCanvas, plateKey: "", crest, highlight, hit, readout: null, shownHp: null,
+      size: centre ? 5 : 3.4, bounds: FULL_CELL, home: group.position.clone(), anchor: group.position.clone(), railX: 0,
+      goal: { home: group.position.clone(), anchor: group.position.clone(), size: centre ? 5 : 3.4, snap: true, at: 0 },
+      boss: false, hitAt: 0, dead: false, dying: false, ready: false, dimFrom: 0, dimUntil: 0, action: null, state: "idle",
+      highlight, hit,
     };
   }
 
@@ -970,15 +988,16 @@ export class World {
         visual.actor.mesh.material.map = texture;
         visual.actor.mesh.material.needsUpdate = true;
       }
+      visual.bounds = boundsOf(entry.texture.image, art);
       visual.placeholder = stand;
       visual.actor.stand = stand ? 0.4 : 0;
       if (!visual.ready || entering) {
         visual.ready = true;
+        visual.goal.snap = true;
         visual.actor.enter(enemy.id, !!ENEMIES[enemy.id]?.boss);
       }
       visual.group.visible = this.showPort(visual);
-      visual.plateKey = "";
-      this.refreshRail();
+      this.layoutRail();
     };
     visual.ready = false;
     visual.group.visible = false;
@@ -988,19 +1007,9 @@ export class World {
     return !!visual.enemy && visual.ready && !visual.dead;
   }
 
-  /** Hostile sizes: the leader keeps today's; escorts 0.68 ×, adds 0.6 × the leader's sprite. */
-  private sizeOf(enemy: Enemy, leaderSize: number) {
-    const definition = ENEMIES[enemy.id];
-    if (enemy.role === "escort") return leaderSize * 0.68;
-    if (enemy.role === "add") return leaderSize * 0.6;
-    return definition?.boss ? 11.6 : enemy.id === "storm" || enemy.id === "moth" ? 10.9 : 10.5;
-  }
-
   private syncRail(roster: readonly Enemy[], sameBattle: boolean) {
     this.enemies = roster.map(enemy => ({ ...enemy }));
     this.pack = roster.length > 1;
-    const centre = roster.find(enemy => enemy.port === "centre" && (enemy.role === "leader" || enemy.role === "single"));
-    const leaderSize = centre ? this.sizeOf(centre, 10.5) : 10.5;
     for (const visual of this.ports) {
       const here = roster.filter(enemy => enemy.port === visual.port);
       const enemy = here.find(item => item.hp > 0) ?? here[here.length - 1] ?? null;
@@ -1008,14 +1017,12 @@ export class World {
         visual.enemy = null;
         visual.uid = null;
         visual.group.visible = false;
-        visual.readout = null;
         visual.light.intensity = 0;
         continue;
       }
       const newcomer = visual.uid !== enemy.uid;
       visual.enemy = { ...enemy };
       visual.boss = !!ENEMIES[enemy.id]?.boss;
-      visual.size = this.sizeOf(enemy, leaderSize);
       visual.light.color.setHex(enemy.color);
       visual.under?.color.setHex(enemy.color);
       if (enemy.hp <= 0 && !visual.dying) {
@@ -1028,12 +1035,12 @@ export class World {
         visual.dead = enemy.hp <= 0;
         visual.dying = false;
         visual.action = null;
-        visual.shownHp = null;
+        visual.goal.snap = true;
         this.bindArt(visual, enemy, true);
         if (arriving) this.arrivalFlourish(visual);
       } else visual.group.visible = this.showPort(visual);
-      this.frameEnemy(visual);
     }
+    this.layoutRail();
     const leader = this.leaderPort();
     const lead = leader.enemy;
     if (lead) {
@@ -1042,66 +1049,208 @@ export class World {
       (this.scanMaterial.uniforms.uThreat.value as THREE.Color).setHex(lead.color).multiplyScalar(leader.boss ? 0.075 : 0.05);
     } else (this.scanMaterial.uniforms.uThreat.value as THREE.Color).setHex(0x000000);
     this.canvas.dataset.ports = this.ports.filter(visual => visual.enemy && visual.enemy.hp > 0).map(visual => visual.port).join(",");
-    this.refreshRail();
   }
 
   /** A reinforcement or an add takes its port: a pulse on the rail and embers (reduced motion: the pulse). */
   private arrivalFlourish(visual: PortVisual) {
     if (!this.visible || !visual.enemy) return;
-    const x = visual.port === "centre" ? 0 : plateX(visual.port);
-    this.pulseAt(x, -5.4, visual.enemy.color, 2.2);
-    this.burst(new THREE.Vector3(x, 1.2, -6), visual.enemy.color, 22, 3.2);
+    this.pulseAt(visual.railX, -5.4, visual.enemy.color, 2.2);
+    this.burst(new THREE.Vector3(visual.railX, 1.2, -6), visual.enemy.color, 22, 3.2);
   }
 
-  /** Rail plates, crests and focus (packs only: a single hostile is today's rail, untouched). */
+  /** The target and the forecast per port (the plates themselves are DOM, #intent-layer). */
   setRail(state: RailState) {
-    this.railState = { focus: state.focus, selected: state.selected, readouts: { ...state.readouts } };
-    for (const visual of this.ports) {
-      visual.readout = state.readouts[visual.port] ?? null;
-      visual.shownHp = null;
-    }
+    this.railState = { focus: state.focus, selected: state.selected };
     this.canvas.dataset.focus = state.focus ?? "";
-    this.refreshRail();
   }
-  /** A packet landed mid-playback: the plate shows the new health before the rules advance. */
-  setPortHealth(port: Port, hp: number) {
-    const visual = this.portOf(port);
-    if (!visual) return;
-    visual.shownHp = hp;
-    this.refreshRail();
+
+  /** A port's portrait and plate stand where the layout wants them, at once. */
+  private settle(visual: PortVisual) {
+    visual.home.copy(visual.goal.home);
+    visual.anchor.copy(visual.goal.anchor);
+    visual.size = visual.goal.size;
+    visual.goal.snap = false;
   }
-  private refreshRail() {
-    for (const visual of this.ports) {
-      const enemy = visual.enemy;
-      const show = this.pack && !!enemy && this.visible && (!visual.dead || visual.dying) && visual.ready;
-      visual.plate.visible = show;
-      visual.crest.visible = show && this.railState.focus === visual.port && enemy!.hp > 0 && !visual.dying;
-      const selectedCrest = show && this.railState.selected === visual.port && this.railState.selected !== this.railState.focus && enemy!.hp > 0;
-      if (selectedCrest) visual.crest.visible = true;
-      visual.crest.userData.dim = selectedCrest;
-      if (!show || !enemy) continue;
-      const readout = visual.readout;
-      const hp = visual.shownHp ?? enemy.hp;
-      const midPlayback = visual.shownHp !== null;
-      const data: RailPlateData = {
-        name: enemy.name, color: enemy.color, hp, maxHp: enemy.maxHp,
-        hpAfter: midPlayback ? hp : readout?.hpAfter ?? hp,
-        damage: midPlayback ? 0 : readout?.damage ?? 0,
-        overflowIn: midPlayback ? 0 : readout?.overflowIn ?? 0,
-        lethal: !midPlayback && !!readout?.lethal,
-        intent: enemy.hp > 0 && !visual.dying ? readout?.intent ?? null : null,
-        amount: readout?.amount ?? 0,
-        state: enemy.hp <= 0 || visual.dying ? "dead" : readout?.state ?? "acts",
-        escalation: readout?.escalation ?? null,
-        placeholder: visual.placeholder,
-      };
-      const key = JSON.stringify(data);
-      if (key === visual.plateKey) continue;
-      visual.plateKey = key;
-      drawRailPlate(visual.plateCanvas, data);
-      (visual.plate.material.map as THREE.CanvasTexture).needsUpdate = true;
-      visual.plate.material.opacity = data.state === "dormant" ? 0.8 : data.state === "dead" ? 0.62 : 1;
+  /** Eases a portrait and its plate toward the layout's place (about a fifth of a second). */
+  private glide(visual: PortVisual, now: number) {
+    const goal = visual.goal, step = goal.at ? Math.min(1, 1 - Math.exp(-(now - goal.at) / 110)) : 1;
+    goal.at = now;
+    visual.home.lerp(goal.home, step);
+    visual.anchor.lerp(goal.anchor, step);
+    visual.size += (goal.size - visual.size) * step;
+  }
+  /** The HUD's measure of the rail (client pixels); the portraits are laid out again when it moves. */
+  setRailFrame(frame: RailFrame) {
+    const same = this.railFrame && JSON.stringify(this.railFrame) === JSON.stringify(frame);
+    this.railFrame = frame;
+    if (!same) this.layoutRail();
+  }
+
+  /**
+   * Lays the rail out in screen space for the resting camera: one slot per port on the table's far
+   * rail, its plate standing on the rail and its portrait fitted above the plate, clear of the
+   * header's items. The leader stands tallest (a guardian taller still); escorts and adds are
+   * smaller. Each sprite is sized so its painted box (not the cell's empty margin) fills the space,
+   * then placed at its port's depth so that box's foot rests on the plate. An orbiting camera
+   * carries the portraits with the table; the plates follow their anchors.
+   */
+  private layoutRail() {
+    const rect = this.canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const shape = `${rect.width.toFixed(0)}x${rect.height.toFixed(0)}@${rect.left.toFixed(0)},${rect.top.toFixed(0)}`;
+    const resized = shape !== this.railShape;
+    this.railShape = shape;
+    const camera = this.layoutCamera;
+    camera.aspect = rect.width / rect.height;
+    camera.position.copy(CAMERA_HOME);
+    camera.lookAt(CAMERA_TARGET);
+    camera.updateProjectionMatrix();
+    camera.updateMatrixWorld();
+    const toScreen = (point: THREE.Vector3) => {
+      const at = point.clone().project(camera);
+      return { x: rect.left + (at.x + 1) / 2 * rect.width, y: rect.top + (1 - at.y) / 2 * rect.height };
+    };
+    /** The world point at depth z under a client point. */
+    const onPlane = (x: number, y: number, z: number) => {
+      const direction = new THREE.Vector3((x - rect.left) / rect.width * 2 - 1, 1 - (y - rect.top) / rect.height * 2, 0.5)
+        .unproject(camera).sub(camera.position).normalize();
+      return camera.position.clone().addScaledVector(direction, (z - camera.position.z) / direction.z);
+    };
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    const frame = this.railFrame ?? {
+      left: rect.left + rect.width * 0.18, right: rect.right - rect.width * 0.18, top: Math.max(0, rect.top) + 84,
+      obstacles: [], plate: { width: 236, side: 200, height: 64, gap: 8 },
+    };
+    const floor = this.railFloor = Math.min(toScreen(RAIL_EDGE).y, toScreen(FAR_CROWN).y);
+    const plateTop = floor - frame.plate.height;
+    const foot = plateTop - frame.plate.gap;
+    const middle = rect.left + rect.width / 2;
+    const pitch = (frame.plate.width + frame.plate.side) / 2 + frame.plate.gap;
+    const leader = this.ports.find(visual => visual.port === "centre" && visual.enemy && (visual.enemy.role === "leader" || visual.enemy.role === "single"));
+    /** The tallest the painted box may stand at x without reaching a header item. */
+    const clear = (x: number, height: number, aspect: number) => {
+      for (let pass = 0; pass < 4; pass++) {
+        const half = height * aspect / 2, top = foot - height;
+        const item = frame.obstacles.find(box => box.left < x + half && box.right > x - half && box.bottom > top && box.top < foot);
+        if (!item) break;
+        height = Math.max(24, foot - item.bottom - 6);
+      }
+      return height;
+    };
+    const fitAll = (centre: number) => {
+      let crown = Infinity;
+      // The leader first: escorts stand at most 0.8 of its height and a guardian's adds 0.72, so
+      // the leader always reads as the leader.
+      const order = leader ? [leader, ...this.ports.filter(visual => visual !== leader)] : [...this.ports];
+      const fits = order.map(visual => {
+        const slot = centre + (visual.port === "left" ? -pitch : visual.port === "right" ? pitch : 0);
+        const role = visual.enemy?.role ?? "escort";
+        const lead = visual === leader;
+        const bounds = visual.bounds;
+        const aspect = (bounds.r - bounds.l) / Math.max(0.05, bounds.b - bounds.t);
+        // The leader stands tallest, a guardian taller still; with a leader beside them escorts
+        // and adds keep to a smaller figure, alone they may fill their space.
+        const share = lead ? visual.boss ? 0.36 : 0.32 : role === "add" ? 0.22 : leader ? 0.24 : 0.3;
+        const plateWidth = visual.port === "centre" ? frame.plate.width : frame.plate.side;
+        const most = Math.min(rect.height * share, foot - frame.top, plateWidth * (lead ? 1.3 : 1.08) / aspect, crown * (role === "add" ? 0.72 : 0.8));
+        // A portrait under a header item may lean in over its plate (up to a quarter of its width)
+        // where that lets it stand taller.
+        const inward = visual.port === "left" ? 1 : visual.port === "right" ? -1 : 0;
+        let best = { x: slot, height: clear(slot, most, aspect) };
+        for (let step = 1; inward && best.height < most && step <= 6; step++) {
+          const x = slot + inward * plateWidth * 0.25 * step / 6;
+          const height = clear(x, most, aspect);
+          if (height > best.height + 2) best = { x, height };
+        }
+        if (lead) crown = best.height;
+        return { visual, slot, aspect, most, ...best };
+      }).sort((a, b) => PORT_ORDER.indexOf(a.visual.port) - PORT_ORDER.indexOf(b.visual.port));
+      // Twins read as a pair: both stand as tall as the shorter.
+      const [left, , right] = fits;
+      if (left.visual.enemy && left.visual.enemy.id === right.visual.enemy?.id) {
+        const height = Math.min(left.height, right.height);
+        for (const fit of [left, right]) if (fit.height > height) {
+          fit.height = height;
+          if (clear(fit.slot, height, fit.aspect) >= height) fit.x = fit.slot;
+        }
+      }
+      return fits;
+    };
+    // The rail stands centred over the table, unless sliding it a little lets a portrait held down
+    // by a header item stand taller (the header's items are not symmetric).
+    const lowest = frame.left + pitch + frame.plate.side / 2, highest = frame.right - pitch - frame.plate.side / 2;
+    let fits = fitAll(Math.min(Math.max(middle, lowest), highest));
+    const score = (list: typeof fits) => list.reduce((sum, fit) => sum + (fit.visual.enemy ? Math.min(fit.height / fit.most, 1) : 0), 0);
+    let best = score(fits);
+    for (const shift of [-80, -60, -45, -30, -15, 15, 30, 45, 60, 80]) {
+      const centre = middle + shift * Math.min(1, rect.height / 784);
+      if (centre < lowest || centre > highest) continue;
+      const trial = fitAll(centre), value = score(trial) - Math.abs(shift) / 600;
+      if (value > best + 0.02) { best = value; fits = trial; }
     }
+    for (const { visual, slot, x, height } of fits) {
+      const bounds = visual.bounds;
+      const depth = PORT_DEPTH[visual.port];
+      const base = onPlane(x, foot, depth);
+      const perUnit = toScreen(base).y - toScreen(base.clone().add(up)).y;
+      const size = height / Math.max(1e-3, perUnit * (bounds.b - bounds.t));
+      // From the painted box's foot to the cell's centre, along the billboard's own axes.
+      const centreOf = base.clone()
+        .addScaledVector(right, -((bounds.l + bounds.r) / 2 - 0.5) * size)
+        .addScaledVector(up, (bounds.b - 0.5) * size);
+      // Idle float never dips the foot onto the plate.
+      const float = rigFloat(visual.enemy?.id ?? "") * 1.6 * size / 10.5;
+      const goal = visual.goal;
+      goal.size = size;
+      goal.home.copy(centreOf).addScaledVector(up, float + 0.02 * size);
+      goal.anchor.copy(onPlane(slot, plateTop, depth));
+      // A standing portrait glides to a new place (the roster changed); anything else snaps there.
+      if (goal.snap || resized || !visual.enemy || !visual.ready || this.reducedMotion()) this.settle(visual);
+      visual.railX = onPlane(slot, floor, RAIL_EDGE.z).x;
+      visual.under?.position.set(0, -size * 0.16, Math.min(1.4, size * 0.3));
+      const ring = visual.anchor.clone().addScaledVector(up, -0.5 * frame.plate.height / perUnit);
+      visual.highlight.position.copy(ring);
+      visual.highlight.scale.set((visual.port === "centre" ? frame.plate.width : frame.plate.side) * 1.25 / perUnit, frame.plate.height * 1.9 / perUnit, 1);
+    }
+    this.placeLabels();
+  }
+
+  /** A device's nameplate (and its junction seal) where it reads without rising over the rail's
+   * plates: over the device as usual, or (the far rows, whose plates would reach the rail) hung at
+   * the device's foot, in front of its plinth. `rest` is its usual height. */
+  private labelSpot(x: number, z: number, rest: number, scale = 0.57): { y: number; z: number } {
+    const rect = this.canvas.getBoundingClientRect();
+    if (!rect.height || !this.railFloor) return { y: rest, z: 0 };
+    const top = rect.top + (1 - new THREE.Vector3(x, -0.42 + rest + scale * 0.31, z).project(this.layoutCamera).y) / 2 * rect.height;
+    return top >= this.railFloor + 4 ? { y: rest, z: 0 } : LABEL_FOOT;
+  }
+  /** An installation's tag (and a Breaker Charge's countdown beside it) follows the same rule as
+   * a nameplate: on a far row it hangs at the installation's foot, clear of the rail's plates. */
+  private placeTags() {
+    for (const group of this.installations.values()) {
+      const data = group.userData.installation;
+      // Their usual heights (front.ts): the tag over the body, the countdown under the tag.
+      const rest = data.kind === "breaker" ? TABLE_Y + 1.78 : TABLE_Y + 2.02, home = TABLE_Y + 1.36;
+      const spot = this.labelSpot(group.position.x, group.position.z, rest, data.label.scale.y);
+      data.label.position.y = spot.y;
+      data.label.position.z = spot.z;
+      if (!data.numeral) continue;
+      const numeral = data.numeral;
+      const low = spot.z !== 0 || this.labelSpot(group.position.x, group.position.z, home, numeral.scale.y).z !== 0;
+      numeral.position.set(low ? -(data.label.scale.x * 0.5 + numeral.scale.x * 0.45) : 0, low ? spot.y : home, low ? spot.z : 0);
+    }
+  }
+  private placeLabels() {
+    for (const group of this.devices.values()) {
+      const label = group.userData.label as THREE.Sprite | undefined;
+      if (!label) continue;
+      const rest = (label.userData.rest as number | undefined) ?? label.position.y;
+      const spot = this.labelSpot(group.position.x, group.position.z, rest, label.scale.y);
+      label.position.set(0, spot.y, spot.z);
+      this.seals.get(group)?.position.copy(label.position);
+    }
+    this.declutterTags();
   }
 
   // ================================================================ devices and cables
@@ -1149,7 +1298,9 @@ export class World {
       : node.shielded ? " · GUARDED" : "";
     const color = jammed ? 0xff6880 : worn ? FRAYED_COLOR : !online ? node.salvage ? 0xc9874a : 0x7f898d : COLORS[node.role];
     const label = makeLabel(`${node.id.toUpperCase()}${status}`, color, { pips: this.pipsOf(node) });
-    label.position.y = node.role === "client" ? 3.0 : node.role === "power" ? 3.05 : 2.86;
+    label.userData.rest = node.role === "client" ? 3.0 : node.role === "power" ? 3.05 : 2.86;
+    const spot = this.labelSpot(node.x, node.z, label.userData.rest, label.scale.y);
+    label.position.set(0, spot.y, spot.z);
     if (!online) label.material.opacity = 0.78;
     return label;
   }
@@ -1222,7 +1373,7 @@ export class World {
       group.userData.rings.push(crown);
     }
     if (node.amplified) {
-      const amplifier = ring(0.72, 0.034, 0x8ce6ef, 2.05, 0.85);
+      const amplifier = ring(0.72, 0.034, AMPLIFIED_COLOR, 2.05, 0.85);
       amplifier.rotation.x = Math.PI / 3;
       group.add(amplifier);
       group.userData.rings.push(amplifier);
@@ -1333,10 +1484,27 @@ export class World {
     const channel = this.channelNodes.get(id);
     const color = channel === undefined || group.userData.role === "client"
       ? group.userData.worn ? FRAYED_COLOR : group.userData.skirtColor
-      : channel === 0 ? CHANNEL_COLORS.primary : CHANNEL_COLORS.secondary;
+      : channelColor(channel);
     skirt.material.color.setHex(color);
     skirt.scale.setScalar(active ? 1.15 : 1);
     skirt.material.opacity = active ? 1 : group.userData.online ? channel === undefined ? 0.8 : 1 : 0.35;
+    skirt.userData.channel = channel ?? null;
+    // Where routes merge: a brass junction seal on the nameplate names the routes it carries.
+    const routes = group.userData.online && group.userData.role !== "client" ? this.shared.get(id) ?? 0 : 0;
+    const seal = this.seals.get(group);
+    if (seal && seal.userData.junction !== routes) {
+      group.remove(seal);
+      seal.material.dispose();
+      this.seals.delete(group);
+    }
+    if (routes && !this.seals.has(group)) {
+      const next = junctionSeal(routes, TABLE_LABEL_ORDER + 1);
+      // It rides its nameplate, wherever that hangs (over the device, or at a far-row device's foot).
+      if (group.userData.label) next.position.copy(group.userData.label.position);
+      else next.position.y = 2.86;
+      group.add(next);
+      this.seals.set(group, next);
+    }
   }
 
   private addCable(a: string, b: string) {
@@ -1348,7 +1516,9 @@ export class World {
     const link = this.topology.links.find((edge) => linkKey(edge.a, edge.b) === key);
     const faulty = this.faultLinks.includes(key);
     const crossings = link && !link.armored && this.terrain ? wreckCrossings(from, to, this.terrain.debris) : [];
-    const color = faulty ? 0xec755d : link?.boosted ? 0x8ce6ef : link?.armored ? 0xf5d196 : crossings.length ? FRAYED_COLOR : 0xe4c58f;
+    // The sheath carries the state (cut, armored, frayed) and, once routed, its channel's colour;
+    // an amplified cable's own colour lives in its violet winding (refreshSignalRoute).
+    const color = faulty ? 0xec755d : link?.armored ? 0xf5d196 : crossings.length ? FRAYED_COLOR : CABLE_COLOR;
     const cable = new THREE.Group();
     const geometry = new THREE.TubeGeometry(curve, 48, 0.055, 8, false);
     const body = new THREE.Mesh(
@@ -1376,6 +1546,12 @@ export class World {
         cable.add(collar);
       }
     }
+    let winding: THREE.MeshBasicMaterial | null = null;
+    if (link?.boosted) {
+      winding = glow(AMPLIFIED_COLOR, faulty ? 0.35 : 1);
+      winding.transparent = true;
+      cable.add(new THREE.Mesh(amplifiedWinding(curve, 0.07), winding));
+    }
     for (const t of crossings) cable.add(this.frayMark(curve, t, true));
     const hit = new THREE.Mesh(
       new THREE.TubeGeometry(curve, 48, 0.17, 5, false),
@@ -1395,7 +1571,8 @@ export class World {
       this.cableBeads.push({ bead, curve, key, offset: i / 3, active: !faulty, reversed: false, routed: false });
     }
     this.cableCurves.set(key, curve);
-    this.cableVisuals.set(key, { body: body.material, filament: filament.material, haze: haze.material, color, faulty, source: a });
+    cable.userData = { kind: "cable", key, amplified: !!link?.boosted, channel: null, sheath: color, fibre: winding ? AMPLIFIED_COLOR : null };
+    this.cableVisuals.set(key, { body: body.material, filament: filament.material, haze: haze.material, winding, group: cable, color, faulty, source: a });
     this.cableGroups.set(key, cable);
     this.dynamic.add(cable);
   }
@@ -1502,7 +1679,6 @@ export class World {
     this.refreshSelection();
     this.refreshSignalRoute();
     this.refreshForecastTargets();
-    this.refreshDeliveries(true);
   }
 
   private rebuildTable(sameBattle: boolean, previousFaults: Set<string>) {
@@ -1548,7 +1724,6 @@ export class World {
     this.refreshSelection();
     this.refreshSignalRoute();
     this.refreshForecastTargets();
-    this.refreshDeliveries(true);
   }
 
   /** Emphasizes the forecast's chosen routes without rebuilding cable geometry. */
@@ -1556,7 +1731,7 @@ export class World {
     this.setChannels([path, alternate].filter((route) => route.length > 1));
   }
 
-  /** Every live channel: paths[0] is the primary (gold) route, the rest are cyan. */
+  /** Every live channel, each in its own colour (channel-palette.ts): paths[0] is the primary (gold). */
   setChannels(paths: string[][]) {
     const signature = JSON.stringify(paths);
     if (signature === this.routeSignature) return;
@@ -1581,22 +1756,36 @@ export class World {
       const route = this.channelSources.get(key);
       const primary = route?.channel === 0;
       const secondary = route !== undefined && !primary;
-      const color = visual.faulty ? 0xec755d : primary ? CHANNEL_COLORS.primary : secondary ? CHANNEL_COLORS.secondary : visual.color;
+      // Each channel in its own colour on the sheath, haze and beads; the fibre of an amplified
+      // cable keeps its violet whichever channel carries it.
+      const color = visual.faulty ? 0xec755d : route ? channelColor(route.channel) : visual.color;
       visual.body.emissive.setHex(color);
       visual.body.emissiveIntensity = visual.faulty ? 0.18 : primary ? 0.85 : secondary ? 0.6 : hasRoute ? 0.15 : 0.34;
-      visual.filament.color.setHex(color);
+      visual.filament.color.setHex(visual.winding && !visual.faulty ? AMPLIFIED_COLOR : color);
       visual.filament.opacity = visual.faulty ? 0.4 : primary ? 1 : secondary ? 0.92 : hasRoute ? 0.38 : 0.95;
       visual.haze.color.setHex(color);
       visual.haze.opacity = visual.faulty ? 0.075 : primary ? 0.16 : secondary ? 0.1 : hasRoute ? 0.025 : 0.055;
+      if (visual.winding) visual.winding.opacity = visual.faulty ? 0.35 : route ? 1 : hasRoute ? 0.72 : 0.92;
+      Object.assign(visual.group.userData, { channel: route?.channel ?? null, sheath: color, fibre: visual.winding ? AMPLIFIED_COLOR : null });
     }
     for (const item of this.cableBeads) {
       const visual = this.cableVisuals.get(item.key)!;
       const route = this.channelSources.get(item.key);
       item.routed = route !== undefined;
       item.reversed = route !== undefined && route.source !== visual.source;
-      item.bead.material.color.copy(visual.filament.color);
+      item.bead.material.color.copy(visual.haze.color);
       item.bead.material.opacity = visual.faulty ? 0.12 : item.routed ? 0.95 : hasRoute ? 0.25 : 0.8;
     }
+    for (const group of this.devices.values()) this.refreshSkirt(group);
+  }
+
+  /** Devices where live routes merge and so carry one channel between them: each gets a brass
+   * junction seal with the number of routes through it. */
+  setShared(devices: readonly { id: string; routes: number }[]) {
+    const signature = devices.map(item => `${item.id}:${item.routes}`).join();
+    if (signature === this.sharedSignature) return;
+    this.sharedSignature = signature;
+    this.shared = new Map(devices.map(item => [item.id, item.routes]));
     for (const group of this.devices.values()) this.refreshSkirt(group);
   }
 
@@ -1613,7 +1802,7 @@ export class World {
       const wasOnline = group.userData.online;
       this.applyOnline(group, node);
       // Coming online is a small event: the device lights up with a gold ring.
-      if (!wasOnline && group.userData.online && previous) this.pulseAt(node.x, node.z, CHANNEL_COLORS.primary, 1.1);
+      if (!wasOnline && group.userData.online && previous) this.pulseAt(node.x, node.z, channelColor(0), 1.1);
     }
   }
 
@@ -1699,6 +1888,7 @@ export class World {
   /** A tag that lands on a device nameplate slides sideways, away from it, until both read (at most
    * 1.6 units, so it stays over its own body). Screen space from the resting camera. */
   private declutterTags() {
+    this.placeTags();
     if (!this.installations.size || !this.devices.size) return;
     this.camera.updateMatrixWorld();
     const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0);
@@ -2001,87 +2191,6 @@ export class World {
     this.bolts.push({ mesh, curve: new THREE.QuadraticBezierCurve3(from, middle, to), start: performance.now(), duration: 520, done });
   }
 
-  // ================================================================ deliveries
-
-  /** Packet glyphs parked at each channel's OMEGA end with a faint dashed line to their port's rail
-   * plate (packs with two or more standing hostiles; otherwise every delivery goes to the one). */
-  setDeliveries(list: readonly DeliveryView[], selected: string | null = null) {
-    this.deliveries = list.map(item => ({ ...item, path: [...item.path] }));
-    this.selectedDelivery = selected;
-    this.refreshDeliveries(false);
-  }
-  private refreshDeliveries(force: boolean) {
-    const standing = this.ports.filter(visual => visual.enemy && visual.enemy.hp > 0).length;
-    const show = this.pack && standing > 1;
-    const signature = JSON.stringify([show, this.deliveries, this.selectedDelivery, this.routeSignature]);
-    if (!force && signature === this.deliverySignature) return;
-    this.deliverySignature = signature;
-    for (const glyph of this.glyphs) {
-      this.deliveryGroup.remove(glyph.glyph, glyph.line);
-      glyph.line.geometry.dispose();
-      glyph.line.material.dispose();
-      glyph.glyph.material.dispose();
-    }
-    this.glyphs.length = 0;
-    this.canvas.dataset.deliveries = show ? String(this.deliveries.length) : "0";
-    if (!show) return;
-    const lastSpan = new Map<string, number>();
-    this.deliveries.forEach((view, index) => {
-      const path = view.path;
-      if (path.length < 2) return;
-      const key = linkKey(path[path.length - 2], path[path.length - 1]);
-      const curve = this.cableCurves.get(key);
-      const end = this.topology.nodes.find(node => node.id === path[path.length - 1]);
-      const before = this.topology.nodes.find(node => node.id === path[path.length - 2]);
-      if (!curve || !end || !before) return;
-      // Several channels may share the last span: fan their glyphs out along it.
-      const shared = lastSpan.get(key) ?? 0;
-      lastSpan.set(key, shared + 1);
-      // The curve runs from the link's first device; the glyph sits toward OMEGA's end of the span.
-      const startsAtEnd = Math.hypot(end.x - curve.getPoint(0).x, end.z - curve.getPoint(0).z) < 0.01;
-      const t = Math.max(0.3, 0.6 - shared * 0.18);
-      const base = curve.getPoint(startsAtEnd ? 1 - t : t).add(new THREE.Vector3(0, 0.42, 0));
-      const plate = this.portOf(view.port)!.plate.position;
-      const toward = new THREE.Vector3(plate.x - base.x, 0, plate.z - base.z).normalize();
-      const color = view.primary ? CHANNEL_COLORS.primary : CHANNEL_COLORS.secondary;
-      const selectedGlyph = view.key === this.selectedDelivery;
-      const glyph = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: packetTexture(view.primary), color, transparent: true, depthWrite: false, toneMapped: false,
-      }));
-      glyph.scale.setScalar(selectedGlyph ? 1.25 : 0.98);
-      glyph.position.copy(base);
-      // Over the table's labels and the rail plates it drifts toward (still hidden by nearer hardware).
-      glyph.renderOrder = TABLE_LABEL_ORDER + 3;
-      glyph.userData.deliveryKey = view.key;
-      const line = this.aimLine(base, new THREE.Vector3(plate.x, plate.y - 0.35, plate.z + 0.05), color, selectedGlyph ? 0.95 : view.aimed ? 0.7 : 0.5);
-      this.deliveryGroup.add(glyph, line);
-      this.glyphs.push({ view, glyph, line, base, toward, phase: index * 1.7 });
-    });
-  }
-  /** A faint dashed arc from a packet glyph up to its port's rail plate (one draw call). */
-  private aimLine(from: THREE.Vector3, to: THREE.Vector3, color: number, opacity: number) {
-    const middle = from.clone().lerp(to, 0.5);
-    middle.y += 1.6 + from.distanceTo(to) * 0.08;
-    const curve = new THREE.QuadraticBezierCurve3(from, middle, to);
-    const dashes: THREE.BufferGeometry[] = [];
-    const count = 16;
-    for (let i = 0; i < count; i++) {
-      const a = i / count, b = a + 0.55 / count;
-      const piece = new THREE.CatmullRomCurve3([curve.getPoint(a), curve.getPoint((a + b) / 2), curve.getPoint(b)]);
-      dashes.push(new THREE.TubeGeometry(piece, 3, 0.04, 5, false));
-    }
-    const geometry = mergeGeometries(dashes)!;
-    for (const dash of dashes) dash.dispose();
-    const material = glow(color, opacity);
-    material.transparent = true;
-    material.depthWrite = false;
-    material.toneMapped = false;
-    material.blending = THREE.AdditiveBlending;
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.renderOrder = 11;
-    return mesh;
-  }
-
   // ================================================================ input
 
   setPlacement(role: Role | null, linkSource: string | null = null, linkArmored = false) {
@@ -2127,6 +2236,12 @@ export class World {
     if (Math.abs(position.x) > 7.35 || Math.abs(position.z) > 4.85) return null;
     return { x: snap(position.x), z: snap(position.z) };
   }
+  /** Where a table point stands on screen (client pixels): the relocation plate sits beside it. */
+  screenFromPoint(x: number, z: number, y = 0.5): { x: number; y: number } {
+    const rect = this.canvas.getBoundingClientRect();
+    const at = new THREE.Vector3(x, y, z).project(this.camera);
+    return { x: rect.left + (at.x + 1) / 2 * rect.width, y: rect.top + (1 - at.y) / 2 * rect.height };
+  }
   /** Mirrors the placement rules: device spacing 1.55, wreckage and installations 1.3. */
   private socketBlocked(point: WorldPoint) {
     return this.topology.nodes.some((node) => Math.hypot(node.x - point.x, node.z - point.z) < 1.55) ||
@@ -2134,10 +2249,6 @@ export class World {
       this.installationList.some((item) => Math.hypot(item.x - point.x, item.z - point.z) < 1.3);
   }
   previewAt(clientX: number, clientY: number) {
-    if (this.aimDrag) {
-      this.highlightPort(this.portAt({ clientX, clientY }));
-      return;
-    }
     const point = this.pointFromScreen(clientX, clientY);
     this.placement.visible = Boolean(this.placementRole && point);
     if (point) {
@@ -2146,53 +2257,50 @@ export class World {
       for (const material of this.placementMaterials) material.color.setHex(blocked ? 0xf07a64 : 0x80ffe6);
     }
   }
-  /** The standing port under the pointer (its sprite or its rail plate). */
+  /** The standing port under the pointer: its plate (the DOM layer over the canvas, which a
+   * captured drag still passes over) or its portrait's painted box. */
   private portAt(event: { clientX: number; clientY: number }): Port | null {
+    const plate = (document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null)?.closest<HTMLElement>(".hostile-plate[data-plate]");
+    const platePort = plate?.dataset.plate as Port | undefined;
+    if (platePort && this.ports.some(visual => visual.port === platePort && visual.enemy && visual.enemy.hp > 0 && !visual.dead)) return platePort;
     this.updateRay(event);
     const targets: THREE.Object3D[] = [];
     for (const visual of this.ports) {
       if (!visual.enemy || visual.enemy.hp <= 0 || visual.dead || !visual.ready) continue;
-      if (visual.plate.visible) targets.push(visual.plate);
-      // The body's hit area: the upper, painted part of the sprite (not its transparent margin).
-      const home = visual.group.position;
-      visual.hit.position.set(home.x, home.y + visual.size * 0.14 + visual.actor.mesh.position.y, home.z + 0.2);
-      visual.hit.scale.set(visual.size * 0.5, visual.size * 0.62, 1);
-      visual.hit.updateMatrixWorld();
+      this.fitHit(visual);
       targets.push(visual.hit);
     }
     const hit = this.raycaster.intersectObjects(targets, false)[0]?.object;
     return (hit?.userData.port as Port | undefined) ?? null;
   }
+  /** The body's click target follows its painted box, wherever the portrait stands this frame. */
+  private fitHit(visual: PortVisual) {
+    const box = visual.bounds, mesh = visual.actor.mesh;
+    mesh.updateWorldMatrix(true, false);
+    visual.hit.position.set((box.l + box.r) / 2 - 0.5, 0.5 - (box.t + box.b) / 2, 0).applyMatrix4(mesh.matrixWorld);
+    visual.hit.scale.set((box.r - box.l) * mesh.scale.x * 0.92, (box.b - box.t) * mesh.scale.y * 0.94, 1);
+    visual.hit.updateMatrixWorld();
+  }
   private highlightPort(port: Port | null) {
-    if (this.aimDrag) this.aimDrag.over = port;
-    for (const visual of this.ports) visual.highlight.visible = visual.port === port && visual.plate.visible;
-    if (this.aimDrag) this.canvas.dataset.cursor = port ? "target" : "grabbing";
+    for (const visual of this.ports) visual.highlight.visible = visual.port === port && this.showPort(visual);
   }
   private hit(event: PointerEvent) {
     this.updateRay(event);
-    const glyphs = this.glyphs.map(item => item.glyph);
     const fronts = [...this.installations.values()].map(group => group.userData.installation.hit);
-    const object = this.raycaster.intersectObjects([...glyphs, ...fronts, ...this.hitObjects], false)[0]
+    const object = this.raycaster.intersectObjects([...fronts, ...this.hitObjects], false)[0]
       ?.object;
     const port = object ? null : this.portAt(event);
     return {
       node: object?.userData.nodeId as string | undefined,
       link: object?.userData.linkKey as string | undefined,
       installation: object?.userData.installationId as string | undefined,
-      delivery: object?.userData.deliveryKey as string | undefined,
       port: port ?? undefined,
     };
   }
   private onPointerDown = (event: PointerEvent) => {
     if (event.button !== 0) return;
+    this.callbacks.onHover?.(null, event.clientX, event.clientY);
     const hit = this.hit(event);
-    if (hit.delivery && !this.placementRole && !this.linkSource && this.callbacks.onAim) {
-      this.aimDrag = { key: hit.delivery, pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false, over: null };
-      this.controls.enabled = false;
-      this.canvas.setPointerCapture(event.pointerId);
-      this.canvas.dataset.cursor = "grabbing";
-      return;
-    }
     this.pointerDown = {
       id: hit.node ?? null,
       pointerId: event.pointerId,
@@ -2206,21 +2314,6 @@ export class World {
     }
   };
   private onPointerMove = (event: PointerEvent) => {
-    if (this.aimDrag) {
-      if (Math.hypot(event.clientX - this.aimDrag.x, event.clientY - this.aimDrag.y) > 5) this.aimDrag.moved = true;
-      const glyph = this.glyphs.find(item => item.view.key === this.aimDrag!.key);
-      if (glyph && this.aimDrag.moved) {
-        // The glyph follows the pointer over the table, lifted toward the rail.
-        // Over the table it rides a hand above the deck; past the far rail it hangs in front of the plates.
-        this.updateRay(event);
-        const point = new THREE.Vector3();
-        const deck = this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.1), point);
-        if (!deck || point.z < -5.6) this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), 5.6), point);
-        glyph.glyph.position.set(THREE.MathUtils.clamp(point.x, -9, 9), THREE.MathUtils.clamp(point.y, 0.6, 6), THREE.MathUtils.clamp(point.z, -5.6, 5));
-      }
-      this.highlightPort(this.portAt(event));
-      return;
-    }
     if (this.targetingZone) {
       const point = this.pointFromScreen(event.clientX,event.clientY);
       this.setZonePreview(point ? point.z < -1.3 ? "north" : point.z > 1.3 ? "south" : "center" : null);
@@ -2246,6 +2339,7 @@ export class World {
         this.callbacks.onMove(this.pointerDown.id, point, false);
         this.canvas.dataset.cursor = "grabbing";
         this.hover(null);
+        this.callbacks.onHover?.(null, event.clientX, event.clientY);
       }
       return;
     }
@@ -2253,13 +2347,18 @@ export class World {
     if (this.linkSource) {
       const target = this.hit(event).node;
       this.showLinkGhost(target && target !== this.linkSource ? target : null);
+      this.callbacks.onHover?.(null, event.clientX, event.clientY);
     } else if (!this.placementRole) {
       const hit = this.hit(event);
-      this.canvas.dataset.cursor = hit.delivery ? "grab"
-        : hit.installation && this.targetingInstallations ? "target"
+      this.canvas.dataset.cursor = hit.installation && this.targetingInstallations ? "target"
         : hit.node || hit.installation || hit.port ? "pointer" : "grab";
       this.hover(hit.installation ? { kind: "installation", id: hit.installation } : hit.node ? { kind: "node", id: hit.node } : null);
-    }
+      const target: TableHover | null = hit.installation ? { kind: "installation", id: hit.installation }
+        : hit.node ? { kind: "node", id: hit.node }
+        : hit.port ? { kind: "port", id: hit.port }
+        : hit.link ? { kind: "link", id: hit.link } : null;
+      this.callbacks.onHover?.(target, event.clientX, event.clientY);
+    } else this.callbacks.onHover?.(null, event.clientX, event.clientY);
   };
   /** Hover reach rings: an installation's reach (magenta), a firewall's quarantine reach (brass),
    * a Server Rack's shelter (sage), a cabled Honeypot's bite (green). Static under reduced motion. */
@@ -2307,18 +2406,6 @@ export class World {
     this.scene.add(ghost);
   }
   private onPointerUp = (event: PointerEvent) => {
-    const aim = this.aimDrag;
-    if (aim) {
-      this.aimDrag = null;
-      this.controls.enabled = true;
-      if (this.canvas.hasPointerCapture(aim.pointerId)) this.canvas.releasePointerCapture(aim.pointerId);
-      const port = aim.moved ? this.portAt(event) : null;
-      this.highlightPort(null);
-      this.canvas.dataset.cursor = "grab";
-      this.refreshDeliveries(true);
-      if (port) this.callbacks.onAim?.(aim.key, port);
-      return;
-    }
     const down = this.pointerDown;
     this.pointerDown = null;
     this.controls.enabled = true;
@@ -2342,39 +2429,72 @@ export class World {
     this.cancelInteraction();
   };
 
-  /** Ends an interrupted drag without committing a placement, movement or aim. */
+  /** Ends an interrupted drag without committing a placement or movement. */
   cancelInteraction() {
-    const pointerId = this.pointerDown?.pointerId ?? this.aimDrag?.pointerId;
-    const aimed = !!this.aimDrag;
+    const pointerId = this.pointerDown?.pointerId;
     this.pointerDown = null;
-    this.aimDrag = null;
     this.controls.enabled = true;
     this.placement.visible = false;
     this.canvas.dataset.cursor = "grab";
     for (const visual of this.ports) visual.highlight.visible = false;
-    if (aimed) this.refreshDeliveries(true);
     if (pointerId !== undefined && this.canvas.hasPointerCapture(pointerId))
       this.canvas.releasePointerCapture(pointerId);
   }
-  private onPointerLeave = () => {
+  private onPointerLeave = (event: PointerEvent) => {
     this.placement.visible = false;
     this.showLinkGhost(null);
     this.hover(null);
+    this.callbacks.onHover?.(null, event.clientX, event.clientY);
   };
 
   // ================================================================ playback primitives
 
-  /** Where a port's hostile is on screen (client pixels), for numbers that rise over it. */
+  /** Client pixels of a world point for the camera as it is now. */
+  private clientOf(point: THREE.Vector3) {
+    const rect = this.canvas.getBoundingClientRect();
+    const at = point.clone().project(this.camera);
+    return { x: rect.left + (at.x + 1) / 2 * rect.width, y: rect.top + (1 - at.y) / 2 * rect.height };
+  }
+  /** Where a port's plate hangs (client pixels): its top centre, just under the portrait's painted
+   * foot, and its width. null while the table is hidden, or for a port without a standing hostile
+   * (a falling one's plate leaves as it starts to fall), unless `empty`: an announced arrival's
+   * plate holds its empty port. */
+  portAnchor(port: Port, empty = false): { x: number; y: number; width: number } | null {
+    const visual = this.portOf(port);
+    if (!visual || !this.visible || !this.railFloor) return null;
+    if (!empty && (!visual.enemy || visual.enemy.hp <= 0 || visual.dead || visual.dying || !visual.ready)) return null;
+    const plate = this.railFrame?.plate;
+    return { ...this.clientOf(visual.anchor), width: (port === "centre" ? plate?.width : plate?.side) ?? 220 };
+  }
+  /** The portrait's painted box on screen (client pixels) as drawn this frame. */
+  portraitRect(port: Port): { left: number; top: number; right: number; bottom: number } | null {
+    const visual = this.portOf(port);
+    if (!visual?.enemy || !visual.group.visible) return null;
+    const mesh = visual.actor.mesh, box = visual.bounds;
+    mesh.updateWorldMatrix(true, false);
+    const corners = [[box.l, box.t], [box.r, box.t], [box.l, box.b], [box.r, box.b]]
+      .map(([u, v]) => this.clientOf(new THREE.Vector3(u - 0.5, 0.5 - v, 0).applyMatrix4(mesh.matrixWorld)));
+    return {
+      left: Math.min(...corners.map(at => at.x)), right: Math.max(...corners.map(at => at.x)),
+      top: Math.min(...corners.map(at => at.y)), bottom: Math.max(...corners.map(at => at.y)),
+    };
+  }
+  /** The middle of a portrait's painted body (world), where packets and bolts strike it. */
+  private bodyOf(visual: PortVisual) {
+    const box = visual.bounds;
+    return visual.group.position.clone().add(new THREE.Vector3(
+      ((box.l + box.r) / 2 - 0.5) * visual.size, (0.5 - (box.t + box.b) / 2) * visual.size, 0));
+  }
+  /** Where a port's hostile is on screen (client pixels), for numbers that rise over it: the lower
+   * half of its body. */
   portScreen(port: Port): { x: number; y: number } | null {
     const visual = this.portOf(port);
     if (!visual?.enemy) return null;
-    const rect = this.canvas.getBoundingClientRect();
-    const point = (this.pack && visual.plate.visible ? visual.plate.position.clone().setY(visual.plate.position.y + 1.4)
-      : visual.group.position.clone().add(new THREE.Vector3(0, visual.size * 0.12, 0))).project(this.camera);
-    return { x: rect.left + (point.x + 1) / 2 * rect.width, y: rect.top + (1 - point.y) / 2 * rect.height };
+    const box = visual.bounds;
+    return this.clientOf(this.bodyOf(visual).add(new THREE.Vector3(0, -(box.b - box.t) * visual.size * 0.12, 0)));
   }
   private portTarget(visual: PortVisual) {
-    return visual.group.position.clone().add(new THREE.Vector3(0, visual.size * 0.08, 1.2));
+    return this.bodyOf(visual).add(new THREE.Vector3(0, 0, 1.2));
   }
 
   playPacket(path: string[], onDone?: () => void, color = 0x8affea, count?: number, air?: THREE.Vector3) {
@@ -2441,14 +2561,15 @@ export class World {
     let remaining = routes.length;
     const finished = () => { if (--remaining === 0) done?.(); };
     routes.forEach((path, channel) =>
-      this.playPacket(path, finished, channel === 0 ? CHANNEL_COLORS.primary : CHANNEL_COLORS.secondary, channel === 0 ? 4 : 3));
+      this.playPacket(path, finished, channelColor(channel), channel === 0 ? 4 : 3));
   }
 
   /**
-   * A split transmission: each delivery runs its channel, then crosses the air to its port.
+   * A pack's transmission: each delivery runs its channel in its colour, then crosses the air to its
+   * port (the target: every delivery lands there).
    * `onPort` fires when the last packet of a port lands (its impact); `done` after every port.
    */
-  playTransmission(deliveries: readonly { path: string[]; port: Port; primary: boolean }[], onPort: (port: Port) => void, done: () => void) {
+  playTransmission(deliveries: readonly { path: string[]; port: Port; primary: boolean; index?: number }[], onPort: (port: Port) => void, done: () => void) {
     const live = deliveries.filter(delivery => delivery.path.length > 1);
     if (!live.length || !this.active) { done(); return; }
     const remaining = new Map<Port, number>();
@@ -2462,7 +2583,7 @@ export class World {
         if (left > 0) return;
         onPort(delivery.port);
         if (--ports === 0) done();
-      }, delivery.primary ? CHANNEL_COLORS.primary : CHANNEL_COLORS.secondary, delivery.primary ? 4 : 3, this.portTarget(visual));
+      }, channelColor(delivery.index ?? (delivery.primary ? 0 : 1)), delivery.primary ? 4 : 3, this.portTarget(visual));
     }
   }
 
@@ -2485,7 +2606,7 @@ export class World {
     const visual = this.portOf(port) ?? this.leaderPort();
     visual.hitAt = performance.now();
     if (this.reducedMotion()) {
-      this.pulseAt(visual.port === "centre" ? 0 : plateX(visual.port), -5.4, color, 1.7);
+      this.pulseAt(visual.railX, -5.4, color, 1.7);
       return;
     }
     const origin = this.portTarget(visual);
@@ -2570,7 +2691,7 @@ export class World {
         trail.position.z = i * .26; effect.add(trail);
       }
     }
-    const origin = visual.group.position.clone(); origin.y += visual.size * .06; origin.z += 1.4;
+    const origin = this.bodyOf(visual); origin.z += 1.4;
     if (kind === "charge") target.copy(origin);
     effect.position.copy(origin); effect.visible = false;
     effect.scale.setScalar(visual.size / 10.5);
@@ -2608,9 +2729,9 @@ export class World {
     const attack = action ? Math.min(1, (now - action.start) / action.duration) : null;
     const enraged = this.enraged(visual);
     const centre = visual.port === "centre";
-    visual.group.position.copy(portHome(visual.port, visual.size));
+    this.glide(visual, now);
+    visual.group.position.copy(visual.home);
     if (!centre) visual.light.position.copy(visual.group.position).add(new THREE.Vector3(0, 0.2, 3.2));
-    visual.group.position.y -= visual.drop;
     if (!reduced) visual.group.position.z -= hurt * .7;
     const dim = visual.dimUntil > now ? Math.sin(Math.min(1, (now - visual.dimFrom) / (visual.dimUntil - visual.dimFrom)) * Math.PI) : 0;
     visual.actor.dim = dim;
@@ -2621,7 +2742,7 @@ export class World {
     const strength = centre ? 1 : 0.5;
     visual.light.intensity = (visual.boss ? 34 : 24) * strength * (1 + heartbeat * .6 + (enraged ? .35 : 0)) * (1 - dim * .5);
     if (visual.under) visual.under.intensity = (visual.boss ? 26 : 18) * (1 + heartbeat * .4);
-    if (!action) return;
+    if (!action) { this.keepFoot(visual); return; }
     const t = Math.min(1, (now - action.start) / action.duration);
     const charge = Math.sin(Math.min(1, t / .5) * Math.PI / 2);
     // Anticipation: it rears back and rises before committing.
@@ -2644,6 +2765,7 @@ export class World {
       action.effect.rotation.set(t * 5, t * 7, action.kind === "sever" ? t * 2 : t * 6);
       action.effect.scale.setScalar((.6 + charge * .8) * Math.max(0.7, size));
     }
+    this.keepFoot(visual);
     visual.actor.mesh.material.color.lerp(new THREE.Color(enemy.color), Math.sin(t * Math.PI) * .3);
     if (t >= .78 && !action.impacted) {
       action.impacted = true;
@@ -2662,17 +2784,28 @@ export class World {
       action.done();
     }
   }
+  /** A portrait's painted foot never sinks onto its plate: a lunge, a rear or a swell lifts the
+   * whole body instead (a falling hostile's plate has already gone). */
+  private keepFoot(visual: PortVisual) {
+    if (visual.dying || !this.railFloor) return;
+    const box = visual.bounds, mesh = visual.actor.mesh;
+    visual.group.updateMatrixWorld(true);
+    const foot = new THREE.Vector3((box.l + box.r) / 2 - 0.5, 0.5 - box.b, 0).applyMatrix4(mesh.matrixWorld);
+    const at = this.clientOf(foot).y, limit = this.clientOf(visual.anchor).y - 2;
+    if (at <= limit) return;
+    const perUnit = at - this.clientOf(foot.clone().setY(foot.y + 1)).y;
+    if (perUnit > 0) visual.group.position.y += (at - limit) / perUnit;
+  }
   playEnemyTransition(kind: "enrage" | "death" | "break", done: () => void, quick = false, port?: Port) {
     const visual = this.portOf(port) ?? this.leaderPort();
     const enemy = visual.enemy;
     if (!enemy || !visual.ready) {
-      if (kind === "death") { visual.dead = true; visual.group.visible = false; this.refreshRail(); }
+      if (kind === "death") { visual.dead = true; visual.group.visible = false; }
       done();
       return;
     }
     this.canvas.dataset.enemyState = kind;
-    const x = visual.port === "centre" ? 0 : plateX(visual.port);
-    this.pulseAt(x, -5.3, enemy.color, (kind === "death" ? 3.4 : 2.4) * (visual.size / 10.5));
+    this.pulseAt(visual.railX, -5.3, enemy.color, (kind === "death" ? 3.4 : 2.4) * (visual.size / 10.5));
     if (kind === "enrage") this.shakeCamera(.14, 600);
     if (kind === "death") {
       visual.dying = true;
@@ -2684,12 +2817,9 @@ export class World {
         visual.dying = false;
         visual.dead = true;
         visual.group.visible = false;
-        this.refreshRail();
-        this.refreshDeliveries(true);
       }
       done();
     }, quick || this.reducedMotion());
-    this.refreshRail();
   }
   /** A reinforcement or an add takes its port now (the playback's arrival beat). */
   arrive(enemy: Enemy) {
@@ -2698,7 +2828,6 @@ export class World {
     const roster = this.enemies.filter(other => other.port !== enemy.port).concat({ ...enemy });
     roster.sort((a, b) => PORT_ORDER.indexOf(a.port) - PORT_ORDER.indexOf(b.port));
     this.syncRail(roster, true);
-    this.refreshDeliveries(true);
   }
 
   /** Trap phase: a firewall's quarantine beam (from a Sentry's searchlight) into an installation. */
@@ -2851,7 +2980,7 @@ export class World {
   dropFragment(port: Port, done: () => void = () => {}) {
     const visual = this.portOf(port);
     const { group, body } = buildTableProp("fragment");
-    const x = visual ? (visual.port === "centre" ? 0 : plateX(visual.port)) : 0;
+    const x = visual ? visual.railX : 0;
     group.position.set(x, 1.6, -5.2);
     group.scale.setScalar(1.6);
     this.scene.add(group);
@@ -2868,7 +2997,6 @@ export class World {
       this.battleIdentity = null;
     }
     this.visible = visible;
-    this.refreshRail();
   }
 
   private clearTransientEffects() {
@@ -2908,22 +3036,8 @@ export class World {
   }
   resetCamera() {
     this.camera.position.copy(CAMERA_HOME);
-    this.controls.target.set(0, 0.15, -0.3);
+    this.controls.target.copy(CAMERA_TARGET);
     this.controls.update();
-  }
-
-  /** Short, wide tables crop the top of the canvas (it starts above the viewport and
-   * under the header). Lower a hostile just enough that its head stays visible. */
-  private frameEnemy(visual: PortVisual) {
-    const rect = this.canvas.getBoundingClientRect();
-    if (!rect.height) return;
-    const limit = Math.max(0, -rect.top) / rect.height + 0.06;
-    const home = portHome(visual.port, visual.size);
-    const crown = home.y + visual.size * 0.44;
-    this.camera.updateMatrixWorld();
-    const at = (y: number) => (1 - new THREE.Vector3(home.x, y, home.z).project(this.camera).y) / 2;
-    const top = at(crown), perUnit = at(crown - 1) - top;
-    visual.drop = top >= limit || perUnit <= 0 ? 0 : Math.min(2.6, (limit - top) / perUnit);
   }
 
   private resize() {
@@ -2935,7 +3049,7 @@ export class World {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height, false);
     this.composer.setSize(width, height);
-    for (const visual of this.ports) this.frameEnemy(visual);
+    this.layoutRail();
     this.declutterTags();
     const ratio = this.renderer.getPixelRatio();
     this.antialias.material.uniforms.resolution.value.set(
@@ -2961,19 +3075,6 @@ export class World {
         group.userData.nextSpark = time + 2.6 + Math.random() * 2.4;
         this.burst(new THREE.Vector3(group.position.x, 1.5, group.position.z), 0xffa05a, 3, 0.9);
       }
-    const glyphPulse = reduced ? 1 : 0.85 + 0.15 * Math.sin(time * 3);
-    for (const item of this.glyphs) {
-      if (this.aimDrag?.key === item.view.key && this.aimDrag.moved) continue;
-      // Each glyph drifts a hand's width toward its port and eases back (static under reduced motion).
-      const drift = reduced ? 0 : (0.5 - 0.5 * Math.cos(time * 1.3 + item.phase)) * 0.42;
-      item.glyph.position.copy(item.base).addScaledVector(item.toward, drift);
-      item.glyph.material.opacity = glyphPulse;
-    }
-    for (const visual of this.ports) {
-      if (!visual.crest.visible) continue;
-      const dim = visual.crest.userData.dim as boolean;
-      visual.crest.material.opacity = (dim ? 0.45 : 1) * (reduced ? 1 : 0.8 + 0.2 * Math.sin(time * 1.6));
-    }
   }
 
   private animateProps(now: number, time: number, motion: number, reduced: boolean) {
@@ -3138,6 +3239,7 @@ export class World {
     }
     this.composer.render();
     if (shaking) this.camera.position.copy(this.cameraRest);
+    this.callbacks.onFrame?.();
   };
   dispose() {
     if (!this.active) return;
@@ -3171,7 +3273,6 @@ export class World {
     this.cableGroups.clear();
     this.cableBeads.length = 0;
     this.frayEmbers.length = 0;
-    this.glyphs.length = 0;
     this.linkGhost = null;
     this.zoneVisuals.clear();
     this.environment.dispose();

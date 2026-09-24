@@ -385,6 +385,7 @@ test("separated circuits defend even when a central route is first, and relocati
   await page.locator('[data-action="devices"]').click();
   await page.locator('[data-manage-node="router3"]').click();
   await page.locator('[data-relocate-zone="center"]').click();
+  await page.locator("#relocate-confirm [data-relocate-confirm]").click();
   await expect(page.locator(".energy-orb strong")).toHaveText("4");
   await expect(page.locator(".forecast-net b")).toHaveText("2");
   await expect(page.locator(".shield-resource strong")).toHaveText("0");
@@ -681,7 +682,7 @@ test("a physical device drag cancelled by blur never spends energy or commits it
   await page.mouse.down();
   await page.mouse.move(x + 90, hitY! + 35, { steps: 6 });
   await expect(canvas).toHaveAttribute("data-cursor", "grabbing");
-  await expect(page.locator("#movement-preview")).toContainText("RELOCATE ROUTER1");
+  await expect(page.locator("#movement-preview")).toContainText("ROUTER1");
   await expect(page.locator("#movement-preview")).toContainText("Shield");
   await page.evaluate(() => window.dispatchEvent(new Event("blur")));
   await expect(canvas).toHaveAttribute("data-cursor", "grab");
@@ -691,6 +692,8 @@ test("a physical device drag cancelled by blur never spends energy or commits it
   expect(await saved(page)).toBe(before);
   await expect(page.locator(".energy-orb strong")).toHaveText("5");
   await page.locator('[data-relocate-zone="north"]').click();
+  await expect(page.locator(".energy-orb strong")).toHaveText("5");
+  await page.locator("#relocate-confirm [data-relocate-confirm]").click();
   await expect(page.locator(".energy-orb strong")).toHaveText("4");
 });
 

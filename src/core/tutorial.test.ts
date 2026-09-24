@@ -90,7 +90,7 @@ test("lesson setups announce the intended enemy action", () => {
   assert.equal(kind("traps"), "jam");
   assert.equal(kind("console-ghost"), "strike");
   assert.equal(kind("danger"), "charge");
-  assert.equal(kind("aim-signal"), "strike", "the Leech strikes, fed by the Drone's uplink");
+  assert.equal(kind("aim-signal"), "strike", "the leader strikes, fed by the Drone's uplink");
   assert.equal(kind("clear-ground"), "install", "the Nest hatches its next Jammer");
   assert.equal(kind("wardens"), "charge", "the Regent's charge turn");
 });
@@ -123,6 +123,7 @@ test("03 · reroute: second channel + Failover Policy survives the cut", () => {
   cable(s.run, "alpha", router);
   cable(s.run, router, "omega");
   assert.ok(s.done("channel"));
+  assert.match(lessonById("reroute")!.takeaway, /Every device carries one channel: two routes through the same router or switch count as one channel/);
   ok(playProtocol(s.run, index(s.run, "failover-policy")), "arm failover");
   const progress = s.transmit();
   assert.ok(progress.goals.find(goal => goal.id === "survive")!.done);
@@ -162,6 +163,10 @@ test("04 · online devices: firewall online anywhere, then a cache server", () =
 test("05 · bands: relocate out of the suppressed, marked band, then resonate", () => {
   const s = new Session("bands");
   assert.equal(s.done("suppression"), false);
+  // A move asks for confirmation: the step says so, and its confirm plate is the lit control
+  // (before it opens, a band button of the chosen router, never NORTH).
+  assert.match(s.progress.coach, /then \*\*confirm\*\*/);
+  assert.deepEqual(s.progress.focus.split("||").map(tier => tier.trim()), ["#relocate-confirm", '#target-dock [data-relocate-zone]:not([data-relocate-zone="north"])']);
   ok(relocateNode(s.run, "router1", 0, 0), "relocate to center");
   assert.ok(s.done("suppression"));
   assert.ok(s.done("jam"));
@@ -296,7 +301,7 @@ test("training rails: cables must serve the step in every cabling lesson", () =>
   assert.equal(guard(online, { kind: "link", card: "fiber", a: "alpha", b: "firewall2" }), null);
   const reroute = new Session("reroute");
   const second = place(reroute.run, "router", 0, 2.6);
-  assert.ok(guard(reroute, { kind: "link", card: "fiber", a: "alpha", b: "router1" }), "the first route's router is off limits");
+  assert.match(guard(reroute, { kind: "link", card: "fiber", a: "alpha", b: "router1" }) ?? "", /Every device carries one channel/, "the first route's router is off limits");
   assert.equal(guard(reroute, { kind: "link", card: "fiber", a: "alpha", b: second }), null);
   const traps = new Session("traps");
   assert.ok(guard(traps, { kind: "link", card: "fiber", a: "alpha", b: "router1" }), "deploy the honeypot before cabling");
@@ -386,56 +391,85 @@ test("progress is sticky and the menu order chains lessons", () => {
 const bandwidth = (run: RunState) => combatPreview(run).deliveries.filter(item => !item.primary);
 const burstOf = (card: string) => CARDS[card as CardId].values.burst ?? 0;
 
-test("10 · aim the signal: select, aim channel 2 at the Drone, transmit; focus the next Drone, overflow", () => {
+test("10 · aim the signal: read the three ports, target the Drone, transmit; aim channel 2 at the Mite, overflow", () => {
   const s = new Session("aim-signal");
-  const drone = s.run.enemies.find(enemy => enemy.id === "relay-drone")!;
-  assert.equal(drone.port, "left");
-  assert.equal(s.run.enemies.find(enemy => enemy.port === "centre")?.id, "leech");
+  const at = (port: Port) => s.run.enemies.find(enemy => enemy.port === port)!;
+  // A full rail: an escort at each outer port, the leader at the centre.
+  assert.deepEqual((["left", "centre", "right"] as Port[]).map(port => [at(port).id, at(port).role]),
+    [["relay-drone", "escort"], [at("centre").id, "leader"], ["spark-mite", "escort"]]);
+  assert.equal(s.run.reinforcement, null, "nothing arrives: every hostile of the drill is on the rail from the start");
   assert.equal(s.run.focus, "centre", "rule 15: the leader is the default focus");
+  const drone = at("left"), mite = at("right"), leader = at("centre"), miteHp = mite.hp;
   const start = combatPreview(s.run);
+  const [primary, second] = start.deliveries;
   assert.equal(start.deliveries.length, 2, "two channels, two deliveries");
-  assert.ok(start.deliveries.every(item => item.port === "centre"), "both land on the focus");
-  const leech = () => combatPreview(s.run).hostiles.find(item => item.id === "leech")!;
-  assert.ok(leech().terms.some(term => /uplink/i.test(term.label)), "the Drone feeds the Leech's strike");
-  const fed = leech().raw;
-  assert.equal(s.progress.focus, '.port-row[data-port="left"]');
+  assert.ok(start.deliveries.every(item => item.port === "centre"), "both land on the target");
+  const forecast = (uid: string) => combatPreview(s.run).hostiles.find(item => item.uid === uid)!;
+  assert.ok(forecast(leader.uid).terms.some(term => /uplink/i.test(term.label)), "the Drone feeds the leader's strike");
+  assert.equal(forecast(drone.uid).state, "acts", "the left escort acts on the first phase");
+  assert.equal(forecast(mite.uid).state, "dormant", "the right escort rests on it: escorts take turns");
+  const fed = forecast(leader.uid).raw;
 
-  // Step 1 is reading: the HUD's selection completes it.
-  s.view.port = "centre";
-  assert.equal(s.done("select"), false, "another port is not the step");
-  s.view.port = "left";
-  assert.ok(s.done("select"));
-  s.view.port = null;
-  assert.ok(s.done("select"), "a met selection step stays met");
+  // Step 1 reads the rail: every hostile's badge, lit together.
+  assert.ok(s.progress.reading, "step 1 is a reading step");
+  assert.equal(s.progress.focus.split("||")[0].trim(), "#intent-layer .hostile-intent");
+  assert.equal(s.progress.spread, true, "the spotlight spans the three badges");
+  assert.match(s.progress.hint, /the Spark Mite rests this phase/, "the hint names every move, the resting escort too");
+  assert.ok(guard(s, { kind: "transmit" }) && guard(s, { kind: "focus", port: "left" }), "nothing plays before the rail is read");
+  s.view.read = ["read"];
+  assert.ok(s.done("read"));
 
-  const second = start.deliveries[1];
-  assert.match(s.progress.focus, new RegExp(`data-aim="${second.channelKey.replace("|", "\\|")}"\\]\\[data-aim-port="left"`), "the spotlight is channel 2's L stud");
-  ok(aimChannel(s.run, second.channelKey, "left"), "aim channel 2");
-  assert.ok(s.done("aim"));
-  const aimed = combatPreview(s.run);
-  assert.equal(aimed.ports.left?.lethal, true, "channel 2 alone kills the Drone");
-  assert.equal(aimed.ports.left?.packet, drone.hp);
-  assert.equal(aimed.ports.centre?.packet, start.deliveries[0].amount, "the primary stays on the Leech");
-  assert.equal(leech().raw, fed - RULES.uplinkBonus, "the uplink is gone with the Drone");
-  assert.equal(aimed.arrivals?.enemyId, "relay-drone", "a second Drone is announced");
+  // Step 2: click the Drone to target it: its badge, else its row on the enemy plate.
+  const tiers = s.progress.focus.split("||").map(tier => tier.trim());
+  assert.equal(tiers[0], '#intent-layer .hostile-intent[data-port="left"]');
+  assert.equal(tiers[tiers.length - 1], '.port-row[data-port="left"]');
+  assert.match(s.progress.coach, /Click the \*\*Relay Drone\*\* to \*\*target\*\* it/);
+  assert.equal(drone.hp, primary.amount + second.amount, "together the deliveries are exactly the Drone's health");
+  assert.ok(guard(s, { kind: "focus", port: "right" }), "another hostile is not the step");
+  assert.equal(guard(s, { kind: "focus", port: "left" }), null);
+  ok(setFocus(s.run, "left"), "target the Drone");
+  assert.ok(s.done("target"));
+  const targeted = combatPreview(s.run);
+  assert.ok(targeted.deliveries.every(item => item.port === "left"), "every delivery follows the target");
+  assert.equal(targeted.ports.left?.lethal, true);
+  assert.equal(targeted.ports.left?.overflowOut, 0, "nothing overflows yet");
+  assert.equal(forecast(leader.uid).raw, fed - RULES.uplinkBonus, "the uplink falls with the Drone");
+  assert.equal(s.progress.focus, ".transmit-button");
 
   s.transmit();
   assert.ok(s.done("strike"));
-  assert.ok(s.last!.deaths.length || !s.run.enemies.some(enemy => enemy.uid === drone.uid && enemy.hp > 0), "the first Drone fell");
-  const next = s.run.enemies.find(enemy => enemy.id === "relay-drone" && enemy.hp > 0)!;
-  assert.ok(next && next.uid !== drone.uid, "the reinforcement arrived");
-  assert.equal(next.port, "left", "it takes the emptied left port");
-  assert.equal(s.run.focus, "centre");
-  assert.equal(s.done("focus"), false);
-  assert.ok(combatPreview(s.run).ports.left!.packet < next.hp, "channel 2 alone no longer kills");
-  assert.match(s.progress.focus, /data-focus-port="left"\] \|\| \.port-row\[data-port="left"\]/);
+  assert.equal(at("left").hp, 0, "the Drone fell");
+  assert.equal(s.run.focus, "centre", "the target returns to the leader");
+  assert.equal(forecast(mite.uid).state, "acts", "the Mite acts on the second phase");
 
-  ok(setFocus(s.run, "left"), "focus the new Drone");
-  assert.ok(s.done("focus"));
-  const focused = combatPreview(s.run).ports.left!;
-  assert.ok(focused.lethal && focused.overflowOut > 0 && focused.overflowTo === "centre", "the surplus overflows into the Leech");
+  // Step 4: pick up channel 2, then click the Mite.
+  const ch2 = combatPreview(s.run).deliveries[1];
+  assert.equal(s.progress.focus, `.delivery-row[data-delivery="${ch2.channelKey}"]`, "the spotlight is channel 2's row");
+  assert.match(s.progress.coach, /Pick up \*\*channel 2\*\*/);
+  s.view.delivery = combatPreview(s.run).deliveries[0].channelKey;
+  assert.match(s.update().coach, /That is the primary/, "the wrong delivery gets the coach's word, not a move");
+  assert.equal(s.progress.focus, `.delivery-row[data-delivery="${ch2.channelKey}"]`);
+  s.view.delivery = ch2.channelKey;
+  const picked = s.update().focus.split("||").map(tier => tier.trim());
+  assert.equal(picked[0], '#intent-layer .hostile-intent[data-port="right"]', "picked up: the spotlight moves to the Mite");
+  assert.ok(picked.includes(`.delivery-row[data-delivery="${ch2.channelKey}"] [data-aim-port="right"]`), "or channel 2's R stud");
+  assert.match(s.progress.coach, /click the \*\*Spark Mite\*\*/);
+  assert.ok(guard(s, { kind: "aim", key: combatPreview(s.run).deliveries[0].channelKey, port: "right" }), "the primary stays on the target");
+  assert.ok(guard(s, { kind: "focus", port: "right" }), "moving the target is not the step");
+  ok(aimChannel(s.run, ch2.channelKey, "right"), "aim channel 2");
+  s.view.delivery = null;
+  assert.ok(s.done("aim"));
+  const aimed = combatPreview(s.run);
+  assert.equal(aimed.ports.right?.lethal, true, "channel 2 alone downs the Mite");
+  assert.equal(aimed.ports.right?.overflowOut, ch2.amount - miteHp, "its spare overflows");
+  assert.equal(aimed.ports.right?.overflowTo, "centre", "to the target");
+  assert.equal(aimed.ports.centre?.packet, primary.amount + ch2.amount - miteHp, "the leader takes the primary and the overflow");
+  assert.match(s.progress.coach, /overflows to your target/);
+  const before = at("centre").hp;
   assert.ok(s.transmit().complete);
-  assert.equal(livingEnemies(s.run).length, 1, "only the Leech stands");
+  assert.equal(livingEnemies(s.run).length, 1, "only the leader stands");
+  assert.equal(at("centre").hp, before - (primary.amount + ch2.amount - miteHp));
+  assert.equal(s.progress.focus, "", "a finished drill spotlights nothing");
 });
 
 test("11 · clear the ground: scrub twice, repair ahead of the telegraphed breakdown, purge the band", () => {
@@ -509,7 +543,16 @@ test("12 · the crown and its wardens: read, aim both bandwidth channels, prepar
   assert.ok(s.done("read"));
   assert.equal(s.progress.reading, false);
 
-  for (const item of bandwidth(s.run)) ok(aimChannel(s.run, item.channelKey, "left"), `aim channel ${item.index + 1}`);
+  // Aiming is two clicks: pick a delivery up (its row), then click the Warden. The spotlight follows.
+  for (const item of bandwidth(s.run)) {
+    s.view.delivery = null;
+    assert.equal(s.update().focus, `.delivery-row[data-delivery="${item.channelKey}"]`, `channel ${item.index + 1}'s row first`);
+    s.view.delivery = item.channelKey;
+    assert.equal(s.update().focus.split("||")[0].trim(), '#intent-layer .hostile-intent[data-port="left"]', "then the Warden");
+    assert.ok(guard(s, { kind: "focus", port: "left" }), "a click on the Warden without a delivery would move the target: refused");
+    ok(aimChannel(s.run, item.channelKey, "left"), `aim channel ${item.index + 1}`);
+  }
+  s.view.delivery = null;
   assert.ok(s.done("aim"));
   const aimed = combatPreview(s.run);
   assert.equal(aimed.ports.left?.lethal, true, "both bandwidth deliveries kill the left Warden");
@@ -563,14 +606,17 @@ function railsHold(s: Session, allowed: (action: LessonAction) => boolean) {
 test("training rails: the aim drill plays only the current step's move", () => {
   const s = new Session("aim-signal");
   railsHold(s, () => false);
-  s.view.port = "left";
-  const key = bandwidth(s.run)[0].channelKey;
-  railsHold(s, action => action.kind === "aim" && action.key === key && action.port === "left");
-  ok(aimChannel(s.run, key, "left"), "aim");
+  s.view.read = ["read"];
+  railsHold(s, action => action.kind === "focus" && action.port === "left");
+  ok(setFocus(s.run, "left"), "target");
   railsHold(s, action => action.kind === "transmit");
   s.transmit();
-  railsHold(s, action => action.kind === "focus" && action.port === "left");
-  ok(setFocus(s.run, "left"), "focus");
+  const key = bandwidth(s.run)[0].channelKey;
+  const aimMite = (action: LessonAction) => action.kind === "aim" && action.key === key && action.port === "right";
+  railsHold(s, aimMite);
+  s.view.delivery = key;
+  railsHold(s, aimMite);
+  ok(aimChannel(s.run, key, "right"), "aim");
   railsHold(s, action => action.kind === "transmit");
 });
 
@@ -609,15 +655,23 @@ test("training rails: the wardens drill plays only the current step's move", () 
 
 test("training rails: undo (Z) reopens a drill step instead of stranding it", () => {
   const s = new Session("aim-signal");
-  s.view.port = "left";
-  const key = bandwidth(s.run)[0].channelKey;
+  s.view.read = ["read"];
   const before = structuredClone(s.run);
-  ok(aimChannel(s.run, key, "left"), "aim");
-  assert.ok(s.done("aim"));
+  ok(setFocus(s.run, "left"), "target");
+  assert.ok(s.done("target"));
   s.run = before;
-  assert.equal(s.done("aim"), false, "the undone aim reopens its step");
-  assert.ok(s.done("select"), "a reading step stays met");
+  assert.equal(s.done("target"), false, "the undone target reopens its step");
+  assert.ok(s.done("read"), "a reading step stays met");
   assert.ok(guard(s, { kind: "transmit" }), "and the transmission waits for it again");
+  ok(setFocus(s.run, "left"), "target");
+  s.transmit();
+  const key = bandwidth(s.run)[0].channelKey;
+  const turn = structuredClone(s.run);
+  ok(aimChannel(s.run, key, "right"), "aim");
+  assert.ok(s.done("aim"));
+  s.run = turn;
+  assert.equal(s.done("aim"), false, "the undone aim reopens its step");
+  assert.ok(guard(s, { kind: "transmit" }), "and the Mite's bite waits for it again");
 
   const w = new Session("wardens");
   w.view.read = ["read"];

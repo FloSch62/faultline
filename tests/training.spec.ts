@@ -27,6 +27,49 @@ async function transmitLesson(page: Page) {
 async function expandCoach(page: Page) {
   if (await page.locator(".training-panel.is-collapsed").count()) await page.locator('[data-action="lesson-collapse"]').click();
 }
+interface Drill { id: string; turn: number; focus: string | null; aims: Record<string, string>; delivery: string | null; deliveries: string[]; step: number; complete: boolean; plate: boolean }
+/** The drill's own state (lesson runs are never saved; a dev-server hook). */
+async function drill(page: Page): Promise<Drill> {
+  return (await page.evaluate(() => (globalThis as { __faultlineLesson?: () => unknown }).__faultlineLesson?.() ?? null)) as Drill;
+}
+/** Keys go to the table, not to the last button clicked. */
+async function press(page: Page, key: string) {
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press(key);
+}
+/** Click a hostile to target it. Where a click on a hostile only selects it, F then targets it. */
+async function target(page: Page, port: string) {
+  await page.locator(`.port-row[data-port="${port}"]`).click();
+  if ((await drill(page)).focus !== port) await press(page, "f");
+  await expect.poll(async () => (await drill(page)).focus).toBe(port);
+}
+/** Pick a delivery up (its row), then click the hostile that takes it. Where a click on a hostile only
+ * selects it, the delivery's stud (or T) aims it instead. */
+async function pickUp(page: Page, key: string) {
+  await page.locator(`.delivery-row[data-delivery="${key}"]`).click();
+  await expect.poll(async () => (await drill(page)).delivery).toBe(key);
+}
+async function aimAt(page: Page, key: string, port: string) {
+  await page.locator(`.port-row[data-port="${port}"]`).click();
+  if ((await drill(page)).aims[key] === port) return;
+  const stud = page.locator(`.delivery-row[data-delivery="${key}"] [data-aim-port="${port}"]`);
+  if (await stud.count()) await stud.click();
+  for (let i = 0; i < 3 && (await drill(page)).aims[key] !== port; i++) await press(page, "t");
+  await expect.poll(async () => (await drill(page)).aims[key]).toBe(port);
+}
+/** The lesson is over: the scrim holds the frozen board and the completion plate is up. */
+async function lessonOver(page: Page, next: string | null) {
+  const plate = page.locator(".lesson-end");
+  await expect(plate).toBeVisible();
+  await expect(page.locator(".lesson-end-scrim")).toBeVisible();
+  await expect(plate.locator('[data-action="lesson-restart"]')).toContainText("Replay");
+  await expect(plate.locator('[data-action="lesson-training"]')).toContainText("Training menu");
+  if (next) await expect(plate.locator('[data-action="lesson-next"]')).toContainText(next);
+  else await expect(plate.locator('[data-action="lesson-next"]')).toHaveCount(0);
+  await expect(page.locator(".training-panel.is-complete")).toBeVisible();
+  await expect(page.locator(".training-panel .training-foot")).toHaveCount(0);
+  return plate;
+}
 
 test("Field Training: lessons 1 and 3 complete through the real controls; exit restores the saved expedition", async ({ page }) => {
   test.setTimeout(120_000);
@@ -54,16 +97,53 @@ test("Field Training: lessons 1 and 3 complete through the real controls; exit r
   await cable(page, "alpha", router);
   await cable(page, router, "omega");
   await transmitLesson(page);
-  await expect(page.locator(".training-panel.is-complete")).toBeVisible();
+  const plate = await lessonOver(page, "Read the Enemy");
   expect(await page.evaluate(key => localStorage.getItem(key), TRAINING)).toContain("first-signal");
   expect(await page.evaluate(key => localStorage.getItem(key), STORAGE)).toBe(savedBefore);
+  // Enter continues: the way on holds the keyboard focus.
+  await expect(plate.locator('[data-action="lesson-next"]')).toBeFocused();
+  if (process.env.FAULTLINE_SHOTS) await page.screenshot({ path: `${process.env.FAULTLINE_SHOTS}/lesson-end-${page.viewportSize()!.width}x${page.viewportSize()!.height}.png` });
 
-  // Lesson 3: a second independent channel plus an armed Failover Policy survive the cut.
-  await page.locator('[data-action="lesson-menu"]').first().click();
+  // The finished lesson is over: no key, card or click plays on its frozen board.
+  const frozen = await drill(page);
+  expect(frozen).toMatchObject({ id: "first-signal", complete: true, plate: true, turn: 2 });
+  for (const key of ["Space", "Enter", "1", "p", "c", "z", "f", "t"]) await press(page, key);
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  const cardBox = (await page.locator("#hand-zone [data-hand]").first().boundingBox())!;
+  await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
+  await expect(page.locator("#hand-zone [data-hand].selected")).toHaveCount(0);
+  expect(await drill(page)).toEqual(frozen);
+  await expect(page.locator(".lesson-end")).toBeVisible();
+
+  // Replay starts over from a fresh board: no router, no cables, step one, turn one.
+  await plate.locator('[data-action="lesson-restart"]').click();
+  await lessonReady(page, "first-signal");
+  await expect(page.locator(".lesson-end, .lesson-end-scrim")).toHaveCount(0);
+  expect(await drill(page)).toMatchObject({ id: "first-signal", turn: 1, step: 0, complete: false, plate: false });
+  await expect(page.locator('#hand-zone [data-card-id="router"]')).toHaveCount(1);
+  await page.locator('[data-hand][data-card-id="router"]').first().click();
+  await page.locator('#target-dock [data-action="auto-place"]').click();
+  const again = (await dockNodes(page)).find(id => !terminals.includes(id))!;
+  await cable(page, "alpha", again);
+  await cable(page, again, "omega");
+  await transmitLesson(page);
+
+  // Training menu leaves the lesson: the menu opens over the title, and closing it stays there.
+  await (await lessonOver(page, "Read the Enemy")).locator('[data-action="lesson-training"]').click();
+  await expect(page.locator("dialog.training-dialog")).toBeVisible();
+  await expect(page.locator(".game-root")).toHaveAttribute("data-training", "");
   await expect(page.locator('dialog .lesson-card.done[data-lesson="first-signal"]')).toBeVisible();
+  await page.locator('dialog [data-action="close"]').first().click();
+  await expect(page.locator(".title-screen")).toBeVisible();
+  await expect(page.locator(".lesson-end")).toHaveCount(0);
+
+  // Lesson 3: a second channel through its own router plus an armed Failover Policy survive the cut.
+  await page.locator('[data-action="tutorial"]').first().click();
   await page.locator('dialog button[data-lesson="reroute"]').click();
   await lessonReady(page, "reroute");
   await expandCoach(page);
+  await expect(page.locator(".training-panel")).toContainText("Every device carries one channel");
+  if (process.env.FAULTLINE_SHOTS) await page.screenshot({ path: `${process.env.FAULTLINE_SHOTS}/03-channel.png` });
   const existing = await dockNodes(page);
   await page.locator('[data-hand][data-card-id="router"]').first().click();
   await page.locator('#target-dock [data-deploy-zone="south"]').click();
@@ -74,9 +154,13 @@ test("Field Training: lessons 1 and 3 complete through the real controls; exit r
   await page.locator('[data-hand][data-card-id="failover-policy"]').first().click();
   await expect(page.locator(".protocol-slot.armed")).toHaveCount(1);
   await transmitLesson(page);
-  await expect(page.locator(".training-panel.is-complete")).toBeVisible();
+  await lessonOver(page, "Online Devices");
   expect(JSON.parse((await page.evaluate(key => localStorage.getItem(key), TRAINING))!)).toEqual(expect.arrayContaining(["first-signal", "reroute"]));
 
+  // Replay, then leave mid-drill from the coach panel: the saved expedition waits untouched.
+  await page.locator('.lesson-end [data-action="lesson-restart"]').click();
+  await lessonReady(page, "reroute");
+  expect(await drill(page)).toMatchObject({ id: "reroute", turn: 1, step: 0, complete: false });
   await page.locator('[data-action="lesson-exit"]').first().click();
   await expect(page.locator(".title-screen")).toBeVisible();
   await expect(page.locator('[data-action="continue"]')).toBeVisible();
@@ -112,8 +196,15 @@ test("the Handbook switches chapters and the expedition walkthrough pages turn",
     await page.locator(`dialog [data-walkthrough="${i}"]`).first().click();
     await expect(page.locator(`dialog [data-walkthrough="${i}"].current`)).toBeVisible();
   }
+  await expect(page.locator('dialog [data-action="lesson-finish-next"]')).toContainText("Aim the Signal");
+  if (process.env.FAULTLINE_SHOTS) await page.screenshot({ path: `${process.env.FAULTLINE_SHOTS}/walkthrough-end.png` });
   await page.locator('dialog [data-action="lesson-finish"]').click();
   await expect(page.locator('dialog .lesson-card.done[data-lesson="expedition"]')).toBeVisible();
+  // The guide ends like a battle lesson: its Next lesson opens chapter 10.
+  await page.locator('dialog button[data-lesson="expedition"]').click();
+  await page.locator(`dialog [data-walkthrough="${pages - 1}"]`).first().click();
+  await page.locator('dialog [data-action="lesson-finish-next"]').click();
+  await lessonReady(page, "aim-signal");
 });
 
 test("Field Training: the danger lesson spotlights the Prepare slot and says where it is", async ({ page }) => {
@@ -144,12 +235,46 @@ test("Field Training: the danger lesson spotlights the Prepare slot and says whe
   await expect(slot).not.toHaveClass(/lesson-focus/);
 });
 
+test("Field Training 5 · Hold the Ground: the relocation is spotlit through to its confirm plate", async ({ page }) => {
+  test.setTimeout(60_000);
+  await install(page, null);
+  await page.locator('[data-action="tutorial"]').first().click();
+  await page.locator('dialog button[data-lesson="bands"]').click();
+  await lessonReady(page, "bands");
+  await expandCoach(page);
+  await expect(page.locator(".training-panel")).toContainText("then confirm");
+  // The table has no DOM to point at; once the router is chosen, its band buttons carry the spotlight.
+  await page.evaluate(() => (globalThis as { __faultlineHud?: { selectNode(id: string): void } }).__faultlineHud!.selectNode("router1"));
+  await expect(page.locator('#target-dock [data-relocate-zone="center"].lesson-focus')).toBeVisible();
+  await expect(page.locator("#lesson-spotlight")).toHaveClass(/active/);
+  await page.locator('#target-dock [data-relocate-zone="center"]').click();
+  // Where the move asks for confirmation, the plate is the lit control: both of its buttons sit in
+  // the spotlight's hole, above the dimmer, and take the click.
+  const confirm = page.locator("#relocate-confirm");
+  if (await confirm.isVisible().catch(() => false)) {
+    await expect(confirm).toHaveClass(/lesson-focus/);
+    for (const button of ["[data-relocate-confirm]", "[data-relocate-cancel]"]) {
+      await expect.poll(async () => {
+        const [hole, box] = await Promise.all([page.locator("#lesson-spotlight i").boundingBox(), confirm.locator(button).boundingBox()]);
+        return !!hole && !!box && box.x >= hole.x && box.y >= hole.y && box.x + box.width <= hole.x + hole.width && box.y + box.height <= hole.y + hole.height;
+      }).toBe(true);
+      expect(await confirm.locator(button).evaluate(el => {
+        const box = el.getBoundingClientRect();
+        return el.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+      })).toBe(true);
+    }
+    await confirm.locator("[data-relocate-confirm]").click();
+  }
+  // One move answers both the suppression and the storm's band: the drill moves on to Resonance.
+  await expect(page.locator(".training-meter")).toHaveAttribute("aria-valuenow", "2");
+});
+
 // ---------------------------------------------------------------------------
 // The table-front drills (lessons 10–12): every step on hard rails with its spotlight.
-// FAULTLINE_SHOTS=<dir> also plays them at 1920×1080 and saves each step's spotlight.
+// FAULTLINE_SHOTS=<dir> also plays them at 1440×900 and 1920×1080 and saves each step's spotlight.
 
 const SHOTS = process.env.FAULTLINE_SHOTS;
-const SIZES = [{ width: 1280, height: 720 }, ...(SHOTS ? [{ width: 1920, height: 1080 }] : [])];
+const SIZES = [{ width: 1280, height: 720 }, ...(SHOTS ? [{ width: 1440, height: 900 }, { width: 1920, height: 1080 }] : [])];
 
 async function openDrill(page: Page, id: string) {
   await install(page, null);
@@ -166,11 +291,6 @@ async function spotlit(page: Page, selector: string) {
 /** The coach stands on step n (goals met so far: n − 1). */
 async function step(page: Page, n: number) {
   await expect(page.locator(".training-meter")).toHaveAttribute("aria-valuenow", String(n - 1));
-}
-/** Keys go to the table, not to the last button clicked. */
-async function press(page: Page, key: string) {
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await page.keyboard.press(key);
 }
 async function shot(page: Page, name: string) {
   if (!SHOTS) return;
@@ -190,46 +310,67 @@ for (const size of SIZES) {
   test.describe(`${size.width}×${size.height}`, () => {
     test.use({ viewport: size });
 
-    test("Field Training 10 · Aim the Signal: select, aim, transmit, focus, overflow — nothing else plays", async ({ page }) => {
+    test("Field Training 10 · Aim the Signal: read, target, transmit, aim, overflow — nothing else plays", async ({ page }) => {
       test.setTimeout(120_000);
       await openDrill(page, "aim-signal");
       await expect(page.locator(".training-kicker")).toContainText("Lesson 10 of 12");
-      await step(page, 1);
-      await spotlit(page, '.port-row[data-port="left"]');
-      await expect(page.locator("#hand-zone [data-hand].lesson-parked")).toHaveCount(await page.locator("#hand-zone [data-hand]").count());
-      await shot(page, "10-1-select");
-      await refused(page, () => press(page, "Space"), /aim channel 2/i);
-      await refused(page, () => page.locator('#hand-zone [data-card-id="pulse"]').first().click(), /Keep Packet Burst for later/);
-      const second = page.locator(".delivery-row:not(.is-primary)").first();
-      await refused(page, () => second.locator('[data-aim-port="left"]').click(), /current step/);
+      // Three hostiles, one per port.
+      for (const port of ["left", "centre", "right"]) await expect(page.locator(`.port-row[data-port="${port}"]`)).toBeVisible();
 
-      await page.locator('.port-row[data-port="left"]').click();
+      // 1 · read the rail: every hostile's next move, lit together; only Got it moves on.
+      await step(page, 1);
+      await spotlit(page, "#intent-layer .hostile-intent, .port-strip");
+      await expect(page.locator("#hand-zone [data-hand].lesson-parked")).toHaveCount(await page.locator("#hand-zone [data-hand]").count());
+      await expect(page.locator(".training-panel")).toContainText(/LEFT.+CENTRE.+RIGHT/);
+      await shot(page, "10-1-read");
+      await refused(page, () => press(page, "Space"), /Read the three ports first/);
+      await refused(page, () => page.locator('#hand-zone [data-card-id="pulse"]').first().click(), /Keep Packet Burst for later/);
+      await refused(page, () => press(page, "f"), /read the three ports/i);
+      await page.locator('.training-panel [data-action="lesson-read"]').first().click();
+
+      // 2 · target the Relay Drone.
       await step(page, 2);
-      await spotlit(page, '.delivery-row:not(.is-primary) [data-aim-port="left"]');
-      await shot(page, "10-2-aim");
-      await refused(page, () => page.locator('.delivery-row.is-primary [data-aim-port="left"]').click(), /Leave the primary on the Leech/);
-      await second.locator('[data-aim-port="left"]').click();
-      await expect(second).toHaveClass(/is-aimed/);
+      await spotlit(page, '#intent-layer .hostile-intent[data-port="left"], [data-focus-port="left"], .port-row[data-port="left"]');
+      await expect(page.locator(".training-panel")).toContainText("Click the Relay Drone to target it");
+      await shot(page, "10-2-target");
+      await refused(page, () => press(page, "Space"), /target the Relay Drone first/);
+      await refused(page, () => page.locator('.port-row[data-port="right"]').click().then(() => press(page, "f")), /Target the Relay Drone/);
+      await target(page, "left");
+
+      // 3 · transmit: everything lands on the Drone.
       await step(page, 3);
       await spotlit(page, ".transmit-button");
       await shot(page, "10-3-strike");
-
       await transmitLesson(page);
+
+      // 4 · the Drone fell and the target went back to the leader. Pick up channel 2, then click the Mite.
       await step(page, 4);
-      await expect(page.locator('.port-row[data-port="left"]')).toContainText("Relay Drone");
-      await spotlit(page, '[data-focus-port="left"], .port-row[data-port="left"]');
-      await shot(page, "10-4-focus");
-      await refused(page, () => press(page, "Space"), /focus on the new Drone/);
-      await refused(page, () => press(page, "t"), /press F|focus/i);
-      await press(page, "f");
-      await expect(page.locator('.port-row[data-port="left"]')).toHaveClass(/is-focus/);
+      const { deliveries } = await drill(page);
+      expect(deliveries).toHaveLength(2);
+      const [primary, second] = deliveries;
+      await expect(page.locator(`.delivery-row[data-delivery="${second}"]`)).toBeVisible();
+      await spotlit(page, `.delivery-row[data-delivery="${second}"]`);
+      await shot(page, "10-4-pick");
+      await refused(page, () => press(page, "Space"), /aim channel 2 at the Spark Mite first/);
+      await refused(page, () => press(page, "f"), /Keep your target/);
+      await pickUp(page, primary);
+      await expect(page.locator(".training-panel")).toContainText("That is the primary");
+      await refused(page, () => press(page, "t"), /Leave the primary on your target/);
+      await pickUp(page, second);
+      await spotlit(page, `#intent-layer .hostile-intent[data-port="right"], .delivery-row[data-delivery="${second}"] [data-aim-port="right"], .port-row[data-port="right"]`);
+      await expect(page.locator(".training-panel")).toContainText("click the Spark Mite");
+      await shot(page, "10-5-aim");
+      await aimAt(page, second, "right");
+
+      // 5 · transmit: the Mite falls, the spare overflows to the target.
       await step(page, 5);
       await spotlit(page, ".transmit-button");
-      await expect(page.locator(".deliveries-foot")).toContainText(/overflow \d+ → CENTRE/);
-      await shot(page, "10-5-transmit");
+      await expect(page.locator(".training-panel")).toContainText(/overflows to your target/);
+      await expect(page.locator(".deliveries-foot")).toContainText(/overflow 1 → CENTRE/);
+      await shot(page, "10-6-overflow");
       await transmitLesson(page);
-      await expect(page.locator(".training-panel.is-complete")).toBeVisible();
-      await expect(page.locator(".training-panel")).toContainText("Clear the Ground");
+      await lessonOver(page, "Clear the Ground");
+      await shot(page, "10-7-complete");
       expect(await page.evaluate(key => localStorage.getItem(key), TRAINING)).toContain("aim-signal");
     });
 
@@ -271,7 +412,7 @@ for (const size of SIZES) {
       await shot(page, "11-6-purge-band");
       await refused(page, () => page.locator('[data-field-zone="south"]').click(), /Purge NORTH/);
       await page.locator('[data-field-zone="north"]').click();
-      await expect(page.locator(".training-panel.is-complete")).toBeVisible();
+      await lessonOver(page, "The Crown and Its Wardens");
       await expect(page.locator(".ledger-chip.is-installation")).toHaveCount(0);
       expect(await page.evaluate(key => localStorage.getItem(key), TRAINING)).toContain("clear-ground");
     });
@@ -287,17 +428,22 @@ for (const size of SIZES) {
       await expect(page.locator(".coach-break, .training-read").filter({ visible: true }).first()).toContainText("Got it");
       await shot(page, "12-1-read");
       await refused(page, () => press(page, "Space"), /Read the break meter first/);
-      await refused(page, () => page.locator('.delivery-row:not(.is-primary) [data-aim-port="left"]').first().click(), /current step/);
+      await refused(page, () => press(page, "t"), /current step/);
       await meter.click();
       await step(page, 2);
-      const bandwidth = page.locator(".delivery-row:not(.is-primary)");
-      await expect(bandwidth).toHaveCount(2);
-      await spotlit(page, '.delivery-row:not(.is-primary) [data-aim-port="left"]');
+      const [primary, ...bandwidth] = (await drill(page)).deliveries;
+      expect(bandwidth).toHaveLength(2);
+      await spotlit(page, `.delivery-row[data-delivery="${bandwidth[0]}"]`);
       await shot(page, "12-2-aim");
-      await refused(page, () => page.locator('.delivery-row.is-primary [data-aim-port="left"]').click(), /Keep the primary on the Regent/);
-      await bandwidth.nth(0).locator('[data-aim-port="left"]').click();
-      await bandwidth.nth(1).locator('[data-aim-port="left"]').click();
-      await expect(page.locator(".delivery-row.is-aimed")).toHaveCount(2);
+      await pickUp(page, primary);
+      await refused(page, () => press(page, "t"), /Keep the primary on your target, the Regent/);
+      for (const key of bandwidth) {
+        await pickUp(page, key);
+        await spotlit(page, `#intent-layer .hostile-intent[data-port="left"], .delivery-row[data-delivery="${key}"] [data-aim-port="left"], .port-row[data-port="left"]`);
+        if (key === bandwidth[0]) await shot(page, "12-2b-aim-warden");
+        await aimAt(page, key, "left");
+      }
+      expect((await drill(page)).aims).toMatchObject({ [bandwidth[0]]: "left", [bandwidth[1]]: "left" });
       await step(page, 3);
       await spotlit(page, ".prepared-pile");
       await shot(page, "12-3-prepare");
@@ -324,7 +470,8 @@ for (const size of SIZES) {
       await spotlit(page, ".transmit-button");
       await shot(page, "12-6-break-ready");
       await transmitLesson(page);
-      await expect(page.locator(".training-panel.is-complete")).toBeVisible();
+      await lessonOver(page, null);
+      await shot(page, "12-7-complete");
       expect(await page.evaluate(key => localStorage.getItem(key), TRAINING)).toContain("wardens");
     });
   });

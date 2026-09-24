@@ -201,7 +201,9 @@ test("Field Training: the coach still guards the drop, and the plate's buttons w
   await selectDevice(page, "router1");
   await page.locator('[data-relocate-zone="center"]').click();
   await expect(plate(page)).toBeVisible();
-  await expect(page.locator("#lesson-spotlight")).not.toHaveClass(/active/);
+  // The coach's spotlight moves onto the plate: the confirmation is the step's one control.
+  await expect(page.locator("#lesson-spotlight")).toHaveClass(/active/);
+  await expect(plate(page).locator("[data-relocate-confirm]")).toBeVisible();
   await plate(page).locator("[data-relocate-confirm]").click();
   await expect(plate(page)).toHaveCount(0);
   await expect(page.locator(".training-meter")).not.toHaveAttribute("aria-valuenow", meter!);

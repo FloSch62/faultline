@@ -101,6 +101,31 @@ Faults last one player turn (an escalated jam two). Hot Patch clears every activ
 
 Fields belong to the ground: moving hardware changes which effects apply immediately. Each band holds one allied and one hostile field, plus any terrain or signal field; another allied field replaces yours, and a second hostile caster replaces the first. An Anchor stops its band's hostile fields from ticking down. Corrosion adds 2 incoming damage while any deployed hardware occupies its band. Suppression removes 3 damage when your primary route crosses its band. Fixed ALPHA/OMEGA terminals do not activate fields. Purge Field destroys every installation in the chosen band and removes hostile fields and device jams there (an Anchor takes the whole purge alone), preserves allied fields, draws one card and exhausts.
 
+## Developer playground
+
+Open `/dev/` to experiment on the real battlefield. With `npm run dev`, use
+`http://localhost:5174/dev/`; a build hosted at `/faultline/` includes `/faultline/dev/`.
+The playground has its own autosave and restart point. It never records wins or
+unlocks ascensions in your normal expedition.
+
+- **Scenarios:** ten editable channel examples, from one router to parallel paths,
+  shared routers/firewalls, cross-links, unfinished routes, missing routers and cuts.
+  A live diagram and independent-route proof explain what counts after every edit.
+- **Build:** repeat cards with refilled energy, choose any card or upgrade, wire
+  devices, remove hardware/cables, jam, cut, repair and undo edits. The normal table
+  limits and channel rules still apply; turn Free cards & energy off to test costs.
+- **Encounter:** jump to any stage, sector, room type, keeper and ascension. Use the
+  seeded encounter or choose an enemy and escorts. Generated terrain is optional.
+- **Cheats:** step a turn instantly, win or skip encounters, restore integrity,
+  add resources, change enemy health/pattern position, toggle relics and enable
+  immortality. Immortality restores integrity after damage resolves; the forecast
+  still shows the real incoming damage.
+- **Restart and share:** save a restart point, replay it, or export/import the whole
+  setup as JSON. Loading a scenario or entering a room sets a new restart point.
+
+The route-variant count groups paths visiting the same devices. Channel count is
+still the maximum number of live router routes sharing no intermediate device.
+
 ## Project guide
 
 - `src/core/` — deterministic rules: `cards.ts` (`RULES`, cards, upgrades, relics), `run.ts` (the public combat API and forecast), `combat/` (the one resolver behind forecast and resolution: board, network, intents and escalation, surprises), `graph.ts` (routes and channels), `terrain.ts`, `enemies.ts` (hostiles, escorts, adds, designations, pack templates, signals, message options), `encounter.ts` (pack plans, crates, reinforcements, messages), `meta.ts` (rooms, rewards, market, sanctuary), `events.ts`, `ascension.ts`, `map.ts`, `expedition.ts` (archetypes, save validation and the v3 migration) and YAML export.
@@ -108,6 +133,7 @@ Fields belong to the ground: moving hardware changes which effects apply immedia
 - `blender/` — one Python script per model in three families (devices, installations, props) that builds its body in Blender and exports `public/models/`; see the [model contract](blender/README.md).
 - `src/ui.ts`, `src/battle-ui.ts`, `src/alpha-ui.ts`, `src/screens.ts` and their stylesheets — illustrated cards, the battle HUD (port strip, transmission breakdown, escalation gauge, repair and scrub plates), inspection, journals (Details, Devices, the message dialog) and every expedition screen.
 - `src/tutorial.ts`, `src/tutorial/` — Field Training lessons and the illustrated Handbook.
+- `src/dev/`, `dev/index.html` — the separate playground, setup operations and live channel inspector.
 - `src/story.ts` — chapters, enemy motivations, sanctuary discoveries and endings.
 - `src/main.ts` — input, view transitions, targeting, undo and autosave.
 - `src/audio.ts`, `src/audio-effects.ts` — music playback, crossfades, sampled effects, voice priority and combat ducking. The CUE GUIDE in `audio-effects.ts` lists exactly when each of the 58 cues plays.

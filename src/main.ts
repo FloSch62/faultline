@@ -82,10 +82,16 @@ import * as screens from "./screens.ts";
 import * as alpha from "./alpha-ui.ts";
 import * as training from "./tutorial.ts";
 import { loadPreferences, storePreferences } from "./preferences.ts";
+import type { DevTools } from "./dev/panel.ts";
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) =>
   document.querySelector<T>(selector)!;
-const STORAGE = "faultline-expedition-v2";
+// Vite's SPA fallback serves the root entry for /dev without its trailing slash.
+// Static hosts serve dev/index.html; recognize both forms under any public base.
+const playgroundPath = `${import.meta.env.BASE_URL}dev`;
+const IS_PLAYGROUND = document.documentElement.dataset.playground === "true" || location.pathname === playgroundPath;
+const STORAGE = IS_PLAYGROUND ? "faultline-dev-expedition-v1" : "faultline-expedition-v2";
+let devTools: DevTools | null = null;
 const sound = new Soundscape();
 // Fetch the device models behind the title screen so the first table is built with them.
 void loadAllModels();
@@ -98,7 +104,7 @@ let expedition: Expedition | null = null;
 let records: RunRecord[] = [];
 try {
   expedition = parseExpedition(localStorage.getItem(STORAGE));
-  records = JSON.parse(localStorage.getItem("faultline-records-v2") || "[]");
+  records = IS_PLAYGROUND ? [] : JSON.parse(localStorage.getItem("faultline-records-v2") || "[]");
   if (!Array.isArray(records)) records = [];
   records = records
     .filter((r) => r && Number.isFinite(r.score) && typeof r.won === "boolean")
@@ -420,6 +426,7 @@ function render(rebuild = true) {
   renderTrack();
   if (
     expedition &&
+    !IS_PLAYGROUND &&
     !practice &&
     ["won", "lost"].includes(run.phase) &&
     !expedition.recorded
@@ -455,6 +462,7 @@ function render(rebuild = true) {
   // A choice waiting for the player (a message, a crate's cards) opens before the next hand
   // is played, and on the victory screen.
   if (view === "run" && !busy && !dialog.open && run.offers?.length && (run.phase === "battle" || run.phase === "reward")) openOffer();
+  devTools?.render(run, busy || !!practice || dialog.open);
 }
 /** The hostile plate must end above the Transmit dial (or the hand): long forecasts fold step
  * by step — the description to fewer lines, then the ledger footer, then the description into
@@ -766,6 +774,7 @@ function playAction(action: () => ActionResult, cue?: EffectKind, card?: CardId)
     if (practice) { practice.showHint = true; renderLesson(); }
     return false;
   }
+  if (!practice) devTools?.afterAction(run, before, card ?? (selected !== null ? before.hand[selected] : undefined));
   undoStack.push(before);
   if (undoStack.length > 20) undoStack.shift();
   if (run.block > before.block) world?.pulseNetwork("shield");
@@ -1378,7 +1387,7 @@ function floatText(text: string, good: boolean, kind = "", anchored = false) {
 }
 /** Transmit: resolve the turn on a copy, play the enemy phase from its forecast (battle-playback.ts),
  * then commit. The generation guard abandons a playback when the battle changes under it. */
-function transmit() {
+function transmit(instant = false) {
   if (!playable()) return;
   if (lessonBlocks({ kind: "transmit" })) return;
   const generation = ++battleGeneration;
@@ -1387,23 +1396,26 @@ function transmit() {
   undoStack.length = 0;
   const before = run, next = structuredClone(run),
     result = endTurn(next);
+  if (!practice) devTools?.afterTurn(next, result);
   const reshuffle = reshuffled(run, next);
   render(false);
+  const commit = () => {
+    run = next;
+    expedition!.run = run;
+    busy = false;
+    delete root.dataset.enemyAction;
+    if (practice) practice.last = result;
+    updateLesson();
+    save();
+    render();
+  };
+  if (instant && IS_PLAYGROUND) { commit(); return; }
   playTurn({
     world, before, next, result, reshuffle,
-    fast: preferences.fast,
+    fast: devTools?.settings.fast ?? preferences.fast,
     motion: sound.settings.motion,
     alive: () => generation === battleGeneration,
-    commit: () => {
-      run = next;
-      expedition!.run = run;
-      busy = false;
-      delete root.dataset.enemyAction;
-      if (practice) practice.last = result;
-      updateLesson();
-      save();
-      render();
-    },
+    commit,
     hooks: {
       sound: (kind, options) => sound.effect(kind, options),
       toast,
@@ -1434,6 +1446,44 @@ function transmit() {
       },
     },
   });
+}
+
+/** Playground transactions stay at the application boundary; combat rules never
+ * read a dev flag and the regular expedition/records keys are never written here. */
+function devMutate(change: (state: RunState) => void, message: string): boolean {
+  if (!IS_PLAYGROUND || busy || practice || dialog.open) return false;
+  const next = structuredClone(run);
+  try { change(next); }
+  catch (error) { toast((error as Error).message, "error"); return false; }
+  if (run.phase === "battle") {
+    undoStack.push(structuredClone(run));
+    if (undoStack.length > 20) undoStack.shift();
+  }
+  run = next;
+  expedition!.run = run;
+  clearSelection();
+  save();
+  render();
+  toast(message);
+  return true;
+}
+function devReplace(next: Expedition): boolean {
+  if (!IS_PLAYGROUND || busy || practice || dialog.open) return false;
+  battleGeneration++;
+  clearSelection();
+  expedition = next;
+  run = next.run;
+  view = "run";
+  undoStack.length = 0;
+  handKey = "";
+  hudRoom = "";
+  terrainShown = "";
+  revealedKey = "";
+  announcedKey = "";
+  hud.port = null;
+  save();
+  render();
+  return true;
 }
 function exportNetwork() {
   const link = document.createElement("a");
@@ -2432,6 +2482,20 @@ document.addEventListener("focusout", hideTooltip);
  *  are ready, so no text ever appears in a fallback face and no art pops in.
  *  It never waits longer than a moment. */
 async function boot() {
+  if (IS_PLAYGROUND) {
+    const playground = await import("./dev/panel.ts");
+    const fresh = !expedition;
+    expedition ??= playground.loadScenario("parallel");
+    run = expedition.run;
+    view = "run";
+    tutorial = false;
+    devTools = playground.mountDevTools({
+      current: () => expedition!, mutate: devMutate, replace: devReplace,
+      selectCard: chooseCard, selectNode: onNode, step: () => transmit(true), notify: message => toast(message, "error"),
+    });
+    if (fresh) { devTools.afterAction(run); devTools.checkpoint(); }
+    save();
+  }
   const faces = ["500 16px Cinzel", "600 16px Grenze", "16px Alegreya", "italic 16px Alegreya", "700 12px 'Alegreya Sans SC'"];
   const panorama = new Image();
   panorama.src = `${import.meta.env.BASE_URL}art/${STAGES[0].art.panorama}`;

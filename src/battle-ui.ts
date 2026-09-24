@@ -550,6 +550,19 @@ function relicTokens(r: RunState) {
 }
 
 interface Engine { label: string; value: string; tip: string; state: "" | "is-active" | "at-risk" }
+/** Shared bandwidth bonus and tooltip for both hover targets. */
+function bandwidthInfo(r: RunState, channels: number) {
+  const per = r.relics.includes("parallel-core") ? RULES.parallelCorePerChannel : RULES.bandwidthPerChannel;
+  const disabled = r.relics.includes("spanning-tree");
+  const bonus = disabled ? 0 : Math.max(0, channels - 1) * per;
+  const scaling = disabled
+    ? "Spanning Tree disables this bonus."
+    : `+${per} damage per extra channel.`;
+  return {
+    bonus,
+    tip: `Bandwidth: ${scaling} Channels need separate devices between ALPHA and OMEGA: two paths through the same device count as one.`,
+  };
+}
 /** The keeper's engine, shown as a badge on the console command it belongs to. */
 function engineFor(r: RunState, p: CombatPreview): Engine {
   if (r.archetype === "ghost") {
@@ -564,11 +577,10 @@ function engineFor(r: RunState, p: CombatPreview): Engine {
     label: "Pressure", value: String(r.backpressure), state: r.backpressure || p.backpressureGain ? "is-active" : "",
     tip: `Backpressure: ${Math.round(RULES.backpressureRatio * 100)}% of the damage your shield prevents is stored and added to your next transmission. ${r.backpressure} rides this transmission; +${p.backpressureGain} will be stored after this enemy action.`,
   };
-  const per = r.relics.includes("parallel-core") ? RULES.parallelCorePerChannel : RULES.bandwidthPerChannel;
-  const bandwidth = r.relics.includes("spanning-tree") ? 0 : Math.max(0, p.channels - 1) * per;
+  const bandwidth = bandwidthInfo(r, p.channels);
   return {
-    label: plural(p.channels, "channel"), value: `+${bandwidth}`, state: p.channels > 1 ? "is-active" : "",
-    tip: `Bandwidth: +${per} damage for every channel beyond the first (${p.channels} now). Every device carries one channel: routes through the same device are one channel. A cut on one channel leaves the others transmitting.`,
+    label: plural(p.channels, "channel"), value: `+${bandwidth.bonus}`, state: p.channels > 1 ? "is-active" : "",
+    tip: bandwidth.tip,
   };
 }
 
@@ -610,7 +622,7 @@ function ledgerMarkup(r: RunState, p: CombatPreview, v: BattleView): string {
     // "3 routes · 2 channels": every live route counts, and routes through one device are one channel.
     // A diamond per channel in its table colour; the tooltip names the devices where routes merge.
     const shared = p.sharedDevices.map(item => `${item.id.toUpperCase()} (${item.routes} routes)`).join(", ");
-    const tip = `${plural(p.routeCount, "route")} from ALPHA to OMEGA make ${plural(p.channels, "channel")}. Every device carries one channel: when two routes go through the same device, they are one channel, not two.${shared ? ` Shared here: ${shared}.` : ""} Each channel is a delivery, and every channel beyond the first adds bandwidth.`;
+    const tip = `${plural(p.routeCount, "route")} make ${plural(p.channels, "channel")}. ${bandwidthInfo(r, p.channels).tip}${shared ? ` Shared: ${shared}.` : ""}`;
     const swatches = Array.from({ length: p.channels }, (_, i) => `<i style="--channel:${channelCss(i)}"></i>`).join("");
     chips.push(`<span class="ledger-chip is-channels ${p.channels > 1 ? "is-strong" : ""}" data-tooltip="${esc(tip)}" aria-label="${esc(tip)}">${icon("channels", 13)} <b>${p.routeCount > 99 ? "99+" : p.routeCount}</b> route${p.routeCount === 1 ? "" : "s"} · <b>${p.channels}</b> channel${p.channels === 1 ? "" : "s"}<i class="channel-swatches" aria-hidden="true">${swatches}</i></span>`);
   }

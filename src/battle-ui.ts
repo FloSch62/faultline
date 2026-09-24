@@ -547,6 +547,19 @@ function relicTokens(r: RunState) {
 }
 
 interface Engine { label: string; value: string; tip: string; state: "" | "is-active" | "at-risk" }
+/** Shared bandwidth bonus and tooltip for both hover targets. */
+function bandwidthInfo(r: RunState, channels: number) {
+  const per = r.relics.includes("parallel-core") ? RULES.parallelCorePerChannel : RULES.bandwidthPerChannel;
+  const disabled = r.relics.includes("spanning-tree");
+  const bonus = disabled ? 0 : Math.max(0, channels - 1) * per;
+  const scaling = disabled
+    ? "Spanning Tree disables this bonus."
+    : `+${per} damage per extra channel.`;
+  return {
+    bonus,
+    tip: `Bandwidth: ${scaling} Channels need separate devices between ALPHA and OMEGA. Two paths sharing a router count as one.`,
+  };
+}
 /** The keeper's engine, shown as a badge on the console command it belongs to. */
 function engineFor(r: RunState, p: CombatPreview): Engine {
   if (r.archetype === "ghost") {
@@ -561,11 +574,10 @@ function engineFor(r: RunState, p: CombatPreview): Engine {
     label: "Pressure", value: String(r.backpressure), state: r.backpressure || p.backpressureGain ? "is-active" : "",
     tip: `Backpressure: ${Math.round(RULES.backpressureRatio * 100)}% of the damage your shield prevents is stored and added to your next transmission. ${r.backpressure} rides this transmission; +${p.backpressureGain} will be stored after this enemy action.`,
   };
-  const per = r.relics.includes("parallel-core") ? RULES.parallelCorePerChannel : RULES.bandwidthPerChannel;
-  const bandwidth = r.relics.includes("spanning-tree") ? 0 : Math.max(0, p.channels - 1) * per;
+  const bandwidth = bandwidthInfo(r, p.channels);
   return {
-    label: plural(p.channels, "channel"), value: `+${bandwidth}`, state: p.channels > 1 ? "is-active" : "",
-    tip: `Bandwidth: +${per} damage for every channel beyond the first (${p.channels} now). Channels are routes that share no device between ALPHA and OMEGA; a cut on one leaves the others transmitting.`,
+    label: plural(p.channels, "channel"), value: `+${bandwidth.bonus}`, state: p.channels > 1 ? "is-active" : "",
+    tip: bandwidth.tip,
   };
 }
 
@@ -603,7 +615,7 @@ function ledgerMarkup(r: RunState, p: CombatPreview, v: BattleView): string {
   for (const fault of [...r.faultNodes, ...r.faultLinks])
     chips.push(`<span class="ledger-chip is-fault" data-tooltip="Faults last for this player turn. Hot Patch, Link Recovery or Fast Reroute clear every one; a second channel keeps transmitting.">${icon("link", 13)} Fault · <b>${esc(pretty(fault))}</b></span>`);
   if (!p.signalPath.length) chips.push(`<span class="ledger-chip is-offline" data-tooltip="A route runs ALPHA → router → OMEGA through live cables.">${icon("online", 13)} No live route</span>`);
-  else chips.push(`<span class="ledger-chip is-channels ${p.channels > 1 ? "is-strong" : ""}" data-tooltip="${esc(`${plural(p.channels, "channel")}: routes that share no device between the terminals. Each channel beyond the first adds bandwidth damage, and a cut on one channel leaves the others transmitting.`)}">${icon("channels", 13)} <b>${p.channels}</b> channel${p.channels === 1 ? "" : "s"}${p.channels > 1 ? `<i class="tag-extra"> · cut-proof</i>` : ""}</span>`);
+  else chips.push(`<span class="ledger-chip is-channels ${p.channels > 1 ? "is-strong" : ""}" data-tooltip="${esc(bandwidthInfo(r, p.channels).tip)}">${icon("channels", 13)} <b>${p.channels}</b> channel${p.channels === 1 ? "" : "s"}${p.channels > 1 ? `<i class="tag-extra"> · cut-proof</i>` : ""}</span>`);
   if (devices.length) chips.push(`<span class="ledger-chip is-online ${p.online.length < devices.length ? "has-offline" : ""}" data-tooltip="${esc(`Online devices sit on at least one live route; offline devices do nothing. ${devices.filter(n => !p.online.includes(n.id)).map(n => n.id.toUpperCase()).join(", ") || "Everything is online."}`)}">${icon("online", 13)} <b>${p.online.length}/${devices.length}</b> online</span>`);
   for (const zone of p.clusters) chips.push(`<span class="ledger-chip is-cluster" data-tooltip="${esc(`${zone.toUpperCase()} holds ${RULES.clusterThreshold}+ online devices: +${RULES.clusterDamage} damage. Clustered bands are also easier for band attacks to hit.`)}">${icon("cluster", 13)} ${title(zone)} cluster <b>+${RULES.clusterDamage}</b></span>`);
   const scrub = scrubCost(r);

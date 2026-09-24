@@ -1,17 +1,20 @@
 # Models
 
-Every 3D body on the table is modelled in Blender by a Python script and exported
-to a GLB under `public/models`. There are three families:
+Every 3D body on the table, and the table itself, is modelled in Blender by a Python script and
+exported to a GLB under `public/models`. There are five families:
 
 | Family | Scripts | Exported to | Names |
 | --- | --- | --- | --- |
 | Device | `devices/<role>.py` | `public/models/<role>.glb` | client, router, switch, firewall, honeypot, cache, power, balancer, rack, phantom |
 | Installation | `installations/<kind>.py` | `public/models/installations/<kind>.glb` | tap, jammer, spike, anchor, breaker |
 | Prop | `props/<name>.py` | `public/models/props/<name>.glb` | crate, fragment |
+| Board | `boards/<name>.py` | `public/models/boards/<name>.glb` | table (the tabletop textures), copper, glass, blackout, regent, cantor, core |
+| Crest | `boards/crests.py` | `public/models/boards/crests/<leader>.glb` | leech, wraith, prophet, serpent, moth, sentinel, colossus, weaver, storm, widow, marshal, choir, reaver, foreman, nest, demolition, blight |
 
-The game loads them at startup (`src/three/models.ts`); until a file arrives (or if
-one fails) a device falls back to the primitive body in `src/three/devices.ts`, and
-an installation or prop to the code-built body World.ts keeps for it.
+The game loads devices, installations and props at startup (`src/three/models.ts`); until a file
+arrives (or if one fails) a device falls back to the primitive body in `src/three/devices.ts`, and
+an installation or prop to the code-built body World.ts keeps for it. Boards and crests load on
+demand, one battle's board at a time (see [The battle board](#the-battle-board)).
 
 ```
 npm run models                          # rebuild every model that has a script
@@ -19,6 +22,7 @@ npm run models -- router tap crate      # rebuild some (names are unique across 
 npm run models -- router --render out   # also write out/router.png previews
 npm run models -- jammer --render out --azimuth 0,35 --no-export
 npm run models -- jammer --no-export --detail   # list the largest parts by triangle count
+npm run models -- copper --render out           # a board, previewed under the game's camera
 ```
 
 `npm run models` needs Blender 4.2 or newer. It finds a standard install on
@@ -29,7 +33,8 @@ still run the game. Each build prints one `MODEL {…}` report line (triangles,
 draw calls, bytes and any problems); the command fails if any model leaves its
 envelope or budget.
 
-To see models in the real renderer, open the dev harness gallery:
+`npm run models` runs up to six Blender processes at once; name one model per command to build one
+at a time. To see models in the real renderer, open the dev harness gallery:
 `/dev/world-preview.html?scene=gallery` (add `&cam=x,y,z&target=x,y,z` for a
 close-up, `&lid=-1.9` to open the crate), or capture it with `dev/preview-shots.ts`
 and `QUERY=`. Its back rows hold one of every device (with the stateful and sentry
@@ -39,11 +44,15 @@ their kind colours and the two props.
 ## Layout
 
 - `build.py`: entry point run inside Blender (`blender -b --python build.py -- <names>`); the
-  `ROLES`, `INSTALLATIONS` and `PROPS` tuples (kept in step with `scripts/models.ts`).
+  `ROLES`, `INSTALLATIONS`, `PROPS`, `BOARDS` and `CRESTS` tuples (kept in step with `scripts/models.ts`).
 - `lib/faultline.py`: shared materials, primitives, hooks, envelopes and budgets, consolidation,
   export and preview render.
 - `devices/<role>.py`, `installations/<kind>.py`, `props/<name>.py`: one file per model, each
   defining `build(name)`.
+- `boards/kit.py`: the board frame every board is built from; `boards/<board>.py` one per stage and
+  guardian; `boards/crests.py` every leader's crest; `boards/surface.py` (numpy, no bpy) draws the
+  tabletop, `boards/table.py` writes it; `boards/mark.py` reads the containerlab mark from
+  `public/containerlab-mark.svg`.
 
 ## The contract with `src/three/models.ts`
 
@@ -152,3 +161,73 @@ pips and the fault warning; for installations the stain decal, pulse ring, light
 integrity pips, reach and blast rings, countdown numeral, beams and the scrub dissolve; for
 props the landing arc, lid animation and callouts. `World.ts` adds them around whatever
 body the model provides.
+
+## The battle board
+
+The table is a Blender board chosen once per battle (`boardFor` in `src/three/board.ts`, called from
+`syncWorld`): the stage's board (I copper, II glass, III blackout) dressed by the leader's crest in
+the leader's colour; a guardian's own board (regent, cantor, core); for a leaderless duo the stage's
+board in its first hostile's colour; Field Training and an empty table the plain stage board. It
+reads the encounter's room first, so a death or a newcomer never swaps it. World.ts keeps its
+code-built table until the board has loaded (`World.setBoard`), and the test renderer skips the
+tabletop textures. Preview any board with `/dev/world-preview.html?board=<spec>`: `glass`, `regent`,
+`copper:leech`, or a leader id on the stage's board (`widow&stage=1`).
+
+**Space.** Z-up, facing -Y as for every family; the origin is the centre of the table surface
+(z = 0, placed at y 0.6 in World.ts's table group, world y 0.18). The play area is x -8..8,
+y -5.2..5.2 with the bands at y 3.25 (north), 0 (center) and -3.25 (south), dividers at y ±1.3.
+
+| Part | Where |
+| --- | --- |
+| Tabletop | not modelled: World.ts lays the textures on a 16.5 × 10.7 plane filling the well (x ±8.25, y ±5.35) |
+| Lip | a brass chamfer from the well's edge up to the rails (z 0.1) |
+| Rails | near: accent lights, then the fascia sloping toward the camera (the front the camera sees above the hand, with the medallion); far: a cable trough and the crest mount at (0, 5.95); sides: a trough and the band lamps |
+| Corners | machined blocks at (±8.85, ±5.85), tops at z 0.3 (near) and 0.16 (far: the hostile portraits stand above the far rail) |
+| Bands | brass dividers across table and rails; NORTH / CENTER / SOUTH stencilled into the deck in each band's south-west corner; a lamp strip in both side rails |
+
+| Family | Envelope | Budget |
+| --- | --- | --- |
+| Board | x ±9.45, y ±6.45, z -1.7..1.0 | ≤ 36,000 triangles, ≤ 28 draw calls, ≤ 1,100 KB |
+| Crest | the same box; sigil within 1.7 × 0.8 on the mount, finials within 0.46 (near) and 0.28 (far) of their block | ≤ 5,000 triangles, ≤ 10 draw calls, ≤ 200 KB |
+
+A whole board stays within 40,000 triangles and 30 draw calls: a stage board's slots are hidden
+when its crest replaces them. Per battle the download is one frame (~0.9 MB), one crest (≤ 0.1 MB)
+and three tabletop textures (~0.8 MB), well under 3 MB; `src/core/boards.test.ts` checks all of it.
+
+**Tabletop textures** (`npm run models -- table`, drawn by `boards/surface.py`): `table-<deck>.jpg`
+(base colour, sRGB: copper, glass, blackout per stage; regent, cantor, core per guardian),
+`table-normal.jpg` (OpenGL/glTF tangent space) and `table-rm.jpg` (G roughness, B metalness), 2048 ×
+1328, row 0 = north. Every board shares the normal and roughness maps. The deck: machined plates with
+seams and screws, a faint etched grid, an etched border with brass brackets and network traces in
+each band, and the containerlab mark inlaid in the centre inside an etched ring gate.
+
+**Materials** (matched by name in `src/three/board.ts`; a crest's `board_*` materials take the board's
+instances, so one crest dresses any stage):
+
+| Name | In game |
+| --- | --- |
+| `board_steel`, `board_panel`, `board_trim`, `board_trim_bright`, `board_ivory`, `board_rubber`, `board_enamel`, `board_container` | lit metal in the board's palette (`STYLES` in `boards/kit.py`) |
+| `accent_glow`, `accent_glow_soft`, `accent_glow_faint`, `accent_luminous` | the board's accent colour: the leader's colour (`src/core/enemies.ts`), else the board's own (`BOARD_ACCENTS`) |
+| `glow_*` | unlit, fixed colour (`glow_lamp`, `glow_ring`, `glow_mark` the containerlab blue, `glow_glass`, `glow_ember`) |
+| `band_<zone>_label` | the band's stencilled name: lit worn ivory; World.ts sets its emission to the band's state colour (targeted, field, INCOMING) |
+| `band_<zone>_lamp` | the band's rail lamps: unlit, World.ts sets colour and opacity; they blink under an INCOMING warning |
+
+**Slots** (glTF extra `slot` on an empty, `fl.slot()`): a stage board's `crest` (the ring-gate emblem
+on the far rail) and `finial` (the four corner beacons). A crest model brings both; the board hides
+its own. Hooks as elsewhere: `spinner` (the colossus cog, the storm rings) and `blinker` (the Blackout
+Core's reactor core).
+
+**Guardians** build on the kit with their own fascia modules, corner dressing, crest and extras
+(`kit.build_base(style, corner, crest, extras)`): the Iron Regent's gatehouse (gate leaves, crenellated
+towers, copper armour, a crown over a barred arch), the Hollow Choir's instrument (resonator pipes,
+glass bells, tuning rods, pipes before a rose window), the Blackout Core's containment (shielded
+portholes, coils round a red core, coolant pipes, a pulsing reactor ring).
+
+**Crests** come in motif families, each leader its own arrangement: maw (leech), hook (wraith), halo
+(prophet), coil (serpent), wing (moth), gate (sentinel), weight (marshal), gear (colossus), hammer
+(foreman), web (weaver), reactor (storm), dial (demolition), shard (widow), bell (choir), blade
+(reaver), pod (nest), root (blight).
+
+The containerlab mark (`public/containerlab-mark.svg`, MIT, `public/containerlab-mark.LICENSE.txt`)
+is inlaid in the tabletop and set in brass on the fascia's medallion; both are drawn from the SVG's
+own paths.

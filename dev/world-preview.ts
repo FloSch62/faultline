@@ -14,14 +14,19 @@
  *   reduced 1 reduced motion
  *   focus   left | centre | right (trio/guardian)       select  a selected port (a dimmer crest)
  *   cam     x,y,z camera position and target x,y,z orbit target, for close-ups
+ *   board   the battle board: copper | glass | blackout | regent | cantor | core, a stage board with a
+ *           leader's crest ("glass:widow"), or a leader id on the stage's board ("widow", see stage);
+ *           default: the board the game would pick for the centre hostile on stage 0
+ *   stage   0 | 1 | 2 for a leader id in `board` (default 0)
  * `window.__world` exposes the World and `window.__preview` scripted beats for captures:
  *   __preview.transmit(), .act(port, kind), .quarantine(), .detonate(), .crate(port), .fragment(port),
  *   .arrive(), .dormant(port), .death(port), .hover(id)
  */
 import * as THREE from "three";
-import { World, type DeliveryView, type RailState } from "../src/three/World.ts";
+import { World, type RailState } from "../src/three/World.ts";
 import { COLORS } from "../src/three/devices.ts";
 import { ENEMIES } from "../src/core/enemies.ts";
+import { boardFor, boardFromSpec } from "../src/three/board.ts";
 import type { Enemy, Installation, InstallationKind, NetworkNode, Port, Terrain, Topology } from "../src/core/types.ts";
 import {
   INSTALLATION_KINDS, PROP_MODELS, addInstallationBody, addPropBody, animateModelBody, loadInstallationModels, loadPropModels,
@@ -56,6 +61,8 @@ let installations: Installation[] = [];
 let forecast: { installs: { kind: InstallationKind; x: number; z: number }[] } | null = null;
 let channels: string[][] = [];
 let online: string[] = [];
+/** A channel's landing, as the transmit beat plays it. */
+type DeliveryView = { key: string; primary: boolean; path: string[]; port: Port; aimed: boolean; amount: number };
 let deliveries: DeliveryView[] = [];
 let rail: RailState = { focus: "centre", selected: null, readouts: {} };
 const link = (a: string, b: string, extra: object = {}) => topology.links.push({ a, b, ...extra });
@@ -169,15 +176,14 @@ const world = new World(document.querySelector<HTMLCanvasElement>("#world")!, {
   onMove: () => {},
   onInstallation: id => { caption(`installation ${id}`); world.setInstallationFocus(id, false); },
   onPort: port => { caption(`port ${port}`); rail = { ...rail, selected: port }; world.setRail(rail); },
-  onAim: (key, port) => {
-    caption(`aim ${key} → ${port}`);
-    deliveries = deliveries.map(item => item.key === key && port ? { ...item, port, aimed: true } : item);
-    world.setDeliveries(deliveries, key);
-  },
 });
 
 function caption(text: string) { document.querySelector("#caption")!.textContent = text; }
 function apply() {
+  const stage = Number(params.get("stage") ?? 0);
+  world.setStage(stage);
+  world.setBoard((params.get("board") && boardFromSpec(params.get("board")!, stage)) ||
+    boardFor({ stage, map: [], currentRoom: null, enemies: scene === "empty" && params.get("enemy") === null ? [] : enemies }));
   world.setTerrain(terrain);
   world.setBattle(topology, scene === "empty" && params.get("enemy") === null ? null : enemies, params.get("fault") ? [params.get("fault")!] : [], []);
   world.setInstallations(installations, forecast);
@@ -185,7 +191,6 @@ function apply() {
   world.setChannels(channels);
   world.setZoneEffects([]);
   world.setRail(rail);
-  world.setDeliveries(deliveries, null);
   if (scene === "front") world.setForecastTarget(["r1"]);
 }
 apply();

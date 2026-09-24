@@ -2,7 +2,7 @@
 
 Project code and project-created assets are released under the root MIT `LICENSE`, to the extent of the contributors' licensable rights. The following third-party materials retain their original terms.
 
-`public/containerlab-mark.svg` is copied from `containerlab-app/apps/web-public/resources/containerlab.svg` in the adjacent Containerlab app repository. That repository is published under the MIT License, copyright (c) 2026 SRL Labs. The license text is included in `public/containerlab-mark.LICENSE.txt`.
+`public/containerlab-mark.svg` is copied from `containerlab-app/apps/web-public/resources/containerlab.svg` in the adjacent Containerlab app repository. That repository is published under the MIT License, copyright (c) 2026 SRL Labs. The license text is included in `public/containerlab-mark.LICENSE.txt`. The battle board models in `public/models/boards/` and their tabletop textures include artwork derived from this mark under the same license.
 
 The `.clab.yml` exporter follows the topology structure shown in the adjacent Containerlab examples. Runtime behavior is not embedded or copied into the game.
 

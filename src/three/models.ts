@@ -11,7 +11,8 @@ import { TABLE_Y } from "./props.ts";
  *   installations  blender/installations/<kind>.py  → public/models/installations/<kind>.glb
  *   props          blender/props/<name>.py          → public/models/props/<name>.glb
  * A device body stands on the code-built plinth (origin at the plinth base); installations and
- * props stand on the table (origin at the table surface).
+ * props stand on the table (origin at the table surface). The battle board's frames and crests
+ * (blender/boards) load on demand through loadBoardModel (src/three/board.ts assembles them).
  */
 const MODEL_ROLES: readonly Role[] = ["client", "router", "switch", "firewall", "honeypot", "cache", "power", "balancer", "rack", "phantom"];
 export const INSTALLATION_KINDS: readonly InstallationKind[] = ["tap", "jammer", "spike", "anchor", "breaker"];
@@ -167,6 +168,48 @@ export function addModelBody(group: DeviceGroup, node: NetworkNode, palette: Pal
   data.blinkers.push(...body.blinkers);
   group.add(body.root);
   return true;
+}
+
+// ---- boards (src/three/board.ts): loaded on demand, one battle's board at a time, cached for the next.
+const boardModels = new Map<string, Promise<THREE.Object3D | null>>();
+const boardTextures = new Map<string, Promise<THREE.Texture | null>>();
+
+/** A board frame or crest GLB (`file` without .glb under public/models), loaded once. Null when it
+ * cannot load: the caller keeps its code-built table. Its geometry is shared by every clone. */
+export function loadBoardModel(file: string): Promise<THREE.Object3D | null> {
+  let loading = boardModels.get(file);
+  if (!loading) {
+    loading = new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}models/${file}.glb`).then((gltf) => {
+      gltf.scene.traverse((child) => {
+        if (child instanceof THREE.Mesh) child.geometry.userData.shared = true;
+      });
+      return gltf.scene;
+    }, (error) => {
+      console.warn(`Board model ${file} is unavailable; keeping the built-in table.`, error);
+      return null;
+    });
+    boardModels.set(file, loading);
+  }
+  return loading;
+}
+
+/** A tabletop texture under public/models (colour: sRGB base colour; otherwise data), loaded once. */
+export function loadBoardTexture(file: string, color: boolean): Promise<THREE.Texture | null> {
+  let loading = boardTextures.get(file);
+  if (!loading) {
+    loading = new THREE.TextureLoader().loadAsync(`${import.meta.env.BASE_URL}models/${file}`).then((texture) => {
+      texture.colorSpace = color ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+      texture.anisotropy = 8;
+      // Shared across battles: World.disposeObject leaves it alone.
+      texture.userData.shared = true;
+      return texture;
+    }, (error) => {
+      console.warn(`Board texture ${file} is unavailable.`, error);
+      return null;
+    });
+    boardTextures.set(file, loading);
+  }
+  return loading;
 }
 
 /** Palette for a body tinted by `color`: role_* materials take it, lit metal gets a faint tint of it. */

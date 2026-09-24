@@ -17,6 +17,7 @@ import { ENEMIES } from "./core/enemies.ts";
 import { crateText } from "./core/encounter.ts";
 import type { Enemy, Port, RunState } from "./core/types.ts";
 import type { ActionKind, RailState, World, WorldPoint } from "./three/World.ts";
+import { boardFor } from "./three/board.ts";
 
 /** The hud's view state the table mirrors (main.ts worldView()). */
 export interface WorldView {
@@ -33,6 +34,8 @@ export interface WorldView {
 export function syncWorld(world: World | null, run: RunState, preview: CombatPreview, view: WorldView, options: { rebuild: boolean; debrief?: boolean }) {
   if (!world) return;
   world.setStage(run.stage);
+  // The board of this encounter: the stage's, dressed by the leader (chosen once, from the room).
+  world.setBoard(boardFor(run));
   // Terrain first: cables read the wreckage to know whether they fray.
   world.setTerrain(run.terrain);
   if (options.rebuild) world.setBattle(run.topology, options.debrief ? null : run.enemies, run.faultNodes, run.faultLinks);

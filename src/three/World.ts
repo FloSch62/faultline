@@ -32,6 +32,7 @@ import {
   brassRingTexture, makeLabel, TABLE_LABEL_ORDER,
 } from "./plates.ts";
 import { AMPLIFIED_COLOR, channelColor } from "../channel-palette.ts";
+import { animateBoard, boardId, buildBoard, disposeBoard, type Board, type BoardKey } from "./board.ts";
 import { amplifiedWinding, junctionSeal } from "./junction.ts";
 
 export type WorldPoint = { x: number; z: number };
@@ -323,6 +324,12 @@ export class World {
   private readonly clock = new THREE.Clock();
   private readonly resizeObserver: ResizeObserver;
   private readonly board = new THREE.Group();
+  /** The code-built table (frame, labels, dividers): shown until the Blender board has arrived. */
+  private readonly tableFrame = new THREE.Group();
+  /** The battle's Blender board (src/three/board.ts), once loaded; the key it was asked for. */
+  private boardModel: Board | null = null;
+  private boardKey = "";
+  private boardToken = 0;
   private readonly dynamic = new THREE.Group();
   private readonly terrainGroup = new THREE.Group();
   private readonly frontGroup = new THREE.Group();
@@ -372,6 +379,12 @@ export class World {
     label: THREE.MeshBasicMaterial;
     warning: THREE.Mesh;
     color: number;
+    /** The Blender board's stencilled band name and rail lamps (empty until it has loaded). */
+    plates: THREE.MeshPhysicalMaterial[];
+    lamps: THREE.MeshBasicMaterial[];
+    /** How strongly they light (0 at rest), and whether the lamps blink (INCOMING). */
+    glow: number;
+    alarm: boolean;
     /** The band's fields on an iron plaque at its left end ("CORROSION · 2"), redrawn when they change. */
     field: { mesh: THREE.Mesh; material: THREE.MeshBasicMaterial; canvas: HTMLCanvasElement; texture: THREE.CanvasTexture; text: string };
     /** A thin lit rim around the band while a field holds it. */
@@ -554,13 +567,14 @@ export class World {
 
   private buildTable() {
     this.board.position.y = -0.42;
+    this.board.add(this.tableFrame);
     const outer = new THREE.Mesh(
       new RoundedBoxGeometry(17.6, 0.75, 11.65, 3, 0.18),
       mat(0x383733),
     );
     outer.castShadow = true;
     outer.receiveShadow = true;
-    this.board.add(outer);
+    this.tableFrame.add(outer);
     const side = new THREE.Mesh(
       new RoundedBoxGeometry(17.23, 0.22, 11.3, 3, 0.08),
       mat(0x675840),
@@ -568,14 +582,14 @@ export class World {
     side.position.y = 0.43;
     side.castShadow = true;
     side.receiveShadow = true;
-    this.board.add(side);
+    this.tableFrame.add(side);
     const inset = new THREE.Mesh(
       new THREE.BoxGeometry(16.6, 0.08, 10.75),
       mat(0x171d20, 0x1a2428, 0.25),
     );
     inset.position.y = 0.56;
     inset.receiveShadow = true;
-    this.board.add(inset);
+    this.tableFrame.add(inset);
 
     // Four separate frames make the table read like a manufactured instrument.
     const rails = [
@@ -591,7 +605,7 @@ export class World {
       );
       mesh.position.set(rail.x, 0.47, rail.z);
       mesh.castShadow = true;
-      this.board.add(mesh);
+      this.tableFrame.add(mesh);
     }
     const edgeMaterial = glow(0xbb9e6c, 0.65);
     for (const z of [-5.59, 5.59]) {
@@ -600,7 +614,7 @@ export class World {
         edgeMaterial,
       );
       strip.position.set(0, 0.57, z);
-      this.board.add(strip);
+      this.tableFrame.add(strip);
     }
     for (const x of [-8.55, 8.55]) {
       const strip = new THREE.Mesh(
@@ -608,16 +622,16 @@ export class World {
         edgeMaterial,
       );
       strip.position.set(x, 0.57, 0);
-      this.board.add(strip);
+      this.tableFrame.add(strip);
     }
 
     this.scanMaterial = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
-      uniforms: { uTime: { value: 0 }, uAlpha: { value: 0.44 }, uThreat: { value: new THREE.Color(0x000000) } },
+      uniforms: { uTime: { value: 0 }, uAlpha: { value: 0.44 }, uThreat: { value: new THREE.Color(0x000000) }, uDeck: { value: 0 } },
       vertexShader: `varying vec2 vUv; void main(){vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
       fragmentShader: `
-        uniform float uTime; uniform float uAlpha; uniform vec3 uThreat; varying vec2 vUv;
+        uniform float uTime; uniform float uAlpha; uniform vec3 uThreat; uniform float uDeck; varying vec2 vUv;
         float line(vec2 p){ vec2 g=abs(fract(p)-.5); vec2 w=fwidth(p)*1.2; return 1.-min(1.,min(g.x/w.x,g.y/w.y)); }
         void main(){
           vec2 uv=vUv; vec2 centered=(uv-.5)*vec2(1.62,1.0);
@@ -631,9 +645,12 @@ export class World {
           vec3 color=base+teal*(grid*.14+major*.15+sweep*.015+rings*.01+lane*.2);
           // The hostile's presence bleeds across the far rail of the table.
           float far=smoothstep(.55,1.,uv.y);
-          color+=uThreat*far*far*(.55+.45*sin(uTime*1.3));
+          vec3 threat=uThreat*far*far*(.55+.45*sin(uTime*1.3));
+          color+=threat;
           float fade=smoothstep(0.,.06,uv.x)*smoothstep(0.,.06,uv.y)*smoothstep(0.,.06,1.-uv.x)*smoothstep(0.,.06,1.-uv.y);
-          gl_FragColor=vec4(color,fade*uAlpha);
+          // Over the Blender board's etched deck (added light): only the sweep, the rings and the threat.
+          vec3 deck=vec3(.3,.62,.58)*(sweep*.05+rings*.03+lane*.03)+threat*1.6;
+          gl_FragColor=uDeck>.5?vec4(deck*fade,1.):vec4(color,fade*uAlpha);
         }`,
     });
     const scan = new THREE.Mesh(
@@ -654,7 +671,7 @@ export class World {
           glow(i % 3 ? 0x214f65 : 0x63eedc, i % 3 ? 0.65 : 0.95),
         );
         bay.position.set(i, 0.52, z);
-        this.board.add(bay);
+        this.tableFrame.add(bay);
       }
     }
     for (const x of [-8.28, 8.28])
@@ -664,7 +681,7 @@ export class World {
         fixture.add(cylinder(0.22, 0.26, 0.18, 8, mat(0x526677), 0.07));
         fixture.add(cylinder(0.12, 0.12, 0.08, 8, glow(0x9cf7e8), 0.19));
         fixture.add(ring(0.19, 0.018, 0x55e4d6, 0.18));
-        this.board.add(fixture);
+        this.tableFrame.add(fixture);
       }
     // Machinery under the deck creates layered mechanical depth.
     for (const z of [-4.5, -2.3, 0, 2.3, 4.5]) {
@@ -673,7 +690,7 @@ export class World {
         mat(0x253347),
       );
       rib.position.set(0, -0.46, z);
-      this.board.add(rib);
+      this.tableFrame.add(rib);
     }
     for (const x of [-7, 7]) {
       const support = new THREE.Mesh(
@@ -681,12 +698,12 @@ export class World {
         mat(0x17283d),
       );
       support.position.set(x, -1.23, 0);
-      this.board.add(support);
+      this.tableFrame.add(support);
       const lamp = ring(0.48, 0.06, 0x286d83, -2.06);
       lamp.position.x = x;
-      this.board.add(lamp);
+      this.tableFrame.add(lamp);
     }
-    // Containerlab flask insignia engraved into the central tabletop.
+    // Containerlab flask insignia engraved into the central tabletop (the Blender boards inlay it).
     const logoTexture = new THREE.TextureLoader().load(
       `${import.meta.env.BASE_URL}containerlab-mark.svg`,
     );
@@ -702,7 +719,7 @@ export class World {
     );
     insignia.rotation.x = -Math.PI / 2;
     insignia.position.set(0, 0.624, 0);
-    this.board.add(insignia);
+    this.tableFrame.add(insignia);
     this.scene.add(this.board);
   }
 
@@ -809,9 +826,9 @@ export class World {
       this.board.add(field);
       const label = this.tableInscription(zone.name, 1.45, zone.color);
       label.position.set(-7.22, 0.638, zone.z);
-      this.board.add(label);
-      const warning = this.tableInscription("INCOMING", 1.58, 0xf29a81);
-      warning.position.set(7.12, 0.64, zone.z);
+      this.tableFrame.add(label);
+      const warning = this.tableInscription("INCOMING", 1.9, 0xf29a81);
+      warning.position.set(7.0, 0.64, zone.z);
       warning.visible = false;
       this.board.add(warning);
       const fieldLine = this.fieldInscription();
@@ -828,17 +845,17 @@ export class World {
         strip.renderOrder = 2;
         this.board.add(strip);
       }
-      this.zoneVisuals.set(zone.id, { fill, label: label.material, warning, color: zone.color, field: fieldLine, rim });
+      this.zoneVisuals.set(zone.id, { fill, label: label.material, warning, color: zone.color, field: fieldLine, rim, plates: [], lamps: [], glow: 0, alarm: false });
     }
     for (const z of [-1.3, 1.3]) {
       const divider = new THREE.Mesh(new THREE.BoxGeometry(16.12, 0.006, 0.014), glow(0xa7a48b, 0.4));
       divider.position.set(0, 0.637, z);
       divider.renderOrder = 2;
-      this.board.add(divider);
+      this.tableFrame.add(divider);
       for (let x = -8; x <= 8; x += 2) {
         const tick = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.006, 0.18), glow(0xa7a48b, 0.5));
         tick.position.set(x, 0.638, z);
-        this.board.add(tick);
+        this.tableFrame.add(tick);
       }
     }
   }
@@ -871,22 +888,6 @@ export class World {
     const under = new THREE.PointLight(0x52c6ef, 42, 16, 2);
     under.position.set(0, -2.1, 0);
     this.ambiance.add(under);
-    for (const side of [-1, 1]) {
-      const tower = new THREE.Group();
-      tower.position.set(side * 10.3, -0.6, -5.7);
-      tower.add(cylinder(0.42, 0.6, 3.7, 8, mat(0x152335), 0));
-      tower.add(
-        cylinder(0.19, 0.3, 0.7, 8, mat(0x40546b, 0x0f3340, 0.4), 2.15),
-      );
-      tower.add(ring(0.37, 0.035, 0x6cdef2, 1.6, 0.8));
-      const antenna = new THREE.Mesh(
-        new THREE.ConeGeometry(0.12, 2.0, 7),
-        mat(0x839caf, 0x20546c, 0.2),
-      );
-      antenna.position.y = 3.3;
-      tower.add(antenna);
-      this.ambiance.add(tower);
-    }
     // Faint light shafts fall through the relay hall behind the hostile.
     const shaftCanvas = document.createElement("canvas");
     shaftCanvas.width = 64;
@@ -2118,7 +2119,8 @@ export class World {
       const aimed = this.targetingZone && !preview;
       const color = preview ? this.previewZoneBlocked ? 0xe66455 : 0x9edde0 : field ? colors[field.kind] : aimed ? 0x9edde0 : danger ? 0xc35e4d : visual.color;
       visual.fill.color.setHex(color);
-      visual.fill.opacity = preview ? 0.28 : field ? 0.18 : aimed ? 0.1 : danger ? 0.14 : 0.045;
+      // At rest the Blender board's deck shows through (its dividers and stencils mark the bands).
+      visual.fill.opacity = preview ? 0.28 : field ? 0.18 : aimed ? 0.1 : danger ? 0.14 : this.boardModel ? 0.008 : 0.045;
       visual.label.color.setHex(color);
       visual.label.opacity = preview || danger || field || aimed ? 1 : 0.72;
       visual.warning.visible = danger;
@@ -2131,6 +2133,62 @@ export class World {
       })));
       visual.rim.color.setHex(preview || aimed ? color : field ? colors[field.kind] : visual.color);
       visual.rim.opacity = preview ? 0.9 : aimed ? 0.45 : field ? 0.55 : 0;
+      // The Blender board's band name and rail lamps light in the band's state.
+      visual.glow = preview ? 1 : danger ? 0.8 : field ? 0.6 : aimed ? 0.45 : 0;
+      visual.alarm = danger && !preview;
+      for (const plate of visual.plates) {
+        plate.emissive.setHex(color);
+        plate.emissiveIntensity = visual.glow * 1.6;
+      }
+      for (const lamp of visual.lamps) {
+        lamp.color.setHex(color);
+        lamp.opacity = 0.4 + 0.6 * visual.glow;
+      }
+    }
+  }
+
+  /**
+   * The battle's board (boardFor in src/three/board.ts): chosen once per battle. The code-built table
+   * stays until the board's frame, crest and tabletop have arrived; a board that cannot load keeps it.
+   */
+  setBoard(key: BoardKey) {
+    const id = boardId(key);
+    if (id === this.boardKey) return;
+    this.boardKey = id;
+    const token = ++this.boardToken;
+    // The test renderer skips the tabletop textures (a plain deck), not the board.
+    const textures = (globalThis as { __faultlineTestRender?: boolean }).__faultlineTestRender !== true;
+    void buildBoard(key, { textures }).then((board) => {
+      if (!board) return;
+      if (!this.active || token !== this.boardToken) { disposeBoard(board); return; }
+      this.installBoard(board);
+    });
+  }
+  private installBoard(board: Board) {
+    if (this.boardModel) disposeBoard(this.boardModel);
+    this.boardModel = board;
+    board.root.position.y = 0.6;
+    this.board.add(board.root);
+    this.tableFrame.visible = false;
+    this.scanMaterial.uniforms.uDeck.value = 1;
+    this.scanMaterial.blending = THREE.AdditiveBlending;
+    this.scanMaterial.needsUpdate = true;
+    for (const [id, visual] of this.zoneVisuals) {
+      visual.plates = board.bands[id].labels;
+      visual.lamps = board.bands[id].lamps;
+    }
+    this.canvas.dataset.board = this.boardKey;
+    this.refreshZones();
+  }
+  /** Per frame: the board's own life, and the lamps of a band under an INCOMING warning blink. */
+  private animateTable(time: number, motion: number, reduced: boolean) {
+    if (!this.boardModel) return;
+    animateBoard(this.boardModel, time, motion, reduced);
+    for (const visual of this.zoneVisuals.values()) {
+      if (!visual.alarm) continue;
+      const on = reduced ? 1 : Math.sin(time * 5.2) > -0.1 ? 1 : 0.25;
+      for (const lamp of visual.lamps) lamp.opacity = on;
+      for (const plate of visual.plates) plate.emissiveIntensity = visual.glow * 1.6 * (0.55 + 0.45 * on);
     }
   }
 
@@ -3227,6 +3285,7 @@ export class World {
     const motion = reducedMotion ? 0 : dt;
     this.controls.update();
     this.scanMaterial.uniforms.uTime.value = reducedMotion ? 0 : time;
+    this.animateTable(time, motion, reducedMotion);
     this.placement.rotation.y += motion * 0.55;
     for (const group of this.devices.values()) animateDevice(group, time, motion, reducedMotion);
     for (const group of this.terrainGroup.children) animateProp(group as PropGroup, time, motion, reducedMotion);

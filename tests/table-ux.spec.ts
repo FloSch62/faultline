@@ -69,7 +69,8 @@ test("the chip counts routes and channels; each channel has its own colour and t
   await expect(chip).not.toContainText("cut-proof");
   await expect(chip.locator(".channel-swatches i")).toHaveCount(3);
   const tip = await chip.getAttribute("data-tooltip");
-  expect(tip).toContain("Every device carries one channel: when two routes go through the same device, they are one channel, not two.");
+  expect(tip).toContain("4 routes make 3 channels.");
+  expect(tip).toContain("two paths through the same device count as one.");
   expect(tip).toContain("SWITCH6 (2 routes)");
 
   // One colour per delivering channel on the cables and skirts; a live route outside the set stays neutral.

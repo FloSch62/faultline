@@ -1,29 +1,26 @@
 /** Expedition layer: rooms, rewards, credits, sanctuary services, the market,
  * relic choices and events. Combat rules live in run.ts; this module decides
  * what happens between fights. */
-import { CARDS, RELICS, REWARD_POOL, baseCard, canUpgrade, isUpgraded, upgraded } from "./cards.ts";
+import { CARDS, RELICS, RULES, baseCard, canUpgrade, isCardId, isUpgraded, upgraded } from "./cards.ts";
 import { reachableRooms, createMap } from "./map.ts";
 import { STAGES } from "./stages.ts";
 import { beginBattle } from "./run.ts";
 import { random, shuffle, log } from "./util.ts";
 import { EVENTS, eventDefinition, openEvent } from "./events.ts";
 import { creditMultiplier, priceMultiplier, repairMultiplier } from "./ascension.ts";
-import { PRE_UPGRADE_CHANCE, encounterRoom, planEncounter, slotRarity } from "./encounter.ts";
+import { encounterRoom, planEncounter } from "./encounter.ts";
+import { MARKET_SLOTS, offerableCards, pickCard, rewardKind, rollSlot, type Rarity } from "./rewards.ts";
 import type { CardId, MapRoom, RelicId, RunState, ShopState } from "./types.ts";
 import type { ActionResult } from "./run.ts";
 
-export type Rarity = "common" | "uncommon" | "rare" | "legendary";
+export type { Rarity } from "./rewards.ts";
 
 // ---------------------------------------------------------------- pools
 
-/** Base cards that may be offered to this expedition: no basics, junk or
- * curses, and archetype cards only for their own archetype. */
+/** Base cards that may be offered to this expedition (both pools): no basics, junk, curses or
+ * tokens, and keeper cards only for their own keeper. */
 export function offerPool(run: RunState): CardId[] {
-  return [...new Set(REWARD_POOL.map(id => baseCard(id) as CardId))].filter(id => {
-    const card = CARDS[id];
-    return card && !isUpgraded(id) && card.rarity !== "basic" && !card.junk && !card.curse &&
-      card.target !== "junk" && (!card.archetype || card.archetype === run.archetype);
-  });
+  return offerableCards(run);
 }
 
 /** Seeded pick of one offerable card of a rarity, avoiding `exclude`. Falls back
@@ -45,7 +42,7 @@ export function rollRelics(run: RunState, tier: "common" | "boss", count: number
   return shuffle(run, relicPool(run, tier)).slice(0, count);
 }
 
-/** Later stages sometimes offer cards that are already upgraded (PRE_UPGRADE_CHANCE by stage). */
+/** Later stages sometimes offer cards that are already upgraded. */
 function maybeUpgraded(run: RunState, id: CardId, chance: number): CardId {
   return random(run) < chance && canUpgrade(id) ? upgraded(id) : id;
 }
@@ -54,15 +51,15 @@ function currentRoom(run: RunState): MapRoom | undefined {
   return run.map.find(room => room.id === run.currentRoom);
 }
 
+/** Card rewards (contract section 4): three slots (Air Gap: one fewer), each rolling its pool,
+ * rarity and card from the expedition RNG (see rewards.ts). */
 export function cardRewards(run: RunState): CardId[] {
-  const type = currentRoom(run)?.type ?? "";
-  const elite = ["elite", "boss", "event"].includes(type);
+  const kind = rewardKind(currentRoom(run)?.type);
+  const count = 3 - (run.relics.includes("air-gap") ? 1 : 0);
   const options: CardId[] = [];
-  for (let i = 0; i < 3; i++) {
-    const roll = random(run);
-    const rarity: Rarity = elite && i === 0 ? "rare" : slotRarity(roll, elite);
-    const card = rollCard(run, rarity, options.map(id => baseCard(id) as CardId));
-    if (card) options.push(maybeUpgraded(run, card, PRE_UPGRADE_CHANCE[run.stage] ?? 0));
+  for (let i = 0; i < count; i++) {
+    const card = rollSlot(run, () => random(run), kind, i, options.map(id => baseCard(id) as CardId));
+    if (card) options.push(card);
   }
   return options;
 }
@@ -82,7 +79,7 @@ export function removalBlocker(run: RunState, index: number): string | null {
   const card = run.deck[index];
   if (!card || !CARDS[card]) return "Choose a card from your deck.";
   if (CARDS[card].curse) return null;
-  if (run.deck.length <= 10) return "Keep at least 10 cards in your deck.";
+  if (run.deck.length <= RULES.deckFloor) return `Keep at least ${RULES.deckFloor} cards in your deck.`;
   if ((isRouterCard(card) && run.deck.filter(isRouterCard).length <= 1) ||
     (isCableCard(card) && run.deck.filter(isCableCard).length <= 2))
     return "Keep one router and two cabling cards for a reliable opening route.";
@@ -175,6 +172,8 @@ export function advanceRoom(run: RunState) {
   delete run.attackers;
   delete run.entrance;
   run.protocols = [];
+  run.daemons = [];
+  delete run.nextTurn;
   run.buffer = 0;
   run.buffering = false;
   run.backpressure = 0;
@@ -216,6 +215,8 @@ export function grantVictory(run: RunState) {
   if (fight) planEncounter(run, fight).credits.forEach(add);
   (run.creditLedger ?? []).forEach(add);
   if (run.relics.includes("credit-line")) add({ label: "credit line", amount: 15 });
+  // Overvolt: a Backdoor curse after every elite you defeat.
+  if (room?.type === "elite" && run.relics.includes("overvolt")) gainCurse(run, "backdoor");
   const credits = ledger.reduce((sum, line) => sum + line.amount, 0);
   run.credits += credits;
   run.creditsEarned = credits;
@@ -260,8 +261,19 @@ export function chooseRelic(run: RunState, relic: RelicId): ActionResult {
   run.relics.push(relic);
   run.relicRewards = [];
   log(run, `${RELICS[relic].name} installed.`);
+  // Overvolt: a Backdoor curse now.
+  if (relic === "overvolt") gainCurse(run, "backdoor");
   advanceRoom(run);
   return { ok: true, message: `${RELICS[relic].name} installed.` };
+}
+
+/** A curse joins the deck (Overvolt's Backdoor, event prices). False, and nothing happens, while
+ * the curse is not defined yet (the colorless agent defines the v5 curses). */
+export function gainCurse(run: RunState, id: CardId): boolean {
+  if (!isCardId(id) || !CARDS[id].curse) return false;
+  run.deck.push(id);
+  log(run, `${CARDS[id].name} joins your deck.`);
+  return true;
 }
 
 // ---------------------------------------------------------------- sanctuary
@@ -282,6 +294,8 @@ export function chooseForge(run: RunState, option: ForgeOption): ActionResult {
   if (run.phase !== "forge")
     return { ok: false, message: "No sanctuary is active." };
   if (option === "repair") {
+    if (run.relics.includes("legacy-mainframe"))
+      return { ok: false, message: `${RELICS["legacy-mainframe"].name}: sanctuaries cannot repair. Choose another service.` };
     const restored = Math.min(repairAmount(run), run.maxIntegrity - run.integrity);
     run.integrity += restored;
     log(run, `Sanctuary repair restored ${restored} integrity.`);
@@ -306,6 +320,15 @@ export function chooseForge(run: RunState, option: ForgeOption): ActionResult {
   log(run, `Sacrificed ${SALVAGE_COST} maximum integrity to salvage a relic. The cost lasts for this expedition.`);
   run.phase = "relic";
   return { ok: true, message: `Maximum integrity reduced by ${SALVAGE_COST}. Select one relic.` };
+}
+
+/** Leave a sanctuary without a service (for a keeper who can take none: Legacy Mainframe with
+ * nothing to upgrade, remove or salvage). */
+export function leaveForge(run: RunState): ActionResult {
+  if (run.phase !== "forge") return { ok: false, message: "No sanctuary is active." };
+  log(run, "You rest without a service and move on.");
+  advanceRoom(run);
+  return { ok: true, message: "You leave the sanctuary." };
 }
 
 /** Sanctuary upgrade: the chosen card becomes its "+" version. */
@@ -339,18 +362,22 @@ export const UPGRADED_PREMIUM = 20;
 export const RELIC_PRICE = { min: 100, max: 130 };
 export const REMOVE_PRICE = { base: 50, step: 25 };
 export const UPGRADE_PRICE = 40;
-const SHOP_SLOTS: Rarity[] = ["common", "common", "uncommon", "uncommon", "rare"];
+/** Share of market rare slots that stock a legendary instead, and of market cards pre-upgraded. */
+const MARKET_LEGENDARY = 0.06;
+const MARKET_UPGRADED = 0.15;
 
 export const marketPrice = (run: RunState, base: number) => Math.round(base * priceMultiplier(run.ascension) / 5) * 5;
 
 export const ROUTER_PRICE = 30;
+/** The market (contract section 4): keeper common, colorless common, keeper uncommon, colorless
+ * uncommon, keeper rare (MARKET_SLOTS; a slot whose pool is empty at its rarity takes the other). */
 export function openShop(run: RunState) {
   const cards: ShopState["cards"] = [];
-  for (const slot of SHOP_SLOTS) {
-    const rarity: Rarity = slot === "rare" && random(run) < 0.06 ? "legendary" : slot;
-    const base = rollCard(run, rarity, cards.map(offer => baseCard(offer.id) as CardId));
+  for (const slot of MARKET_SLOTS) {
+    const rarity: Rarity = slot.rarity === "rare" && random(run) < MARKET_LEGENDARY ? "legendary" : slot.rarity;
+    const base = pickCard(run, () => random(run), slot.pool, rarity, cards.map(offer => baseCard(offer.id) as CardId));
     if (!base) continue;
-    const id = maybeUpgraded(run, base, 0.15);
+    const id = maybeUpgraded(run, base, MARKET_UPGRADED);
     const jitter = [-5, 0, 5][Math.floor(random(run) * 3)];
     const price = CARD_PRICES[CARDS[base].rarity as Rarity] ?? CARD_PRICES.common;
     cards.push({ id, price: marketPrice(run, price + jitter + (isUpgraded(id) ? UPGRADED_PREMIUM : 0)), sold: false });

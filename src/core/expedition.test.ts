@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ARCHETYPES, newExpedition, parseExpedition, dailySeed, starterDeck, type Expedition } from "./expedition.ts";
-import { ASCENSION_LEVELS, MAX_ASCENSION } from "./ascension.ts";
+import { ARCHETYPES, EXPEDITION_VERSION, newExpedition, parseExpedition, dailySeed, starterDeck } from "./expedition.ts";
+import { ASCENSION_LEVELS, ASCENSION_RULES, MAX_ASCENSION } from "./ascension.ts";
 import { CARDS, STARTER_DECK } from "./cards.ts";
 import { chooseRoom, combatPreview } from "./run.ts";
 import { createMap } from "./map.ts";
@@ -10,32 +10,23 @@ import type { CardId, MapRoom, RunState } from "./types.ts";
 
 const count = (deck: CardId[], id: CardId) => deck.filter(card => card === id).length;
 
-test("each archetype has its promised deck, relic, console and integrity, and survives a save round trip", () => {
-  assert.equal(STARTER_DECK.length, 17);
+test("each keeper has its twelve-card starter, relic, console and integrity, and survives a save round trip", () => {
+  assert.deepEqual([...STARTER_DECK].sort(), ["fiber", "fiber", "fiber", "guard", "guard", "patch", "pulse", "pulse", "router", "router"]);
+  const signatures = { architect: ["switch", "branch-line"], warden: ["firewall", "deep-inspection"], ghost: ["store-forward", "dark-fiber"] } as const;
   for (const id of ["architect", "warden", "ghost"] as const) {
     const e = newExpedition(id, 1234);
     const deck = e.run.deck;
-    assert.equal(e.version, 4);
+    assert.equal(e.version, EXPEDITION_VERSION);
+    assert.equal(e.version, 5);
     assert.equal(e.run.archetype, id);
     assert.equal(e.run.ascension, 0);
     assert.equal(e.run.credits, 0);
     assert.deepEqual(e.run.relics, [ARCHETYPES[id].relic]);
-    assert.equal(deck.length, 17);
+    assert.equal(deck.length, 12);
     assert.deepEqual(deck, starterDeck(id));
-    if (id === "architect") {
-      assert.deepEqual([count(deck, "duplex"), count(deck, "relay"), count(deck, "load-balancer")], [1, 1, 1]);
-      assert.deepEqual([count(deck, "fiber"), count(deck, "switch"), count(deck, "guard")], [3, 0, 1]);
-      assert.equal(ARCHETYPES[id].console, "patch");
-    }
-    if (id === "warden") {
-      assert.deepEqual([count(deck, "hardened-router"), count(deck, "router"), count(deck, "bastion"), count(deck, "firewall"), count(deck, "pulse")], [1, 1, 1, 1, 0]);
-      assert.equal(ARCHETYPES[id].relic, "backpressure");
-      assert.equal(ARCHETYPES[id].console, "harden");
-    }
-    if (id === "ghost") {
-      assert.deepEqual([count(deck, "crosslink"), count(deck, "fiber"), count(deck, "diagnostic"), count(deck, "patch"), count(deck, "store-forward"), count(deck, "guard")], [2, 2, 1, 0, 1, 1]);
-      assert.equal(ARCHETYPES[id].console, "buffer");
-    }
+    assert.deepEqual(deck.slice(STARTER_DECK.length), [...signatures[id]]);
+    assert.equal(ARCHETYPES[id].console, { architect: "patch", warden: "harden", ghost: "buffer" }[id]);
+    assert.equal(ARCHETYPES[id].relic, { architect: "hot-swap", warden: "backpressure", ghost: "deep-cache" }[id]);
     assert.equal(e.run.integrity, { architect: 14, warden: 15, ghost: 12 }[id]);
     assert.ok(deck.every(card => !CARDS[card].archetype || CARDS[card].archetype === id));
     assert.deepEqual(parseExpedition(JSON.stringify(e)), e);
@@ -46,19 +37,19 @@ test("each archetype has its promised deck, relic, console and integrity, and su
   }
 });
 
-test("ascension levels are cumulative expedition rules", () => {
-  assert.equal(MAX_ASCENSION, 10);
-  assert.deepEqual(ASCENSION_LEVELS.map(level => level.level), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-  const four = newExpedition("warden", 5, false, 4).run;
-  assert.equal(four.ascension, 4);
-  assert.ok(!four.deck.includes("cve"));
-  const five = newExpedition("warden", 5, false, 5).run;
-  assert.equal(count(five.deck, "cve"), 1);
-  assert.equal(five.maxIntegrity, 15);
-  const eight = newExpedition("warden", 5, false, 8).run;
-  assert.equal(eight.maxIntegrity, 13);
-  assert.equal(eight.integrity, 13);
-  assert.equal(newExpedition("ghost", 5, false, 99).run.ascension, 10);
+test("ascension levels are cumulative expedition rules: four levels, each rule named", () => {
+  assert.equal(MAX_ASCENSION, 4);
+  assert.deepEqual(ASCENSION_LEVELS.map(level => level.level), [1, 2, 3, 4]);
+  assert.ok(Object.values(ASCENSION_RULES).every(level => level >= 1 && level <= MAX_ASCENSION));
+  const before = newExpedition("warden", 5, false, ASCENSION_RULES.knownVulnerability - 1).run;
+  assert.ok(!before.deck.includes("cve"));
+  const cursed = newExpedition("warden", 5, false, ASCENSION_RULES.knownVulnerability).run;
+  assert.equal(count(cursed.deck, "cve"), 1);
+  assert.equal(cursed.maxIntegrity, 15);
+  const worn = newExpedition("warden", 5, false, ASCENSION_RULES.wornBackbone).run;
+  assert.equal(worn.maxIntegrity, 13);
+  assert.equal(worn.integrity, 13);
+  assert.equal(newExpedition("ghost", 5, false, 99).run.ascension, MAX_ASCENSION);
   assert.equal(newExpedition("ghost", 5, false, -3).run.ascension, 0);
 });
 
@@ -116,14 +107,16 @@ function fullBattle(seed = 555): ReturnType<typeof newExpedition> {
   r.encounterCards = ["zero-day"];
   r.creditLedger = [{ label: "crates", amount: 12 }];
   r.terrain = { name: "Collapsed rack row", description: "Wreckage blocks the north aisle.", debris: [{ x: 1, z: -3 }, { x: -4.1, z: 2.4, fresh: true, role: "router" }] };
-  r.turnEffects = { everyPort: 2, focusBonus: 2, discounted: ["router"] };
+  r.turnEffects = { everyPort: 2, focusBonus: 2, discounted: ["router"], freeLinks: 1, hardwareDiscount: 1, misses: 1, missSources: ["Spoof"], dodges: 1, dodgeSources: ["Ghost Protocol"], mitm: 2, payloads: 1, payloadDamage: 2 };
+  r.daemons = ["keepalive", "keepalive+", "keepalive"];
+  r.nextTurn = { block: 3, draw: 1 };
   r.lingeringJams = { switch2: 1 };
   r.frayedByCut = ["router1::switch2"];
   r.repairsThisTurn = 1;
   return e;
 }
 
-test("a v4 battle state survives the save round trip exactly", () => {
+test("a battle state with every v4 and v5 field survives the save round trip exactly", () => {
   const e = fullBattle();
   assert.equal(e.run.enemies.length, 3);
   assert.equal(e.run.installations.length, 4);
@@ -133,77 +126,6 @@ test("a v4 battle state survives the save round trip exactly", () => {
   duo.run.map[0] = { ...duo.run.map[0], pack: ["spark-mite", "splicer"] };
   delete duo.run.map[0].enemyId;
   assert.ok(parseExpedition(JSON.stringify(duo)));
-});
-
-test("a v4 save from before aiming was removed loads: its channel aims and Traffic Shaping's redirect are dropped", () => {
-  const e = fullBattle();
-  const old = JSON.parse(JSON.stringify(e)) as { run: Record<string, unknown> & { turnEffects: Record<string, unknown> } };
-  old.run.aims = { "router1|switch2": "left", router1: "centre", "router1|ghost9": "up" };
-  old.run.turnEffects.forceFocus = true;
-  const parsed = parseExpedition(JSON.stringify(old));
-  assert.ok(parsed, "an old save is not refused");
-  assert.deepEqual(parsed, e);
-  assert.ok(!("aims" in parsed.run));
-  assert.ok(!("forceFocus" in parsed.run.turnEffects!));
-  // Every delivery of the loaded fight lands on its target.
-  const p = combatPreview(parsed.run);
-  assert.ok(p.deliveries.every(delivery => delivery.port === parsed.run.focus));
-  // A malformed old flag is still refused.
-  old.run.turnEffects.forceFocus = "yes";
-  assert.equal(parseExpedition(JSON.stringify(old)), null);
-});
-
-test("a v3 save migrates in memory: the hostile stands at the centre, malware becomes Taps, faults become lists", () => {
-  const e = newExpedition("warden", 77);
-  const r = e.run as unknown as Record<string, unknown> & RunState;
-  const room = r.map.find(item => item.floor === 0)!;
-  // A v3 chart: singles only, no ribbons.
-  for (const item of r.map) {
-    if (item.pack && !item.enemyId) item.enemyId = "wraith";
-    delete item.pack; delete item.designations; delete item.designationHidden; delete item.reinforced;
-  }
-  if (!room.enemyId) room.enemyId = "leech";
-  r.phase = "battle";
-  r.currentRoom = room.id;
-  r.topology.nodes.push({ id: "router1", role: "router", x: 0, z: 0 }, { id: "switch2", role: "switch", x: 2.6, z: -3.4, salvage: true });
-  r.topology.links.push({ a: "alpha", b: "router1" }, { a: "router1", b: "omega" });
-  const v3 = {
-    ...e, version: 3,
-    run: {
-      ...Object.fromEntries(Object.entries(r).filter(([key]) =>
-        !["enemies", "faultNodes", "faultLinks", "installations", "focus", "enemyPhase", "hostileActions", "reinforcement", "signal", "offers", "encounterCards"].includes(key))),
-      enemy: { id: "leech", name: "PACKET LEECH", title: "Feeds on lost traffic", color: 0x6ee4d4, hp: 15, maxHp: 21, turn: 4 },
-      malware: [{ id: "malware1", x: 0, z: 2.4 }, { id: "malware2", x: 2.5, z: 2.4 }],
-      faultNode: "router1",
-      faultLink: "alpha::router1",
-    },
-  };
-  const parsed = parseExpedition(JSON.stringify(v3)) as Expedition;
-  assert.ok(parsed, "v3 saves are migrated, not refused");
-  const m = parsed.run;
-  assert.equal(parsed.version, 4);
-  assert.deepEqual(m.enemies, [{ id: "leech", name: "PACKET LEECH", title: "Feeds on lost traffic", color: 0x6ee4d4, hp: 15, maxHp: 21, turn: 4, uid: "h1", port: "centre", role: "single" }]);
-  assert.deepEqual(m.installations, [
-    { id: "malware1", kind: "tap", x: 0, z: 2.4, integrity: 1, activeFrom: 0, owner: "h1" },
-    { id: "malware2", kind: "tap", x: 2.5, z: 2.4, integrity: 1, activeFrom: 0, owner: "h1" },
-  ]);
-  assert.deepEqual([m.faultNodes, m.faultLinks], [["router1"], ["alpha::router1"]]);
-  assert.deepEqual(m.topology.nodes.map(node => [node.id, node.condition]),
-    [["alpha", undefined], ["omega", undefined], ["router1", 2], ["switch2", 1]], "deployed devices 2, salvage 1, terminals none");
-  assert.deepEqual([m.focus, m.enemyPhase, m.hostileActions, m.reinforcement, m.signal, m.offers, m.encounterCards],
-    ["centre", 4, 4, null, null, [], []]);
-  for (const key of ["enemy", "malware", "faultNode", "faultLink"]) assert.ok(!(key in m), `${key} is gone`);
-  // A v3 save between rooms migrates to an empty rail; malformed v3 values are still rejected.
-  const between = { ...v3, run: { ...v3.run, phase: "map", currentRoom: null, enemy: null, malware: [], faultNode: null, faultLink: null } };
-  const mapSave = parseExpedition(JSON.stringify(between))!;
-  assert.deepEqual([mapSave.run.enemies, mapSave.run.focus, mapSave.run.installations], [[], null, []]);
-  assert.equal(parseExpedition(JSON.stringify({ ...v3, run: { ...v3.run, malware: [1, 2, 3, 4, 5].map(i => ({ id: `m${i}`, x: 0, z: i / 2 })) } })), null, "five Taps exceed the cap");
-  assert.equal(parseExpedition(JSON.stringify({ ...v3, run: { ...v3.run, enemy: { ...v3.run.enemy, id: "nobody" } } })), null);
-  assert.equal(parseExpedition(JSON.stringify({ ...v3, run: { ...v3.run, faultNode: "missing" } })), null);
-  // A v4 state that is merely labelled 3 keeps everything it carries.
-  const labelled = fullBattle();
-  const relabelled = parseExpedition(JSON.stringify({ ...labelled, version: 3 }));
-  assert.deepEqual(relabelled, labelled);
 });
 
 test("invalid, tampered and pre-redesign saves fall back to a fresh menu", () => {
@@ -216,16 +138,17 @@ test("invalid, tampered and pre-redesign saves fall back to a fresh menu", () =>
     return parseExpedition(JSON.stringify(e));
   };
   assert.ok(tamper(() => {}), "an untouched save loads");
-  assert.equal(tamper(e => { (e as { version: number }).version = 2; }), null, "v2 saves predate the redesign");
-  assert.equal(tamper(e => { (e as { version: number }).version = 5; }), null, "future saves are refused");
+  assert.equal(tamper(e => { (e as { version: number }).version = 4; }), null, "a v4 save is not continued (no migration)");
+  assert.equal(tamper(e => { (e as { version: number }).version = 3; }), null);
+  assert.equal(tamper(e => { (e as { version: number }).version = 6; }), null, "future saves are refused");
   assert.equal(tamper(e => e.run.deck.push("bad-card" as never)), null);
   assert.equal(tamper(e => { e.run.integrity = -1; }), null);
   assert.equal(tamper(e => e.run.topology.links.push({ a: "alpha", b: "missing" })), null);
   assert.equal(tamper(e => { e.run.archetype = "ghost"; }), null, "run and expedition archetype agree");
-  assert.equal(tamper(e => { e.run.ascension = 11; }), null);
+  assert.equal(tamper(e => { e.run.ascension = MAX_ASCENSION + 1; }), null);
   assert.equal(tamper(e => { e.run.credits = -5; }), null);
   assert.equal(tamper(e => { e.run.credits = 1.5; }), null);
-  assert.equal(tamper(e => { e.run.protocols = ["failover-policy", "rate-limiter", "tarpit"]; }), null);
+  assert.equal(tamper(e => { e.run.protocols = Array(9).fill("tarpit"); }), null);
   assert.equal(tamper(e => { e.run.protocols = ["nonsense" as never]; }), null);
   assert.equal(tamper(e => { e.run.consoleUses = 3; }), null);
   assert.equal(tamper(e => { e.run.buffer = -1; }), null);
@@ -295,6 +218,11 @@ test("invalid, tampered and pre-redesign saves fall back to a fresh menu", () =>
   bad("a negative phase count", r => { r.enemyPhase = -1; });
   bad("negative banked credits", r => { r.creditLedger = [{ label: "crates", amount: -3 }]; });
   bad("a malformed turn effect", r => { (r.turnEffects as Record<string, unknown>).everyPort = "lots"; });
+  bad("a negative free link", r => { r.turnEffects!.freeLinks = -1; });
+  bad("a dodge source that is not a name", r => { (r.turnEffects as Record<string, unknown>).dodgeSources = [7]; });
+  bad("a daemon that is not a daemon card", r => { r.daemons = ["router"]; });
+  bad("daemons missing", r => { delete (r as unknown as Record<string, unknown>).daemons; });
+  bad("negative next-turn block", r => { r.nextTurn = { block: -2 }; });
   bad("a lingering jam on a missing device", r => { r.lingeringJams = { ghost9: 1 }; });
   bad("a room with an unknown designation", r => { (r.map[0] as unknown as Record<string, unknown>).designations = ["cursed"]; });
   bad("a pack led by a leader in the escort slots", r => { r.map.find(room => room.type === "battle")!.pack = ["serpent"]; });

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { newExpedition, parseExpedition } from "./expedition.ts";
+import { EXPEDITION_VERSION, newExpedition, parseExpedition } from "./expedition.ts";
 import { EVENTS, openEvent } from "./events.ts";
 import { chooseRoom, chooseEvent, leaveEvent, eventView, eventCardChoices, grantVictory, chooseCardReward } from "./meta.ts";
 import { encounterHealth } from "./map.ts";
@@ -54,7 +54,7 @@ test("every event offers two or three stated choices, and every available choice
       assert.equal(run.event!.resolved, true);
       assert.equal(run.event!.outcome, result.message);
       assert.equal(chooseEvent(run, choice).ok, false, "an answered event cannot be answered again");
-      assert.ok(parseExpedition(JSON.stringify({ version: 4, run, archetype: "architect", daily: false, startedAt: 1, recorded: false })), `${id}/${choice} saves`);
+      assert.ok(parseExpedition(JSON.stringify({ version: EXPEDITION_VERSION, run, archetype: "architect", daily: false, startedAt: 1, recorded: false })), `${id}/${choice} saves`);
       assert.ok(leaveEvent(run).ok);
       assert.equal(run.phase, "map");
       assert.equal(run.event, null);
@@ -106,7 +106,7 @@ test("Signal in the Static is an optional empowered fight with an elite-like rew
   assert.equal(run.enemies[0].maxHp, Math.round(encounterHealth(0, { ...room, type: "battle" }) * 1.4));
   grantVictory(run);
   assert.equal(run.credits, credits + 40);
-  assert.equal(CARDS[run.cardRewards[0]].rarity, "rare");
+  assert.notEqual(CARDS[run.cardRewards[0]].rarity, "common", "an event fight rewards like an elite: uncommon or better first");
   chooseCardReward(run, null);
   assert.equal(run.phase, "map", "event fights never offer a relic");
   assert.equal(run.event, null);

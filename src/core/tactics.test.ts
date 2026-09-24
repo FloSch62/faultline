@@ -4,7 +4,7 @@ import { newExpedition, parseExpedition } from "./expedition.ts";
 import { ENEMIES } from "./enemies.ts";
 import { chooseRoom, chooseForge, chooseRelic, combatPreview, endTurn, intentFor, prepareCard, releasePreparedCard, HAND_LIMIT, SALVAGE_COST } from "./run.ts";
 import { makeEnemy } from "./encounter.ts";
-import { RELICS } from "./cards.ts";
+import { RELICS, RULES } from "./cards.ts";
 import type { RelicId } from "./types.ts";
 import type { RunState } from "./types.ts";
 
@@ -37,7 +37,7 @@ test("preparing conserves cards and energy, replaces one draw, and can be revers
   assert.ok(prepareCard(r, 2).ok);
   endTurn(r);
   assert.equal(r.hand[0], "pulse");
-  assert.equal(r.hand.length, 6);
+  assert.equal(r.hand.length, RULES.handDraw);
   assert.equal(r.preparedCard, null);
   assert.deepEqual(heldCards(r), cards);
 });
@@ -58,7 +58,7 @@ test("prepared cards respect phases, hand limits, deep cache, saves, and victory
   assert.ok(!releasePreparedCard(r).ok);
   r.relics.push("deep-cache");
   endTurn(r);
-  assert.equal(r.hand.length, 7);
+  assert.equal(r.hand.length, RULES.handDraw + 1);
   prepareCard(r, 0);
   const cards = heldCards(r);
   r.enemies[0].hp = 1;

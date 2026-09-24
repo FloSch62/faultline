@@ -3,7 +3,7 @@
  * balance harness, not an optimal player. Combat turns live in bot.ts. */
 import { reachableRooms } from "../src/core/map.ts";
 import {
-  chooseRoom, chooseCardReward, chooseRelic, chooseForge, upgradeDeckCard, removeDeckCard,
+  chooseRoom, chooseCardReward, chooseRelic, chooseForge, leaveForge, upgradeDeckCard, removeDeckCard,
   buyCard, buyRelic, shopRemoveCard, shopUpgradeCard, leaveShop, eventView, chooseEvent,
   leaveEvent, eventCardChoices, repairAmount, relicPool, upgradableIndices, removableIndices,
   SALVAGE_COST, SALVAGE_MIN_INTEGRITY,
@@ -141,10 +141,8 @@ export function playMetaPhase(run: RunState, policy: string, options: MetaOption
   }
   if (run.phase === "forge") {
     const missing = run.maxIntegrity - run.integrity;
-    if (careless || missing >= Math.max(3, repairAmount(run) - 1) || run.integrity / run.maxIntegrity < 0.5) {
-      chooseForge(run, "repair");
-      return;
-    }
+    // Legacy Mainframe refuses repair: fall through to the other services.
+    if ((careless || missing >= Math.max(3, repairAmount(run) - 1) || run.integrity / run.maxIntegrity < 0.5) && chooseForge(run, "repair").ok) return;
     const curse = run.deck.findIndex(id => CARDS[id].curse);
     if (curse >= 0 && removeDeckCard(run, curse).ok) return;
     const upgrades = upgradableIndices(run);
@@ -157,8 +155,9 @@ export function playMetaPhase(run: RunState, policy: string, options: MetaOption
       removeDeckCard(run, pickCard(run, "remove", removable, options));
       return;
     }
-    if (relicPool(run, "common").length && run.maxIntegrity - SALVAGE_COST >= SALVAGE_MIN_INTEGRITY) chooseForge(run, "relic");
-    else chooseForge(run, "repair");
+    if (relicPool(run, "common").length && run.maxIntegrity - SALVAGE_COST >= SALVAGE_MIN_INTEGRITY && chooseForge(run, "relic").ok) return;
+    if (chooseForge(run, "repair").ok) return;
+    leaveForge(run);
     return;
   }
   if (run.phase === "shop") {

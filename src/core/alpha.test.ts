@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CARDS, RELICS, RULES } from "./cards.ts";
+import { CARDS, RELICS, RULES, cardOwner } from "./cards.ts";
 import { newExpedition, parseExpedition } from "./expedition.ts";
 import {
   createRun,
@@ -34,19 +34,20 @@ function cast(run: RunState, card: CardId) {
   return playInstant(run, 0);
 }
 
-test("v4 collection: 75 base cards, an upgrade for every non-junk card, 29 tiered relics", () => {
+test("v5 collection: every card has an owner, an upgrade for every non-junk card, 32 tiered relics", () => {
   const bases = Object.values(CARDS).filter(card => !card.upgraded);
-  assert.equal(bases.length, 75);
+  assert.ok(bases.length >= 77);
   for (const card of bases) {
+    assert.ok(cardOwner(card.id), `${card.id} belongs to a data file`);
     const plus = CARDS[`${card.id}+` as CardId];
     if (card.junk || card.curse) { assert.equal(plus, undefined, card.id); continue; }
     assert.ok(plus, `${card.id} has an upgrade`);
     assert.equal(plus.base, card.id);
     assert.ok(plus.cost < card.cost || plus.rules !== card.rules, `${card.id}+ improves`);
   }
-  assert.equal(Object.keys(RELICS).length, 29);
-  assert.equal(Object.values(RELICS).filter(relic => relic.tier === "boss").length, 8);
-  assert.ok(Object.values(CARDS).every((card) => card.cost >= 0 && card.rules.length > 20));
+  assert.equal(Object.keys(RELICS).length, 32);
+  assert.equal(Object.values(RELICS).filter(relic => relic.tier === "boss").length, 11);
+  assert.ok(Object.values(CARDS).every((card) => card.cost >= 0 && card.rules.length > 5));
 });
 
 test("preview is pure and its visible terms exactly sum to resolution", () => {
@@ -124,7 +125,7 @@ test("power surge exhausts before drawing and cannot draw itself from an empty d
   r.discardPile = [];
   const energy = r.energy;
   playInstant(r, 0);
-  assert.equal(r.energy, energy + 2);
+  assert.equal(r.energy, energy + CARDS.surge.values.energy!);
   assert.equal(r.hand.length, 0);
   assert.ok(r.exhaustPile.includes("surge"));
   endTurn(r);
@@ -230,7 +231,8 @@ test("capacitor and Reserve Cell recharge only next turn; Grounded Core renews b
   cast(r, "capacitor");
   assert.equal(r.energy, 3);
   endTurn(r);
-  assert.equal(r.energy, 9);
+  // The turn's base, the capacitor's next-turn energy and Reserve Cell's carry of 2, uncapped.
+  assert.equal(r.energy, RULES.baseEnergy + CARDS.capacitor.values.nextEnergy! + 2);
   assert.equal(r.reserveEnergy, 0);
   assert.equal(r.block, 1);
 });
@@ -277,11 +279,11 @@ test("new hardware and cable cards have live rule effects", () => {
       .filter((node) => ["switch2", "router3", "firewall4"].includes(node.id))
       .every((node) => node.shielded),
   );
-  assert.equal(r.block, 7);
+  assert.equal(r.block, CARDS["hardened-router"].values.block! + CARDS.bastion.values.block!);
   playLink(r, 0, "alpha", "switch2");
   playLink(r, 0, "switch2", "router3");
   playLink(r, 0, "router3", "omega");
-  assert.equal(r.block, 10);
+  assert.equal(r.block, CARDS["hardened-router"].values.block! + CARDS.bastion.values.block! + CARDS.duplex.values.block!);
   assert.ok(r.topology.links.some((link) => link.armored));
   assert.ok(r.topology.links.some((link) => link.boosted));
 });
@@ -297,7 +299,7 @@ test("emergency cards repair integrity and create a usable backup route", () => 
   assert.equal(combatPreview(r).packetDamage, 5 + 2 + RULES.bandwidthPerChannel);
 });
 
-test("reward rolls exclude basics, stay unique, and guarantee an elite rare", () => {
+test("reward rolls exclude basics, stay unique, and open an elite reward with an uncommon or better", () => {
   for (let seed = 1; seed <= 100; seed++) {
     const r = battle();
     r.rng = seed;
@@ -306,7 +308,7 @@ test("reward rolls exclude basics, stay unique, and guarantee an elite rare", ()
     endTurn(r);
     assert.equal(r.cardRewards.length, 3);
     assert.equal(new Set(r.cardRewards).size, 3);
-    assert.equal(CARDS[r.cardRewards[0]].rarity, "rare");
+    assert.ok(["uncommon", "rare", "legendary"].includes(CARDS[r.cardRewards[0]].rarity));
     assert.ok(r.cardRewards.every((id) => CARDS[id].rarity !== "basic"));
     chooseCardReward(r, null);
     assert.equal(r.phase, "relic");

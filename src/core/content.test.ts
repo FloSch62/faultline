@@ -172,7 +172,7 @@ test("signals, message options and message fragments are complete", () => {
   assert.ok(MESSAGE_FRAGMENTS.every(fragment => fragment.sender.length > 3 && fragment.text.length > 20));
 });
 
-test("the fourteen v4 cards: cost, rarity, target, pool, upgrade, values and insight", () => {
+test("the fourteen v4 cards (v5 costs): cost, rarity, target, pool, upgrade, values and insight", () => {
   const spec: Record<string, [cost: number, rarity: string, target: string, archetype: string | undefined, plusCost: number]> = {
     "broadcast-storm": [1, "uncommon", "instant", undefined, 1],
     "traffic-shaping": [0, "common", "instant", undefined, 0],
@@ -181,9 +181,9 @@ test("the fourteen v4 cards: cost, rarity, target, pool, upgrade, values and ins
     spearhead: [1, "uncommon", "instant", "ghost", 0],
     "packet-storm": [2, "rare", "instant", undefined, 2],
     quorum: [1, "common", "instant", undefined, 1],
-    "server-rack": [2, "uncommon", "ground", undefined, 1],
+    "server-rack": [1, "uncommon", "ground", undefined, 0],
     "redundant-psu": [1, "common", "node", undefined, 0],
-    "sentry-firewall": [2, "uncommon", "ground", "warden", 2],
+    "sentry-firewall": [1, "uncommon", "ground", "warden", 1],
     "demolition-charge": [1, "common", "instant", undefined, 1],
     "field-repair": [0, "common", "instant", undefined, 0],
     "rapid-redeploy": [1, "uncommon", "instant", "architect", 1],
@@ -226,11 +226,13 @@ test("the fourteen v4 cards: cost, rarity, target, pool, upgrade, values and ins
 });
 
 test("card, relic, trait and plate text read the numbers from RULES", () => {
+  // v5: a face stays short; the rest of a card's numbers are in its detail.
+  const text = (id: CardId) => `${CARDS[id].rules} ${CARDS[id].detail ?? ""}`;
   const reads: [string, (string | number)[]][] = [
-    [CARDS["server-rack"].rules, [reach, RULES.rackCondition]],
-    [CARDS["redundant-psu"].rules, [RULES.psuCondition]],
-    [CARDS["sentry-firewall"].rules, [RULES.sentryQuarantine, RULES.quarantineDamage, RULES.sentryReclaimBonus, RULES.firewallBreachBlock]],
-    [CARDS.honeypot.rules, [RULES.honeypotDamage, reach, RULES.honeypotBite]],
+    [text("server-rack"), [reach, RULES.rackCondition]],
+    [text("redundant-psu"), [RULES.psuCondition]],
+    [text("sentry-firewall"), [RULES.sentryQuarantine, RULES.quarantineDamage, RULES.sentryReclaimBonus, RULES.firewallBreachBlock]],
+    [text("honeypot"), [RULES.honeypotDamage, reach, RULES.honeypotBite]],
     [CARDS.patch.rules, [RULES.faultClearRepair]],
     [CARDS.reroute.rules, [RULES.faultClearRepair]],
     [CARDS.protocol.rules, [RULES.faultClearRepair]],
@@ -256,8 +258,8 @@ test("card, relic, trait and plate text read the numbers from RULES", () => {
     [ENEMIES["quarantine-drone"].trait, [RULES.addBreakBonus, RULES.quarantineScrubCost]],
     [ENEMIES.leech.trait, [RULES.malwarePenalty, RULES.leechTapHeal, RULES.leechHeal, RULES.scrubCost]],
     [ENEMIES.core.trait, [RULES.blackoutWear, RULES.addBreakBonus]],
-    [ASCENSION_LEVELS[8].rule, [Math.round(RULES.packRateAscensionBonus * 100), RULES.maxInstallationIntegrity]],
-    [ASCENSION_LEVELS[9].rule, [RULES.addBreakBonusLate, RULES.addBreakBonus]],
+    [ASCENSION_LEVELS[2].rule, [Math.round(RULES.packRateAscensionBonus * 100)]],
+    [ASCENSION_LEVELS[3].rule, [RULES.addBreakBonusLate, RULES.addBreakBonus]],
   ];
   for (const [text, numbers] of reads) for (const number of numbers)
     assert.ok(text.includes(String(number)), `"${text.slice(0, 60)}…" prints ${number}`);

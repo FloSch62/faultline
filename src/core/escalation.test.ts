@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { RULES } from "./cards.ts";
+import { ASCENSION_RULES } from "./ascension.ts";
 import { makeEnemy } from "./encounter.ts";
 import { newExpedition } from "./expedition.ts";
 import {
@@ -271,7 +272,7 @@ test("the Choir's plating is 3 while a Chorister lives; a Quarantine Drone's ISO
   assert.equal(q.energy, 3 - RULES.quarantineScrubCost, "scrubbing costs 2 per point while a Drone lives");
 });
 
-test("Total Blackout (enraged) wears every primary-route device; ascension 6 gate closure and stolen voice wear their target", () => {
+test("Total Blackout (enraged) wears every primary-route device; Ancient Guardians' gate closure and stolen voice wear their target", () => {
   const r = pack([["core", "centre", "single", 200, 5]]);
   leader(r).hp = 80; // enraged
   leader(r).chargedEarly = true;
@@ -282,11 +283,11 @@ test("Total Blackout (enraged) wears every primary-route device; ascension 6 gat
   assert.ok(p.intent?.ultimate);
   assert.deepEqual(p.wear.map(item => item.nodeId).sort(), ["r1", "s1"]);
   const g = pack([["regent", "centre", "single", 200, 1]]); // CLOSE THE GATES
-  g.ascension = 6;
+  g.ascension = ASCENSION_RULES.ancientGuardians;
   device(g, "r1", "router", 0, -2.4);
   wire(g, "alpha", "r1", "omega");
   assert.deepEqual(combatPreview(g).wear.map(item => item.nodeId), ["r1"]);
-  g.ascension = 5;
+  g.ascension = ASCENSION_RULES.ancientGuardians - 1;
   assert.deepEqual(combatPreview(g).wear, []);
 });
 

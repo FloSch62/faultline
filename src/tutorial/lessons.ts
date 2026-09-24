@@ -462,6 +462,8 @@ export function createLessonRun(id: LessonId): RunState {
         hand: ["fiber", "fiber", "guard", "pulse"],
         draw: ["cache-server", "fiber", "fiber", "patch", "guard", "poe-injector"],
         nextNodeId: 3,
+        // v5 (3 energy a turn): the second turn deploys and cables the Cache Server (4 energy).
+        finish: run => { run.reserveEnergy = 1; },
       });
     }
     case "bands": {

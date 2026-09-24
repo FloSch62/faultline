@@ -1,11 +1,13 @@
-import { CARDS, RULES, STARTER_DECK, baseCard, type CardDefinition } from "./cards.ts";
+import { CARDS, RULES, STARTER_DECK, STARTER_SIGNATURES, baseCard, type CardDefinition, type CardValues } from "./cards.ts";
 import { canLink, cableable, initialTopology, linkKey, paths } from "./graph.ts";
 import { createMap } from "./map.ts";
 import { grantVictory } from "./meta.ts";
 import { random, shuffle, log } from "./util.ts";
 import { crossesWreckage, terrainFor } from "./terrain.ts";
 import { planEncounter } from "./encounter.ts";
-import type { BaseCardId, CardId, ConsoleId, EscalationLevel, Installation, MapRoom, NetworkNode, Port, RunState, Zone } from "./types.ts";
+import type {
+  CardId, ConsoleId, EscalationLevel, Installation, MapRoom, NetworkLink, NetworkNode, Port, Role, RunState, TurnEffects, Zone,
+} from "./types.ts";
 import { crateText } from "./encounter.ts";
 import { ENEMIES } from "./enemies.ts";
 import { levelRule } from "./combat/intent.ts";
@@ -13,13 +15,17 @@ import { openFallen, type ArrivalRecord, type FallenRecord } from "./combat/surp
 import {
   FIELD_RULES, INSTALLATION_NAMES, PORTS, ZONES, card, damageEnemy, deployCondition, destroyInstallation, effectiveFocus, enemyAt,
   freeSocket, has, hostileFieldTurns, installField, insideGrid, isBlocked, isWorn, leaderOf, livingEnemies, maxConditionOf,
-  mostDangerous, mostWorn, repairDevice, scrubCost, startingFocus, wearable, zoneForNode,
+  mostDangerous, mostWorn, repairDevice, scrubCost, socketNear, startingFocus, wearable, zoneForNode,
 } from "./combat/board.ts";
 import { analyze } from "./combat/network.ts";
 import {
-  resolveTurn, simulationOf, sumTerms, turnDrawBase, turnEnergyBase,
+  bufferMultiplier, portArmor, resolveTurn, simulationOf, sumTerms, turnDrawBase, turnEnergyBase,
   type CombatPreview, type DestroyRecord, type PortForecast,
 } from "./combat/resolve.ts";
+import {
+  daemonTotal, daemonsWith, effectOf, fireDaemons, HAND_HOOKS, playLimit,
+  type CardEffect, type EngineApi, type PlayContext, type StrikeRecord,
+} from "./effects/index.ts";
 
 export type { Zone, Intent } from "./types.ts";
 export type {
@@ -28,6 +34,10 @@ export type {
 } from "./combat/resolve.ts";
 export { random } from "./util.ts";
 export { RULES } from "./cards.ts";
+/** v5: the turn's energy base (min(RULES.relicEnergyCap, baseEnergy + energy relics)); the energy
+ * orb reads `current / turnEnergyBase(run)`. Next turn's full energy is combatPreview().nextTurn.energy. */
+export { turnEnergyBase, turnDrawBase } from "./combat/resolve.ts";
+export { runningDaemons, daemonLabel, playLimit, type RunningDaemon } from "./effects/index.ts";
 export { channelKey } from "./graph.ts";
 export {
   PORTS, ZONES, FIELD_RULES, INSTALLATION_NAMES, livingEnemies, enemyAt, leaderOf, isBlocked, zoneForNode, conditionOf,
@@ -95,7 +105,10 @@ export interface TurnResult {
 
 export const HAND_LIMIT = RULES.handLimit;
 
-function draw(run: RunState, count: number) {
+/** Draws up to `count` cards (hand limit 10; an empty draw pile reshuffles the discard pile with the
+ * expedition RNG). Every drawn card fires its onDraw hand hook (Memory Leak) and the daemons' onDraw. */
+function draw(run: RunState, count: number): CardId[] {
+  const drawn: CardId[] = [];
   for (let i = 0; i < count && run.hand.length < HAND_LIMIT; i++) {
     if (!run.drawPile.length && run.discardPile.length) {
       run.drawPile = shuffle(run, run.discardPile.splice(0));
@@ -104,18 +117,29 @@ function draw(run: RunState, count: number) {
     const next = run.drawPile.shift();
     if (!next) break;
     run.hand.push(next);
+    drawn.push(next);
+    drawnHooks(run, next);
   }
+  return drawn;
+}
+function drawnHooks(run: RunState, id: CardId) {
+  const hooks = HAND_HOOKS[baseCard(id)];
+  if (hooks?.onDraw && CARDS[id]) hooks.onDraw({ run, card: CARDS[id], api });
+  if (run.daemons?.length) fireDaemons(run, "onDraw", api, { drawn: id });
 }
 function guaranteedDraw(run: RunState, match: (id: CardId) => boolean) {
   const index = run.drawPile.findIndex(match);
-  if (index !== -1) run.hand.push(run.drawPile.splice(index, 1)[0]);
+  if (index === -1 || run.hand.length >= HAND_LIMIT) return;
+  const [id] = run.drawPile.splice(index, 1);
+  run.hand.push(id);
+  drawnHooks(run, id);
 }
 
-/** Every encounter-scoped v4 field at its empty value. */
-function freshEncounter(): Pick<RunState, "enemies" | "faultNodes" | "faultLinks" | "installations" | "focus" | "enemyPhase" | "hostileActions" | "reinforcement" | "signal" | "offers" | "encounterCards"> {
+/** Every encounter-scoped field at its empty value. */
+function freshEncounter(): Pick<RunState, "enemies" | "faultNodes" | "faultLinks" | "installations" | "focus" | "enemyPhase" | "hostileActions" | "reinforcement" | "signal" | "offers" | "encounterCards" | "daemons"> {
   return {
     enemies: [], faultNodes: [], faultLinks: [], installations: [], focus: null, enemyPhase: 0, hostileActions: 0,
-    reinforcement: null, signal: null, offers: [], encounterCards: [],
+    reinforcement: null, signal: null, offers: [], encounterCards: [], daemons: [],
   };
 }
 
@@ -133,7 +157,8 @@ export function createRun(seed = Date.now() >>> 0): RunState {
     integrity: 12,
     maxIntegrity: 12,
     score: 0,
-    deck: [...STARTER_DECK],
+    // The Architect's twelve (newExpedition sets the chosen keeper's deck).
+    deck: [...STARTER_DECK, ...STARTER_SIGNATURES.architect],
     drawPile: [],
     discardPile: [],
     exhaustPile: [],
@@ -185,6 +210,7 @@ export function beginBattle(run: RunState, room: MapRoom) {
   run.attackers = [];
   run.lingeringJams = {};
   run.frayedByCut = [];
+  delete run.nextTurn;
   run.bossIntroSeen = room.type !== "boss";
   run.phase = "battle";
   run.turn = 1;
@@ -219,11 +245,20 @@ export function beginBattle(run: RunState, room: MapRoom) {
   // Round Robin: every hostile takes 2 as the fight begins (it never ends a fight before it starts).
   if (has(run, "round-robin"))
     for (const enemy of run.enemies) damageEnemy(run, enemy, Math.min(RULES.roundRobinDamage, enemy.hp - 1));
+  // Innate cards start in the opening hand, drawn first (before the guaranteed router and links),
+  // beyond the draw count if needed; the hand limit holds.
+  for (let i = 0; i < run.drawPile.length && run.hand.length < HAND_LIMIT;) {
+    if (!card(run.drawPile[i])?.innate) { i++; continue; }
+    const [id] = run.drawPile.splice(i, 1);
+    run.hand.push(id);
+    drawnHooks(run, id);
+  }
   guaranteedDraw(run, (id) => ["router", "hardened-router"].includes(baseCard(id)));
   guaranteedDraw(run, (id) => card(id).target === "link");
   guaranteedDraw(run, (id) => card(id).target === "link");
-  if (has(run, "spare-parts")) run.hand.push("fiber");
-  draw(run, turnDrawBase(run) - run.hand.length + Number(has(run, "spare-parts")));
+  const spare = has(run, "spare-parts") && run.hand.length < HAND_LIMIT;
+  if (spare) run.hand.push("fiber");
+  draw(run, Math.max(0, turnDrawBase(run) - (run.hand.length - Number(spare))));
   const names = run.enemies.map(enemy => enemy.name).join(", ");
   log(run, `${names} ${run.enemies.length > 1 ? "enter" : "enters"} the grid. ${run.terrain.name}. Establish a route.`);
   for (const line of plan.entrance) log(run, line);
@@ -262,16 +297,29 @@ export function releasePreparedCard(run: RunState): ActionResult {
   return { ok: true, message: `${card(prepared).name} returned to your hand.` };
 }
 
+/** Hot Swap is unspent: the first link card this turn costs 0. */
+const hotSwapReady = (run: RunState) => has(run, "hot-swap") && !run.firstFiberPlayed;
 export function costFor(run: RunState, index: number): number {
   const id = run.hand[index];
   if (!id) return Infinity;
   const definition = card(id);
+  const fx = run.turnEffects;
   let cost = definition.cost;
-  if (baseCard(id) === "fiber" && !run.firstFiberPlayed && has(run, "hot-swap")) cost = 0;
-  if (definition.target === "link" && has(run, "zero-trust")) cost += 1;
-  // Rapid Redeploy: the recovered hardware card costs less this turn.
-  if (run.turnEffects?.discounted?.includes(id)) cost = Math.max(0, cost - 1);
+  if (definition.target === "link") {
+    // Hot Swap: the first link card each turn; Patch Panel: the next N link cards.
+    if (hotSwapReady(run) || (fx?.freeLinks ?? 0) > 0) cost = 0;
+    if (has(run, "zero-trust")) cost += 1;
+  }
+  // Rack and Stack: the next hardware card costs less.
+  if (definition.target === "ground" && fx?.hardwareDiscount) cost = Math.max(0, cost - fx.hardwareDiscount);
+  // Rapid Redeploy, Blueprint: these hand cards cost 1 less this turn; Rearm: these cost 0.
+  if (fx?.discounted?.includes(id)) cost = Math.max(0, cost - 1);
+  if (fx?.freeCards?.includes(id)) cost = 0;
   return cost;
+}
+/** Protocol slots: RULES.maxProtocols plus the protocolSlots daemons (Policy Engine). */
+export function protocolLimit(run: RunState): number {
+  return RULES.maxProtocols + daemonTotal(run, "protocolSlots");
 }
 function canPlay(run: RunState, index: number, target: CardDefinition["target"]): ActionResult {
   if (run.phase !== "battle")
@@ -279,6 +327,10 @@ function canPlay(run: RunState, index: number, target: CardDefinition["target"])
   const id = run.hand[index];
   if (!id || card(id).target !== target)
     return { ok: false, message: "Select a matching card." };
+  // Kernel Panic: while it is in your hand, at most N card plays this turn.
+  const limit = playLimit(run);
+  if (run.cardsPlayed >= limit.limit)
+    return { ok: false, message: `${limit.by} is in your hand: at most ${limit.limit} card${limit.limit === 1 ? "" : "s"} this turn.` };
   if (run.energy < costFor(run, index))
     return { ok: false, message: "Not enough energy. End the turn to recharge." };
   return { ok: true, message: "" };
@@ -290,29 +342,53 @@ function encounterOnly(run: RunState, id: CardId): boolean {
   run.encounterCards.splice(index, 1);
   return true;
 }
+/** Moves a card to the exhaust pile; Cover Tracks and other cardExhausted daemons hear it. */
+function exhaust(run: RunState, id: CardId) {
+  run.exhaustPile.push(id);
+  if (run.daemons?.length) fireDaemons(run, "cardExhausted", api, { exhausted: id });
+}
+/** Pays for the card at `index` and spends the discounts it used (Hot Swap, freeLinks,
+ * hardwareDiscount, discounted, freeCards). The card is still in the hand. */
+function pay(run: RunState, index: number) {
+  const id = run.hand[index], definition = card(id), fx = run.turnEffects;
+  const hotSwap = hotSwapReady(run);
+  run.energy -= costFor(run, index);
+  if (fx?.discounted?.includes(id)) fx.discounted.splice(fx.discounted.indexOf(id), 1);
+  if (fx?.freeCards?.includes(id)) fx.freeCards.splice(fx.freeCards.indexOf(id), 1);
+  if (definition.target === "link") {
+    // Hot Swap is spent by the first link card; Patch Panel's free links by the ones after it.
+    if (!hotSwap && fx?.freeLinks) fx.freeLinks--;
+    run.firstFiberPlayed = true;
+  }
+  if (definition.target === "ground" && fx?.hardwareDiscount) fx.hardwareDiscount = 0;
+  run.cardsPlayed++;
+}
+/** A played card leaves the hand: daemons start running, Exhaust and encounter-only cards
+ * exhaust, the rest goes to discard. */
 function consume(run: RunState, index: number) {
   const id = run.hand[index];
-  run.energy -= costFor(run, index);
-  const discounted = run.turnEffects?.discounted;
-  if (discounted?.includes(id)) discounted.splice(discounted.indexOf(id), 1);
-  run.hand.splice(index, 1);
-  (card(id).exhaust || encounterOnly(run, id) ? run.exhaustPile : run.discardPile).push(id);
-  run.cardsPlayed++;
-  if (baseCard(id) === "fiber") run.firstFiberPlayed = true;
+  pay(run, index);
   run.score += 1;
+  run.hand.splice(index, 1);
+  const encounter = encounterOnly(run, id);
+  if (card(id).target === "daemon") run.daemons.push(id);
+  else if (card(id).exhaust || encounter) exhaust(run, id);
+  else run.discardPile.push(id);
 }
-/** Generic numeric effects shared by every card after its specific rule. */
-function applyValues(run: RunState, id: CardId) {
+/** Generic numeric effects shared by every card after its specific rule; `manual` keys are the
+ * card effect's own business. */
+function applyValues(run: RunState, id: CardId, manual: readonly (keyof CardValues)[] = []) {
   const v = card(id).values;
-  if (v.block) run.block += v.block;
-  if (v.burst) run.packetBoost += v.burst;
-  if (v.energy) run.energy += v.energy;
-  if (v.nextEnergy) run.reserveEnergy += v.nextEnergy;
-  if (v.heal) run.integrity = Math.min(run.maxIntegrity, run.integrity + v.heal);
-  if (v.buffer) run.buffer += v.buffer;
-  if (v.draw) draw(run, v.draw);
+  const on = (key: keyof CardValues) => !!v[key] && !manual.includes(key);
+  if (on("block")) run.block += v.block!;
+  if (on("burst")) run.packetBoost += v.burst!;
+  if (on("energy")) run.energy += v.energy!;
+  if (on("nextEnergy")) run.reserveEnergy += v.nextEnergy!;
+  if (on("heal")) run.integrity = Math.min(run.maxIntegrity, run.integrity + v.heal!);
+  if (on("buffer")) run.buffer += v.buffer!;
+  if (on("draw")) draw(run, v.draw!);
 }
-const effects = (run: RunState) => (run.turnEffects ??= {});
+const effects = (run: RunState): TurnEffects => (run.turnEffects ??= {});
 /** A hostile killed during your turn (Scorched Earth) drops its crate and cargo at once. */
 function settleFallen(run: RunState) {
   const fallen = run.enemies.filter(enemy => enemy.hp <= 0 && !enemy.looted).map(enemy => enemy.uid);
@@ -324,15 +400,84 @@ function unjam(run: RunState, keep: (id: string) => boolean) {
   if (run.lingeringJams) for (const id of Object.keys(run.lingeringJams)) if (!keep(id)) delete run.lingeringJams[id];
 }
 
+// ------------------------------------------------------------------ the card-effect registry
+
+interface Play {
+  ctx: PlayContext;
+  effect: CardEffect | undefined;
+  /** Man-in-the-Middle as it stood before this card (the card that sets it does not feed itself). */
+  mitm: number;
+}
+/** The registry context for the card at `index`: its effect, and the channels before the play. */
+function playOf(run: RunState, index: number, target: Partial<PlayContext> = {}): Play {
+  const id = run.hand[index], definition = card(id), effect = effectOf(id);
+  const before = effect ? analyze(run, run.faultNodes, run.faultLinks, true) : null;
+  return {
+    effect,
+    mitm: run.turnEffects?.mitm ?? 0,
+    ctx: {
+      id, base: baseCard(id), card: definition, values: definition.values, api,
+      before: { channels: before?.channelCount ?? 0, primary: before?.primary?.path ?? [] },
+      ...target,
+    },
+  };
+}
+const refuse = (message: string): ActionResult => ({ ok: false, message });
+/** After the card left the hand: its registered rule, the generic values (unless `generic` is
+ * false: daemons and the legacy branches that apply their own numbers), then every card-played
+ * listener. Returns the effect's note. */
+function resolvePlay(run: RunState, play: Play, generic = true): string {
+  const note = play.effect?.play?.(run, play.ctx) || "";
+  if (generic) applyValues(run, play.ctx.id, play.effect?.manual);
+  afterPlay(run, play.ctx.id, play.mitm);
+  return note;
+}
+/** Every card play ends here: Man-in-the-Middle feeds the buffer, cardPlayed daemons hear it
+ * (a daemon just started does not hear its own play). */
+function afterPlay(run: RunState, id: CardId, mitm = run.turnEffects?.mitm ?? 0) {
+  (effects(run).cardsPlayed ??= []).push(id);
+  if (mitm) run.buffer += mitm;
+  const started = card(id).target === "daemon" && run.daemons?.at(-1) === id;
+  const listening = started ? run.daemons.slice(0, -1) : run.daemons ?? [];
+  if (listening?.length) fireDaemons(run, "cardPlayed", api, { played: id }, listening);
+}
+/** The player deployed a device / laid a cable: the daemons hear it. */
+function deployed(run: RunState, node: NetworkNode) {
+  if (run.daemons?.length) fireDaemons(run, "deviceDeployed", api, { node });
+}
+function laid(run: RunState, link: NetworkLink) {
+  if (run.daemons?.length) fireDaemons(run, "linkPlaced", api, { link });
+}
+/** Player actions that can change the board watch the live channel count: channelsGained daemons
+ * (Peering Session) fire with the channels the action added. */
+function watched(run: RunState, action: () => ActionResult): ActionResult {
+  if (run.phase !== "battle" || !daemonsWith(run, "channelsGained")) return action();
+  const before = analyze(run, run.faultNodes, run.faultLinks, true).channelCount;
+  const result = action();
+  if (result.ok && run.phase === "battle") {
+    const gained = analyze(run, run.faultNodes, run.faultLinks, true).channelCount - before;
+    if (gained > 0) fireDaemons(run, "channelsGained", api, { gained });
+  }
+  return result;
+}
+
 // ------------------------------------------------------------------ placement
 
 export function playZone(run: RunState, index: number, zone: Zone): ActionResult {
+  return watched(run, () => zonePlay(run, index, zone));
+}
+function zonePlay(run: RunState, index: number, zone: Zone): ActionResult {
   const ready = canPlay(run, index, "zone");
   if (!ready.ok) return ready;
   if (!ZONES.includes(zone)) return { ok: false, message: "Choose North, Center, or South." };
   const id = run.hand[index], base = baseCard(id);
+  const play = playOf(run, index, { zone });
+  const reason = play.effect?.validate?.(run, play.ctx);
+  if (reason) return refuse(reason);
   let purged = "";
-  if (base === "purge-field") {
+  if (play.effect) {
+    // A registered zone card: its rule does everything.
+  } else if (base === "purge-field") {
     const anchor = run.installations.find(item => item.kind === "anchor" && zoneForNode(item) === zone);
     if (anchor) {
       // Rule 35: Purge Field on an anchored band destroys the Anchor and nothing else.
@@ -350,13 +495,16 @@ export function playZone(run: RunState, index: number, zone: Zone): ActionResult
     installField(run, { zone, kind, turns: RULES.alliedFieldTurns });
   }
   consume(run, index);
-  applyValues(run, id);
+  const note = resolvePlay(run, play);
   settleFallen(run);
-  const message = `${card(id).name} · ${zone.toUpperCase()}${base === "purge-field" ? ` cleansed${purged}` : ` · ${RULES.alliedFieldTurns} turns`}.`;
+  const message = `${card(id).name} · ${zone.toUpperCase()}${play.effect ? note : base === "purge-field" ? ` cleansed${purged}` : ` · ${RULES.alliedFieldTurns} turns`}.`;
   log(run, message);
   return { ok: true, message };
 }
 export function relocateNode(run: RunState, id: string, x: number, z: number): ActionResult {
+  return watched(run, () => relocate(run, id, x, z));
+}
+function relocate(run: RunState, id: string, x: number, z: number): ActionResult {
   if (run.phase !== "battle")
     return { ok: false, message: "Relocate devices during an encounter." };
   const node = run.topology.nodes.find((item) => item.id === id);
@@ -378,9 +526,8 @@ export function relocateNode(run: RunState, id: string, x: number, z: number): A
   log(run, message);
   return { ok: true, message };
 }
-/** Link cards that lay armored cable: cut-proof and fray-proof. */
-const ARMORED_CABLES: readonly BaseCardId[] = ["armored-fiber", "vxlan", "dark-fiber"];
-export const laysArmoredCable = (id: CardId | null) => !!id && ARMORED_CABLES.includes(baseCard(id));
+/** Link cards that lay armored cable (cut-proof and fray-proof): the `cutProof` card flag. */
+export const laysArmoredCable = (id: CardId | null | undefined) => !!id && !!CARDS[id]?.cutProof;
 /** Whether a new cable from `a` to `b` would fray over wreckage. `cardId` is the
  * link card in hand, or null for the Patch Cable console. */
 export function cableFrays(run: RunState, a: string, b: string, cardId: CardId | null): boolean {
@@ -398,6 +545,9 @@ function nearest(run: RunState, origin: { x: number; z: number; id?: string }, c
     .slice(0, count);
 }
 export function playGround(run: RunState, index: number, x: number, z: number): ActionResult {
+  return watched(run, () => groundPlay(run, index, x, z));
+}
+function groundPlay(run: RunState, index: number, x: number, z: number): ActionResult {
   const ready = canPlay(run, index, "ground");
   if (!ready.ok) return ready;
   if (!insideGrid(x, z))
@@ -406,47 +556,66 @@ export function playGround(run: RunState, index: number, x: number, z: number): 
     return { ok: false, message: "The table has no more device slots." };
   const blocked = isBlocked(run, x, z);
   if (blocked) return { ok: false, message: blocked };
-  const id = run.hand[index], base = baseCard(id);
-  const role = card(id).role!;
+  const id = run.hand[index], base = baseCard(id), definition = card(id);
+  const role = definition.role!;
   if (role === "firewall" && has(run, "anycast"))
     return { ok: false, message: "Anycast forbids firewalls on your table." };
+  const play = playOf(run, index, { x, z });
+  const reason = play.effect?.validate?.(run, play.ctx);
+  if (reason) return refuse(reason);
   const node: NetworkNode = { id: `${role}${run.nextNodeId++}`, role, x, z, deployedBy: id };
-  if (["hardened-router", "relay", "bastion"].includes(base) || id === "stateful-firewall+" || id === "sentry-firewall+") node.shielded = true;
+  if (definition.jamProof) node.shielded = true;
   if (base === "stateful-firewall") node.stateful = true;
   if (base === "sentry-firewall") node.sentry = true;
-  if (role === "phantom") node.absorbs = card(id).values.absorbs ?? 1;
+  if (role === "phantom") node.absorbs = definition.values.absorbs ?? 1;
   else node.condition = node.maxCondition = role === "rack" ? RULES.rackCondition : deployCondition(run);
-  const autoLinks = base === "linux-bridge"
-    ? nearest(run, { x, z }, card(id).values.links ?? 1)
-    : base === "spine-leaf" ? run.topology.nodes.filter(other => other.role === "router") : [];
+  // Auto-links: `values.links` nearest devices (Linux Bridge, …); Spine-Leaf: every router.
+  const autoLinks = !cableable(node) ? []
+    : base === "spine-leaf" ? run.topology.nodes.filter(other => other.role === "router")
+      : definition.values.links ? nearest(run, { x, z }, definition.values.links) : [];
   run.topology.nodes.push(node);
-  for (const other of autoLinks) run.topology.links.push({ a: node.id, b: other.id });
+  const cables = autoLinks.map(other => ({ a: node.id, b: other.id }));
+  run.topology.links.push(...cables);
   consume(run, index);
-  applyValues(run, id);
-  log(run, `${node.id.toUpperCase()} installed${autoLinks.length ? ` and cabled to ${autoLinks.map(n => n.id.toUpperCase()).join(", ")}` : ""}.`);
-  return { ok: true, message: `${card(id).name} installed.` };
+  play.ctx.node = node;
+  deployed(run, node);
+  for (const cable of cables) laid(run, cable);
+  const note = resolvePlay(run, play);
+  log(run, `${node.id.toUpperCase()} installed${autoLinks.length ? ` and cabled to ${autoLinks.map(n => n.id.toUpperCase()).join(", ")}` : ""}${note}.`);
+  return { ok: true, message: `${definition.name} installed${note}.` };
 }
 export function playLink(run: RunState, index: number, a: string, b: string): ActionResult {
+  return watched(run, () => linkPlay(run, index, a, b));
+}
+function linkPlay(run: RunState, index: number, a: string, b: string): ActionResult {
   const ready = canPlay(run, index, "link");
   if (!ready.ok) return ready;
   if (!canLink(run.topology, a, b))
     return { ok: false, message: "Those devices cannot be linked again." };
-  const id = run.hand[index], base = baseCard(id);
-  run.topology.links.push({
+  const id = run.hand[index], definition = card(id);
+  const play = playOf(run, index, { a, b });
+  const reason = play.effect?.validate?.(run, play.ctx);
+  if (reason) return refuse(reason);
+  const cable: NetworkLink = {
     a,
     b,
-    ...(ARMORED_CABLES.includes(base) ? { armored: true } : {}),
-    ...(["conduit", "vxlan"].includes(base) ? { boosted: true } : {}),
-  });
+    ...(definition.cutProof ? { armored: true } : {}),
+    ...(definition.amplified ? { boosted: true } : {}),
+  };
+  run.topology.links.push(cable);
   consume(run, index);
-  applyValues(run, id);
-  log(run, `${a.toUpperCase()} connected to ${b.toUpperCase()}.`);
-  return { ok: true, message: "Optic link established." };
+  play.ctx.link = cable;
+  laid(run, cable);
+  const note = resolvePlay(run, play);
+  log(run, `${a.toUpperCase()} connected to ${b.toUpperCase()}${note}.`);
+  return { ok: true, message: `Optic link established${note}.` };
 }
 export function canTargetNode(run: RunState, index: number, id: string): boolean {
   const node = run.topology.nodes.find((item) => item.id === id);
   const held = run.hand[index];
   if (!node || !held || card(held).target !== "node") return false;
+  const effect = effectOf(held);
+  if (effect?.canTarget) return effect.canTarget(run, node, held);
   const base = baseCard(held);
   if (base === "clabernetes") return node.role === "router";
   if (base === "firmware") return node.role === "router" && !node.upgraded;
@@ -455,9 +624,13 @@ export function canTargetNode(run: RunState, index: number, id: string): boolean
   if (base === "shield") return !node.fixed && !node.shielded && cableable(node);
   if (base === "mesh-weave") return cableable(node) && nearest(run, node, 1).length > 0;
   if (base === "redundant-psu") return wearable(node);
-  return false;
+  // A registered node card without canTarget takes any deployed device.
+  return !!effect && !node.fixed;
 }
 export function playNode(run: RunState, index: number, id: string): ActionResult {
+  return watched(run, () => nodePlay(run, index, id));
+}
+function nodePlay(run: RunState, index: number, id: string): ActionResult {
   const ready = canPlay(run, index, "node");
   if (!ready.ok) return ready;
   const node = run.topology.nodes.find((item) => item.id === id);
@@ -465,6 +638,15 @@ export function playNode(run: RunState, index: number, id: string): ActionResult
   const held = run.hand[index], base = baseCard(held);
   if (!canTargetNode(run, index, id))
     return { ok: false, message: `Choose a valid device for ${card(held).name}.` };
+  const play = playOf(run, index, { node });
+  const reason = play.effect?.validate?.(run, play.ctx);
+  if (reason) return refuse(reason);
+  if (play.effect) {
+    consume(run, index);
+    const note = resolvePlay(run, play);
+    log(run, `${card(held).name} · ${node.id.toUpperCase()}${note}.`);
+    return { ok: true, message: `${card(held).name} applied${note}.` };
+  }
   if (base === "clabernetes") {
     const socket = freeSocket(run);
     if (!socket) return { ok: false, message: "The table has no free socket for a replica." };
@@ -489,13 +671,19 @@ export function playNode(run: RunState, index: number, id: string): ActionResult
     run.topology.nodes.push(replica);
     run.topology.links.push(...links);
     consume(run, index);
+    deployed(run, replica);
+    for (const link of links) laid(run, link);
+    afterPlay(run, held, play.mitm);
     log(run, `Clabernetes replicated ${id.toUpperCase()}. Both routers are shielded.`);
     return { ok: true, message: "Router replicated. Its cables and upgrades are preserved." };
   }
   if (base === "mesh-weave") {
     const targets = nearest(run, node, card(held).values.links ?? 2);
-    for (const other of targets) run.topology.links.push({ a: node.id, b: other.id });
+    const woven = targets.map(other => ({ a: node.id, b: other.id }));
+    run.topology.links.push(...woven);
     consume(run, index);
+    for (const link of woven) laid(run, link);
+    afterPlay(run, held, play.mitm);
     log(run, `${node.id.toUpperCase()} woven to ${targets.map(n => n.id.toUpperCase()).join(" and ")}.`);
     return { ok: true, message: `${targets.length} cable${targets.length === 1 ? "" : "s"} woven.` };
   }
@@ -512,7 +700,7 @@ export function playNode(run: RunState, index: number, id: string): ActionResult
   if (base === "startup-config") node.configured = true;
   if (base === "firmware") node.upgraded = true;
   consume(run, index);
-  applyValues(run, held);
+  resolvePlay(run, play);
   const verb = base === "shield" ? "shielded" : base === "compression" ? "amplified" : base === "startup-config" ? "configured" : base === "redundant-psu" ? "given a redundant power supply" : "overclocked";
   log(run, `${node.id.toUpperCase()} ${verb}.`);
   return { ok: true, message: `${card(held).name} applied.` };
@@ -530,16 +718,31 @@ function clearFaultsAndRepair(run: RunState, clear: boolean): string | null {
   return worn && repairDevice(worn, RULES.faultClearRepair) ? worn.id : null;
 }
 export function playInstant(run: RunState, index: number, installationId?: string): ActionResult {
+  return watched(run, () => instantPlay(run, index, installationId));
+}
+function instantPlay(run: RunState, index: number, installationId?: string): ActionResult {
   const ready = canPlay(run, index, "instant");
   if (!ready.ok) return ready;
   const id = run.hand[index], base = baseCard(id), values = card(id).values;
+  const play = playOf(run, index, installationId ? { installationId } : {});
+  const reason = play.effect?.validate?.(run, play.ctx);
+  if (reason) return refuse(reason);
+  if (play.effect) {
+    // A registered instant: its rule, then the generic values.
+    consume(run, index);
+    const note = resolvePlay(run, play);
+    settleFallen(run);
+    log(run, `${card(id).name} activated${note}${card(id).exhaust ? " · exhausted for this encounter" : ""}.`);
+    return { ok: true, message: `${card(id).name} activated${note}.` };
+  }
   const network = analyze(run, run.faultNodes, run.faultLinks);
   const primary = network.primary;
   if (base === "wireshark" && !primary)
     return { ok: false, message: "Wireshark needs a live ALPHA → router → OMEGA route to capture." };
   if (base === "mirror" && network.channelCount < 2)
     return { ok: false, message: "Mirror Protocol needs two or more live channels." };
-  if ((base === "ecmp" || base === "flood-fill") && !primary)
+  // v5: Equal-Cost Multipath needs no live route (0 channels gives 0); Flood Fill keeps the check.
+  if (base === "flood-fill" && !primary)
     return { ok: false, message: `${card(id).name} needs a live route.` };
   if (base === "salvage" && !run.discardPile.some((held) => card(held).target === "link"))
     return { ok: false, message: "No cable cards are in your discard pile." };
@@ -557,34 +760,39 @@ export function playInstant(run: RunState, index: number, installationId?: strin
   const capturedRoles = base === "wireshark" && primary
     ? new Set(primary.path.map(nodeId => run.topology.nodes.find(node => node.id === nodeId)!).filter(node => node.role !== "client").map(node => node.role))
     : null;
-  if (base === "containerlab" || base === "rebuild") {
-    const socket = freeSocket(run);
-    if (!socket) return { ok: false, message: "The table has no free socket for a new lab." };
-    const condition = deployCondition(run);
-    const node: NetworkNode = { id: `router${run.nextNodeId++}`, role: "router", ...socket, upgraded: base === "containerlab", condition, maxCondition: condition, deployedBy: id };
-    run.topology.nodes.push(node);
-    run.topology.links.push({ a: "alpha", b: node.id }, { a: node.id, b: "omega" });
-  }
+  const lab = base === "containerlab" || base === "rebuild" ? freeSocket(run) : null;
+  if ((base === "containerlab" || base === "rebuild") && !lab)
+    return { ok: false, message: "The table has no free socket for a new lab." };
   consume(run, index);
   let note = "";
+  if (lab) {
+    const condition = deployCondition(run);
+    const node: NetworkNode = { id: `router${run.nextNodeId++}`, role: "router", ...lab, upgraded: base === "containerlab", condition, maxCondition: condition, deployedBy: id };
+    const cables = [{ a: "alpha", b: node.id }, { a: node.id, b: "omega" }];
+    run.topology.nodes.push(node);
+    run.topology.links.push(...cables);
+    deployed(run, node);
+    for (const cable of cables) laid(run, cable);
+  }
   if (["patch", "reroute", "protocol"].includes(base)) {
     const repaired = clearFaultsAndRepair(run, true);
     if (repaired) note = ` · ${repaired.toUpperCase()} repaired`;
   }
   let capturedDraw = 0;
+  // The legacy branches below apply their own numbers; the rest take the generic values.
+  let generic = false;
   if (base === "inspect") draw(run, primary ? values.draw ?? 2 : values.drawOffline ?? 1);
   else if (capturedRoles) {
     run.packetBoost += capturedRoles.size;
-    const before = run.hand.length;
-    draw(run, values.draw ?? 2);
-    capturedDraw = run.hand.length - before;
+    capturedDraw = draw(run, values.draw ?? 2).length;
   } else if (base === "mirror") {
     run.packetBoost += (values.perChannel ?? 2) * network.channelCount;
     run.block += (values.perChannel ?? 2) * network.channelCount;
   } else if (base === "ecmp") run.packetBoost += (values.perChannel ?? 2) * network.channelCount;
   else if (base === "deep-inspection") {
+    // v5: base block plus a bonus per online firewall.
     const firewalls = network.onlineNodes.filter(node => node.role === "firewall").length;
-    run.block += Math.max(values.minimum ?? 2, (values.perFirewall ?? 2) * firewalls);
+    run.block += (values.block ?? 0) + (values.perFirewall ?? 0) * firewalls;
   } else if (base === "reflect") run.backpressure *= 2;
   else if (base === "replay-attack") run.buffer *= 2;
   else if (base === "salvage") {
@@ -595,12 +803,13 @@ export function playInstant(run: RunState, index: number, installationId?: strin
       recovered++;
     }
   } else {
-    // ---- v4 cards (values from content's definitions, design defaults as fallbacks)
-    if (base === "broadcast-storm" || base === "packet-storm") effects(run).everyPort = (run.turnEffects!.everyPort ?? 0) + (values.everyPort ?? 2);
-    if (base === "flood-fill") effects(run).everyPort = (run.turnEffects!.everyPort ?? 0) + (values.perChannelEveryPort ?? 1) * network.channelCount;
-    if (base === "traffic-shaping") effects(run).focusBonus = (run.turnEffects!.focusBonus ?? 0) + (values.focusBonus ?? 2);
+    generic = true;
+    // ---- v4 cards (values from their definitions)
+    if (base === "broadcast-storm" || base === "packet-storm") effects(run).everyPort = (run.turnEffects!.everyPort ?? 0) + (values.everyPort ?? 0);
+    if (base === "flood-fill") effects(run).everyPort = (run.turnEffects!.everyPort ?? 0) + (values.perChannelEveryPort ?? 0) * network.channelCount;
+    if (base === "traffic-shaping") effects(run).focusBonus = (run.turnEffects!.focusBonus ?? 0) + (values.focusBonus ?? 0);
     if (base === "demolition-charge") {
-      effects(run).focusBonus = (run.turnEffects!.focusBonus ?? 0) + (values.focusBonus ?? 2);
+      effects(run).focusBonus = (run.turnEffects!.focusBonus ?? 0) + (values.focusBonus ?? 0);
       if (demolish) {
         run.reclaim = (run.reclaim ?? 0) + destroyInstallation(run, demolish, card(id).name);
         note = ` · ${INSTALLATION_NAMES[demolish.kind]} destroyed`;
@@ -608,8 +817,8 @@ export function playInstant(run: RunState, index: number, installationId?: strin
       }
     }
     if (base === "spearhead") effects(run).spearhead = true;
-    if (base === "bulkhead") effects(run).firewallBonus = (run.turnEffects!.firewallBonus ?? 0) + (values.firewallBonus ?? 1);
-    if (base === "quorum") run.block += (values.perHostile ?? 2) * Math.max(0, livingEnemies(run).length - 1);
+    if (base === "bulkhead") effects(run).firewallBonus = (run.turnEffects!.firewallBonus ?? 0) + (values.firewallBonus ?? 0);
+    if (base === "quorum") run.block += (values.perHostile ?? 0) * Math.max(0, livingEnemies(run).length - 1);
     if (base === "field-repair") for (const node of run.topology.nodes) if (wearable(node)) node.condition = maxConditionOf(node);
     if (base === "rapid-redeploy") {
       // Deterministic: the most recently discarded hardware card.
@@ -622,8 +831,8 @@ export function playInstant(run: RunState, index: number, installationId?: strin
         break;
       }
     }
-    applyValues(run, id);
   }
+  resolvePlay(run, play, generic);
   log(
     run,
     capturedRoles
@@ -637,16 +846,38 @@ export function playInstant(run: RunState, index: number, installationId?: strin
 export function playProtocol(run: RunState, index: number): ActionResult {
   const ready = canPlay(run, index, "protocol");
   if (!ready.ok) return ready;
-  if (run.protocols.length >= RULES.maxProtocols)
-    return { ok: false, message: `Only ${RULES.maxProtocols} protocols can be armed at once.` };
+  const limit = protocolLimit(run);
+  if (run.protocols.length >= limit)
+    return { ok: false, message: `Only ${limit} protocols can be armed at once.` };
   const id = run.hand[index];
-  run.energy -= costFor(run, index);
+  const play = playOf(run, index);
+  const reason = play.effect?.validate?.(run, play.ctx);
+  if (reason) return refuse(reason);
+  pay(run, index);
+  run.score += 1;
   run.hand.splice(index, 1);
   run.protocols.push(id);
-  run.cardsPlayed++;
-  run.score += 1;
-  log(run, `${card(id).name} armed.`);
+  const note = resolvePlay(run, play);
+  log(run, `${card(id).name} armed${note}.`);
   return { ok: true, message: `${card(id).name} armed. It fires on the matching enemy action.` };
+}
+/** v5: starts a daemon. It runs for the rest of the encounter (RunState.daemons), never goes to
+ * discard, and copies stack. Its numbers are read by its hooks, so no generic values apply. */
+export function playDaemon(run: RunState, index: number): ActionResult {
+  return watched(run, () => daemonPlay(run, index));
+}
+function daemonPlay(run: RunState, index: number): ActionResult {
+  const ready = canPlay(run, index, "daemon");
+  if (!ready.ok) return ready;
+  const id = run.hand[index];
+  const play = playOf(run, index);
+  const reason = play.effect?.validate?.(run, play.ctx);
+  if (reason) return refuse(reason);
+  consume(run, index);
+  const note = resolvePlay(run, play, false);
+  const copies = run.daemons.filter(item => item === id).length;
+  log(run, `${card(id).name} running${copies > 1 ? ` ×${copies}` : ""}${note}.`);
+  return { ok: true, message: `${card(id).name} runs for the rest of the encounter${note}.` };
 }
 /** Deletes a playable junk card (Worm). */
 export function playJunk(run: RunState, index: number): ActionResult {
@@ -655,12 +886,24 @@ export function playJunk(run: RunState, index: number): ActionResult {
   const id = run.hand[index];
   if (card(id).unplayable)
     return { ok: false, message: `${card(id).name} cannot be played.` };
-  run.energy -= costFor(run, index);
+  pay(run, index);
   run.hand.splice(index, 1);
-  run.exhaustPile.push(id);
-  run.cardsPlayed++;
+  exhaust(run, id);
+  afterPlay(run, id);
   log(run, `${card(id).name} deleted.`);
   return { ok: true, message: `${card(id).name} deleted.` };
+}
+
+/** Encounter-only tokens (Payload) into the hand; the hand limit holds and the overflow goes to the
+ * discard pile. They exhaust when played and never enter the deck. Returns how many reached the hand. */
+export function addTokens(run: RunState, id: CardId, count: number): number {
+  let added = 0;
+  for (let i = 0; i < count; i++) {
+    (run.encounterCards ??= []).push(id);
+    if (run.hand.length < HAND_LIMIT) { run.hand.push(id); added++; }
+    else run.discardPile.push(id);
+  }
+  return added;
 }
 
 // ------------------------------------------------------------------ the table front: scrub and repair
@@ -727,6 +970,9 @@ export function consoleState(run: RunState) {
   return { id, ...definition, cost, usable: run.phase === "battle" && (active || (run.consoleUses < limit && run.energy >= cost)), reason, active, uses: run.consoleUses, limit };
 }
 export function useConsole(run: RunState, a?: string, b?: string): ActionResult {
+  return watched(run, () => consoleUse(run, a, b));
+}
+function consoleUse(run: RunState, a?: string, b?: string): ActionResult {
   const state = consoleState(run);
   if (!state.usable) return { ok: false, message: state.reason || "Console unavailable." };
   if (state.id === "buffer") {
@@ -738,35 +984,132 @@ export function useConsole(run: RunState, a?: string, b?: string): ActionResult 
     run.buffering = true;
     run.consoleUses++;
     log(run, "Buffer armed: this transmission will be stored.");
-    return { ok: true, message: `Buffering: this transmission is stored ×${RULES.bufferMultiplier}.` };
+    return { ok: true, message: `Buffering: this transmission is stored ×${bufferMultiplierOf(run)}.` };
   }
   if (state.id === "patch") {
     if (!a || !b || !canLink(run.topology, a, b)) return { ok: false, message: "Choose two unconnected devices." };
-    run.topology.links.push({ a, b });
+    const cable = { a, b };
+    run.topology.links.push(cable);
     run.energy -= state.cost;
     run.consoleUses++;
+    laid(run, cable);
     log(run, `Patch Cable: ${a.toUpperCase()} ↔ ${b.toUpperCase()}.`);
     return { ok: true, message: "Patch cable connected." };
   }
-  const gained = hardenBlock(run);
-  run.block += gained;
   run.energy -= state.cost;
   run.consoleUses++;
-  const repaired = clearFaultsAndRepair(run, false);
+  const { block: gained, repaired } = hardenOnce(run);
   log(run, `Harden: +${gained} block${repaired ? ` · ${repaired.toUpperCase()} repaired` : ""}.`);
   return { ok: true, message: `Hardened · +${gained} block${repaired ? ` · ${repaired.toUpperCase()} repaired` : ""}.` };
 }
 
 /** Block the Warden's Harden grants now: base, per online firewall, per living hostile beyond the
- * first (hardenPerHostile) and per living guardian add (hardenPerAdd). One hostile and no adds:
- * the v3 Harden. The console preview should read this. */
+ * first (hardenPerHostile), per living guardian add (hardenPerAdd) and the hardenBonus daemons.
+ * One hostile, no adds and no daemon: the v3 Harden. The console preview should read this. */
 export function hardenBlock(run: RunState): number {
   const firewalls = analyze(run, run.faultNodes, run.faultLinks).onlineNodes.filter(node => node.role === "firewall").length;
   const living = livingEnemies(run);
   const others = Math.max(0, living.length - 1);
   const adds = living.filter(enemy => enemy.role === "add").length;
-  return RULES.hardenShield + RULES.hardenPerFirewall * firewalls + RULES.hardenPerHostile * others + RULES.hardenPerAdd * adds;
+  return RULES.hardenShield + RULES.hardenPerFirewall * firewalls + RULES.hardenPerHostile * others + RULES.hardenPerAdd * adds + daemonTotal(run, "hardenBonus");
 }
+/** Harden once, without spending the console (Double Shift; the console calls it too): its block
+ * and its repair of the most worn device. */
+export function hardenOnce(run: RunState): { block: number; repaired: string | null } {
+  const block = hardenBlock(run);
+  run.block += block;
+  return { block, repaired: clearFaultsAndRepair(run, false) };
+}
+/** The buffering multiplier now (RULES.bufferMultiplier, or a bufferMultiplier daemon's). */
+export function bufferMultiplierOf(run: RunState): number {
+  return bufferMultiplier(run).value;
+}
+
+// ------------------------------------------------------------------ helpers for card effects
+
+/** Deals `amount` to your target now (Exfiltrate): overflow to the target if it is another living
+ * hostile, otherwise the next living port left → right; each receiving port pays its armor unless
+ * `ignoreArmor`. Death side effects apply (crates open at once). Not a transmission. */
+export function strikeTarget(run: RunState, amount: number, options: { ignoreArmor?: boolean } = {}): StrikeRecord {
+  const record: StrikeRecord = { ports: {}, killed: [], total: 0 };
+  const network = analyze(run, run.faultNodes, run.faultLinks);
+  const focus = effectiveFocus(run);
+  let left = Math.max(0, amount);
+  const visited = new Set<Port>();
+  let port: Port | null = focus;
+  while (left > 0 && port) {
+    const enemy = enemyAt(run, port);
+    if (!enemy) break;
+    visited.add(port);
+    const armor = options.ignoreArmor ? 0 : Math.max(0, -sumTerms(portArmor(run, network, enemy)));
+    const landed = Math.max(0, left - armor);
+    const taken = Math.min(landed, enemy.hp);
+    damageEnemy(run, enemy, taken);
+    record.ports[port] = (record.ports[port] ?? 0) + taken;
+    record.total += taken;
+    if (enemy.hp <= 0) record.killed.push(enemy.uid);
+    left = landed - taken;
+    const living = livingEnemies(run).filter(other => !visited.has(other.port));
+    port = (living.find(other => other.port === focus) ?? living[0])?.port ?? null;
+  }
+  settleFallen(run);
+  return record;
+}
+/** The legal socket nearest a point (Splice: a cable's midpoint). */
+export { socketNear };
+
+/** Everything a card effect or daemon hook may do to the run (effects/types.ts documents it). */
+export const api: EngineApi = {
+  draw,
+  addTokens,
+  harden: hardenOnce,
+  hardenBlock,
+  clearFaultsAndRepair,
+  network: run => analyze(run, run.faultNodes, run.faultLinks),
+  deploy(run, role: Role, socket, extra = {}) {
+    if (run.topology.nodes.length >= RULES.maxDevices || isBlocked(run, socket.x, socket.z)) return null;
+    const node: NetworkNode = { id: `${role}${run.nextNodeId++}`, role, x: socket.x, z: socket.z, ...extra };
+    if (role === "phantom") node.absorbs ??= 1;
+    else if (node.condition === undefined) node.condition = node.maxCondition = role === "rack" ? RULES.rackCondition : deployCondition(run);
+    run.topology.nodes.push(node);
+    deployed(run, node);
+    return node;
+  },
+  link(run, a, b, flags = {}) {
+    if (!canLink(run.topology, a, b)) return null;
+    const cable: NetworkLink = { a, b, ...(flags.armored ? { armored: true } : {}), ...(flags.boosted ? { boosted: true } : {}) };
+    run.topology.links.push(cable);
+    laid(run, cable);
+    return cable;
+  },
+  unlink(run, a, b) {
+    const key = linkKey(a, b);
+    const index = run.topology.links.findIndex(link => linkKey(link.a, link.b) === key);
+    if (index < 0) return null;
+    const [cable] = run.topology.links.splice(index, 1);
+    run.faultLinks = run.faultLinks.filter(item => item !== key);
+    if (run.frayedByCut) run.frayedByCut = run.frayedByCut.filter(item => item !== key);
+    return cable;
+  },
+  nearest,
+  socketNear,
+  freeSocket,
+  strike: strikeTarget,
+  exhaust,
+  addMisses(run, count, source) {
+    const fx = effects(run);
+    fx.misses = (fx.misses ?? 0) + count;
+    (fx.missSources ??= []).push(...Array(count).fill(source));
+  },
+  addDodges(run, count, source) {
+    const fx = effects(run);
+    fx.dodges = (fx.dodges ?? 0) + count;
+    (fx.dodgeSources ??= []).push(...Array(count).fill(source));
+  },
+  effects,
+  settle: settleFallen,
+  log,
+};
 
 // ------------------------------------------------------------------ network analysis
 
@@ -818,6 +1161,8 @@ function victory(run: RunState, result: TurnResult) {
   run.consoleUses = 0;
   run.turnEffects = {};
   run.reclaim = 0;
+  run.daemons = [];
+  delete run.nextTurn;
   if (run.preparedCard) run.discardPile.push(run.preparedCard);
   run.preparedCard = null;
   for (const enemy of run.enemies) delete enemy.exposed;
@@ -989,7 +1334,8 @@ export function endTurn(run: RunState): TurnResult {
     run.buffer = 0;
     result.bufferLost = true;
   }
-  run.block = has(run, "grounded-core") ? 1 : 0;
+  // Block: Grounded Core, what Persistent State carries, and next-turn gains (Brace).
+  run.block = forecast.nextTurn.block;
   run.packetBoost = 0;
   run.cardsPlayed = 0;
   run.firstFiberPlayed = false;
@@ -998,13 +1344,26 @@ export function endTurn(run: RunState): TurnResult {
   run.turnEffects = {};
   run.reclaim = 0;
   run.repairsThisTurn = 0;
+  delete run.nextTurn;
   // Rule 15: a dead target moves on.
   run.focus = effectiveFocus(run);
-  for (const held of run.hand.splice(0))
-    (baseCard(held) === "packet-loss" ? run.exhaustPile : run.discardPile).push(held);
-  if (run.preparedCard) run.hand.push(run.preparedCard);
+  // The hand: Retain stays, Volatile (Packet Loss) exhausts, the rest is discarded.
+  const retained: CardId[] = [];
+  for (const held of run.hand.splice(0)) {
+    const definition = card(held);
+    if (definition.retain) retained.push(held);
+    else if (definition.volatile) exhaust(run, held);
+    else run.discardPile.push(held);
+  }
+  run.hand.push(...retained);
+  const prepared = run.preparedCard;
+  // A hand already full of retained cards leaves the prepared card on top of the draw pile.
+  if (prepared) (run.hand.length < HAND_LIMIT ? run.hand.push(prepared) : run.drawPile.unshift(prepared));
   run.preparedCard = null;
-  draw(run, forecast.nextTurn.draw - run.hand.length);
+  // The prepared card replaces one draw; retained cards do not.
+  draw(run, forecast.nextTurn.draw - (prepared ? 1 : 0));
+  // Daemons: the start of your turn, after the draw.
+  if (run.daemons?.length) fireDaemons(run, "turnStart", api, {});
   if (run.integrity <= 0) {
     run.phase = "lost";
     result.lost = true;

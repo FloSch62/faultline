@@ -9,6 +9,7 @@ import {
 import { CARDS, RULES } from "./cards.ts";
 import { DESIGNATIONS, ENEMIES, ESCORT_THREAT, PACKS, REINFORCEMENT_ESCORTS, SHED_SPAWN, SIGNALS, compositionAllowed, threatBudget } from "./enemies.ts";
 import { STAGES } from "./stages.ts";
+import { ASCENSION_RULES } from "./ascension.ts";
 import type { Archetype, CardId, MapRoom, RunState } from "./types.ts";
 
 function expedition(stage = 0, seed = 7, ascension = 0, archetype: Archetype = "architect"): RunState {
@@ -69,11 +70,12 @@ test("ports, roles, cadence and uids follow the pack's shape", () => {
   }
 });
 
-test("pack health shares the room's single health, Hardened and ascension 2 included", () => {
+test("pack health shares the room's single health, Hardened and the ascension health rule included", () => {
   const run = expedition(1, 3);
   const base = room({ floor: 2, enemyId: "nest", pack: ["tap-spinner"] });
   const single = encounterHealth(1, base, 0);
-  assert.equal(single, 39);
+  const [start, perFloor, perStage] = RULES.normalHealth;
+  assert.equal(single, start + 2 * perFloor + perStage, "RULES.normalHealth: base + per floor + per stage");
   const pair = planEncounter(run, base).enemies;
   assert.deepEqual(pair.map(e => e.maxHp), [Math.round(single * 0.40), Math.round(single * 0.75)], "escort 0.40 H, leader 0.75 H");
   const shares = RULES.packShares;
@@ -85,19 +87,21 @@ test("pack health shares the room's single health, Hardened and ascension 2 incl
     assert.equal(plan.enemies.find(e => e.role === "leader")!.maxHp, Math.round(h * expected[0]));
   }
   const duo = planEncounter(expedition(0, 3), room({ floor: 3, pack: ["spark-mite", "spark-mite"] })).enemies;
-  assert.deepEqual(duo.map(e => e.maxHp), [18, 18], "the design's stage I floor-4 duo: 18 / 18 of 31");
+  const duoH = encounterHealth(0, room({ floor: 3 }), 0), duoShare = Math.round(duoH * RULES.packHealthScale * 0.5);
+  assert.deepEqual(duo.map(e => e.maxHp), [duoShare, duoShare], "a stage I floor-4 duo splits 1.15 H evenly");
   const hardened = planEncounter(run, { ...base, designations: ["hardened"] }).enemies;
   assert.equal(hardened[1].maxHp, Math.round(single * 0.75 * (1 + RULES.hardenedHealth)));
   assert.equal(hardened[0].maxHp, pair[0].maxHp, "Hardened touches only the designated hostile");
-  // Ascension 2 raises every member of a normal pack and its reinforcement.
-  const stubborn = expedition(1, 3, 2);
+  // Hardened Quarantine (stubbornSignals) raises every member of a normal pack and its reinforcement.
+  const level = ASCENSION_RULES.stubbornSignals;
+  const stubborn = expedition(1, 3, level);
   const a2 = planEncounter(stubborn, base).enemies;
-  assert.deepEqual(a2.map(e => e.maxHp), [Math.round(Math.round(39 * 1.1) * 0.40), Math.round(Math.round(39 * 1.1) * 0.75)]);
+  assert.deepEqual(a2.map(e => e.maxHp), [Math.round(Math.round(single * 1.1) * 0.40), Math.round(Math.round(single * 1.1) * 0.75)]);
   for (let seed = 1; seed < 400; seed++) {
-    const r = expedition(1, seed, 2);
+    const r = expedition(1, seed, level);
     const plan = planEncounter(r, room({ id: `x${seed}`, floor: 4, enemyId: "widow" }));
     if (!plan.reinforcement) continue;
-    assert.equal(plan.reinforcement.hp, Math.round(encounterHealth(1, room({ floor: 4 }), 2) * RULES.reinforcementShares.single));
+    assert.equal(plan.reinforcement.hp, Math.round(encounterHealth(1, room({ floor: 4 }), level) * RULES.reinforcementShares.single));
   }
   // Ascension 6: adds × RULES.ascensionAddHealth (the design had 9 / 12 / 16; the ascension pass set 1).
   const adds = ["gate-warden", "chorister", "quarantine-drone"] as const;
@@ -241,7 +245,7 @@ test("roomScout shows members leader first, hides an interference ribbon until e
   run.currentRoom = null;
   assert.equal(roomScout(run, { ...hidden, cleared: true }).hidden, false, "the record shows it after the room is cleared");
   const boss = roomScout(run, room({ type: "boss", floor: 6, enemyId: "core" }));
-  assert.deepEqual(boss, { members: ["core"], designations: [], hidden: false, health: [STAGES[2].bossHp] });
+  assert.deepEqual(boss, { members: ["core"], designations: [], hidden: false, health: [RULES.guardianHealth[2]] });
 });
 
 test("Signal in the Static rolls like the stage's normals from the seed, at the event's health", () => {

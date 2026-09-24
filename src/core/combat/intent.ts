@@ -12,6 +12,7 @@
 import { RULES } from "../cards.ts";
 import type { Enemy, EscalationLevel, InstallationKind, Intent, RunState } from "../types.ts";
 import { definitionOf } from "./board.ts";
+import { ascends } from "../ascension.ts";
 
 /** Hostiles that grow: leaders, singles and guardians. Escorts and adds never escalate and get
  * no stage bonus, pressure or enrage (rule 4). */
@@ -71,7 +72,7 @@ const patternMarks = (enemy: Enemy) => {
   return { length: pattern.length, charge: pattern.findIndex(step => step.kind === "charge"), ultimate: pattern.findIndex(step => step.ultimate) };
 };
 export function enrageThreshold(run: RunState, enemy: Enemy) {
-  return definitionOf(enemy).boss && run.ascension >= 10 ? 0.6 : 0.5;
+  return definitionOf(enemy).boss && ascends(run.ascension, "lastSignal") ? 0.6 : 0.5;
 }
 /** Wounded: at or below the enrage threshold (half health; 60 % at ascension 10). */
 export const wounded = (run: RunState, enemy: Enemy) => enemy.hp <= enemy.maxHp * enrageThreshold(run, enemy);
@@ -166,8 +167,8 @@ export function intentFor(run: RunState, enemy: Enemy, phasesAhead = 0): Intent 
   const enraged = grows && !!definition.enrages && wounded(run, enemy);
   const level = escalationLevel(run, enemy, turn + 1);
   const attack = base.kind === "strike" || base.kind === "breach";
-  const ascension = attack && run.ascension >= 4 ? 1 : 0;
-  const ultimate = base.ultimate && run.ascension >= 10 ? 2 : 0;
+  const ascension = attack && ascends(run.ascension, "sharperTeeth") ? 1 : 0;
+  const ultimate = base.ultimate && ascends(run.ascension, "lastSignal") ? 2 : 0;
   const escalated = attack && level >= 3 ? 1 : 0;
   const hardened = base.kind === "strike" && has(enemy, "hardened") ? RULES.hardenedStrike : 0;
   const raw = base.amount + (attack
@@ -181,7 +182,7 @@ export function intentFor(run: RunState, enemy: Enemy, phasesAhead = 0): Intent 
   const planted: InstallationKind = run.stage >= 2 ? "jammer" : "tap";
   if (has(enemy, "nesting") && turn === 0) alsoInstalls.push({ kind: planted, source: "nesting" });
   if (level >= 3 && index === 0) alsoInstalls.push({ kind: planted, source: "escalation" });
-  if (definition.boss && base.kind === "charge" && run.ascension >= 10 && RULES.ascensionChargeBreaker > 0) alsoInstalls.push({ kind: "breaker", source: "charge" });
+  if (definition.boss && base.kind === "charge" && ascends(run.ascension, "lastSignal") && RULES.ascensionChargeBreaker > 0) alsoInstalls.push({ kind: "breaker", source: "charge" });
   const doubled = level >= 2 && (base.kind === "jam" || base.kind === "sever");
   const suffix = [
     doubled ? " ×2" : "",

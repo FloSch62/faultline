@@ -127,7 +127,9 @@ test("single-hostile invariant: v4 reproduces the v3 forecast and resolution on 
     assert.equal(p.channels, want.channels, `${at}: channels`);
     assert.deepEqual(p.signalPath, want.signalPath, `${at}: primary route`);
     assert.deepEqual(p.clusters, want.clusters, `${at}: clusters`);
-    assert.deepEqual(p.nextTurn, want.nextTurn, `${at}: next turn`);
+    // v5 economy: the v3 fixture's turn was 5 energy and 6 cards; online devices add the same.
+    const v3Next = want.nextTurn as { energy: number; draw: number };
+    assert.deepEqual(p.nextTurn, { energy: v3Next.energy - 5 + RULES.baseEnergy, draw: v3Next.draw - 6 + RULES.handDraw, block: 0 }, `${at}: next turn`);
     assert.equal(p.intent?.kind, v3Kind, `${at}: intent`);
     assert.equal(p.intent?.amount, want.intent?.amount, `${at}: intent amount`);
     assert.equal(p.intent?.target ?? null, want.intent?.target ?? null, `${at}: intent target`);
@@ -155,8 +157,9 @@ test("single-hostile invariant: v4 reproduces the v3 forecast and resolution on 
     assert.equal(result.defeated, after.defeated, `${at}: defeated`);
     assert.equal(r.integrity, after.integrity, `${at}: integrity`);
     assert.equal(result.defeated ? null : r.enemies[0].hp, after.enemyHp, `${at}: hostile health (from ${hpBefore})`);
-    assert.equal(r.energy, after.energy, `${at}: energy`);
-    assert.equal(r.hand.length, after.handSize, `${at}: hand`);
+    // v5 economy (a won fight keeps its energy and hand): 2 energy and 1 card fewer than v3.
+    assert.equal(r.energy, (after.energy as number) - (result.defeated ? 0 : 5 - RULES.baseEnergy), `${at}: energy`);
+    assert.equal(r.hand.length, (after.handSize as number) - (result.defeated ? 0 : 6 - RULES.handDraw), `${at}: hand`);
     assert.equal(r.faultNodes[0] ?? null, after.faultNode, `${at}: jam`);
     assert.equal(r.faultLinks[0] ?? null, after.faultLink, `${at}: cut`);
     assert.deepEqual(r.installations.map(item => ({ x: item.x, z: item.z })), after.malware, `${at}: Taps`);

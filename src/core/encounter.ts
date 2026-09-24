@@ -9,14 +9,15 @@ import type {
   CardId, CrateContents, DesignationId, Enemy, HostileRole, MapRoom, MessageOption, MessageOptionId,
   Offer, Port, Reinforcement, Role, RunState, SignalId,
 } from "./types.ts";
-import { CARDS, REWARD_POOL, RULES, baseCard, canUpgrade, upgraded } from "./cards.ts";
+import { CARDS, RULES, baseCard } from "./cards.ts";
+import { pickCard, rollSlot } from "./rewards.ts";
 import {
   DESIGNATIONS, ENEMIES, ESCORT_THREAT, MESSAGE_OPTIONS, REINFORCEMENT_ESCORTS, SHED_SPAWN, SIGNALS, SIGNAL_IDS,
   compositionAllowed, hostileName, threatBudget,
 } from "./enemies.ts";
 import { encounterHealth, roomTemplate, rollRoomContents } from "./map.ts";
 import { STAGES } from "./stages.ts";
-import { creditMultiplier, healthMultiplier } from "./ascension.ts";
+import { ascends, creditMultiplier, healthMultiplier } from "./ascension.ts";
 import { log } from "./util.ts";
 import { MESSAGE_FRAGMENTS, designationEntranceLine, reinforcementEntranceLine } from "../story.ts";
 
@@ -67,38 +68,17 @@ const pick = <T>(random: () => number, list: readonly T[]): T => list[Math.floor
 
 // ---------------------------------------------------------------- reward-slot cards
 
-export type SlotRarity = "common" | "uncommon" | "rare" | "legendary";
-/** Later stages sometimes offer cards that are already upgraded (shared with meta.ts). */
-export const PRE_UPGRADE_CHANCE: readonly number[] = [0, 0.1, 0.2];
-/** Rarity of one card-reward slot (shared with meta.ts cardRewards). */
-export function slotRarity(roll: number, elite: boolean): SlotRarity {
-  return roll < (elite ? 0.02 : 0.005) ? "legendary"
-    : roll < (elite ? 0.27 : 0.125) ? "rare"
-      : roll < (elite ? 0.77 : 0.505) ? "uncommon"
-        : "common";
-}
-/** Base cards this expedition may be offered: no basics, junk or curses; archetype cards for their own keeper. */
-function offerable(run: RunState): CardId[] {
-  return REWARD_POOL.filter(id => {
-    const card = CARDS[id];
-    return card && card.rarity !== "basic" && !card.junk && !card.curse && card.target !== "junk" &&
-      (!card.archetype || card.archetype === run.archetype);
-  }) as CardId[];
-}
-function cardOfRarity(random: () => number, pool: CardId[], rarity: SlotRarity, exclude: CardId[]): CardId | null {
-  const open = pool.filter(id => !exclude.includes(id));
-  const exact = open.filter(id => CARDS[id].rarity === rarity);
-  const available = exact.length ? exact : open;
-  return available.length ? pick(random, available) : null;
-}
-/** Two named cards for a crate, each rolled like a normal reward slot. */
+/** Later stages offer some cards already upgraded (RULES.upgradedOfferRate by stage; read it live). */
+export const PRE_UPGRADE_CHANCE: readonly number[] = RULES.upgradedOfferRate;
+export { slotRarity, type Rarity as SlotRarity } from "./rewards.ts";
+/** Two named cards for a crate, each rolled like a normal reward slot (pool, rarity, card,
+ * pre-upgrade) from the crate's own seeded stream. */
 function crateCards(run: RunState, random: () => number): [CardId, CardId] | null {
-  const pool = offerable(run);
   const cards: CardId[] = [];
   for (let slot = 0; slot < 2; slot++) {
-    const card = cardOfRarity(random, pool, slotRarity(random(), false), cards.map(id => baseCard(id) as CardId));
+    const card = rollSlot(run, random, "normal", slot, cards.map(id => baseCard(id) as CardId));
     if (!card) return null;
-    cards.push(random() < (PRE_UPGRADE_CHANCE[run.stage] ?? 0) && canUpgrade(card) ? upgraded(card) : card);
+    cards.push(card);
   }
   return [cards[0], cards[1]];
 }
@@ -179,7 +159,7 @@ export function nextUid(run: RunState): string {
  * the ascension 6 rule (RULES.ascensionAddHealth). */
 export function addHealth(run: RunState, id: string): number {
   const base = (RULES.addHealth as Record<string, number>)[id] ?? ENEMIES[id]?.addHealth ?? 0;
-  return Math.round(base * (run.ascension >= 6 ? RULES.ascensionAddHealth : 1));
+  return Math.round(base * (ascends(run.ascension, "ancientGuardians") ? RULES.ascensionAddHealth : 1));
 }
 
 type Shape = "single" | "duo" | "pair" | "trio";
@@ -342,7 +322,8 @@ export function messageOffer(run: RunState, source: "laden" | "crate", salt: str
     else if (id === "credit") options.push({ id, amount: credit(run, RULES.messageCredits) });
     else if (id === "purge") options.push({ id });
     else {
-      const card = cardOfRarity(random, offerable(run), "rare", []);
+      // Recover: a named rare card from either pool (the keeper's first, like a reward slot).
+      const card = pickCard(run, random, random() < RULES.keeperShare ? "keeper" : "colorless", "rare");
       if (card) options.push({ id, card });
     }
   }

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { ASCENSION_RULES } from "./ascension.ts";
 import { CARDS, RULES, baseCard, canUpgrade, isUpgraded, upgraded } from "./cards.ts";
 import { newExpedition } from "./expedition.ts";
 import {
@@ -180,7 +181,7 @@ test("cache servers and PoE injectors act at turn start; a jam can take them off
   wire(r, "r1", "cache", "omega");
   wire(r, "alpha", "poe", "r1");
   const p = combatPreview(r);
-  assert.deepEqual(p.nextTurn, { energy: RULES.baseEnergy + 1, draw: RULES.handDraw + 1 });
+  assert.deepEqual(p.nextTurn, { energy: RULES.baseEnergy + 1, draw: RULES.handDraw + 1, block: 0 });
   endTurn(r);
   assert.equal(r.energy, RULES.baseEnergy + 1);
   assert.equal(r.hand.length, RULES.handDraw + 1);
@@ -189,7 +190,7 @@ test("cache servers and PoE injectors act at turn start; a jam can take them off
   r.hand = [];
   const jammed = combatPreview(r);
   assert.equal(jammed.faultTarget, "r1");
-  assert.deepEqual(jammed.nextTurn, { energy: RULES.baseEnergy, draw: RULES.handDraw });
+  assert.deepEqual(jammed.nextTurn, { energy: RULES.baseEnergy, draw: RULES.handDraw, block: 0 });
   endTurn(r);
   assert.equal(r.energy, RULES.baseEnergy);
 });
@@ -504,7 +505,7 @@ test("boss relics: Spanning Tree, Anycast, Jumbo Frames, BGP Hijack", () => {
   assert.equal(playGround(r, 0, 2.5, -2.5).ok, false);
   r.relics = ["jumbo-frames"];
   r.hand = [];
-  assert.deepEqual(combatPreview(r).nextTurn, { energy: RULES.baseEnergy + 1, draw: RULES.handDraw - 1 });
+  assert.deepEqual(combatPreview(r).nextTurn, { energy: RULES.baseEnergy + 1, draw: RULES.handDraw - 1, block: 0 });
   r.relics = ["zero-trust"];
   r.hand = ["fiber"];
   assert.equal(costFor(r, 0), 2);
@@ -525,25 +526,27 @@ test("SDN Controller costs a starting energy; Spare Parts adds a Fiber; Watchdog
 
 // ------------------------------------------------------------------ ascension hooks
 
-test("ascension 4, 9 and 10 raise attacks, lengthen fields and enrage guardians sooner", () => {
+test("ascension: Sharper Teeth raises attacks and lengthens fields; The Last Signal enrages guardians sooner", () => {
   const r = table("wraith", 1);
   const base = intentFor(r, r.enemies[0]).amount;
-  r.ascension = 4;
+  r.ascension = ASCENSION_RULES.sharperTeeth - 1;
+  assert.equal(intentFor(r, r.enemies[0]).amount, base);
+  r.ascension = ASCENSION_RULES.sharperTeeth;
   assert.equal(intentFor(r, r.enemies[0]).amount, base + 1);
   const f = table("prophet", 0);
   route(f, "r1", 0);
-  f.ascension = 9;
+  f.ascension = ASCENSION_RULES.lingeringCorruption;
   assert.equal(combatPreview(f).zoneThreat!.turns, RULES.hostileFieldTurns + 1);
   const g = table("regent", 0);
   g.enemies[0].hp = Math.floor(g.enemies[0].maxHp * 0.55);
   assert.ok(!intentFor(g, g.enemies[0]).label.startsWith("ENRAGED"));
-  g.ascension = 10;
+  g.ascension = ASCENSION_RULES.lastSignal;
   assert.ok(intentFor(g, g.enemies[0]).label.startsWith("ENRAGED"));
   g.enemies[0].turn = 5;
   g.enemies[0].hp = g.enemies[0].maxHp;
-  g.ascension = 9;
+  g.ascension = ASCENSION_RULES.lastSignal - 1;
   const ultimate = intentFor(g, g.enemies[0]).amount;
-  g.ascension = 10;
+  g.ascension = ASCENSION_RULES.lastSignal;
   assert.equal(intentFor(g, g.enemies[0]).amount, ultimate + 2);
 });
 

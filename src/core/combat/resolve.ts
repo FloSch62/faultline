@@ -7,8 +7,9 @@
  * 4 traps, protocols, firewall quarantine · 5 installs and heals · 6 faults clear, fields
  * tick, fields / faults / overloads per hostile, then installation effects · 7 junk ·
  * 8 attacks against one shared shield pool · 9 exposed · 10 next turn on the post-phase board. */
-import { RULES, baseCard } from "../cards.ts";
+import { ENERGY_RELICS, RULES, baseCard, type ProtocolTrigger as Trigger } from "../cards.ts";
 import { channelKey, linkKey } from "../graph.ts";
+import type { CardDefinition } from "../card-types.ts";
 import type {
   CardId, DesignationId, Enemy, Installation, InstallationKind, Intent, NetworkNode, Port, RunState, Zone, ZoneEffect, EscalationLevel, HostileRole,
 } from "../types.ts";
@@ -20,8 +21,13 @@ import {
 } from "./board.ts";
 import { analyze, contributionOf, type Network } from "./network.ts";
 import { addWreck } from "../terrain.ts";
+import { addBreakBonus, ascends } from "../ascension.ts";
 import { actsInPhase, advanceSteps, intentFor, nextLevel, scales } from "./intent.ts";
 import { announceSignal, emptySidePort, fireSignal, raiseAdds, reinforce, type ArrivalRecord } from "./surprises.ts";
+import {
+  daemonAmounts, daemonFlag, daemonMax, daemonRouteTerms, daemonShieldTerms, handHooks, protocolRetaliation,
+  type EndOfTurnEffect,
+} from "../effects/index.ts";
 
 export interface CombatTerm {
   label: string;
@@ -122,6 +128,13 @@ export interface HostileForecast {
   decoyed: number;
   absorbed: number;
   cancelled: number;
+  // ---- v5
+  /** Jams and cuts that missed (Spoof, Obfuscation). */
+  missed: number;
+  /** Its strike or breach deals 0: the dodge's source (Ghost Protocol), or null. */
+  dodged: string | null;
+  /** Its strike or breach was cancelled by a protocol (Null Route): the protocol's name, or null. */
+  nullified: string | null;
 }
 export type InstallationEffectKind = "jam" | "wear" | "tick" | "detonate" | "idle" | "anchor" | "siphon";
 export interface InstallationEffect {
@@ -133,6 +146,8 @@ export interface InstallationEffect {
   decoyed?: boolean;
   absorbed?: boolean;
   cancelled?: boolean;
+  /** v5: its jam missed (Spoof, Obfuscation): the source. */
+  missed?: string;
   /** It was destroyed while acting (a honeypot bite or Port Security). */
   destroyed?: boolean;
 }
@@ -148,6 +163,27 @@ export interface ProtocolTrigger {
   effect: string;
   /** Enemy.uid or installation id it answered. */
   target?: string;
+  /** v5: protocolFired daemons (Incident Response) hit the one that set it off. */
+  retaliation?: CombatTerm[];
+}
+/** v5: a jam or cut that missed, or a strike or breach dodged, with its source (the forecast names it). */
+export interface EvasionRecord {
+  kind: "miss" | "dodge";
+  source: string;
+  /** Enemy.uid of the hostile, or the installation id (a Jammer's jam). */
+  by: string;
+  /** The jammed node or cut cable that was spared (misses). */
+  target: string | null;
+}
+/** v5: a card left in the hand at the end of the turn and what it does in the enemy phase. */
+export interface HandEffectRecord {
+  id: CardId;
+  name: string;
+  count: number;
+  /** Unblockable integrity loss (in `incoming` and `incomingTerms`). */
+  integrity: number;
+  /** Devices it wears in the table-front step (in `wear`, source = its name). */
+  wear: string[];
 }
 export interface CombatPreview {
   signalPath: string[];
@@ -198,7 +234,9 @@ export interface CombatPreview {
   /** First installation socket planted this phase (compatibility: the Siphon Tap ghost beam). */
   malwareTarget: { x: number; z: number } | null;
   junk: { card: CardId; count: number } | null;
-  nextTurn: { energy: number; draw: number };
+  /** Next turn on the post-phase board. `block`: Grounded Core, block a blockCarry daemon keeps
+   * (Persistent State) and next-turn gains (Brace). */
+  nextTurn: { energy: number; draw: number; block: number };
   // ---- v4
   deliveries: Delivery[];
   ports: Record<Port, PortForecast | null>;
@@ -223,13 +261,31 @@ export interface CombatPreview {
   /** Every jam and cut that lands this phase, Jammers included. */
   faultTargets: string[];
   installTargets: (InstallForecast & { owner: string })[];
+  // ---- v5
+  /** Misses and dodges this phase, in resolution order. */
+  evasions: EvasionRecord[];
+  /** Curses in hand with an end-of-turn effect (Backdoor, Bitrot). */
+  handEffects: HandEffectRecord[];
+  /** Block that does not expire (a blockCarry daemon), and the daemon's label. */
+  blockCarried: { amount: number; by: string } | null;
 }
 
 // ------------------------------------------------------------------ turn resources
 
-/** Energy at the start of a turn before online power injectors. */
+/** v5: the turn's energy base, before temporary energy: RULES.baseEnergy plus 1 per energy relic,
+ * capped at RULES.relicEnergyCap. PoE Injectors online, next-turn energy, Reserve Cell and cards
+ * come on top of it, uncapped. The energy orb reads current / this. */
 export function turnEnergyBase(run: RunState): number {
-  return RULES.baseEnergy + Number(has(run, "anycast")) + Number(has(run, "jumbo-frames")) + Number(has(run, "storm-control"));
+  const relics = ENERGY_RELICS.filter(relic => has(run, relic)).length;
+  return Math.min(Math.max(RULES.relicEnergyCap, RULES.baseEnergy), RULES.baseEnergy + relics);
+}
+/** Buffering stores ×this (a bufferMultiplier daemon such as Deep Queue may raise it). */
+export function bufferMultiplier(run: RunState): { value: number; label: string | null } {
+  return daemonMax(run, "bufferMultiplier", RULES.bufferMultiplier);
+}
+/** Share of prevented damage the Backpressure relic stores (Flow Control may raise it). */
+export function backpressureRatio(run: RunState): { value: number; label: string | null } {
+  return daemonMax(run, "backpressureRatio", RULES.backpressureRatio);
 }
 export function turnDrawBase(run: RunState): number {
   return RULES.handDraw + Number(has(run, "deep-cache")) - Number(has(run, "jumbo-frames"));
@@ -251,11 +307,22 @@ export function simulationOf(run: RunState): RunState {
     reinforcement: run.reinforcement && { ...run.reinforcement },
     signal: run.signal && { ...run.signal, ...(run.signal.socket ? { socket: { ...run.signal.socket } } : {}) },
     ...(run.frayedByCut ? { frayedByCut: [...run.frayedByCut] } : {}),
-    ...(run.turnEffects ? { turnEffects: { ...run.turnEffects } } : {}),
+    ...(run.turnEffects ? { turnEffects: copyEffects(run.turnEffects) } : {}),
+    ...(run.nextTurn ? { nextTurn: { ...run.nextTurn } } : {}),
+    daemons: [...(run.daemons ?? [])],
     ...(run.lingeringJams ? { lingeringJams: { ...run.lingeringJams } } : {}),
     ...(run.attackers ? { attackers: [...run.attackers] } : {}),
   };
 }
+
+const copyEffects = (fx: NonNullable<RunState["turnEffects"]>) => ({
+  ...fx,
+  ...(fx.discounted ? { discounted: [...fx.discounted] } : {}),
+  ...(fx.freeCards ? { freeCards: [...fx.freeCards] } : {}),
+  ...(fx.missSources ? { missSources: [...fx.missSources] } : {}),
+  ...(fx.dodgeSources ? { dodgeSources: [...fx.dodgeSources] } : {}),
+  ...(fx.cardsPlayed ? { cardsPlayed: [...fx.cardsPlayed] } : {}),
+});
 
 // ------------------------------------------------------------------ step 1–2: the transmission
 
@@ -272,7 +339,8 @@ interface Transmission {
   bufferRelease: number;
 }
 
-/** Route terms of the primary route (v3 labels). */
+/** Route terms of the primary route (v3 labels), then the route daemons (v5: switchBonus per
+ * switch, routeTerms hooks), labelled with the daemon's name. */
 function routeTerms(run: RunState, path: readonly string[], boosted: number, frayed: number): CombatTerm[] {
   const nodes = run.topology.nodes.filter(node => path.includes(node.id));
   const count = (test: (node: NetworkNode) => boolean) => nodes.filter(test).length;
@@ -294,11 +362,13 @@ function routeTerms(run: RunState, path: readonly string[], boosted: number, fra
     if (resonance) route.push({ label: `${zone.toUpperCase()} · Resonance${resonance > 1 ? ` ×${resonance}` : ""}`, amount: resonance * RULES.resonanceDamage });
     if (suppression) route.push({ label: `${zone.toUpperCase()} · Suppression${suppression > 1 ? ` ×${suppression}` : ""}`, amount: -suppression * RULES.suppressionPenalty });
   }
+  if (switches) for (const term of daemonAmounts(run, "switchBonus")) route.push({ label: `${term.label} · switches ×${switches}`, amount: term.amount * switches });
+  if (run.daemons?.length) route.push(...daemonRouteTerms(run, nodes.filter(node => !node.fixed)));
   return route;
 }
 
 /** Armor and plating of one port (rule 12): subtracted once from the merged packet. */
-function portArmor(run: RunState, network: Network, enemy: Enemy): CombatTerm[] {
+export function portArmor(run: RunState, network: Network, enemy: Enemy): CombatTerm[] {
   if (enemy.exposed) return [];
   const definition = definitionOf(enemy);
   const firewall = network.onlineNodes.some(node => node.role === "firewall");
@@ -355,6 +425,9 @@ function transmit(run: RunState, network: Network, focus: Port | null): Transmis
       primaryTerms.push(doubled);
     }
     if (!spanning && channels > 1) terms.push({ label: `Bandwidth · ${channels} channels`, amount: (channels - 1) * bandwidth });
+    // v5 · bandwidthBonus daemons (Fabric Controller): each bandwidth delivery deals more.
+    const bandwidthBonus = !spanning && channels > 1 ? daemonAmounts(run, "bandwidthBonus") : [];
+    for (const term of bandwidthBonus) terms.push({ label: `${term.label} · ${channels - 1} bandwidth ${channels === 2 ? "delivery" : "deliveries"}`, amount: term.amount * (channels - 1) });
     if (!spanning && balancers) terms.push({ label: `Load balancers ×${balancers} · ${channels} channel${channels === 1 ? "" : "s"}`, amount: balancers * channels * RULES.balancerPerChannel });
     if (!spanning && balancers) primaryTerms.push({ label: `Load balancers ×${balancers}`, amount: balancers * RULES.balancerPerChannel });
     for (const zone of network.clusters) {
@@ -362,9 +435,21 @@ function transmit(run: RunState, network: Network, focus: Port | null): Transmis
       terms.push(cluster);
       primaryTerms.push(cluster);
     }
+    // v5 · clusterBonus daemons (Datacenter): every cluster deals more.
+    if (network.clusters.length) for (const term of daemonAmounts(run, "clusterBonus")) {
+      const bonus = { label: `${term.label} · clusters ×${network.clusters.length}`, amount: term.amount * network.clusters.length };
+      terms.push(bonus);
+      primaryTerms.push(bonus);
+    }
     if (taps) terms.push({ label: `Siphon Taps ×${taps}`, amount: -taps * RULES.malwarePenalty });
     const riders: CombatTerm[] = [];
     if (run.packetBoost) riders.push({ label: "Packet boost this turn", amount: run.packetBoost });
+    // v5 · Payload tokens played this turn, and the payloadBonus daemons (Exploit Kit) per Payload.
+    const payloads = effects.payloads ?? 0;
+    if (payloads) {
+      riders.push({ label: `Payload${payloads > 1 ? ` ×${payloads}` : ""}`, amount: effects.payloadDamage ?? payloads * RULES.payloadDamage });
+      for (const term of daemonAmounts(run, "payloadBonus")) riders.push({ label: `${term.label} · Payloads ×${payloads}`, amount: term.amount * payloads });
+    }
     if (has(run, "bgp-hijack")) riders.push({ label: "BGP Hijack", amount: RULES.bgpHijackDamage });
     if (run.backpressure && !backpressurePorts.length) riders.push({ label: "Backpressure", amount: run.backpressure });
     if (release) riders.push({ label: "Buffer release", amount: release });
@@ -376,7 +461,7 @@ function transmit(run: RunState, network: Network, focus: Port | null): Transmis
       const key = channelKey(route.path);
       const own: CombatTerm[] = index === 0 ? [...primaryTerms]
         : spanning ? [{ label: "Spanning Tree · bandwidth gives nothing", amount: 0 }]
-          : [{ label: "Bandwidth", amount: bandwidth }, ...(balancers ? [{ label: `Load balancers ×${balancers}`, amount: balancers * RULES.balancerPerChannel }] : [])];
+          : [{ label: "Bandwidth", amount: bandwidth }, ...bandwidthBonus, ...(balancers ? [{ label: `Load balancers ×${balancers}`, amount: balancers * RULES.balancerPerChannel }] : [])];
       deliveries.push({ channelKey: key, index, primary: index === 0, path: route.path, port, amount: sumTerms(own), terms: own });
     });
     // Priority Queue: +1 while the target is the hostile with the least health.
@@ -405,7 +490,7 @@ function transmit(run: RunState, network: Network, focus: Port | null): Transmis
   // ---- ports: merge, bonuses, armor, overflow (rules 12–14)
   const everyPort = primary ? effects.everyPort ?? 0 : 0;
   const focusBonus = primary ? effects.focusBonus ?? 0 : 0;
-  const addBonus = (run.ascension >= 10 ? RULES.addBreakBonusLate : RULES.addBreakBonus);
+  const addBonus = addBreakBonus(run.ascension);
   interface State { enemy: Enemy; raw: number; bonus: number; armor: number; armorTerms: CombatTerm[]; buffer: number; merged: number; in: number; out: number; to: Port | null; packet: number; spared: number }
   const states: State[] = living.map(enemy => {
     const mine = deliveries.filter(delivery => delivery.port === enemy.port);
@@ -478,8 +563,9 @@ function transmit(run: RunState, network: Network, focus: Port | null): Transmis
     if (state.spared) terms.push({ label: "Spearhead · the release ignores armor", amount: state.spared });
   }
   const storable = sumTerms(deliveries.map(delivery => ({ label: "", amount: delivery.amount }))) + everyPort + focusBonus + (backpressurePorts.length ? run.backpressure : 0);
-  const bufferGain = buffering ? Math.floor(Math.max(0, storable) * RULES.bufferMultiplier) : 0;
-  if (buffering && sumTerms(terms) !== 0) terms.push({ label: `Stored in buffer · +${bufferGain} (×${RULES.bufferMultiplier})`, amount: -sumTerms(terms) });
+  const multiplier = bufferMultiplier(run);
+  const bufferGain = buffering ? Math.floor(Math.max(0, storable) * multiplier.value) : 0;
+  if (buffering && sumTerms(terms) !== 0) terms.push({ label: `Stored in buffer · +${bufferGain} (×${multiplier.value}${multiplier.label ? ` · ${multiplier.label}` : ""})`, amount: -sumTerms(terms) });
   const packetDamage = buffering ? 0 : [...taken.values()].reduce((sum, amount) => sum + amount, 0);
   const rawPacketDamage = sumTerms(terms.filter(term => term.amount > 0));
   const gap = packetDamage - sumTerms(terms);
@@ -489,7 +575,7 @@ function transmit(run: RunState, network: Network, focus: Port | null): Transmis
 
 // ------------------------------------------------------------------ step 1: targets
 
-type UnitState = "lands" | "decoyed" | "absorbed" | "cancelled";
+type UnitState = "lands" | "decoyed" | "absorbed" | "cancelled" | "missed";
 interface Unit {
   target: string;
   state: UnitState;
@@ -542,6 +628,10 @@ interface Plan {
   raw: number;
   through: number;
   junk: { card: CardId; count: number } | null;
+  /** v5: a protocol cancelled its strike or breach (Null Route): the protocol's name. */
+  nullified: string | null;
+  /** v5: its strike or breach was dodged: the dodge's source. */
+  dodged: string | null;
 }
 /** Its action resolves: it acts and lives, or it is Spiteful (its announced action resolves even if
  * it dies this turn, rule 59). */
@@ -555,7 +645,7 @@ function nearerDevice(run: RunState, key: string): NetworkNode | null {
 
 function isEnraged(run: RunState, enemy: Enemy) {
   const definition = definitionOf(enemy);
-  const threshold = definition.boss && run.ascension >= 10 ? 0.6 : 0.5;
+  const threshold = definition.boss && ascends(run.ascension, "lastSignal") ? 0.6 : 0.5;
   return scales(enemy) && !!definition.enrages && enemy.hp <= enemy.maxHp * threshold;
 }
 
@@ -692,6 +782,51 @@ function planField(run: RunState, network: Network, plan: Plan): ZoneEffect {
   return { zone, kind, turns: hostileFieldTurns(run) + (intent.fieldBonus ?? 0) };
 }
 
+// ------------------------------------------------------------------ step 4: the protocol table (v5: data)
+
+/** The hostile actions each trigger answers (the first match in port order fires it). */
+const PROTOCOL_MATCH: Record<Trigger, (plan: Plan) => boolean> = {
+  sever: plan => plan.cuts.some(unit => unit.state === "lands"),
+  jam: plan => plan.jams.some(unit => unit.state === "lands"),
+  strike: plan => plan.intent.kind === "strike" && plan.intent.amount > 0,
+  breach: plan => plan.intent.kind === "breach" && plan.intent.amount > 0,
+  field: plan => !!plan.field && !plan.fieldCancelled,
+  ultimate: plan => plan.intent.kind === "charge" || !!plan.intent.ultimate,
+};
+/** Applies a protocol card to the action it answers, from its data alone: `cancels` cancels the
+ * action's cuts, jams or field, or the strike's / breach's damage (Null Route; riders resolve);
+ * `values.shield` / `values.reduce` shield that action; `values.damage` hits the hostile in the
+ * trap step (Port Security, Tarpit, Tripwire). Returns the forecast's effect sentence. */
+function answerProtocol(protocol: CardDefinition, trigger: Trigger, target: Plan): string {
+  const v = protocol.values, clauses: string[] = [];
+  if (protocol.cancels) {
+    if (trigger === "sever") {
+      target.cuts.forEach(unit => { if (unit.state === "lands") unit.state = "cancelled"; });
+      clauses.push("cancels the cable cut");
+    } else if (trigger === "jam") {
+      target.jams.forEach(unit => { if (unit.state === "lands") unit.state = "cancelled"; });
+      clauses.push("cancels the jam");
+    } else if (trigger === "field") {
+      target.fieldCancelled = true;
+      clauses.push(`cancels ${FIELD_RULES[target.field!.kind].name} on ${target.field!.zone.toUpperCase()}`);
+    } else if (trigger === "strike" || trigger === "breach" || target.intent.ultimate) {
+      target.nullified = protocol.name;
+      clauses.push(`cancels the ${target.intent.kind}`);
+    }
+  }
+  const shield = v.shield ?? v.reduce ?? 0;
+  if (shield) {
+    target.protocolShield.push({ label: `${protocol.name} ${protocol.cancels && trigger === "sever" ? "· cut cancelled" : `vs ${trigger}`}`, amount: shield });
+    clauses.push(clauses.length ? `gives ${shield} shield` : `reduces the ${trigger} by ${shield}`);
+  }
+  if (v.damage) {
+    target.trapDamage += v.damage;
+    clauses.push(`${trigger === "ultimate" ? "the guardian" : "the attacker"} takes ${v.damage}`);
+  }
+  const sentence = clauses.reduce((text, clause, i) => !i ? clause : clause.startsWith("gives") ? `${text} and ${clause}` : `${text}; ${clause}`, "");
+  return sentence ? `${sentence[0].toUpperCase()}${sentence.slice(1)}.` : `${protocol.name} fires.`;
+}
+
 // ------------------------------------------------------------------ step 5: installations
 
 /** The device a reach installation is aimed beside (rule 31 and the traits of 9.1–9.3). */
@@ -739,7 +874,7 @@ function plant(run: RunState, network: Network, plan: Plan, plans: Plan[], unit:
   let integrity: number = RULES.installationIntegrity[kind];
   // Rigger Drone · rigging: while a leader lives its Spikes arrive with integrity 3.
   if (plan.enemy.id === "rigger-drone" && kind === "spike" && source === "intent" && livingLeader(run, plan.enemy)) integrity = RULES.riggedSpikeIntegrity;
-  if (run.ascension >= 9) integrity += RULES.ascensionInstallationIntegrity;
+  if (ascends(run.ascension, "lingeringCorruption")) integrity += RULES.ascensionInstallationIntegrity;
   integrity = Math.min(RULES.maxInstallationIntegrity, integrity);
   const bitten = cabledHoneypots(run).some(pot => within(pot, socket));
   if (bitten) integrity -= RULES.honeypotBite;
@@ -806,6 +941,7 @@ export function resolveTurn(s: RunState): Resolution {
       enraged: isEnraged(s, enemy), interrupted: false, acted: false, index: 0,
       jams: [], cuts: [], overload: null, field: null, fieldCancelled: false, hazard: null,
       chip: [], exposure: [], protocolShield: [], trapDamage: 0, heal: 0, terms: [], shieldTerms: [], raw: 0, through: 0, junk: null,
+      nullified: null, dodged: null,
     };
   });
   // Phase-level terms are read now: fields cast this phase cannot hurt until the next one.
@@ -828,6 +964,22 @@ export function resolveTurn(s: RunState): Resolution {
     pool.push({ label: "Watchdog · no live route", amount: RULES.watchdogShield });
     s.watchdogUsed = true;
   }
+  // v5 · shieldTerms daemons join the shared pool.
+  if (s.daemons?.length) pool.push(...daemonShieldTerms(s, network));
+  // v5 · cards left in the hand at the end of the turn (Backdoor, Bitrot): read now, resolved in
+  // the table-front step (wear) and with the attacks (integrity, unblockable).
+  const inHand = handHooks(s).filter(entry => entry.hooks.endOfTurn)
+    .map(entry => ({ entry, effect: entry.hooks.endOfTurn!({ run: s, card: entry.card, count: entry.count, network }) as EndOfTurnEffect }));
+  // v5 · misses (Spoof: the next N jams or cuts; Obfuscation: the first N each phase) and dodges
+  // (Ghost Protocol: the first N strikes or breaches deal 0), in grant order then daemon order.
+  const evasions: EvasionRecord[] = [];
+  const grants = (count: number | undefined, sources: string[] | undefined, fallback: string) =>
+    Array.from({ length: Math.max(0, count ?? 0) }, (_, i) => sources?.[i] ?? fallback);
+  const misses = [...grants(s.turnEffects?.misses, s.turnEffects?.missSources, "Miss"),
+    ...daemonAmounts(s, "missDisruptions").flatMap(term => Array(Math.max(0, term.amount)).fill(term.label) as string[])];
+  const dodges = [...grants(s.turnEffects?.dodges, s.turnEffects?.dodgeSources, "Dodge"),
+    ...daemonAmounts(s, "dodges").flatMap(term => Array(Math.max(0, term.amount)).fill(term.label) as string[])];
+  const missTake = (): string | null => misses.shift() ?? null;
   const linksAtStart = s.topology.links.length;
   const firewallsAtStart = network.onlineNodes.filter(node => node.role === "firewall");
 
@@ -857,9 +1009,12 @@ export function resolveTurn(s: RunState): Resolution {
   const reclaim = { amount: s.reclaim ?? 0 };
   const honeynet: CombatTerm[] = [];
   const events: Resolution["events"] = { arrived: [], signalAnnounced: null, signalFired: null, shed: [], escalated: [] };
+  const handEffects: HandEffectRecord[] = inHand.map(({ entry, effect }) => ({
+    id: entry.id, name: entry.card.name, count: entry.count, integrity: effect.integrity ?? 0, wear: (effect.wear ?? []).map(item => item.nodeId),
+  }));
   const records = (attack?: AttackResult, stormHits = 0): Records => ({
     chip, pool, honeynet, reclaim: reclaim.amount, table, destroyed, quarantine, protocolTriggers, installationEffects, stormHits, lethal,
-    hpAtStart, linksAtStart, firewallsAtStart, signalAtStart, ...(attack ? { attack } : {}),
+    hpAtStart, linksAtStart, firewallsAtStart, signalAtStart, evasions, handEffects, ...(attack ? { attack } : {}),
   });
   const finish = (ended: Resolution["ended"]) => buildResolution(s, network, tx, plans, focus, ended, records(), events);
   if (lethal && !spite()) return finish("transmission");
@@ -876,39 +1031,25 @@ export function resolveTurn(s: RunState): Resolution {
     if (decoys && has(s, "honeynet"))
       for (let i = 0; i < decoys; i++) honeynet.push({ label: "Honeynet · decoy triggered", amount: RULES.honeynetShield });
   }
-  // Protocols fire once per phase, each on the first matching action in port order,
-  // in arming order (rule 20). Port Security also answers a Jammer later in the phase.
+  // Protocols fire once per phase, each on the first matching action in port order, in arming
+  // order (rule 20). v5: the effect is data (CardDefinition.protocol / cancels / values), so a new
+  // protocol needs no code. Port Security also answers a Jammer later in the phase.
   const fired = new Set<string>();
   for (const id of [...s.protocols]) {
-    const protocol = card(id), trigger = protocol.protocol!, v = protocol.values;
+    const protocol = card(id), trigger = protocol.protocol!;
     if (fired.has(trigger)) continue;
-    const candidates = plans.filter(resolving);
-    let target: Plan | undefined, effect = "";
-    if (trigger === "sever" && (target = candidates.find(plan => plan.cuts.some(unit => unit.state === "lands")))) {
-      target.cuts.forEach(unit => { if (unit.state === "lands") unit.state = "cancelled"; });
-      target.protocolShield.push({ label: `${protocol.name} · cut cancelled`, amount: v.shield ?? 3 });
-      effect = `Cancels the cable cut and gives ${v.shield ?? 3} shield.`;
-    } else if (trigger === "jam" && (target = candidates.find(plan => plan.jams.some(unit => unit.state === "lands")))) {
-      target.jams.forEach(unit => { if (unit.state === "lands") unit.state = "cancelled"; });
-      target.trapDamage += v.damage ?? 4;
-      effect = `Cancels the jam; the attacker takes ${v.damage ?? 4}.`;
-    } else if (trigger === "strike" && (target = candidates.find(plan => plan.intent.kind === "strike" && plan.intent.amount > 0))) {
-      target.protocolShield.push({ label: `${protocol.name} vs strike`, amount: v.reduce ?? 5 });
-      effect = `Reduces the strike by ${v.reduce ?? 5}.`;
-    } else if (trigger === "breach" && (target = candidates.find(plan => plan.intent.kind === "breach" && plan.intent.amount > 0))) {
-      target.protocolShield.push({ label: `${protocol.name} vs breach`, amount: v.reduce ?? 6 });
-      effect = `Reduces the breach by ${v.reduce ?? 6}.`;
-    } else if (trigger === "field" && (target = candidates.find(plan => plan.field && !plan.fieldCancelled))) {
-      target.fieldCancelled = true;
-      effect = `Cancels ${FIELD_RULES[target.field!.kind].name} on ${target.field!.zone.toUpperCase()}.`;
-    } else if (trigger === "ultimate" && (target = candidates.find(plan => plan.intent.kind === "charge" || plan.intent.ultimate))) {
-      target.trapDamage += v.damage ?? 8;
-      effect = `The guardian takes ${v.damage ?? 8}.`;
-    }
+    const target = plans.filter(resolving).find(PROTOCOL_MATCH[trigger]);
     if (!target) continue;
+    const effect = answerProtocol(protocol, trigger, target);
     fired.add(trigger);
     s.protocols.splice(s.protocols.indexOf(id), 1);
-    protocolTriggers.push({ card: id, name: protocol.name, effect, target: target.enemy.uid });
+    const retaliation = protocolRetaliation(s, id, trigger);
+    target.trapDamage += sumTerms(retaliation);
+    protocolTriggers.push({
+      card: id, name: protocol.name, target: target.enemy.uid,
+      effect: `${effect}${retaliation.map(term => ` ${term.label}: it takes ${term.amount}.`).join("")}`,
+      ...(retaliation.length ? { retaliation } : {}),
+    });
   }
   // Firewall quarantine (rule 36): each online firewall deals 1 (Sentry 2) to the nearest
   // installation within reach, whatever its route delivers.
@@ -947,6 +1088,13 @@ export function resolveTurn(s: RunState): Resolution {
     for (const unit of plan.units) unit.absorbed = phantomTake() ?? undefined;
     for (const unit of [...plan.jams, ...plan.cuts, ...(plan.overload ? [plan.overload] : [])]) {
       if (unit.state !== "lands") continue;
+      // v5: a miss takes the next jam or cut before any phantom does (never an overload or an install).
+      const miss = unit !== plan.overload ? missTake() : null;
+      if (miss) {
+        Object.assign(unit, { state: "missed", by: miss });
+        evasions.push({ kind: "miss", source: miss, by: plan.enemy.uid, target: unit.target });
+        continue;
+      }
       const by = phantomTake();
       if (by) Object.assign(unit, { state: "absorbed", by });
     }
@@ -1023,7 +1171,7 @@ export function resolveTurn(s: RunState): Resolution {
       if (node) wearDevice(s, node, `${name} · ${plan.intent.label.replace(/^(ENRAGED|WOUNDED) · /, "")}`, table);
     }
     // Ascension 6: the Regent's CLOSE THE GATES and the Choir's STOLEN VOICE also wear their target.
-    if (s.ascension >= 6 && RULES.ascensionRiderWear > 0 && ((plan.enemy.id === "regent" && plan.intent.kind === "sever") || (plan.enemy.id === "cantor" && plan.intent.kind === "jam")))
+    if (ascends(s.ascension, "ancientGuardians") && RULES.ascensionRiderWear > 0 && ((plan.enemy.id === "regent" && plan.intent.kind === "sever") || (plan.enemy.id === "cantor" && plan.intent.kind === "jam")))
       for (const unit of [...plan.jams, ...plan.cuts]) {
         if (unit.state !== "lands" && unit.state !== "decoyed") continue;
         const device = plan.intent.kind === "jam" ? s.topology.nodes.find(node => node.id === unit.target) : nearerDevice(s, unit.target);
@@ -1066,16 +1214,29 @@ export function resolveTurn(s: RunState): Resolution {
         .sort((a, b) => Math.hypot(a.x - item.x, a.z - item.z) - Math.hypot(b.x - item.x, b.z - item.z)
           || Number(!path.includes(a.id)) - Number(!path.includes(b.id)) || s.topology.nodes.indexOf(a) - s.topology.nodes.indexOf(b))[0];
       if (!target) { installationEffects.push({ id: item.id, kind: item.kind, effect: "jam", target: null }); continue; }
-      const security = !fired.has("jam") ? s.protocols.find(id => card(id).protocol === "jam") : undefined;
+      // An unfired protocol that cancels jams (Port Security) answers a Jammer later in the phase.
+      const security = !fired.has("jam") ? s.protocols.find(id => card(id).protocol === "jam" && card(id).cancels) : undefined;
       if (security) {
-        const damage = card(security).values.damage ?? 4;
+        const damage = card(security).values.damage ?? 0;
         fired.add("jam");
         s.protocols.splice(s.protocols.indexOf(security), 1);
-        protocolTriggers.push({ card: security, name: card(security).name, effect: `Cancels the Jammer's jam; the Jammer takes ${damage}.`, target: item.id });
-        item.integrity -= damage;
+        const retaliation = protocolRetaliation(s, security, "jam");
+        const total = damage + sumTerms(retaliation);
+        protocolTriggers.push({
+          card: security, name: card(security).name, target: item.id,
+          effect: `Cancels the Jammer's jam${damage ? `; the Jammer takes ${damage}` : ""}.${retaliation.map(term => ` ${term.label}: it takes ${term.amount}.`).join("")}`,
+          ...(retaliation.length ? { retaliation } : {}),
+        });
+        item.integrity -= total;
         const gone = item.integrity <= 0;
         installationEffects.push({ id: item.id, kind: item.kind, effect: "jam", target: target.id, cancelled: true, ...(gone ? { destroyed: true } : {}) });
         if (gone) reclaim.amount += destroyInstallation(s, item, card(security).name, 0, destroyed);
+        continue;
+      }
+      const miss = missTake();
+      if (miss) {
+        evasions.push({ kind: "miss", source: miss, by: item.id, target: target.id });
+        installationEffects.push({ id: item.id, kind: item.kind, effect: "jam", target: target.id, missed: miss });
         continue;
       }
       const phantom = phantomTake();
@@ -1098,6 +1259,18 @@ export function resolveTurn(s: RunState): Resolution {
     }
   }
 
+  // v5 · cards left in the hand wear devices in the table-front step (Bitrot), after the installations.
+  for (const { entry, effect } of inHand)
+    for (const request of effect.wear ?? []) {
+      const node = s.topology.nodes.find(item => item.id === request.nodeId);
+      if (!node || !wearable(node) || request.points <= 0) continue;
+      if (!request.direct) { wearDevice(s, node, entry.card.name, table, request.points); continue; }
+      const from = conditionOf(node), to = Math.max(0, from - request.points);
+      node.condition = to;
+      table.wear.push({ nodeId: node.id, from, to, breaks: to <= 0, source: entry.card.name });
+      if (to <= 0) breakDevice(s, node, table);
+    }
+
   // ================================================================ step 7: junk (positions are RNG: endTurn)
   const junk: Resolution["junk"] = [];
   for (const plan of plans) if (resolving(plan) && plan.intent.junk) {
@@ -1106,7 +1279,9 @@ export function resolveTurn(s: RunState): Resolution {
   }
 
   // ================================================================ step 8: attacks against one shared pool
-  const attack = attackPhase(s, network, plans, { chip, pool, honeynet, reclaim: reclaim.amount, stormHits, linksAtStart, firewallsAtStart });
+  const unblockable = inHand.filter(({ effect }) => (effect.integrity ?? 0) > 0)
+    .map(({ entry, effect }) => ({ label: `${entry.card.name}${entry.count > 1 ? ` ×${entry.count}` : ""} · in hand`, amount: effect.integrity! }));
+  const attack = attackPhase(s, network, plans, { chip, pool, honeynet, reclaim: reclaim.amount, stormHits, linksAtStart, firewallsAtStart, dodges, unblockable, evasions });
   s.integrity = Math.max(0, s.integrity - attack.incoming);
   if (attack.backpressureGain) s.backpressure += attack.backpressureGain;
 
@@ -1181,6 +1356,11 @@ interface AttackContext {
   stormHits: number;
   linksAtStart: number;
   firewallsAtStart: NetworkNode[];
+  /** v5: dodge sources left this phase (consumed in port order), unblockable integrity terms
+   * (curses in hand), and the evasion record the dodges join. */
+  dodges: string[];
+  unblockable: CombatTerm[];
+  evasions: EvasionRecord[];
 }
 interface AttackResult {
   incoming: number;
@@ -1189,6 +1369,8 @@ interface AttackResult {
   shieldTerms: CombatTerm[];
   shield: number;
   backpressureGain: number;
+  /** v5: block a blockCarry daemon keeps for the next turn (what the attacks left of it). */
+  blockCarried: { amount: number; by: string } | null;
 }
 
 /** The raw terms of one hostile's action (v3 labels for the single hostile). */
@@ -1226,6 +1408,11 @@ function actionTerms(run: RunState, network: Network, plan: Plan, linksAtStart: 
     const reduce = Math.min(RULES.ingressFilterReduce, Math.max(0, terms.reduce((sum, term) => sum + term.amount, 0)));
     if (reduce) terms.push({ label: "Ingress Filter", amount: -reduce });
   }
+  // v5 · a protocol cancelled the attack (Null Route): it deals 0; its riders still resolve.
+  if (attack && plan.nullified) {
+    const total = Math.max(0, sumTerms(terms));
+    if (total) terms.push({ label: `${plan.nullified} · ${intent.kind} cancelled`, amount: -total });
+  }
   return terms;
 }
 
@@ -1237,37 +1424,51 @@ function attackPhase(run: RunState, network: Network, plans: Plan[], context: At
   const pack = plans.length > 1;
   const firewalls = context.firewallsAtStart.filter(node => run.topology.nodes.includes(node));
   let chipDone = false, incoming = 0, raw = 0, prevented = 0;
-  const entries: { plan: Plan | null; terms: CombatTerm[]; perAttack: CombatTerm[] }[] = [];
+  const entries: { plan: Plan | null; terms: CombatTerm[]; perAttack: CombatTerm[]; unblockable?: boolean }[] = [];
   const phaseChip = [...context.chip];
   const exposure = plans.flatMap(plan => resolving(plan) ? plan.exposure : [])[0];
   if (exposure) phaseChip.push(exposure);
+  const dodges = [...context.dodges];
+  const firewallDaemons = firewalls.length ? daemonAmounts(run, "firewallBonus") : [];
   for (const plan of plans) {
     // A Spiteful hostile's attack lands even though it fell this turn (rule 59).
     if (!(plan.acted && plan.enemy.hp > 0) && plan.state !== "spiteful") continue;
-    const terms = [...actionTerms(run, network, plan, context.linksAtStart), ...plan.chip];
+    const action = actionTerms(run, network, plan, context.linksAtStart);
+    const attack = !plan.interrupted && (plan.intent.kind === "strike" || plan.intent.kind === "breach");
+    // v5 · a dodge (Ghost Protocol) zeroes the first strikes or breaches in port order.
+    if (attack && !plan.nullified && sumTerms(action) > 0 && dodges.length) {
+      const source = dodges.shift()!;
+      plan.dodged = source;
+      context.evasions.push({ kind: "dodge", source, by: plan.enemy.uid, target: null });
+      action.push({ label: `${source} · ${plan.intent.kind} dodged`, amount: -sumTerms(action) });
+    }
+    const terms = [...action, ...plan.chip];
     if (!chipDone) { terms.push(...phaseChip); chipDone = true; }
     const perAttack: CombatTerm[] = [...plan.protocolShield];
-    const attack = !plan.interrupted && (plan.intent.kind === "strike" || plan.intent.kind === "breach");
     if (attack && firewalls.length) {
       const per = plan.intent.kind === "breach" ? RULES.firewallBreachBlock : RULES.firewallStrikeBlock;
       const bonus = run.turnEffects?.firewallBonus ?? 0;
       const amount = firewalls.reduce((sum, node) => sum + per * (node.stateful ? 2 : 1) * (has(run, "zero-trust") ? 2 : 1) + bonus, 0);
       if (amount) perAttack.push({ label: `Online firewalls ×${firewalls.length} vs ${plan.intent.kind}`, amount });
+      // v5 · firewallBonus daemons (Defense in Depth): every online firewall blocks more.
+      for (const term of firewallDaemons) perAttack.push({ label: `${term.label} · firewalls ×${firewalls.length}`, amount: term.amount * firewalls.length });
     }
     entries.push({ plan, terms, perAttack });
   }
   if (!chipDone && phaseChip.length) entries.push({ plan: null, terms: phaseChip, perAttack: [] });
   if (context.stormHits && has(run, "storm-control"))
     entries.push({ plan: null, terms: [{ label: `Storm Control · ${context.stormHits} jam${context.stormHits === 1 ? "" : "s"} or cut${context.stormHits === 1 ? "" : "s"} landed`, amount: context.stormHits * RULES.stormControlDamage }], perAttack: [] });
+  // v5 · curses in hand (Backdoor): unblockable, after every attack.
+  for (const term of context.unblockable) entries.push({ plan: null, terms: [term], perAttack: [], unblockable: true });
   for (const entry of entries) {
     const label = (term: CombatTerm) => pack && entry.plan ? { ...term, label: `${hostileLabel(entry.plan.enemy)} · ${term.label}` } : term;
     const own = Math.max(0, sumTerms(entry.terms));
     const guard = sumTerms(entry.perAttack);
     let through = Math.max(0, own - guard);
-    const take = Math.min(through, pool);
+    const take = entry.unblockable ? 0 : Math.min(through, pool);
     pool -= take;
     through -= take;
-    if (through > 0 && has(run, "shield-array") && !run.shieldArrayUsed) {
+    if (through > 0 && !entry.unblockable && has(run, "shield-array") && !run.shieldArrayUsed) {
       const stop = Math.min(RULES.shieldArrayPrevent, through);
       through -= stop;
       run.shieldArrayUsed = true;
@@ -1285,8 +1486,12 @@ function attackPhase(run: RunState, network: Network, plans: Plan[], context: At
       entry.plan.through = through;
     }
   }
-  const backpressureGain = has(run, "backpressure") ? Math.ceil(prevented * RULES.backpressureRatio) : 0;
-  return { incoming, raw, incomingTerms, shieldTerms, shield: sumTerms(shieldTerms), backpressureGain };
+  const backpressureGain = has(run, "backpressure") ? Math.ceil(prevented * backpressureRatio(run).value) : 0;
+  // v5 · blockCarry (Persistent State): the pool's other terms expire first, so the block that
+  // survives is what is left of the pool, up to the block itself.
+  const carrier = run.block > 0 ? daemonFlag(run, "blockCarry") : null;
+  const blockCarried = carrier ? { amount: Math.max(0, Math.min(run.block, pool)), by: carrier } : null;
+  return { incoming, raw, incomingTerms, shieldTerms, shield: sumTerms(shieldTerms), backpressureGain, blockCarried };
 }
 
 // ------------------------------------------------------------------ the forecast record
@@ -1307,6 +1512,8 @@ interface Records {
   linksAtStart: number;
   firewallsAtStart: NetworkNode[];
   signalAtStart: CombatPreview["signal"];
+  evasions: EvasionRecord[];
+  handEffects: HandEffectRecord[];
   attack?: AttackResult;
 }
 
@@ -1319,7 +1526,9 @@ function buildResolution(s: RunState, network: Network, tx: Transmission, plans:
   const after = over ? network : analyze(s, s.faultNodes, s.faultLinks, true);
   const nextTurn = {
     energy: turnEnergyBase(s) + s.reserveEnergy + (has(s, "reserve-cell") ? Math.min(2, s.energy) : 0) + after.onlineNodes.filter(node => node.role === "power").length,
-    draw: turnDrawBase(s) + after.onlineNodes.filter(node => node.role === "cache").length + (has(s, "fanout") && after.channelCount >= 3 ? 1 : 0),
+    draw: turnDrawBase(s) + after.onlineNodes.filter(node => node.role === "cache").length + (has(s, "fanout") && after.channelCount >= 3 ? 1 : 0) + (s.nextTurn?.draw ?? 0),
+    // Block: Grounded Core, what a blockCarry daemon keeps, next-turn gains (Brace).
+    block: (has(s, "grounded-core") ? 1 : 0) + (attack?.blockCarried?.amount ?? 0) + (s.nextTurn?.block ?? 0),
   };
   const leader = leaderOf(s);
   const leaderPlan = plans.find(plan => plan.enemy === leader) ?? plans.find(plan => plan.enemy.port === "centre") ?? plans[0] ?? null;
@@ -1360,6 +1569,9 @@ function buildResolution(s: RunState, network: Network, tx: Transmission, plans:
       decoyed: disruptions.filter(unit => unit.state === "decoyed").length,
       absorbed: disruptions.filter(unit => unit.state === "absorbed").length + plan.installs.filter(item => item.absorbed).length,
       cancelled: disruptions.filter(unit => unit.state === "cancelled").length,
+      missed: disruptions.filter(unit => unit.state === "missed").length,
+      dodged: plan.dodged,
+      nullified: plan.nullified,
     };
   });
   const leaderForecast = leaderPlan ? hostiles[plans.indexOf(leaderPlan)] : null;
@@ -1430,6 +1642,9 @@ function buildResolution(s: RunState, network: Network, tx: Transmission, plans:
     risingAdds: events.arrived.filter(item => item.kind === "add").map(item => ({ enemyId: item.id, port: item.port })),
     faultTargets: cut ? [] : [...s.faultNodes, ...s.faultLinks],
     installTargets,
+    evasions: cut ? [] : records.evasions,
+    handEffects: cut ? [] : records.handEffects,
+    blockCarried: cut ? null : attack?.blockCarried ?? null,
   };
   return {
     preview, ended,

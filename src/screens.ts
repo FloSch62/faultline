@@ -109,6 +109,8 @@ const RELIC_GLYPHS: Record<RelicId, string> = {
   // v4 · Under Quarantine
   "round-robin": "fanout", "ingress-filter": "lock", "priority-queue": "queue", "reinforced-frame": "frames",
   "field-engineer": "wrench", "bill-of-lading": "crate", "storm-control": "storm", "scorched-earth": "sword",
+  // v5 · Three Energy (engine placeholder glyphs; the UI agent may choose better ones)
+  "air-gap": "lock", "legacy-mainframe": "frames", overvolt: "bolt",
 };
 export function relicEmblem(id: RelicId, size = 30): string {
   return `<span class="relic-emblem tier-${RELICS[id].tier}" style="--relic-color:${RELICS[id].color}">${sicon(RELIC_GLYPHS[id] ?? "elite", size)}</span>`;
@@ -148,7 +150,8 @@ export function loadProgress(): Progress {
     const cleared: Progress["cleared"] = {};
     for (const id of Object.keys(ARCHETYPES) as Archetype[]) {
       const level = value?.cleared?.[id];
-      if (Number.isInteger(level) && level >= 0 && level <= MAX_ASCENSION) cleared[id] = level;
+      // v5: ascension has four levels; a record from the ten-level game is clamped, never migrated.
+      if (Number.isInteger(level) && level >= 0) cleared[id] = Math.min(MAX_ASCENSION, level);
     }
     const unlock = value?.lastUnlock;
     return {

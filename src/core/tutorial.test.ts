@@ -157,7 +157,7 @@ test("04 · online devices: firewall online anywhere, then a cache server", () =
   cable(s.run, "alpha", cache);
   cable(s.run, cache, "router1");
   assert.ok(s.update().complete);
-  assert.ok(combatPreview(s.run).nextTurn.draw > 6, "cache server draws next turn");
+  assert.ok(combatPreview(s.run).nextTurn.draw > RULES.handDraw, "cache server draws next turn");
 });
 
 test("05 · bands: relocate out of the suppressed, marked band, then resonate", () => {

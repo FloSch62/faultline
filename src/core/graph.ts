@@ -5,7 +5,7 @@ export function linkKey(a: string, b: string): string {
   return [a, b].sort().join("::");
 }
 
-/** Stable identity of a channel for delivery aims: its inner device ids (terminals
+/** Stable identity of a channel (its delivery in the forecast): its inner device ids (terminals
  * excluded), sorted and joined by "|". It survives re-enumeration while the channel's
  * device set exists; a channel that changes its devices is a new channel. */
 export function channelKey(path: readonly string[]): string {

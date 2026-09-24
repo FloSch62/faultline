@@ -27,7 +27,7 @@ async function transmitLesson(page: Page) {
 async function expandCoach(page: Page) {
   if (await page.locator(".training-panel.is-collapsed").count()) await page.locator('[data-action="lesson-collapse"]').click();
 }
-interface Drill { id: string; turn: number; focus: string | null; aims: Record<string, string>; delivery: string | null; deliveries: string[]; step: number; complete: boolean; plate: boolean }
+interface Drill { id: string; turn: number; focus: string | null; deliveries: { key: string; port: string }[]; step: number; complete: boolean; plate: boolean }
 /** The drill's own state (lesson runs are never saved; a dev-server hook). */
 async function drill(page: Page): Promise<Drill> {
   return (await page.evaluate(() => (globalThis as { __faultlineLesson?: () => unknown }).__faultlineLesson?.() ?? null)) as Drill;
@@ -37,25 +37,11 @@ async function press(page: Page, key: string) {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press(key);
 }
-/** Click a hostile to target it. Where a click on a hostile only selects it, F then targets it. */
+/** Click a hostile (its row on the plate) to target it: every delivery follows. */
 async function target(page: Page, port: string) {
   await page.locator(`.port-row[data-port="${port}"]`).click();
-  if ((await drill(page)).focus !== port) await press(page, "f");
   await expect.poll(async () => (await drill(page)).focus).toBe(port);
-}
-/** Pick a delivery up (its row), then click the hostile that takes it. Where a click on a hostile only
- * selects it, the delivery's stud (or T) aims it instead. */
-async function pickUp(page: Page, key: string) {
-  await page.locator(`.delivery-row[data-delivery="${key}"]`).click();
-  await expect.poll(async () => (await drill(page)).delivery).toBe(key);
-}
-async function aimAt(page: Page, key: string, port: string) {
-  await page.locator(`.port-row[data-port="${port}"]`).click();
-  if ((await drill(page)).aims[key] === port) return;
-  const stud = page.locator(`.delivery-row[data-delivery="${key}"] [data-aim-port="${port}"]`);
-  if (await stud.count()) await stud.click();
-  for (let i = 0; i < 3 && (await drill(page)).aims[key] !== port; i++) await press(page, "t");
-  await expect.poll(async () => (await drill(page)).aims[key]).toBe(port);
+  expect((await drill(page)).deliveries.every(item => item.port === port)).toBe(true);
 }
 /** The lesson is over: the scrim holds the frozen board and the completion plate is up. */
 async function lessonOver(page: Page, next: string | null) {
@@ -196,7 +182,7 @@ test("the Handbook switches chapters and the expedition walkthrough pages turn",
     await page.locator(`dialog [data-walkthrough="${i}"]`).first().click();
     await expect(page.locator(`dialog [data-walkthrough="${i}"].current`)).toBeVisible();
   }
-  await expect(page.locator('dialog [data-action="lesson-finish-next"]')).toContainText("Aim the Signal");
+  await expect(page.locator('dialog [data-action="lesson-finish-next"]')).toContainText("Choose the Target");
   if (process.env.FAULTLINE_SHOTS) await page.screenshot({ path: `${process.env.FAULTLINE_SHOTS}/walkthrough-end.png` });
   await page.locator('dialog [data-action="lesson-finish"]').click();
   await expect(page.locator('dialog .lesson-card.done[data-lesson="expedition"]')).toBeVisible();
@@ -310,12 +296,14 @@ for (const size of SIZES) {
   test.describe(`${size.width}×${size.height}`, () => {
     test.use({ viewport: size });
 
-    test("Field Training 10 · Aim the Signal: read, target, transmit, aim, overflow — nothing else plays", async ({ page }) => {
+    test("Field Training 10 · Choose the Target: read, target, transmit and overflow, retarget, overflow — nothing else plays", async ({ page }) => {
       test.setTimeout(120_000);
       await openDrill(page, "aim-signal");
       await expect(page.locator(".training-kicker")).toContainText("Lesson 10 of 12");
-      // Three hostiles, one per port.
+      await expect(page.locator(".training-panel")).toContainText("Choose the Target");
+      // Three hostiles, one per port; no per-channel controls anywhere.
       for (const port of ["left", "centre", "right"]) await expect(page.locator(`.port-row[data-port="${port}"]`)).toBeVisible();
+      await expect(page.locator(".delivery-row, .port-stud, [data-aim]")).toHaveCount(0);
 
       // 1 · read the rail: every hostile's next move, lit together; only Got it moves on.
       await step(page, 1);
@@ -328,49 +316,42 @@ for (const size of SIZES) {
       await refused(page, () => press(page, "f"), /read the three ports/i);
       await page.locator('.training-panel [data-action="lesson-read"]').first().click();
 
-      // 2 · target the Relay Drone.
+      // 2 · target the Relay Drone: its badge, else its row.
       await step(page, 2);
-      await spotlit(page, '#intent-layer .hostile-intent[data-port="left"], [data-focus-port="left"], .port-row[data-port="left"]');
+      await spotlit(page, '#intent-layer .hostile-intent[data-port="left"], .port-row[data-port="left"]');
       await expect(page.locator(".training-panel")).toContainText("Click the Relay Drone to target it");
       await shot(page, "10-2-target");
       await refused(page, () => press(page, "Space"), /target the Relay Drone first/);
-      await refused(page, () => page.locator('.port-row[data-port="right"]').click().then(() => press(page, "f")), /Target the Relay Drone/);
+      await refused(page, () => page.locator('.port-row[data-port="right"]').click(), /Target the Relay Drone/);
       await target(page, "left");
 
-      // 3 · transmit: everything lands on the Drone.
+      // 3 · transmit: the whole packet lands on the Drone, and the spare overflows to the leader.
       await step(page, 3);
       await spotlit(page, ".transmit-button");
+      await expect(page.locator(".training-panel")).toContainText(/spare 2 overflows to the CENTRE/);
+      await expect(page.locator(".enemy-plate .landing-overflow")).toContainText("overflow 2 → CENTRE");
+      await expect(page.locator(".transmit-button .transmit-note")).toContainText("overflow → CENTRE");
       await shot(page, "10-3-strike");
       await transmitLesson(page);
 
-      // 4 · the Drone fell and the target went back to the leader. Pick up channel 2, then click the Mite.
+      // 4 · the Drone fell and the target went back to the leader. The Mite bites now: retarget it.
       await step(page, 4);
-      const { deliveries } = await drill(page);
-      expect(deliveries).toHaveLength(2);
-      const [primary, second] = deliveries;
-      await expect(page.locator(`.delivery-row[data-delivery="${second}"]`)).toBeVisible();
-      await spotlit(page, `.delivery-row[data-delivery="${second}"]`);
-      await shot(page, "10-4-pick");
-      await refused(page, () => press(page, "Space"), /aim channel 2 at the Spark Mite first/);
-      await refused(page, () => press(page, "f"), /Keep your target/);
-      await pickUp(page, primary);
-      await expect(page.locator(".training-panel")).toContainText("That is the primary");
-      await refused(page, () => press(page, "t"), /Leave the primary on your target/);
-      await pickUp(page, second);
-      await spotlit(page, `#intent-layer .hostile-intent[data-port="right"], .delivery-row[data-delivery="${second}"] [data-aim-port="right"], .port-row[data-port="right"]`);
-      await expect(page.locator(".training-panel")).toContainText("click the Spark Mite");
-      await shot(page, "10-5-aim");
-      await aimAt(page, second, "right");
+      expect((await drill(page)).focus).toBe("centre");
+      await spotlit(page, '#intent-layer .hostile-intent[data-port="right"], .port-row[data-port="right"]');
+      await expect(page.locator(".training-panel")).toContainText("click the Spark Mite to target it");
+      await shot(page, "10-4-retarget");
+      await refused(page, () => press(page, "Space"), /target the Spark Mite first/);
+      await target(page, "right");
 
-      // 5 · transmit: the Mite falls, the spare overflows to the target.
+      // 5 · transmit: the Mite falls before it bites, the spare overflows into the leader.
       await step(page, 5);
       await spotlit(page, ".transmit-button");
-      await expect(page.locator(".training-panel")).toContainText(/overflows to your target/);
-      await expect(page.locator(".deliveries-foot")).toContainText(/overflow 1 → CENTRE/);
-      await shot(page, "10-6-overflow");
+      await expect(page.locator(".training-panel")).toContainText(/the Mite falls, and the spare \d+ overflows into/);
+      await expect(page.locator(".enemy-plate .landing-overflow")).toContainText(/overflow \d+ → CENTRE/);
+      await shot(page, "10-5-overflow");
       await transmitLesson(page);
       await lessonOver(page, "Clear the Ground");
-      await shot(page, "10-7-complete");
+      await shot(page, "10-6-complete");
       expect(await page.evaluate(key => localStorage.getItem(key), TRAINING)).toContain("aim-signal");
     });
 
@@ -417,7 +398,7 @@ for (const size of SIZES) {
       expect(await page.evaluate(key => localStorage.getItem(key), TRAINING)).toContain("clear-ground");
     });
 
-    test("Field Training 12 · The Crown and Its Wardens: read, aim, prepare, transmit, break — nothing else plays", async ({ page }) => {
+    test("Field Training 12 · The Crown and Its Wardens: read, target, prepare, transmit, break — nothing else plays", async ({ page }) => {
       test.setTimeout(120_000);
       await openDrill(page, "wardens");
       await expect(page.locator(".training-kicker")).toContainText("Lesson 12 of 12");
@@ -428,23 +409,19 @@ for (const size of SIZES) {
       await expect(page.locator(".coach-break, .training-read").filter({ visible: true }).first()).toContainText("Got it");
       await shot(page, "12-1-read");
       await refused(page, () => press(page, "Space"), /Read the break meter first/);
-      await refused(page, () => press(page, "t"), /current step/);
+      await refused(page, () => press(page, "f"), /read the break meter/i);
       await meter.click();
       await step(page, 2);
-      const [primary, ...bandwidth] = (await drill(page)).deliveries;
-      expect(bandwidth).toHaveLength(2);
-      await spotlit(page, `.delivery-row[data-delivery="${bandwidth[0]}"]`);
-      await shot(page, "12-2-aim");
-      await pickUp(page, primary);
-      await refused(page, () => press(page, "t"), /Keep the primary on your target, the Regent/);
-      for (const key of bandwidth) {
-        await pickUp(page, key);
-        await spotlit(page, `#intent-layer .hostile-intent[data-port="left"], .delivery-row[data-delivery="${key}"] [data-aim-port="left"], .port-row[data-port="left"]`);
-        if (key === bandwidth[0]) await shot(page, "12-2b-aim-warden");
-        await aimAt(page, key, "left");
-      }
-      expect((await drill(page)).aims).toMatchObject({ [bandwidth[0]]: "left", [bandwidth[1]]: "left" });
+      expect((await drill(page)).deliveries).toHaveLength(3);
+      await spotlit(page, '#intent-layer .hostile-intent[data-port="left"], .port-row[data-port="left"]');
+      await expect(page.locator(".training-panel")).toContainText("Click the left Gate Warden to target it");
+      await shot(page, "12-2-target");
+      await refused(page, () => press(page, "Space"), /Target the left Warden first/);
+      await refused(page, () => page.locator('.port-row[data-port="right"]').click(), /Target the left Gate Warden/);
+      await target(page, "left");
+      await expect(page.locator(".enemy-plate .landing-overflow")).toContainText(/overflow \d+ → CENTRE/);
       await step(page, 3);
+      await refused(page, () => page.locator('.port-row[data-port="centre"]').click(), /Keep your target on the left Warden/);
       await spotlit(page, ".prepared-pile");
       await shot(page, "12-3-prepare");
       await refused(page, () => press(page, "Space"), /Prepare Packet Burst first/);

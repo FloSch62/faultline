@@ -55,7 +55,7 @@
  * Ports, table front and surprises (v4 · Under Quarantine)
  *   arrive     An escort or reinforcement takes a port (also the guardian's adds rising).
  *   dormant    An escort goes dormant for the phase.
- *   aim        A channel is aimed at a port, or the focus changes.
+ *   aim        The target changes (a hostile clicked, or F).
  *   install    A Jammer, Spike, Anchor or Breaker Charge is planted (Taps keep malware).
  *   wear       An overload or a Spike removes a condition point.
  *   breakdown  A device breaks and leaves wreckage.

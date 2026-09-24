@@ -51,7 +51,6 @@ import {
   livingEnemies,
   effectiveFocus,
   setFocus,
-  aimChannel,
   mostDangerous,
   isWorn,
   conditionOf,
@@ -94,7 +93,7 @@ void loadAllModels();
 const faultKey = (state: RunState) => `${state.faultNodes.join(",")}|${state.faultLinks.join(",")}`;
 const installationPoints = (state: RunState) => state.installations.reduce((sum, item) => sum + item.integrity, 0);
 /** Controls whose hover deserves a whisper; icon buttons and toolbars stay silent. */
-const HOVER_CUES = ".game-card:not(.drag-ghost), .route-room:not([disabled]), .archetype, .relic-option, [data-forge], .transmit-button, .console-button, .title-menu button, .gold-button, .field-seal.targetable, .lesson-card, button.port-row, .port-stud, .hostile-intent[data-port], .delivery-pick";
+const HOVER_CUES = ".game-card:not(.drag-ghost), .route-room:not([disabled]), .archetype, .relic-option, [data-forge], .transmit-button, .console-button, .title-menu button, .gold-button, .field-seal.targetable, .lesson-card, button.port-row, .hostile-intent[data-port]";
 let expedition: Expedition | null = null;
 let records: RunRecord[] = [];
 try {
@@ -114,8 +113,8 @@ let daily = false;
 let selected: number | null = null;
 let source: string | null = null;
 let selectedNode: string | null = null;
-/** Far rail and table-front selection (reading only; focus and aims live in the run). */
-const hud: battleUi.HudView = { port: null, delivery: null, installation: null, demolition: false };
+/** Far rail and table-front selection (reading only; the target lives in the run). */
+const hud: battleUi.HudView = { port: null, installation: null, demolition: false };
 /** Encounters whose hidden designation was already re-engraved, and arrivals already announced. */
 let revealedKey = "", announcedKey = "", hudRoom = "";
 let busy = false;
@@ -250,8 +249,6 @@ function ensureWorld() {
       onLink: () => {},
       onMove,
       onPort: clickHostile,
-      onAim: aimDelivery,
-      onDelivery: pickDelivery,
       onFrame: placeIntents,
       onInstallation: selectInstallation,
       onHover: hoverTable,
@@ -268,15 +265,15 @@ function ensureWorld() {
 }
 /** Test hooks: on the dev server, and on a production build under the browser suite's render flag. */
 const testHooks = import.meta.env.DEV || (globalThis as { __faultlineTestRender?: boolean }).__faultlineTestRender === true;
-/** Hover cards on the table: devices, cables and installations (table-cards.ts), hostiles and
- * packet glyphs (hostile-cards.ts). The same target only moves the card; render() hides it. */
+/** Hover cards on the table: devices, cables and installations (table-cards.ts), hostiles
+ * (hostile-cards.ts). The same target only moves the card; render() hides it. */
 function hoverTable(target: TableHover | null, x: number, y: number) {
   if (!target || view !== "run" || run.phase !== "battle" || dialog.open || pendingMove) { hideHoverCard(); return; }
   const key = `${target.kind}:${target.id}`;
   if (hoverCardKey() === key) { moveHoverCard(x, y); return; }
   const preview = combatPreview(run);
   const html = target.kind === "port" || target.kind === "delivery"
-    ? hostileCards.hoverMarkup(run, preview, target, hud.delivery)
+    ? hostileCards.hoverMarkup(run, preview, target)
     : tableCards.hoverMarkup(run, preview, target);
   if (html) showHoverCard(key, html, x, y);
   else hideHoverCard();
@@ -526,7 +523,7 @@ function fitLedger() {
 /** Encounter-scoped HUD moments: a hidden designation re-engraves once, an announced arrival rings once. */
 function revealDesignation(): boolean {
   const key = `${run.seed}:${run.stage}:${run.currentRoom}`;
-  if (key !== hudRoom) { hudRoom = key; hud.port = hud.delivery = hud.installation = null; hud.demolition = false; }
+  if (key !== hudRoom) { hudRoom = key; hud.port = hud.installation = null; hud.demolition = false; }
   const room = run.map.find(item => item.id === run.currentRoom);
   if (practice || revealedKey === key || !room?.designationHidden || run.turn !== 1 || run.cardsPlayed) return false;
   revealedKey = key;
@@ -907,20 +904,16 @@ function journalAction(move: () => void) {
   if (surface) surface.scrollTop = scroll;
   if (again) dialog.querySelector<HTMLElement>(again)?.focus();
 }
-/** Rails for the v4 moves (aim, focus, repair, scrub): the lesson guard refuses them outside their step. */
-function lessonMove(action: Extract<training.LessonAction, { kind: "aim" | "focus" | "repair" | "scrub" }>): boolean {
+/** Rails for the v4 moves (target, repair, scrub): the lesson guard refuses them outside their step. */
+function lessonMove(action: Extract<training.LessonAction, { kind: "focus" | "repair" | "scrub" }>): boolean {
   return lessonBlocks(action);
 }
-/** A click on a hostile (its body, rail plate, intent badge or port-strip row). With a delivery
- * picked up it aims that delivery there; otherwise the hostile becomes the target. */
+/** A click on a hostile (its body, rail plate, intent badge or port-strip row) targets it. */
 function clickHostile(port: Port) {
-  if (!playable() || !livingEnemies(run).some(enemy => enemy.port === port)) return;
-  const armed = hud.delivery && livingEnemies(run).length > 1 && combatPreview(run).deliveries.some(item => item.channelKey === hud.delivery);
-  if (armed) aimDelivery(hud.delivery!, port);
-  else focusPort(port);
+  focusPort(port);
 }
-/** Make a port the target (the rules' focus): every unaimed delivery and all overflow go there
- * (free, undoable). The right plate details the target. Targeting the target changes nothing. */
+/** Make a port the target (the rules' focus): every delivery lands there and overflow carries the
+ * surplus on (free, undoable). The right plate details the target. Targeting the target changes nothing. */
 function focusPort(port: Port) {
   if (!playable() || !livingEnemies(run).some(enemy => enemy.port === port)) return;
   if (effectiveFocus(run) === port && run.focus === port) { hud.port = port; render(false); return; }
@@ -928,39 +921,13 @@ function focusPort(port: Port) {
   hud.port = port;
   playAction(() => setFocus(run, port), "aim");
 }
-/** Re-aim one delivery at a port (null follows the target): a click on a hostile with the delivery
- * picked up, the ledger's studs, a dropped packet glyph, or T (`keep`: it stays picked up to cycle). */
-function aimDelivery(channelKey: string, port: Port | null, keep = false) {
-  if (!playable()) return;
-  const delivery = combatPreview(run).deliveries.find(item => item.channelKey === channelKey);
-  if (!delivery) return;
-  if (port !== null && delivery.port === port && (delivery.aimed || effectiveFocus(run) === port)) {
-    hud.delivery = keep ? channelKey : null;
-    render(false);
-    return;
-  }
-  if (lessonMove({ kind: "aim", key: channelKey, port })) return;
-  hud.delivery = keep ? channelKey : null;
-  playAction(() => aimChannel(run, channelKey, port), "aim");
-}
-/** Pick a delivery up (a packet glyph or its ledger row) to aim it with the next hostile clicked;
- * the same one again, or null (the empty table, Esc), puts it down. Reading only. */
-function pickDelivery(channelKey: string | null) {
-  if (!playable() || (channelKey && (selected !== null || consoleTargeting))) return;
-  const next = channelKey && channelKey !== hud.delivery && livingEnemies(run).length > 1
-    && combatPreview(run).deliveries.some(item => item.channelKey === channelKey) ? channelKey : null;
-  if (next === hud.delivery) return;
-  hud.delivery = next;
-  render(false);
-  sound.effect(next ? "select" : "undo");
-}
 let intentMarkup = "";
 /** The intent badges (hostile-cards.ts): content on render, position on every drawn frame. */
 function renderIntents(forecast: ReturnType<typeof combatPreview> | null) {
   const layer = document.getElementById("intent-layer");
   if (!layer) return;
   // Without a table (WebGL unavailable) there is nothing to hang them on: the plates carry the intents.
-  const markup = world && forecast && view === "run" && run.phase === "battle" ? hostileCards.intentBadges(run, forecast, { armed: hud.delivery }) : "";
+  const markup = world && forecast && view === "run" && run.phase === "battle" ? hostileCards.intentBadges(run, forecast, { armed: null }) : "";
   if (markup !== intentMarkup) {
     intentMarkup = markup;
     layer.innerHTML = markup;
@@ -990,7 +957,7 @@ function placeIntents() {
   if (shown && practice) spotlightLesson();
 }
 /** Hover cards off the canvas: an intent badge or a port-strip row shows its hostile's card, a
- * delivery row's mark its delivery's card (the canvas raises its own through hoverTable). */
+ * channel of the landing breakdown its channel's card (the canvas raises its own through hoverTable). */
 document.addEventListener("pointermove", event => {
   const el = event.target as HTMLElement;
   if (el.id === "world") return;
@@ -1005,7 +972,7 @@ document.addEventListener("pointermove", event => {
   const plate = spot.closest(".battle-right")?.getBoundingClientRect();
   const x = plate ? plate.left : event.clientX;
   if (hoverCardKey() === key) { moveHoverCard(x, event.clientY); return; }
-  const html = hostileCards.hoverMarkup(run, combatPreview(run), target, hud.delivery);
+  const html = hostileCards.hoverMarkup(run, combatPreview(run), target);
   if (html) showHoverCard(key, html, x, event.clientY);
   else hideHoverCard();
 });
@@ -1039,25 +1006,20 @@ function mostWornDevice() {
   return run.topology.nodes.filter(isWorn)
     .sort((a, b) => conditionOf(a) - maxConditionOf(a) - (conditionOf(b) - maxConditionOf(b)) || Number(!primary.includes(a.id)) - Number(!primary.includes(b.id)))[0] ?? null;
 }
-/** The view the table mirrors: selected port, delivery and installation, and installation targeting. */
+/** The view the table mirrors: selected port and installation, and installation targeting. */
 function worldView() {
   return {
     selectedPort: hud.port,
-    selectedDelivery: hud.delivery,
     selectedInstallation: hud.installation,
     targetingInstallation: hud.demolition,
   };
 }
 // Browser tests reach the table's click targets without the canvas (dev server only).
-if (testHooks) (globalThis as { __faultlineHud?: unknown }).__faultlineHud = { selectPort: clickHostile, clickHostile, pickDelivery, selectInstallation, aimDelivery, focusPort, selectNode: onNode };
+if (testHooks) (globalThis as { __faultlineHud?: unknown }).__faultlineHud = { selectPort: clickHostile, clickHostile, selectInstallation, focusPort, selectNode: onNode };
 /** Forget selections that no longer point at anything (a fallen hostile, a scrubbed installation). */
 function settleHud() {
-  if (view !== "run" || run.phase !== "battle") { hud.port = hud.delivery = hud.installation = null; hud.demolition = false; return; }
+  if (view !== "run" || run.phase !== "battle") { hud.port = hud.installation = null; hud.demolition = false; return; }
   if (hud.port && !livingEnemies(run).some(enemy => enemy.port === hud.port)) hud.port = null;
-  // A picked-up delivery is put down when its channel is gone, one hostile is left, or a card or
-  // the console starts choosing a target instead.
-  if (hud.delivery && (selected !== null || consoleTargeting || livingEnemies(run).length < 2
-    || !combatPreview(run).deliveries.some(item => item.channelKey === hud.delivery))) hud.delivery = null;
   if (hud.installation && !run.installations.some(item => item.id === hud.installation)) hud.installation = null;
   if (hud.demolition && (selected === null || baseCard(run.hand[selected] ?? "guard") !== "demolition-charge")) hud.demolition = false;
 }
@@ -1670,16 +1632,10 @@ document.addEventListener("click", (event) => {
     sound.effect("select");
     return;
   }
-  // The far rail: a hostile's badge or strip row targets it (or receives the picked-up delivery),
-  // a delivery row picks its delivery up, a stud aims it at once.
+  // The far rail: a hostile's badge or strip row targets it.
   if (!dialog.open) {
     const hostile = target.closest<HTMLElement>(".hostile-intent[data-port], .port-row[data-port]")?.dataset.port as Port | undefined;
     if (hostile) { clickHostile(hostile); return; }
-    const stud = target.closest<HTMLElement>("[data-aim][data-aim-port]");
-    if (stud) { aimDelivery(stud.dataset.aim!, stud.dataset.aimPort as Port); return; }
-    if (target.closest("[data-aim-cancel]")) { pickDelivery(null); return; }
-    const delivery = target.closest<HTMLElement>(".delivery-row[data-delivery]")?.dataset.delivery;
-    if (delivery) { pickDelivery(delivery); return; }
     const demolishId = target.closest<HTMLElement>("[data-demolish]")?.dataset.demolish;
     if (demolishId) { selectInstallation(demolishId); return; }
   }
@@ -1933,9 +1889,7 @@ window.addEventListener("pointerup", (event) => {
   setTimeout(() => (ignoreClick = false), 0);
 });
 document.addEventListener("keydown", (event) => {
-  // [ and ] need AltGr on some layouts (German): let exactly those through.
-  const altGraph = (event.key === "[" || event.key === "]") && event.getModifierState?.("AltGraph");
-  if (((event.ctrlKey || event.altKey) && !altGraph) || event.metaKey || event.repeat) return;
+  if (event.ctrlKey || event.altKey || event.metaKey || event.repeat) return;
   // A message waits for its answer: 1, 2, 3 choose.
   if (dialog.open && modal === "offer") {
     if (/^[1-9]$/.test(event.key) && dialog.querySelector(`[data-offer="${Number(event.key) - 1}"]`)) {
@@ -1977,8 +1931,6 @@ document.addEventListener("keydown", (event) => {
   }
   if (event.key === "Escape") {
     event.preventDefault();
-    // A picked-up delivery is put down first (it waits for a click on a hostile).
-    if (hud.delivery && selected === null && !consoleTargeting && playable()) { pickDelivery(null); return; }
     if (selected !== null || selectedNode || deviceDragging || cardDrag || consoleTargeting || hud.installation || hud.demolition) {
       clearSelection();
       render(false);
@@ -2027,11 +1979,10 @@ window.addEventListener("pagehide", (event) => {
   save();
   if (!event.persisted) world?.dispose();
 });
-/** Targeting and table-front keys (13.8): F cycles the target, [ ] pick a delivery up, T aims it at
- * the next port, R repair, S scrub. */
+/** Targeting and table-front keys (13.8): F cycles the target, R repair, S scrub. */
 function tableKey(event: KeyboardEvent): boolean {
   const key = event.key.toLowerCase();
-  if (!["f", "[", "]", "t", "r", "s"].includes(key)) return false;
+  if (!["f", "r", "s"].includes(key)) return false;
   event.preventDefault();
   const living = livingEnemies(run).map(enemy => enemy.port);
   if (key === "f") {
@@ -2039,24 +1990,6 @@ function tableKey(event: KeyboardEvent): boolean {
       const focus = effectiveFocus(run);
       focusPort(living[(living.indexOf(focus ?? living[0]) + 1) % living.length]);
     }
-    return true;
-  }
-  if (key === "[" || key === "]") {
-    const deliveries = combatPreview(run).deliveries;
-    if (!deliveries.length) return true;
-    const at = deliveries.findIndex(item => item.channelKey === hud.delivery);
-    const next = at < 0 ? (key === "]" ? 0 : deliveries.length - 1) : (at + (key === "]" ? 1 : -1) + deliveries.length) % deliveries.length;
-    hud.delivery = deliveries[next].channelKey;
-    render(false);
-    sound.effect("select");
-    document.querySelector<HTMLElement>(`.delivery-row[data-delivery="${CSS.escape(hud.delivery)}"] .port-stud.is-current`)?.focus({ preventScroll: true });
-    return true;
-  }
-  if (key === "t") {
-    const deliveries = combatPreview(run).deliveries;
-    const delivery = deliveries.find(item => item.channelKey === hud.delivery) ?? deliveries[0];
-    if (!delivery || living.length < 2) return true;
-    aimDelivery(delivery.channelKey, living[(living.indexOf(delivery.port) + 1) % living.length], true);
     return true;
   }
   if (key === "r") {
@@ -2130,8 +2063,8 @@ function startLesson(id: training.LessonId) {
   battleGeneration++;
   undoStack.length = 0;
   clearSelection();
-  // A drill starts unread: no port or delivery carried over from another board.
-  hud.port = hud.delivery = null;
+  // A drill starts unread: no port carried over from another board.
+  hud.port = null;
   lessonViewKey = "";
   handKey = "";
   world?.resetCamera();
@@ -2205,20 +2138,20 @@ function lessonMarkup(): string {
 }
 // Browser tests read the drill's state (lesson runs are never saved). Dev server only.
 if (testHooks) (globalThis as { __faultlineLesson?: unknown }).__faultlineLesson = () => practice && {
-  id: practice.id, turn: run.turn, focus: effectiveFocus(run), aims: { ...run.aims }, delivery: hud.delivery,
-  deliveries: run.phase === "battle" && run.enemies.length ? combatPreview(run).deliveries.map(item => item.channelKey) : [],
+  id: practice.id, turn: run.turn, focus: effectiveFocus(run),
+  deliveries: run.phase === "battle" && run.enemies.length ? combatPreview(run).deliveries.map(item => ({ key: item.channelKey, port: item.port })) : [],
   step: practice.progress?.current ?? 0, complete: !!practice.progress?.complete, plate: practice.plate,
 };
-/** What the lessons read beyond the run: the selected port, the picked-up delivery and the reading steps acknowledged. */
+/** What the lessons read beyond the run: the selected port, the lifted card and the reading steps acknowledged. */
 function lessonView(): training.LessonView {
-  return { port: hud.port, read: practice?.read ?? [], selected: selected !== null ? run.hand[selected] ?? null : null, delivery: hud.delivery };
+  return { port: hud.port, read: practice?.read ?? [], selected: selected !== null ? run.hand[selected] ?? null : null };
 }
 let lessonViewKey = "";
 /** Selection is reading, not a move, so no action recomputes the lesson: a step met by
  * selecting (or reading) moves on here, on the render that shows the selection. */
 function syncLessonView() {
   if (!practice?.progress || view !== "run") return;
-  const key = `${practice.id}|${hud.port}|${practice.read.join(",")}|${selected !== null ? run.hand[selected] : ""}|${hud.delivery}`;
+  const key = `${practice.id}|${hud.port}|${practice.read.join(",")}|${selected !== null ? run.hand[selected] : ""}`;
   if (key === lessonViewKey) return;
   lessonViewKey = key;
   const before = practice.progress;
@@ -2359,7 +2292,7 @@ function placeSpotlight(hole: HTMLElement, lit: readonly HTMLElement[]) {
     right: Math.max(...boxes.map(box => box.right)), bottom: Math.max(...boxes.map(box => box.bottom)),
   };
   const width = rect.right - rect.left, height = rect.bottom - rect.top;
-  // A tiny control (a delivery stud) still gets a hole the eye finds: at least 40 px a side.
+  // A tiny control still gets a hole the eye finds: at least 40 px a side.
   const padX = Math.max(9, (40 - width / scale) / 2), padY = Math.max(9, (40 - height / scale) / 2);
   hole.style.left = `${(rect.left - origin.left) / scale - padX}px`;
   hole.style.top = `${(rect.top - origin.top) / scale - padY}px`;

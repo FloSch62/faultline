@@ -103,7 +103,7 @@ test("leaving a room clears every v4 encounter field", () => {
   run.enemies = planEncounter(run, room).enemies;
   run.installations = [{ id: "i1", kind: "jammer", x: 1, z: 1, integrity: 2, activeFrom: 1, owner: "h1" }];
   run.faultNodes = ["router1"]; run.faultLinks = ["alpha::router1"];
-  run.focus = "centre"; run.aims = { router1: "centre" }; run.enemyPhase = 3; run.hostileActions = 4;
+  run.focus = "centre"; run.enemyPhase = 3; run.hostileActions = 4;
   run.reinforcement = { enemyId: "splicer", after: 1, hp: 10, crate: { kind: "empty" } };
   run.signal = { id: "surge", firesOnTurn: 3, resolved: false };
   run.offers = [{ kind: "crate-card", cards: ["quorum", "bulkhead"] }];
@@ -113,8 +113,8 @@ test("leaving a room clears every v4 encounter field", () => {
   grantVictory(run);
   chooseCardReward(run, null);
   assert.equal(run.phase, "map");
-  assert.deepEqual([run.enemies, run.installations, run.faultNodes, run.faultLinks, run.focus, run.aims, run.enemyPhase, run.hostileActions,
-    run.reinforcement, run.signal, run.offers, run.encounterCards], [[], [], [], [], null, {}, 0, 0, null, null, [], []]);
+  assert.deepEqual([run.enemies, run.installations, run.faultNodes, run.faultLinks, run.focus, run.enemyPhase, run.hostileActions,
+    run.reinforcement, run.signal, run.offers, run.encounterCards], [[], [], [], [], null, 0, 0, null, null, [], []]);
   assert.deepEqual([run.turnEffects, run.lingeringJams, run.frayedByCut, run.repairsThisTurn, run.creditLedger], [undefined, undefined, undefined, undefined, undefined]);
 });
 

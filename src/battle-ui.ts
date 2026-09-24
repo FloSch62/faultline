@@ -37,13 +37,10 @@ import { designationGlyph } from "./tutorial/icons.ts";
 import { levelRule } from "./core/combat/intent.ts";
 
 /** What the player is looking at on the far rail and the table front. Reading only:
- * none of it changes a number (the focus and the aims live in RunState). */
+ * none of it changes a number (the target lives in RunState). */
 export interface HudView {
   /** The port the player last targeted (lessons read it); the right plate details the target. */
   port: Port | null;
-  /** The delivery picked up (a channelKey) from its packet glyph, its row or [ ]: the next hostile
-   * clicked receives it; T aims it at the next port. */
-  delivery: string | null;
   /** Installation whose plate is open in the target dock. */
   installation: string | null;
   /** Demolition Charge is choosing the installation it destroys. */
@@ -61,7 +58,7 @@ export interface BattleView {
   consoleTargeting: boolean;
   /** A Field Training lesson is running. */
   training: boolean;
-  /** Port, delivery and installation selection (defaults: nothing selected). */
+  /** Port and installation selection (defaults: nothing selected). */
   hud?: HudView;
   /** A hidden designation is being revealed this render: its ribbon re-engraves. */
   revealing?: boolean;
@@ -82,7 +79,7 @@ const TRIGGER_WORDS: Record<ProtocolTrigger, string> = {
 const TRIGGER_ICONS: Record<ProtocolTrigger, string> = {
   sever: "link", jam: "bolt", strike: "sword", breach: "shield", field: "field", ultimate: "boss",
 };
-/** Plate glyphs the shared icon set lacks: the focus crest, the delivery marks (the
+/** Plate glyphs the shared icon set lacks: the target crest, the channel marks (the
  * table's channel colours), installation kinds and the cracked plate of an overload. */
 const GLYPHS: Record<string, string> = {
   crest: '<path d="M12 1.6 22.4 12 12 22.4 1.6 12Z"/><path d="m12 6.6 1.5 3.1 3.4.5-2.5 2.4.6 3.4-3-1.6-3 1.6.6-3.4-2.5-2.4 3.4-.5Z" fill="currentColor" stroke="none"/>',
@@ -277,9 +274,8 @@ const stripName = (name: string) => title(name).replace(/^The /, "");
 /** The colour key of an intent on the strip and the badges: its kind, or the planted installation. */
 const intentKind = (intent: Pick<Intent, "kind" | "install">) => intent.kind === "install" ? `install-${intent.install ?? "tap"}` : intent.kind;
 /** One row of the port strip: who stands there, its health, what it does this phase. The whole row
- * targets its hostile (or, with a delivery picked up, aims that delivery there); the target's row
- * wears the lit crest. Hovering it shows the hostile's card. */
-function portRow(r: RunState, p: CombatPreview, enemy: Enemy, h: HostileForecast | undefined, focus: Port | null, armed: CombatPreview["deliveries"][number] | undefined): string {
+ * targets its hostile; the target's row wears the lit crest. Hovering it shows the hostile's card. */
+function portRow(r: RunState, p: CombatPreview, enemy: Enemy, h: HostileForecast | undefined, focus: Port | null): string {
   const port = p.ports[enemy.port];
   const loss = port && !p.buffering ? Math.min(enemy.hp, port.packet) + (h?.trapDamage ?? 0) : h?.trapDamage ?? 0;
   const intent = h?.intent ?? intentFor(r, enemy);
@@ -297,13 +293,12 @@ function portRow(r: RunState, p: CombatPreview, enemy: Enemy, h: HostileForecast
   const spite = state === "spiteful" ? `<i class="row-spite" aria-hidden="true">acts anyway</i>` : "";
   const what = state === "dormant" ? "rests this phase, acts next phase" : state === "cancelled" ? (h?.interrupted && !lethal ? "its ultimate is broken" : "falls before it acts") : state === "skipped" ? "skips this action"
     : `${intentNameFor(enemy, intent)}${intent.kind === "strike" || intent.kind === "breach" ? ` ${h?.raw ?? intent.amount}` : ""}${state === "spiteful" ? ", Spiteful: acts anyway" : ""}`;
-  const name = armed ? (armed.primary ? "the primary delivery" : `channel ${armed.index + 1}`) : "";
-  const verb = armed ? `Aim ${name} at the` : isTarget ? "Your target: the" : "Target the";
+  const verb = isTarget ? "Your target: the" : "Target the";
   const label = `${verb} ${PORT_NAME[enemy.port].toLowerCase()} port, ${title(enemy.name)}, ${enemy.hp} of ${enemy.maxHp} integrity${loss ? `, takes ${loss}${lethal ? ", lethal" : ""}` : ""}${port?.overflowIn ? ` including ${port.overflowIn} overflow` : ""}. ${what}.${enemy.crate ? " Carries a crate." : ""}`;
   // The target's port stud turns into the lit brass crest.
   const stud = isTarget ? `<i class="row-crest" aria-hidden="true">${glyph("crest", 16)}</i>` : `<span class="port-letter${enemy.crate ? " has-crate" : ""}" aria-hidden="true">${PORT_LETTER[enemy.port]}</span>`;
   return `<div class="port-row-slot${isTarget ? " is-target" : ""}">
-    <button class="port-row state-${state}${isTarget ? " is-focus is-target" : ""}${lethal ? " is-lethal" : ""}${armed ? " is-aiming" : ""}" data-port="${enemy.port}" data-hover-port="${enemy.port}" aria-pressed="${isTarget}" aria-label="${esc(label)}" style="--hostile:#${enemy.color.toString(16).padStart(6, "0")}${armed ? `;--channel:${channelCss(armed.index)}` : ""}">
+    <button class="port-row state-${state}${isTarget ? " is-focus is-target" : ""}${lethal ? " is-lethal" : ""}" data-port="${enemy.port}" data-hover-port="${enemy.port}" aria-pressed="${isTarget}" aria-label="${esc(label)}" style="--hostile:#${enemy.color.toString(16).padStart(6, "0")}">
       ${stud}
       <span class="port-name"><span>${esc(stripName(enemy.name))}</span>${ribbon}<b>${enemy.hp}</b></span>
       ${level}${act}${spite}
@@ -321,45 +316,42 @@ function arrivalRow(p: CombatPreview, follows: boolean): string {
   return `<div class="port-row-slot is-arrival${follows ? " is-following" : ""}"><div class="port-row state-arrival" role="note" aria-label="${esc(text)}" data-tooltip="${esc(`SIGNAL DETECTED · ${name} ${when}${a.port ? ` at the ${a.port} port` : ""}. It takes the port with a crate and acts as an escort.`)}"><span class="port-letter" aria-hidden="true">${a.port ? PORT_LETTER[a.port] : "·"}</span><span class="port-name"><span>${esc(stripName(name))}</span></span><span class="row-state is-arrival">${a.inPhases <= 1 ? "next" : `in ${a.inPhases}`}</span></div></div>`;
 }
 
-/** Deliveries: one row per live channel in its channel's colour, three port studs each; the footer
- * totals each port. A row (or its packet glyph on the table) is picked up with a click, and the next
- * hostile clicked receives it; a stud aims it at once. */
-function deliveriesMarkup(r: RunState, p: CombatPreview, v: BattleView): string {
-  if (!p.deliveries.length || p.buffering) return "";
-  const living = new Set(livingEnemies(r).map(enemy => enemy.port));
-  const selected = v.hud?.delivery ?? null;
-  const rows = p.deliveries.map(d => {
-    const name = d.primary ? "Primary" : `Channel ${d.index + 1}`;
-    const picked = selected === d.channelKey;
-    const receiver = r.enemies.find(item => item.port === d.port && item.hp > 0);
-    const studs = PORTS.map(port => {
-      const enemy = living.has(port) ? r.enemies.find(item => item.port === port && item.hp > 0) : null;
-      const current = d.port === port;
-      const label = enemy ? `${current ? "Aimed at" : "Aim"} the ${name.toLowerCase()} delivery, ${d.amount} damage, ${current ? "" : "at "}the ${port} port, ${title(enemy.name)}` : `${PORT_NAME[port]} port is empty`;
-      return `<button class="port-stud${current ? " is-current" : ""}" data-aim="${esc(d.channelKey)}" data-aim-port="${port}" aria-pressed="${current}" aria-label="${esc(label)}" ${enemy ? "" : "disabled"} ${enemy ? `data-tooltip="${esc(`${title(enemy.name)}${current ? " · receives it" : " · aim here"}`)}"` : ""}>${PORT_LETTER[port]}</button>`;
-    }).join("");
-    const where = `${receiver ? title(receiver.name) : d.port}, ${d.aimed ? "aimed" : "following the target"}`;
-    const pick = `${picked ? "Put down" : "Pick up"} the ${name.toLowerCase()} delivery, ${d.amount} damage, landing on ${where}.${picked ? "" : " Then click a hostile to aim it there."}`;
-    return `<div class="delivery-row${d.primary ? " is-primary" : ""}${picked ? " is-selected" : ""}${d.aimed ? " is-aimed" : ""}" data-delivery="${esc(d.channelKey)}" role="group" aria-label="${esc(`${name}, ${d.amount} damage, aimed at the ${d.port} port`)}" style="--channel:${channelCss(d.index)}"><button class="delivery-pick" data-hover-delivery="${esc(d.channelKey)}" aria-pressed="${picked}" aria-label="${esc(pick)}"><span class="delivery-mark">${glyph(d.primary ? "hexagon" : "diamond", 12)}<span>${d.primary ? "Primary" : `Ch ${d.index + 1}`}</span></span><b class="delivery-amount">${d.amount}</b></button><span class="delivery-studs">${studs}</span></div>`;
-  }).join("");
-  // Footer: overflow first, then what lands on each port (gold when lethal).
-  const landing = PORTS.flatMap(port => {
-    const forecast = p.ports[port];
-    return forecast && (forecast.packet || forecast.merged) ? [{ port, packet: forecast.packet, lethal: forecast.lethal }] : [];
-  });
-  const overflow = PORTS.flatMap(port => {
-    const forecast = p.ports[port];
-    return forecast?.overflowOut && forecast.overflowTo ? [`overflow ${forecast.overflowOut} → ${forecast.overflowTo.toUpperCase()}`] : [];
-  });
-  const foot = [...overflow, ...landing.map(item => `${item.port.toUpperCase()} ${item.packet}${item.lethal ? " lethal" : ""}`)].join(" · ");
-  // The foot is the ledger's totals line: what lands on each port, set under that port's stud
-  // column (the frame's bottom crest owns the plate's centre), and any overflow on its own line.
-  const cells = PORTS.map(port => {
-    const item = landing.find(entry => entry.port === port);
-    return item ? `<b class="${item.lethal ? "is-lethal" : ""}"><span class="visually-hidden">${PORT_LETTER[port]} </span>${item.packet}</b>` : `<b class="is-empty" aria-hidden="true">·</b>`;
-  }).join("");
-  const footMarkup = `${overflow.map(text => `<span class="foot-overflow">${esc(text)}</span>`).join("")}<span class="foot-totals"><span class="foot-label">lands</span><span class="foot-cells">${cells}</span></span>`;
-  return `<section class="deliveries" aria-label="Deliveries: ${esc(foot)}"><div class="deliveries-head"><span>Deliveries</span><span class="deliveries-keys" aria-hidden="true"><kbd>[</kbd><kbd>]</kbd><kbd>T</kbd><kbd>F</kbd></span></div>${rows}${foot ? `<div class="deliveries-foot" data-tooltip="${esc(`Lands: ${foot}. Click a delivery, then a hostile, to aim it · [ ] pick one up · T aims it at the next port · F cycles the target`)}">${footMarkup}</div>` : ""}</section>`;
+/** What lands on the target: each channel's delivery in its colour, summed with the target's bonus
+ * and armor (paid once) into its one packet, then the overflow its kill does not need and where it
+ * goes. Reading only; a channel's hover card itemises it. Every number is the forecast's. */
+function landingMarkup(r: RunState, p: CombatPreview): string {
+  const focus = p.focus;
+  const landing = focus ? p.ports[focus] : null;
+  if (!p.deliveries.length || p.buffering || !focus || !landing) return "";
+  const target = r.enemies.find(enemy => enemy.uid === landing.uid);
+  if (!target) return "";
+  const name = (d: CombatPreview["deliveries"][number]) => d.primary ? "Primary" : `Channel ${d.index + 1}`;
+  const chips = p.deliveries.map(d => `<span class="landing-channel${d.primary ? " is-primary" : ""}" data-hover-delivery="${esc(d.channelKey)}" style="--channel:${channelCss(d.index)}" aria-hidden="true">${glyph(d.primary ? "hexagon" : "diamond", 10)}<b>${d.amount}</b></span>`).join('<i class="landing-op" aria-hidden="true">+</i>');
+  // The target's bonuses, named by the forecast's own ledger lines; the armor it actually paid.
+  const tag = `${focus.toUpperCase()} · `;
+  const bonusNames = p.damageTerms.filter(term => term.label.startsWith(tag) && term.amount > 0).map(term => term.label.slice(tag.length))
+    .concat(target.exposed && p.damageTerms.some(term => term.label === "Exposed guardian") ? ["Exposed guardian"] : []);
+  const paid = Math.min(landing.armor, Math.max(0, landing.merged + landing.bonus + landing.overflowIn - landing.packet));
+  const mods = [
+    landing.bonus ? `<span class="landing-mod is-bonus" data-tooltip="${esc(bonusNames.join(" · ") || "Bonus on your target")}">+${landing.bonus}</span>` : "",
+    landing.overflowIn ? `<span class="landing-mod is-bonus" data-tooltip="Overflow from another port">+${landing.overflowIn}</span>` : "",
+    paid ? `<span class="landing-mod is-armor" data-tooltip="${esc(`Armor, paid once from the whole packet: ${landing.armorTerms.map(term => term.label).join(" · ")}`)}">${icon("shield", 11)}−${paid}</span>` : "",
+  ].join("");
+  const lethal = landing.lethal;
+  const hostile = stripName(target.name);
+  const total = `<span class="landing-equals" data-tooltip="${esc(`${landing.packet} lands on ${hostile}${lethal ? `: it falls${landing.overflowOut ? `, and ${landing.overflowOut} overflows` : ""}` : ""}`)}"><i class="landing-op" aria-hidden="true">=</i><b class="landing-total${lethal ? " is-lethal" : ""}">${landing.packet}</b></span>`;
+  const to = landing.overflowTo;
+  const overflow = landing.overflowOut && to
+    ? `<div class="landing-overflow"><span>overflow <b>${landing.overflowOut}</b> → ${to.toUpperCase()}</span></div>` : "";
+  // Other ports take a packet too (every-port cards, backpressure, overflow): named in the label.
+  const elsewhere = PORTS.filter(port => port !== focus && (p.ports[port]?.packet ?? 0) > 0).map(port => `${port.toUpperCase()} ${p.ports[port]!.packet}`);
+  const receiver = to ? r.enemies.find(enemy => enemy.port === to && enemy.hp > 0) : undefined;
+  const label = `Transmission onto your target, ${title(target.name)}: ${p.deliveries.map(d => `${name(d)} ${d.amount}`).join(", ")}${landing.bonus ? `, bonus ${landing.bonus}` : ""}${paid ? `, armor ${paid}` : ""}; ${landing.packet} lands${lethal ? ", lethal" : ""}${landing.overflowOut && to ? `; overflow ${landing.overflowOut} to the ${to} port${receiver ? `, ${title(receiver.name)}` : ""}` : ""}${elsewhere.length ? `; also ${elsewhere.join(", ")}` : ""}.`;
+  return `<section class="landing" role="group" aria-label="${esc(label)}">
+      <div class="landing-head"><span>Transmission</span>${lethal ? '<em class="landing-lethal">lethal</em>' : ""}</div>
+      <div class="landing-sum"><span class="landing-terms">${chips}</span><span class="landing-result">${mods}${total}</span></div>
+      ${overflow}
+    </section>`;
 }
 
 /** Extras for the shown hostile: one line each, in the hazard-caption voice. */
@@ -428,7 +420,6 @@ function enemyPlate(r: RunState, p: CombatPreview, v: BattleView, stage: (typeof
   const focus = p.focus ?? effectiveFocus(r);
   const pack = living.length > 1;
   const chosen = living.find(enemy => enemy.port === focus) || leaderOf(r)!;
-  const armed = pack && v.hud?.delivery ? p.deliveries.find(item => item.channelKey === v.hud!.delivery) : undefined;
   const enemy = pack ? chosen : leaderOf(r)!;
   const h = p.hostiles.find(item => item.uid === enemy.uid);
   const definition = ENEMIES[enemy.id];
@@ -474,7 +465,7 @@ function enemyPlate(r: RunState, p: CombatPreview, v: BattleView, stage: (typeof
   const rows = PORTS.map(slot => {
     const standing = living.find(item => item.port === slot);
     const arriving = p.arrivals?.port === slot ? arrivalRow(p, !!standing) : "";
-    if (standing) return portRow(r, p, standing, p.hostiles.find(item => item.uid === standing.uid), focus, armed) + arriving;
+    if (standing) return portRow(r, p, standing, p.hostiles.find(item => item.uid === standing.uid), focus) + arriving;
     return arriving;
   }).join("") + (p.arrivals && !p.arrivals.port ? arrivalRow(p, false) : "");
   const leader = living.find(grows);
@@ -485,7 +476,7 @@ function enemyPlate(r: RunState, p: CombatPreview, v: BattleView, stage: (typeof
   const kick = definition.boss || (leader && ENEMIES[leader.id].boss) ? `Stage ${stage.numeral} · Guardian` : v.training ? "Training Signal" : "Hostile Pack";
   return `<aside class="battle-right battle-plate enemy-plate is-pack" aria-label="Hostiles, ${living.length} standing">
       <div class="combatant-identity pack-identity"><span class="combatant-seal">${icon(definition.boss ? "boss" : "sword", 25)}</span><div>${kicker(kick)}</div></div>
-      <div class="port-strip${armed ? " is-aiming" : ""}" role="group" aria-label="${armed ? `Click a hostile to aim ${armed.primary ? "the primary delivery" : `channel ${armed.index + 1}`} there` : "Hostiles in phase order, left, centre, right: click one to target it"}">${rows}</div>
+      <div class="port-strip" role="group" aria-label="Hostiles in phase order, left, centre, right: click one to target it">${rows}</div>
       ${guardian && guardianIntent ? bossWindowMarkup(r, p, guardian, guardianIntent) : ""}
       <div class="port-detail" aria-label="${esc(`Target: ${title(enemy.name)}`)}">
         <div class="port-detail-head"><h2><i class="detail-crest" aria-hidden="true">${glyph("crest", 14)}</i>${esc(title(enemy.name))}</h2>${marks}<button class="trait-badge" data-action="enemy-dossier" data-tooltip="${esc(`${definition.badge}: ${definition.trait}`)}" aria-label="${esc(`${definition.badge}: ${definition.trait}`)}">${icon("elite", 13)}<span>${esc(definition.badge)}</span></button></div>
@@ -493,7 +484,7 @@ function enemyPlate(r: RunState, p: CombatPreview, v: BattleView, stage: (typeof
         ${states ? `<div class="intent-heading"><span>Next<span class="wide-only"> intent</span></span><span class="intent-states">${states}</span></div>` : ""}
         ${tools}
       </div>
-      ${deliveriesMarkup(r, p, v)}
+      ${landingMarkup(r, p)}
     </aside>`;
 }
 
@@ -664,19 +655,17 @@ function fieldStrip(r: RunState, p: CombatPreview, targeting: boolean): string {
 export function battleMarkup(r: RunState, v: BattleView): { hud: string; foot: string } {
   const stage = STAGES[r.stage], p = combatPreview(r), enemy = leaderOf(r)!, intent = p.intent ?? intentFor(r, enemy);
   const target = v.selected === null ? null : CARDS[r.hand[v.selected]];
-  // A picked-up delivery waits for a hostile: the hint names it in its channel's colour.
-  const armed = v.selected === null && !v.consoleTargeting && v.hud?.delivery && livingEnemies(r).length > 1 ? p.deliveries.find(item => item.channelKey === v.hud!.delivery) : undefined;
-  const hint = armed ? `Aim ${armed.primary ? "Primary" : `Ch ${armed.index + 1}`}: click a hostile` : v.consoleTargeting ? `Patch Cable · ${v.source ? "choose the second device" : "choose the first device"}`
+  const hint = v.consoleTargeting ? `Patch Cable · ${v.source ? "choose the second device" : "choose the first device"}`
     : v.hud?.demolition ? `${target?.name ?? "Demolition Charge"} · choose an installation on the table or a tag below`
     : !target ? "Choose your next move" : target.target === "zone" ? "Choose a band on the table or a field seal below" : target.target === "ground" ? "Choose an empty socket on the table" : target.target === "link" ? v.source ? "Choose the second device" : "Choose the first device" : "Choose a device";
   const intentName = intent.ultimate ? ENEMIES[enemy.id].pattern[enemy.turn % ENEMIES[enemy.id].pattern.length].label : INTENT_NAMES[intent.kind];
   const heading = intent.ultimate ? `${intentName} · ${p.interrupted ? "Break ready" : "Inbound"}` : intent.kind === "charge" ? "The guardian gathers power" : enemy.exposed ? "The guardian is exposed" : v.training ? "Field Training" : stage.chapters[r.floor] ?? "";
   const buffering = p.buffering;
   const shownDamage = buffering ? p.bufferGain : p.packetDamage;
-  // The dial keeps the total; a second line says when the packet is divided or ends the fight.
-  const ports = new Set([...p.deliveries.map(d => d.port), ...PORTS.filter(port => p.ports[port]?.overflowIn)]).size;
+  // The dial keeps the total; a second line says when the surplus overflows or the fight ends.
+  const spills = PORTS.filter(port => p.ports[port]?.overflowIn);
   const finishing = !buffering && p.lethal;
-  const dialNote = v.busy || buffering ? "" : [finishing ? "finishing blow" : "", ports > 1 ? `${ports} ports` : ""].filter(Boolean).join(" · ");
+  const dialNote = v.busy || buffering ? "" : [finishing ? "finishing blow" : "", spills.length === 1 ? `overflow → ${spills[0].toUpperCase()}` : spills.length ? `overflow · ${spills.length} ports` : ""].filter(Boolean).join(" · ");
   const note = !p.signalPath.length ? "Build ALPHA → router → OMEGA, then transmit."
     : p.channels < 2 ? `Your route is alive. A second channel adds +${RULES.bandwidthPerChannel} and keeps transmitting through a cut.`
     : "Two channels: bandwidth is flowing and one cut can't silence you. Arm a protocol for what's coming.";
@@ -712,7 +701,7 @@ export function battleMarkup(r: RunState, v: BattleView): { hud: string; foot: s
     <div class="battle-bottom battle-controls">
       <div class="energy-orb" aria-label="${r.energy} energy available" data-tooltip="${esc(`${r.energy} energy now. Next turn: ${p.nextTurn.energy}.`)}"><strong>${r.energy}</strong><span>Energy</span></div>
       <div class="draw-piles">${([["draw-pile", r.drawPile.length, "Draw"], ["discard-pile", r.discardPile.length, "Discard"], ["exhaust-pile", r.exhaustPile.length, "Exhaust"]] as const).map(([action, count, label]) => `<button data-action="${action}" class="${action}" data-tooltip="${label === "Exhaust" ? "Exhausted cards return next encounter" : `Inspect your ${label.toLowerCase()} pile`}">${icon("deck", 18)}<span>${count}<small>${label}</small></span></button>`).join("")}<button data-action="prepare" class="prepared-pile ${r.preparedCard ? "occupied" : ""}" aria-label="${r.preparedCard ? `Prepared: ${esc(CARDS[r.preparedCard].name)}` : "Prepare a card for next turn"}" data-tooltip="${r.preparedCard ? `${esc(CARDS[r.preparedCard].name)} is held for next turn` : "Hold one card for next turn, replacing one draw · P"}" ${v.busy ? "disabled" : ""}>${icon("battery", 18)}<span>${r.preparedCard ? "1" : "+"}<small>${r.preparedCard ? "Ready" : "Prepare"}</small></span></button></div>
-      <div class="target-hint ${v.selected !== null || v.consoleTargeting || armed ? "active" : ""}${armed ? " is-aiming" : ""}"${armed ? ` style="--channel:${channelCss(armed.index)}"` : ""}>${armed ? `${glyph(armed.primary ? "hexagon" : "diamond", 13)}` : ""}${esc(hint)}${armed ? '<button data-aim-cancel aria-label="Put the delivery down · Esc"><kbd>Esc</kbd></button>' : v.selected !== null || v.consoleTargeting ? '<button data-action="cancel">Cancel <kbd>Esc</kbd></button>' : `<span class="hint-keys"><span><kbd>1</kbd>–<kbd>0</kbd> Play</span><span><kbd>C</kbd> Console</span><span>${icon("mouse", 14)} Inspect</span></span>`}</div>
+      <div class="target-hint ${v.selected !== null || v.consoleTargeting ? "active" : ""}">${esc(hint)}${v.selected !== null || v.consoleTargeting ? '<button data-action="cancel">Cancel <kbd>Esc</kbd></button>' : `<span class="hint-keys"><span><kbd>1</kbd>–<kbd>0</kbd> Play</span><span><kbd>C</kbd> Console</span><span>${icon("mouse", 14)} Inspect</span></span>`}</div>
       <button class="transmit-button ${shownDamage ? "ready" : ""} ${buffering ? "buffering" : ""} ${v.busy ? "transmitting" : ""}${dialNote ? " has-note" : ""}${finishing ? " is-finishing" : ""}" data-action="transmit" aria-label="${buffering ? `Store · ${p.bufferGain} into the buffer · End turn` : `Transmit · ${p.packetDamage} damage${dialNote ? ` · ${dialNote}` : ""} · End turn`}" ${v.busy ? "disabled" : ""}><span class="transmit-dial" aria-hidden="true"></span><span class="transmit-power" aria-hidden="true"><strong>${v.busy ? "· · ·" : buffering ? `+${p.bufferGain}` : p.packetDamage}</strong><small>${v.busy ? "sending" : buffering ? "to buffer" : "damage"}</small></span><span class="transmit-label">${v.busy ? "Transmitting" : buffering ? "Store" : "Transmit"}${dialNote ? `<small class="transmit-note">${esc(dialNote)}</small>` : ""}</span><span class="transmit-shortcut">End turn <kbd>Space</kbd></span></button>
     </div>`;
   return { hud, foot };

@@ -68,10 +68,10 @@ export const CARD_INSIGHTS: Partial<Record<BaseCardId, string>> = {
   cve: "A curse from a hard bargain. Remove it at a Sanctuary or a Market, or purge it with an undelivered message.",
   // ---------------------------------------------------------------- v4
   "broadcast-storm": "Every port takes the bonus, so it is worth twice as much against a pack as against a single hostile. Against one hostile it is a slightly cheaper Packet Burst.",
-  "traffic-shaping": "Collapses the targeting decision: every delivery merges on the focus, so armor and plating are paid once. Free, and it replaces itself.",
+  "traffic-shaping": "Free damage on your target that replaces itself: a clean top-up to reach a kill, a break threshold or a lethal overflow.",
   "flood-fill": `Pays per live channel on every port: three channels against a trio is +3 on each of three hostiles. Load Balancers already give every delivery +${R.balancerPerChannel}; this cashes the width in.`,
   bulkhead: "Firewalls block per attack, so a pack's several attacks each lose 1 more. Best on the phase where the forecast shows three hostiles striking.",
-  spearhead: "The buffer is one number released into the primary delivery: aim it at the armored or plated port and none of it is wasted. Superb against Colossus, Marshal, Sentinel, Ward Node links and Armored ribbons.",
+  spearhead: "The buffer is one number released into the primary delivery: target the armored or plated hostile and none of it is wasted. Superb against Colossus, Marshal, Sentinel, Ward Node links and Armored ribbons.",
   "packet-storm": "Every port takes +5: finish two escorts and press the leader in one transmission, or break a guardian through its adds.",
   quorum: "Block that grows with the rail: each other living hostile adds to it. Against a trio it outguards Packet Guard and still draws.",
   "server-rack": `It carries no signal but counts as deployed hardware for clusters. Place it among your key devices: overloads, Spikes and detonations within ${R.reach.toFixed(1)} wear the rack (condition ${R.rackCondition}) instead.`,

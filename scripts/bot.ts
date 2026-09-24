@@ -3,10 +3,10 @@
  * v3: builds width, arms protocols against visible intents, uses the archetype
  * console (Patch Cable / Harden / Buffer) and deletes worms.
  * v4 tactical line (every choice is read from combatPreview, never from hidden state):
- * - kill order and aiming: tries every focus, and for each other port the smallest set of
- *   deliveries that kills it (spread), and keeps the plan with the best outlook (damage,
- *   kills weighted by the hostile's threat, adds before the ultimate, an interrupt, minus
- *   incoming damage, disruption and installs); `killOrder: "leader"` keeps the leader focus;
+ * - kill order: tries every target (every delivery lands there; overflow carries the rest)
+ *   and keeps the one with the best outlook (damage, kills weighted by the hostile's threat,
+ *   adds before the ultimate, an interrupt, minus incoming damage, disruption and installs);
+ *   `killOrder: "leader"` keeps the leader targeted;
  * - maintenance: a phantom before a disruption, saves a device the forecast breaks (Field
  *   Repair, Redundant PSU, repairs), scrubs or demolishes by value per energy (charges, then
  *   Jammers, Spikes, Taps), steps a device out of reach when that is cheaper, repairs a worn
@@ -62,7 +62,6 @@ export type BotAction = (
   | { kind: "scrub"; id: string }
   | { kind: "repair"; id: string }
   | { kind: "focus"; port: Port }
-  | { kind: "aim"; key: string; port: Port | null }
 ) & { card?: CardId; purpose?: "maintenance" }
 
 /** Kept for the browser playthrough: reward order used when no meta player is attached. */
@@ -109,7 +108,6 @@ export function playBotTurn(run: RunState, policy: Policy, observe?: (action: Bo
     scrub: (r: RunState, id: string) => record({ kind: "scrub", id }, rules.scrubInstallation(r, id)),
     repair: (r: RunState, id: string) => record({ kind: "repair", id }, rules.repairNode(r, id)),
     focus: (r: RunState, port: Port) => record({ kind: "focus", port }, rules.setFocus(r, port)),
-    aim: (r: RunState, key: string, port: Port | null) => record({ kind: "aim", key, port }, rules.aimChannel(r, key, port)),
   };
   const affordable = (r: RunState, i: number) => costFor(r, i) <= r.energy;
   const indexOf = (r: RunState, ids: BaseCardId[]) => {
@@ -153,7 +151,7 @@ export function playBotTurn(run: RunState, policy: Policy, observe?: (action: Bo
     if (enemy.role === "add") return 4;
     return AVERAGE_SINGLE_THREAT.battle[Math.min(2, r.stage)] ?? 8;
   }
-  /** Whether killing adds buys a break: the guardian's packet with the focus on it comes within
+  /** Whether killing adds buys a break: the guardian's packet with the target on it comes within
    * 6 of its base break threshold. Set by bestTargeting before it scores candidates. */
   let breakable = true;
   /** What the tactical line wants from a forecast: damage that sticks (weighted toward the
@@ -162,7 +160,7 @@ export function playBotTurn(run: RunState, policy: Policy, observe?: (action: Bo
   function outlook(r: RunState, p: CombatPreview): number {
     const guardian = guardianOf(r);
     // A fortress line (it cannot break the ultimate) leaves the adds to its return fire and
-    // keeps every delivery on the guardian (worked example 11.5 C, the Warden).
+    // keeps the guardian targeted (worked example 11.5 C, the Warden).
     const fortress = !!guardian && !breakable;
     let value = p.lethal ? 500 : 0;
     for (const port of PORTS) {
@@ -181,68 +179,36 @@ export function playBotTurn(run: RunState, policy: Policy, observe?: (action: Bo
     value -= 3 * p.incoming + 4 * p.faultTargets.length + 2 * installs + p.enemyHealing;
     return value;
   }
-  interface Targeting { focus: Port; aims: Record<string, Port> }
-  /** The smallest delivery set (by sum) that reaches `need`; null when even all fall short. */
-  function smallestLethal(amounts: { key: string; amount: number }[], need: number): string[] | null {
-    let best: { keys: string[]; sum: number } | null = null;
-    const n = Math.min(amounts.length, 8);
-    for (let mask = 1; mask < 1 << n; mask++) {
-      let sum = 0;
-      const keys: string[] = [];
-      for (let i = 0; i < n; i++) if (mask & (1 << i)) { sum += amounts[i].amount; keys.push(amounts[i].key); }
-      if (sum >= need && (!best || sum < best.sum || (sum === best.sum && keys.length < best.keys.length))) best = { keys, sum };
-    }
-    return best?.keys ?? null;
-  }
-  /** Every focus, plus "spread": for each other port the smallest delivery set that kills it. */
-  function bestTargeting(r: RunState): Targeting | null {
+  /** Every living hostile as the target; the one with the best outlook wins. */
+  function bestTargeting(r: RunState): Port | null {
     const alive = livingEnemies(r);
-    const base = combatPreview(r);
-    if (!alive.length || !base.deliveries.length) return null;
+    if (!alive.length || !combatPreview(r).deliveries.length) return null;
     const lead = alive.find(enemy => enemy.role === "leader" || enemy.role === "single") ?? alive[0];
-    if (options.killOrder === "leader" && !guardianOf(r)) return { focus: lead.port, aims: {} };
-    if (alive.length === 1) return { focus: alive[0].port, aims: {} };
-    const amounts = base.deliveries.map(item => ({ key: item.channelKey, amount: item.amount }));
-    const candidates: Targeting[] = [];
-    const ordered = [lead, ...alive.filter(enemy => enemy !== lead)];
-    for (const focus of ordered) {
-      candidates.push({ focus: focus.port, aims: {} });
-      for (const other of ordered) {
-        if (other === focus) continue;
-        const forecast = base.ports[other.port];
-        const need = other.hp + (forecast?.armor ?? 0) - (forecast?.bonus ?? 0);
-        const keys = smallestLethal(amounts, need);
-        if (keys && keys.length < amounts.length) candidates.push({ focus: focus.port, aims: Object.fromEntries(keys.map(key => [key, other.port])) });
-      }
-    }
-    const saved = { focus: r.focus, aims: r.aims };
+    if (options.killOrder === "leader" && !guardianOf(r)) return lead.port;
+    if (alive.length === 1) return alive[0].port;
+    const saved = r.focus;
     const guardian = guardianOf(r);
     if (guardian) {
       r.focus = guardian.port;
-      r.aims = {};
       const packet = combatPreview(r).ports[guardian.port]?.packet ?? 0;
       breakable = packet + 6 >= (ENEMIES[guardian.id].boss?.breakDamage ?? 0);
     } else breakable = true;
-    let best: Targeting | null = null, bestValue = -Infinity;
-    for (const candidate of candidates) {
-      r.focus = candidate.focus;
-      r.aims = candidate.aims;
+    let best: Port | null = null, bestValue = -Infinity;
+    for (const candidate of [lead, ...alive.filter(enemy => enemy !== lead)]) {
+      r.focus = candidate.port;
       const value = outlook(r, combatPreview(r));
-      if (value > bestValue + 1e-9) { best = candidate; bestValue = value; }
+      if (value > bestValue + 1e-9) { best = candidate.port; bestValue = value; }
     }
-    r.focus = saved.focus;
-    r.aims = saved.aims;
+    r.focus = saved;
     return best;
   }
-  /** Sets the best focus and aims: through the rules (recorded) on the real run, directly on a
+  /** Sets the best target: through the rules (recorded) on the real run, directly on a
    * simulation copy. */
   function retarget(r: RunState, record = true): void {
-    const plan = bestTargeting(r);
-    if (!plan) return;
-    if (!record) { r.focus = plan.focus; r.aims = { ...plan.aims }; return; }
-    if (r.focus !== plan.focus) act.focus(r, plan.focus);
-    for (const key of Object.keys(r.aims)) if (plan.aims[key] !== r.aims[key] && !plan.aims[key]) act.aim(r, key, null);
-    for (const [key, port] of Object.entries(plan.aims)) if (r.aims[key] !== port) act.aim(r, key, port);
+    const port = bestTargeting(r);
+    if (!port) return;
+    if (!record) { r.focus = port; return; }
+    if (r.focus !== port) act.focus(r, port);
   }
   const reachOf = () => RULES.reach + 0.01;
   const distance = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -380,7 +346,7 @@ export function playBotTurn(run: RunState, policy: Policy, observe?: (action: Bo
     const leader = () => leaderOf(r);
     const tactical = policy === "tactical";
     if (tactical) retarget(r);
-    let aimedToBreak = false;
+    let retargetedToBreak = false;
     for (let action = 0; action < 60; action++) {
       const p = combatPreview(r);
       if (p.lethal) return;
@@ -434,7 +400,7 @@ export function playBotTurn(run: RunState, policy: Policy, observe?: (action: Bo
       if (tactical && guardianOf(r) && p.intent?.ultimate && !p.interrupted && p.packetDamage) {
         const index = breakingCard(r);
         if (index >= 0 && act.instant(r, index).ok) { retarget(r); continue; }
-        if (index === -2 && !aimedToBreak) { aimedToBreak = true; retarget(r); continue; }
+        if (index === -2 && !retargetedToBreak) { retargetedToBreak = true; retarget(r); continue; }
       }
       // Tactical Ghost: the charge turn buffers (and feeds the buffer) so the release breaks the
       // ultimate through the adds (worked example 11.5 C).

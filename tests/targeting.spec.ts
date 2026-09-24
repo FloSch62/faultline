@@ -1,6 +1,7 @@
 /** Targeting: a click on a hostile (its body, rail plate, intent badge or port-strip row) makes it the
- * target; a delivery picked up from its packet glyph or ledger row goes to the next hostile clicked;
- * every living hostile shows its next action on the table as a badge read from the forecast. */
+ * target, and every channel's delivery lands there as one packet (no per-channel aiming); the right
+ * plate adds it up and names the overflow; every living hostile shows its next action on the table
+ * as a badge read from the forecast. */
 import type { Page } from "@playwright/test";
 import { combatPreview } from "../src/core/run.ts";
 import type { NetworkLink, NetworkNode } from "../src/core/types.ts";
@@ -32,24 +33,6 @@ async function bodyPoint(page: Page, port: string, name: RegExp) {
   }
   throw new Error(`No point on the ${port} hostile's body`);
 }
-/** Screen position of a delivery's packet glyph on the table. */
-async function glyphPoint(page: Page, key: string) {
-  await expect.poll(() => page.locator("#world").getAttribute("data-deliveries")).not.toBe("0");
-  const at = await page.evaluate(wanted => {
-    type Node = { children: Node[]; visible: boolean; isSprite?: boolean; userData: Record<string, unknown>; matrixWorld: { elements: number[] } };
-    const scene = (window as unknown as { __table: { scene: Node } }).__table.scene;
-    let found: number[] | null = null;
-    const walk = (node: Node) => {
-      if (node.isSprite && node.visible && node.userData?.deliveryKey === wanted) found = node.matrixWorld.elements.slice(12, 15);
-      for (const child of node.children) walk(child);
-    };
-    walk(scene);
-    return found as number[] | null;
-  }, key);
-  expect(at, `packet glyph ${key}`).not.toBeNull();
-  return tablePoint(page, at![0], at![1], at![2]);
-}
-
 test("clicking a hostile's body targets it; clicking the target again changes nothing", async ({ page }) => {
   await watchTable(page);
   await install(page, trio());
@@ -68,7 +51,7 @@ test("clicking a hostile's body targets it; clicking the target again changes no
   await expect(page.locator('.port-row[data-port="right"]')).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator('.port-row[data-port="right"] .row-crest')).toHaveCount(1);
   await expect(page.locator(".port-detail h2")).toContainText(/Splicer/i);
-  // Unaimed deliveries follow the target.
+  // Every delivery follows the target.
   expect(combatPreview(await saved(page)).deliveries.every(item => item.port === "right")).toBe(true);
   // The target again: nothing changes.
   const before = await saved(page);
@@ -97,85 +80,64 @@ test("a port-strip row and an intent badge each target their hostile", async ({ 
   expect((await saved(page)).focus).toBe("centre");
 });
 
-test("a delivery picked up from its row goes to the next hostile clicked, then is put down", async ({ page }) => {
-  await watchTable(page);
-  await install(page, trio());
-  const [, second] = combatPreview(await saved(page)).deliveries;
-  const row = page.locator(`.delivery-row[data-delivery="${second.channelKey}"]`);
-  await row.locator(".delivery-pick").click();
-  await expect(row).toHaveClass(/is-selected/);
-  await expect(row.locator(".delivery-pick")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator("#world")).toHaveAttribute("data-armed", second.channelKey);
-  await expect(page.locator(".target-hint")).toContainText("Aim Ch 2: click a hostile");
-  await expect(page.locator("#intent-layer .hostile-intent.is-aiming")).toHaveCount(3);
-  // Hovering a hostile now previews the aim.
-  await badge(page, "left").hover();
-  await expect(page.locator("#hover-card.visible")).toContainText("Aim Ch 2 here");
-  // A click on the hostile's badge aims that delivery; the target stays.
-  await badge(page, "left").click();
-  await expect.poll(async () => (await saved(page)).aims[second.channelKey]).toBe("left");
-  expect((await saved(page)).focus).toBe("centre");
-  await expect(row).not.toHaveClass(/is-selected/);
-  await expect(page.locator("#world")).toHaveAttribute("data-armed", "");
-  await expect(page.locator(".target-hint")).not.toContainText("Aim Ch 2");
-  await expect(page.locator(`.port-stud[data-aim="${second.channelKey}"][data-aim-port="left"]`)).toHaveAttribute("aria-pressed", "true");
-  // Picked up again, a strip row receives it too.
-  await row.locator(".delivery-pick").click();
-  await page.locator('.port-row[data-port="right"]').click();
-  await expect.poll(async () => (await saved(page)).aims[second.channelKey]).toBe("right");
-  expect((await saved(page)).focus).toBe("centre");
-});
-
-test("a packet glyph clicked on the table is picked up and aimed by a click on a hostile; dragging still aims", async ({ page }) => {
-  await watchTable(page);
-  await install(page, trio());
-  const [, second] = combatPreview(await saved(page)).deliveries;
-  const glyph = await glyphPoint(page, second.channelKey);
-  await page.mouse.click(glyph.x, glyph.y);
-  await expect(page.locator(`.delivery-row[data-delivery="${second.channelKey}"]`)).toHaveClass(/is-selected/);
-  await expect(page.locator("#world")).toHaveAttribute("data-armed", second.channelKey);
-  const body = await bodyPoint(page, "right", /Aim Ch 2 here[\s\S]*Splicer/i);
-  await page.mouse.click(body.x, body.y);
-  await expect.poll(async () => (await saved(page)).aims[second.channelKey]).toBe("right");
-  expect((await saved(page)).focus).toBe("centre");
-  await expect(page.locator("#world")).toHaveAttribute("data-armed", "");
-  // Drag-to-aim: the glyph dropped on the left rail plate.
-  const plate = (await tableState(page)).plates.find(item => item.port === "left")!;
-  const drop = await tablePoint(page, plate.x, plate.y, plate.z);
-  const from = await glyphPoint(page, second.channelKey);
-  await page.mouse.move(from.x, from.y);
-  await page.mouse.down();
-  await page.mouse.move(drop.x, drop.y, { steps: 10 });
-  await page.mouse.up();
-  await expect.poll(async () => (await saved(page)).aims[second.channelKey]).toBe("left");
-});
-
-test("Esc puts a picked-up delivery down: the next click targets instead of aiming", async ({ page }) => {
-  await install(page, trio());
-  const [primary] = combatPreview(await saved(page)).deliveries;
-  const row = page.locator(`.delivery-row[data-delivery="${primary.channelKey}"]`);
-  await row.locator(".delivery-pick").click();
-  await expect(row).toHaveClass(/is-selected/);
-  await page.keyboard.press("Escape");
-  await expect(row).not.toHaveClass(/is-selected/);
-  await expect(page.locator("#world")).toHaveAttribute("data-armed", "");
-  await expect(page.locator("dialog")).not.toBeVisible();
+test("every channel lands on the target: the plate adds the channels into one packet and names the overflow", async ({ page }) => {
+  // The Spark Mite needs 4 of the 8: targeted, it falls and 4 overflow into the leader.
+  const e = pack([
+    { id: "spark-mite", port: "left", hp: 4, maxHp: 12 },
+    { id: "serpent", port: "centre", hp: 40, turn: turnOf("serpent", "strike") },
+    { id: "splicer", port: "right", hp: 14 },
+  ], { ...twoChannels, integrity: 60 });
+  await install(page, e);
+  let forecast = combatPreview(await saved(page));
+  const landing = page.locator(".enemy-plate .landing");
+  // On the leader: both channels in their colours, summed, nothing overflows.
+  await expect(landing.locator(".landing-channel")).toHaveCount(forecast.deliveries.length);
+  for (const [i, d] of forecast.deliveries.entries()) await expect(landing.locator(".landing-channel b").nth(i)).toHaveText(String(d.amount));
+  await expect(landing.locator(".landing-total")).toHaveText(String(forecast.ports.centre!.packet));
+  await expect(landing.locator(".landing-overflow")).toHaveCount(0);
+  // No per-channel aiming anywhere: no rows, studs, pick-ups or armed table.
+  await expect(page.locator(".delivery-row, .port-stud, [data-aim], [data-aim-cancel], .delivery-pick")).toHaveCount(0);
+  expect(await page.locator("#world").getAttribute("data-armed")).toBeNull();
+  // Target the Mite: the whole packet moves with the target, the surplus overflows to the leader.
   await badge(page, "left").click();
   await expect.poll(async () => (await saved(page)).focus).toBe("left");
-  expect((await saved(page)).aims).toEqual({});
-  // The row's own toggle and the hint's Esc button put it down as well.
-  await row.locator(".delivery-pick").click();
-  await row.locator(".delivery-pick").click();
-  await expect(row).not.toHaveClass(/is-selected/);
-  await row.locator(".delivery-pick").click();
-  await page.locator(".target-hint [data-aim-cancel]").click();
-  await expect(row).not.toHaveClass(/is-selected/);
-  // [ ] pick a delivery up by keyboard and T aims it at the next port, keeping it picked up.
-  await page.keyboard.press("]");
-  await expect(row).toHaveClass(/is-selected/);
-  await page.keyboard.press("t");
-  await expect.poll(async () => (await saved(page)).aims[primary.channelKey]).toBe("centre");
-  await expect(row).toHaveClass(/is-selected/);
+  forecast = combatPreview(await saved(page));
+  expect(forecast.deliveries.every(item => item.port === "left")).toBe(true);
+  const left = forecast.ports.left!;
+  expect(left.lethal).toBe(true);
+  expect(left.overflowOut).toBe(forecast.deliveries.reduce((sum, d) => sum + d.amount, 0) - 4);
+  await expect(landing.locator(".landing-total")).toHaveText(String(left.packet));
+  await expect(landing.locator(".landing-total")).toHaveClass(/is-lethal/);
+  await expect(landing.locator(".landing-overflow")).toContainText(`overflow ${left.overflowOut} → CENTRE`);
+  await expect(landing).toHaveAttribute("aria-label", new RegExp(`overflow ${left.overflowOut} to the centre port`));
+  await expect(page.locator(".transmit-button .transmit-note")).toContainText("overflow → CENTRE");
+  // The old aim keys do nothing; F still moves the target.
+  const before = await saved(page);
+  for (const key of ["t", "[", "]"]) await page.keyboard.press(key);
+  await page.waitForTimeout(150);
+  expect(await saved(page)).toEqual(before);
+  await page.keyboard.press("f");
+  await expect.poll(async () => (await saved(page)).focus).toBe("centre");
+  // The plate's channel reads its own card: terms, route and the packet it joins. Read only.
+  const [primary] = forecast.deliveries;
+  await landing.locator(".landing-channel").first().hover();
+  const card = page.locator("#hover-card.visible");
+  await expect(card).toContainText("Primary channel");
+  await expect(card).toContainText(String(primary.amount));
+  await expect(card).toContainText("Lands on your target");
+  await expect(card).toContainText(primary.terms[0].label);
+  await expect(card).not.toContainText(/aim|click/i);
+});
+
+test("a click on a hostile always targets it, even right after hovering a channel", async ({ page }) => {
+  await watchTable(page);
+  await install(page, trio());
+  await page.locator(".enemy-plate .landing .landing-channel").nth(1).hover();
+  const body = await bodyPoint(page, "right", /Splicer/i);
+  await page.mouse.click(body.x, body.y);
+  await expect.poll(async () => (await saved(page)).focus).toBe("right");
+  expect("aims" in await saved(page)).toBe(false);
+  await expect(page.locator(".target-hint")).not.toContainText(/Aim/);
 });
 
 test("intent badges: one per living hostile over its rail plate, verb and number from the forecast", async ({ page }) => {
@@ -242,8 +204,7 @@ test("a hostile that falls this turn is marked on its badge, and its badge leave
     { id: "spark-mite", port: "left", hp: 2, maxHp: 12 },
     { id: "serpent", port: "centre", hp: 40 },
   ], { ...twoChannels, integrity: 60 });
-  const key = combatPreview(e.run).deliveries[0].channelKey;
-  e.run.aims = { [key]: "left" };
+  e.run.focus = "left";
   await install(page, e, { motion: true });
   await expect(badge(page, "left")).toHaveClass(/state-falls/);
   await expect(badge(page, "left").locator(".hi-note")).toHaveText("FALLS THIS TURN");
@@ -268,7 +229,7 @@ test("outside a battle the intent layer is empty", async ({ page }) => {
   await expect(page.locator("#intent-layer")).toBeHidden();
 });
 
-test("hover cards: a hostile's full forecast and health after the transmission; a delivery's terms and destination", async ({ page }) => {
+test("hover cards: a hostile's full forecast and health after the transmission; a channel's terms and destination", async ({ page }) => {
   await install(page, trio());
   const forecast = combatPreview(await saved(page));
   await badge(page, "centre").hover();
@@ -280,9 +241,9 @@ test("hover cards: a hostile's full forecast and health after the transmission; 
   await expect(card).toContainText("Your target");
   for (const d of forecast.deliveries) await expect(card).toContainText(d.primary ? "Primary" : `Ch ${d.index + 1}`);
   const [primary] = forecast.deliveries;
-  await page.locator(`.delivery-row[data-delivery="${primary.channelKey}"] .delivery-pick`).hover();
-  await expect(card).toContainText("Primary delivery");
+  await page.locator(`.landing-channel[data-hover-delivery="${primary.channelKey}"]`).hover();
+  await expect(card).toContainText("Primary channel");
   await expect(card).toContainText(String(primary.amount));
-  await expect(card).toContainText("follows the target");
+  await expect(card).toContainText("Lands on your target");
   await expect(card).toContainText(primary.terms[0].label);
 });

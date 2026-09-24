@@ -8,7 +8,6 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { FXAAShader } from "three/addons/shaders/FXAAShader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { linkKey } from "../core/graph.ts";
 import { wreckCrossings } from "../core/terrain.ts";
 import { conditionOf, maxConditionOf } from "../core/combat/board.ts";
@@ -30,27 +29,23 @@ import {
   type InstallationGroup,
 } from "./front.ts";
 import {
-  brassRingTexture, drawRailPlate, haloTexture, makeLabel, packetTexture, railPlateSprite, reticleTexture, TABLE_LABEL_ORDER, type RailPlateData,
+  brassRingTexture, drawRailPlate, makeLabel, railPlateSprite, reticleTexture, TABLE_LABEL_ORDER, type RailPlateData,
 } from "./plates.ts";
 import { AMPLIFIED_COLOR, channelColor } from "../channel-palette.ts";
 import { amplifiedWinding, junctionSeal } from "./junction.ts";
 
 export type WorldPoint = { x: number; z: number };
 export type BoardZone = Zone;
-/** What the pointer rests on over the table: a device, a cable (its linkKey), an installation,
- * a hostile (its port) or a delivery's packet glyph (its channelKey). */
+/** What the pointer rests on over the table: a device, a cable (its linkKey), an installation or
+ * a hostile (its port). "delivery" (a channelKey) is raised by the HUD's landing breakdown. */
 export type TableHover = { kind: "node" | "link" | "installation" | "port" | "delivery"; id: string };
 export interface WorldCallbacks {
   onGround: (point: WorldPoint) => void;
   onNode: (id: string) => void;
   onLink: (key: string) => void;
   onMove: (id: string, point: WorldPoint | null, finished: boolean) => void;
-  /** A hostile's sprite or rail plate was clicked: target it (or aim the selected delivery there). */
+  /** A hostile's sprite or rail plate was clicked: target it. */
   onPort?: (port: Port) => void;
-  /** A packet glyph was dropped on a port. */
-  onAim?: (channelKey: string, port: Port | null) => void;
-  /** A packet glyph was clicked (select that delivery), or the empty table while one is selected (null). */
-  onDelivery?: (channelKey: string | null) => void;
   /** After every drawn frame: DOM overlays that follow the table (the intent badges) re-anchor. */
   onFrame?: () => void;
   /** An installation was clicked: its plate, or a Demolition Charge's target. */
@@ -80,15 +75,6 @@ export interface RailState {
   /** The port the right plate details (the table marks only the target). */
   selected: Port | null;
   readouts: Partial<Record<Port, RailReadout>>;
-}
-/** One delivery of this transmission, as the table shows it. */
-export interface DeliveryView {
-  key: string;
-  primary: boolean;
-  path: string[];
-  port: Port;
-  aimed: boolean;
-  amount: number;
 }
 /** What the table front forecasts: the next installations (ghosts) and each installation's effect. */
 export interface TableForecast {
@@ -226,16 +212,6 @@ interface PortVisual {
   /** A mid-playback health (the packet landed; the rules advance at the end). */
   shownHp: number | null;
 }
-interface DeliveryGlyph {
-  view: DeliveryView;
-  glyph: THREE.Sprite;
-  /** The selected delivery's lit ring in its channel colour. */
-  halo: THREE.Sprite | null;
-  line: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
-  base: THREE.Vector3;
-  toward: THREE.Vector3;
-  phase: number;
-}
 
 /** v3 names for the first two channel colours; every channel has its own (channel-palette.ts). */
 export const CHANNEL_COLORS = { primary: channelColor(0), secondary: channelColor(1) } as const;
@@ -322,7 +298,6 @@ export class World {
   private readonly terrainGroup = new THREE.Group();
   private readonly frontGroup = new THREE.Group();
   private readonly ghostGroup = new THREE.Group();
-  private readonly deliveryGroup = new THREE.Group();
   private readonly ambiance = new THREE.Group();
   private motes!: THREE.Points;
   private readonly shafts: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>[] = [];
@@ -403,10 +378,6 @@ export class World {
   private enemies: Enemy[] = [];
   private pack = false;
   private railState: RailState = { focus: null, selected: null, readouts: {} };
-  private deliveries: DeliveryView[] = [];
-  private selectedDelivery: string | null = null;
-  private readonly glyphs: DeliveryGlyph[] = [];
-  private deliverySignature = "";
   private faultNodes: string[] = [];
   private faultLinks: string[] = [];
   private selected: string | null = null;
@@ -424,10 +395,6 @@ export class World {
     y: number;
     moved: boolean;
   } | null = null;
-  /** A packet glyph being dragged toward a port. */
-  private aimDrag: { key: string; pointerId: number; x: number; y: number; moved: boolean; over: Port | null } | null = null;
-  /** While a delivery is selected: a lit line from its glyph to the pointer. */
-  private tether: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | null = null;
   private active = true;
   private visible = true;
   private frame = 0;
@@ -517,7 +484,6 @@ export class World {
     this.scene.add(this.ghostGroup);
     this.scene.add(this.tethers);
     this.scene.add(this.dynamic);
-    this.scene.add(this.deliveryGroup);
     this.hoverRing = dashedRing(REACH, 0.034, MALWARE_COLOR, 0.24, 0.85, 32);
     this.selectRing = dashedRing(REACH, 0.038, MALWARE_COLOR, 0.25, 0.95, 32);
     for (const reach of [this.hoverRing, this.selectRing]) {
@@ -1552,7 +1518,6 @@ export class World {
     this.refreshSelection();
     this.refreshSignalRoute();
     this.refreshForecastTargets();
-    this.refreshDeliveries(true);
   }
 
   private rebuildTable(sameBattle: boolean, previousFaults: Set<string>) {
@@ -1598,7 +1563,6 @@ export class World {
     this.refreshSelection();
     this.refreshSignalRoute();
     this.refreshForecastTargets();
-    this.refreshDeliveries(true);
   }
 
   /** Emphasizes the forecast's chosen routes without rebuilding cable geometry. */
@@ -2065,100 +2029,6 @@ export class World {
     this.bolts.push({ mesh, curve: new THREE.QuadraticBezierCurve3(from, middle, to), start: performance.now(), duration: 520, done });
   }
 
-  // ================================================================ deliveries
-
-  /** Packet glyphs parked at each channel's OMEGA end with a faint dashed line to their port's rail
-   * plate (packs with two or more standing hostiles; otherwise every delivery goes to the one). */
-  setDeliveries(list: readonly DeliveryView[], selected: string | null = null) {
-    this.deliveries = list.map(item => ({ ...item, path: [...item.path] }));
-    this.selectedDelivery = selected;
-    this.refreshDeliveries(false);
-  }
-  private refreshDeliveries(force: boolean) {
-    const standing = this.ports.filter(visual => visual.enemy && visual.enemy.hp > 0).length;
-    const show = this.pack && standing > 1;
-    const signature = JSON.stringify([show, this.deliveries, this.selectedDelivery, this.routeSignature]);
-    if (!force && signature === this.deliverySignature) return;
-    this.deliverySignature = signature;
-    for (const glyph of this.glyphs) {
-      this.deliveryGroup.remove(glyph.glyph, glyph.line);
-      glyph.line.geometry.dispose();
-      glyph.line.material.dispose();
-      glyph.glyph.material.dispose();
-      if (glyph.halo) { this.deliveryGroup.remove(glyph.halo); glyph.halo.material.dispose(); }
-    }
-    this.glyphs.length = 0;
-    this.canvas.dataset.deliveries = show ? String(this.deliveries.length) : "0";
-    this.canvas.dataset.armed = show && this.selectedDelivery && this.deliveries.some(view => view.key === this.selectedDelivery) ? this.selectedDelivery : "";
-    if (!this.canvas.dataset.armed) this.showTether(null);
-    if (!show) return;
-    const lastSpan = new Map<string, number>();
-    this.deliveries.forEach((view, index) => {
-      const path = view.path;
-      if (path.length < 2) return;
-      const key = linkKey(path[path.length - 2], path[path.length - 1]);
-      const curve = this.cableCurves.get(key);
-      const end = this.topology.nodes.find(node => node.id === path[path.length - 1]);
-      const before = this.topology.nodes.find(node => node.id === path[path.length - 2]);
-      if (!curve || !end || !before) return;
-      // Several channels may share the last span: fan their glyphs out along it.
-      const shared = lastSpan.get(key) ?? 0;
-      lastSpan.set(key, shared + 1);
-      // The curve runs from the link's first device; the glyph sits toward OMEGA's end of the span.
-      const startsAtEnd = Math.hypot(end.x - curve.getPoint(0).x, end.z - curve.getPoint(0).z) < 0.01;
-      const t = Math.max(0.3, 0.6 - shared * 0.18);
-      const base = curve.getPoint(startsAtEnd ? 1 - t : t).add(new THREE.Vector3(0, 0.42, 0));
-      const plate = this.portOf(view.port)!.plate.position;
-      const toward = new THREE.Vector3(plate.x - base.x, 0, plate.z - base.z).normalize();
-      // Channel i wears colour i of the shared palette, as its delivery row in the HUD does.
-      const color = channelColor(index);
-      const selectedGlyph = view.key === this.selectedDelivery;
-      const glyph = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: packetTexture(view.primary), color, transparent: true, depthWrite: false, toneMapped: false,
-      }));
-      glyph.scale.setScalar(selectedGlyph ? 1.4 : 0.98);
-      glyph.position.copy(base);
-      // Over the table's labels and the rail plates it drifts toward (still hidden by nearer hardware).
-      glyph.renderOrder = TABLE_LABEL_ORDER + 3;
-      glyph.userData.deliveryKey = view.key;
-      // The selected delivery: a lit ring in its channel colour around the glyph.
-      let halo: THREE.Sprite | null = null;
-      if (selectedGlyph) {
-        halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTexture(), color, transparent: true, depthWrite: false, depthTest: false, toneMapped: false, blending: THREE.AdditiveBlending }));
-        halo.renderOrder = TABLE_LABEL_ORDER + 2;
-        halo.scale.setScalar(1.9);
-        halo.position.copy(base);
-        this.deliveryGroup.add(halo);
-      }
-      const line = this.aimLine(base, new THREE.Vector3(plate.x, plate.y - 0.35, plate.z + 0.05), color, selectedGlyph ? 0.95 : view.aimed ? 0.7 : 0.5);
-      this.deliveryGroup.add(glyph, line);
-      this.glyphs.push({ view, glyph, halo, line, base, toward, phase: index * 1.7 });
-    });
-  }
-  /** A faint dashed arc from a packet glyph up to its port's rail plate (one draw call). */
-  private aimLine(from: THREE.Vector3, to: THREE.Vector3, color: number, opacity: number) {
-    const middle = from.clone().lerp(to, 0.5);
-    middle.y += 1.6 + from.distanceTo(to) * 0.08;
-    const curve = new THREE.QuadraticBezierCurve3(from, middle, to);
-    const dashes: THREE.BufferGeometry[] = [];
-    const count = 16;
-    for (let i = 0; i < count; i++) {
-      const a = i / count, b = a + 0.55 / count;
-      const piece = new THREE.CatmullRomCurve3([curve.getPoint(a), curve.getPoint((a + b) / 2), curve.getPoint(b)]);
-      dashes.push(new THREE.TubeGeometry(piece, 3, 0.04, 5, false));
-    }
-    const geometry = mergeGeometries(dashes)!;
-    for (const dash of dashes) dash.dispose();
-    const material = glow(color, opacity);
-    material.transparent = true;
-    material.depthWrite = false;
-    material.toneMapped = false;
-    material.blending = THREE.AdditiveBlending;
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.renderOrder = 11;
-    return mesh;
-  }
-
   // ================================================================ input
 
   setPlacement(role: Role | null, linkSource: string | null = null, linkArmored = false) {
@@ -2217,10 +2087,6 @@ export class World {
       this.installationList.some((item) => Math.hypot(item.x - point.x, item.z - point.z) < 1.3);
   }
   previewAt(clientX: number, clientY: number) {
-    if (this.aimDrag) {
-      this.highlightPort(this.portAt({ clientX, clientY }));
-      return;
-    }
     const point = this.pointFromScreen(clientX, clientY);
     this.placement.visible = Boolean(this.placementRole && point);
     if (point) {
@@ -2251,68 +2117,18 @@ export class World {
     return (hit?.userData.port as Port | undefined) ?? null;
   }
   private highlightPort(port: Port | null) {
-    if (this.aimDrag) this.aimDrag.over = port;
     for (const visual of this.ports) visual.highlight.visible = visual.port === port && visual.plate.visible;
-    if (this.aimDrag) this.canvas.dataset.cursor = port ? "target" : "grabbing";
-  }
-  /** Where the pointer is over the table for a glyph or a tether: a hand above the deck, and past
-   * the far rail in front of the plates. */
-  private pointerPoint(event: { clientX: number; clientY: number }) {
-    this.updateRay(event);
-    const point = new THREE.Vector3();
-    const deck = this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.1), point);
-    if (!deck || point.z < -5.6) this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), 5.6), point);
-    return new THREE.Vector3(THREE.MathUtils.clamp(point.x, -9, 9), THREE.MathUtils.clamp(point.y, 0.6, 6), THREE.MathUtils.clamp(point.z, -5.6, 5));
-  }
-  /** The selected delivery's tether: its glyph to the pointer, or (over a hostile) to that hostile's
-   * plate, in the channel's colour. null removes it. */
-  private showTether(event: { clientX: number; clientY: number } | null) {
-    const glyph = event && this.glyphs.find(item => item.view.key === this.selectedDelivery && item.halo);
-    if (!glyph || !event || this.placementRole || this.linkSource || this.aimDrag) {
-      if (this.tether) {
-        this.deliveryGroup.remove(this.tether);
-        this.tether.geometry.dispose();
-        this.tether.material.dispose();
-        this.tether = null;
-      }
-      if (!this.aimDrag) for (const visual of this.ports) visual.highlight.visible = false;
-      return;
-    }
-    const port = this.portAt(event);
-    this.highlightPort(port);
-    const plate = port ? this.portOf(port)!.plate.position : null;
-    const to = plate ? new THREE.Vector3(plate.x, plate.y + 0.2, plate.z + 0.05) : this.pointerPoint(event);
-    const from = glyph.glyph.position;
-    const middle = from.clone().lerp(to, 0.5);
-    middle.y += 0.6 + from.distanceTo(to) * 0.12;
-    const geometry = new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(from.clone(), middle, to), 24, 0.05, 5, false);
-    if (this.tether) {
-      this.tether.geometry.dispose();
-      this.tether.geometry = geometry;
-      return;
-    }
-    const material = glow(glyph.glyph.material.color.getHex(), 0.8);
-    material.transparent = true;
-    material.depthWrite = false;
-    material.depthTest = false;
-    material.toneMapped = false;
-    material.blending = THREE.AdditiveBlending;
-    this.tether = new THREE.Mesh(geometry, material);
-    this.tether.renderOrder = TABLE_LABEL_ORDER + 1;
-    this.deliveryGroup.add(this.tether);
   }
   private hit(event: PointerEvent) {
     this.updateRay(event);
-    const glyphs = this.glyphs.map(item => item.glyph);
     const fronts = [...this.installations.values()].map(group => group.userData.installation.hit);
-    const object = this.raycaster.intersectObjects([...glyphs, ...fronts, ...this.hitObjects], false)[0]
+    const object = this.raycaster.intersectObjects([...fronts, ...this.hitObjects], false)[0]
       ?.object;
     const port = object ? null : this.portAt(event);
     return {
       node: object?.userData.nodeId as string | undefined,
       link: object?.userData.linkKey as string | undefined,
       installation: object?.userData.installationId as string | undefined,
-      delivery: object?.userData.deliveryKey as string | undefined,
       port: port ?? undefined,
     };
   }
@@ -2320,13 +2136,6 @@ export class World {
     if (event.button !== 0) return;
     this.callbacks.onHover?.(null, event.clientX, event.clientY);
     const hit = this.hit(event);
-    if (hit.delivery && !this.placementRole && !this.linkSource && this.callbacks.onAim) {
-      this.aimDrag = { key: hit.delivery, pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false, over: null };
-      this.controls.enabled = false;
-      this.canvas.setPointerCapture(event.pointerId);
-      this.canvas.dataset.cursor = "grabbing";
-      return;
-    }
     this.pointerDown = {
       id: hit.node ?? null,
       pointerId: event.pointerId,
@@ -2340,18 +2149,6 @@ export class World {
     }
   };
   private onPointerMove = (event: PointerEvent) => {
-    if (this.aimDrag) {
-      if (Math.hypot(event.clientX - this.aimDrag.x, event.clientY - this.aimDrag.y) > 5) this.aimDrag.moved = true;
-      const glyph = this.glyphs.find(item => item.view.key === this.aimDrag!.key);
-      if (glyph && this.aimDrag.moved) {
-        // The glyph follows the pointer over the table, lifted toward the rail.
-        glyph.glyph.position.copy(this.pointerPoint(event));
-        glyph.halo?.position.copy(glyph.glyph.position);
-        this.showTether(null);
-      }
-      this.highlightPort(this.portAt(event));
-      return;
-    }
     if (this.targetingZone) {
       const point = this.pointFromScreen(event.clientX,event.clientY);
       this.setZonePreview(point ? point.z < -1.3 ? "north" : point.z > 1.3 ? "south" : "center" : null);
@@ -2388,15 +2185,10 @@ export class World {
       this.callbacks.onHover?.(null, event.clientX, event.clientY);
     } else if (!this.placementRole) {
       const hit = this.hit(event);
-      const armed = !!this.canvas.dataset.armed;
-      if (armed) this.showTether(event);
-      this.canvas.dataset.cursor = hit.delivery ? "grab"
-        : hit.installation && this.targetingInstallations ? "target"
-        : hit.port && armed ? "target"
+      this.canvas.dataset.cursor = hit.installation && this.targetingInstallations ? "target"
         : hit.node || hit.installation || hit.port ? "pointer" : "grab";
       this.hover(hit.installation ? { kind: "installation", id: hit.installation } : hit.node ? { kind: "node", id: hit.node } : null);
-      const target: TableHover | null = hit.delivery ? { kind: "delivery", id: hit.delivery }
-        : hit.installation ? { kind: "installation", id: hit.installation }
+      const target: TableHover | null = hit.installation ? { kind: "installation", id: hit.installation }
         : hit.node ? { kind: "node", id: hit.node }
         : hit.port ? { kind: "port", id: hit.port }
         : hit.link ? { kind: "link", id: hit.link } : null;
@@ -2449,20 +2241,6 @@ export class World {
     this.scene.add(ghost);
   }
   private onPointerUp = (event: PointerEvent) => {
-    const aim = this.aimDrag;
-    if (aim) {
-      this.aimDrag = null;
-      this.controls.enabled = true;
-      if (this.canvas.hasPointerCapture(aim.pointerId)) this.canvas.releasePointerCapture(aim.pointerId);
-      const port = aim.moved ? this.portAt(event) : null;
-      this.highlightPort(null);
-      this.canvas.dataset.cursor = "grab";
-      this.refreshDeliveries(true);
-      if (port) this.callbacks.onAim?.(aim.key, port);
-      // A click (no drag) picks the delivery up: the next hostile clicked receives it.
-      else if (!aim.moved) this.callbacks.onDelivery?.(aim.key);
-      return;
-    }
     const down = this.pointerDown;
     this.pointerDown = null;
     this.controls.enabled = true;
@@ -2477,7 +2255,6 @@ export class World {
     else if (hit.node) this.callbacks.onNode(hit.node);
     else if (hit.link && !this.targetingZone) this.callbacks.onLink(hit.link);
     else if (hit.port && !this.placementRole && !this.linkSource && this.callbacks.onPort) this.callbacks.onPort(hit.port);
-    else if (this.canvas.dataset.armed && !this.placementRole && !this.linkSource && !this.targetingZone) this.callbacks.onDelivery?.(null);
     else {
       const point = this.pointFromScreen(event.clientX, event.clientY);
       if (point) this.callbacks.onGround(point);
@@ -2487,25 +2264,19 @@ export class World {
     this.cancelInteraction();
   };
 
-  /** Ends an interrupted drag without committing a placement, movement or aim. */
+  /** Ends an interrupted drag without committing a placement or movement. */
   cancelInteraction() {
-    const pointerId = this.pointerDown?.pointerId ?? this.aimDrag?.pointerId;
-    const aimed = !!this.aimDrag;
+    const pointerId = this.pointerDown?.pointerId;
     this.pointerDown = null;
-    this.aimDrag = null;
     this.controls.enabled = true;
     this.placement.visible = false;
     this.canvas.dataset.cursor = "grab";
     for (const visual of this.ports) visual.highlight.visible = false;
-    this.showTether(null);
-    if (aimed) this.refreshDeliveries(true);
     if (pointerId !== undefined && this.canvas.hasPointerCapture(pointerId))
       this.canvas.releasePointerCapture(pointerId);
   }
   private onPointerLeave = (event: PointerEvent) => {
     this.placement.visible = false;
-    // Onto a hostile's intent badge the tether follows (it reaches that hostile); elsewhere it goes.
-    if (!this.aimDrag) this.showTether((event.relatedTarget as HTMLElement | null)?.closest?.(".hostile-intent[data-port]") ? event : null);
     this.showLinkGhost(null);
     this.hover(null);
     this.callbacks.onHover?.(null, event.clientX, event.clientY);
@@ -2616,7 +2387,8 @@ export class World {
   }
 
   /**
-   * A split transmission: each delivery runs its channel, then crosses the air to its port.
+   * A pack's transmission: each delivery runs its channel in its colour, then crosses the air to its
+   * port (the target: every delivery lands there).
    * `onPort` fires when the last packet of a port lands (its impact); `done` after every port.
    */
   playTransmission(deliveries: readonly { path: string[]; port: Port; primary: boolean; index?: number }[], onPort: (port: Port) => void, done: () => void) {
@@ -2856,7 +2628,6 @@ export class World {
         visual.dead = true;
         visual.group.visible = false;
         this.refreshRail();
-        this.refreshDeliveries(true);
       }
       done();
     }, quick || this.reducedMotion());
@@ -2869,7 +2640,6 @@ export class World {
     const roster = this.enemies.filter(other => other.port !== enemy.port).concat({ ...enemy });
     roster.sort((a, b) => PORT_ORDER.indexOf(a.port) - PORT_ORDER.indexOf(b.port));
     this.syncRail(roster, true);
-    this.refreshDeliveries(true);
   }
 
   /** Trap phase: a firewall's quarantine beam (from a Sentry's searchlight) into an installation. */
@@ -3132,22 +2902,6 @@ export class World {
         group.userData.nextSpark = time + 2.6 + Math.random() * 2.4;
         this.burst(new THREE.Vector3(group.position.x, 1.5, group.position.z), 0xffa05a, 3, 0.9);
       }
-    const glyphPulse = reduced ? 1 : 0.85 + 0.15 * Math.sin(time * 3);
-    for (const item of this.glyphs) {
-      const dragged = this.aimDrag?.key === item.view.key && this.aimDrag.moved;
-      if (!dragged) {
-        // Each glyph drifts a hand's width toward its port and eases back (static under reduced motion);
-        // the selected one holds still and lit, so its tether has a fixed end.
-        const drift = reduced || item.halo ? 0 : (0.5 - 0.5 * Math.cos(time * 1.3 + item.phase)) * 0.42;
-        item.glyph.position.copy(item.base).addScaledVector(item.toward, drift);
-        item.glyph.material.opacity = item.halo ? 1 : glyphPulse;
-      }
-      if (item.halo) {
-        item.halo.position.copy(item.glyph.position);
-        item.halo.material.opacity = reduced ? 0.9 : 0.7 + 0.3 * Math.sin(time * 4);
-        item.halo.scale.setScalar(reduced ? 1.9 : 1.8 + 0.18 * Math.sin(time * 4));
-      }
-    }
     // The target's reticle breathes (still under reduced motion).
     for (const visual of this.ports) {
       if (!visual.reticle.visible) continue;
@@ -3156,7 +2910,6 @@ export class World {
       visual.reticle.scale.set(base.x * breath, base.y * breath, 1);
       visual.reticle.material.opacity = reduced ? 1 : 0.82 + 0.18 * Math.sin(time * 2.4);
     }
-    if (this.tether) this.tether.material.opacity = reduced ? 0.85 : 0.6 + 0.3 * Math.sin(time * 5);
   }
 
   private animateProps(now: number, time: number, motion: number, reduced: boolean) {
@@ -3355,7 +3108,6 @@ export class World {
     this.cableGroups.clear();
     this.cableBeads.length = 0;
     this.frayEmbers.length = 0;
-    this.glyphs.length = 0;
     this.linkGhost = null;
     this.zoneVisuals.clear();
     this.environment.dispose();

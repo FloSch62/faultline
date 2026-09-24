@@ -1,10 +1,11 @@
 /** The far rail in the DOM (targeting): one intent badge per living hostile, hung over the table
  * above its rail plate (#intent-layer; main.ts places the badges every frame), and the hover cards
- * for hostiles and packet glyphs. Every number is read from the forecast (combatPreview). */
+ * for hostiles and for the channels of the right plate's landing breakdown. Every number is read
+ * from the forecast (combatPreview). */
 import { CARDS } from "./core/cards.ts";
 import { DESIGNATIONS, ENEMIES, designationRule } from "./core/enemies.ts";
 import {
-  INSTALLATION_NAMES, PORTS, aimChannel, combatPreview, livingEnemies, zoneForNode,
+  INSTALLATION_NAMES, livingEnemies, zoneForNode,
   type CombatPreview, type Delivery, type HostileForecast, type InstallForecast,
 } from "./core/run.ts";
 import type { Enemy, Port, RunState } from "./core/types.ts";
@@ -130,34 +131,6 @@ export function intentBadges(r: RunState, p: CombatPreview, options: { armed: st
 
 // ------------------------------------------------------------------ hover cards
 
-/** While a delivery is picked up, a hostile's card is the aim's preview: each port's health after
- * this transmission now and with the delivery landing here (the forecast of the aimed copy). */
-function aimCard(r: RunState, p: CombatPreview, armed: Delivery, port: Port): string | null {
-  const living = livingEnemies(r);
-  const enemy = living.find(item => item.port === port);
-  if (!enemy) return null;
-  const copy: RunState = { ...r, aims: { ...r.aims } };
-  if (!aimChannel(copy, armed.channelKey, port).ok) return null;
-  const after = combatPreview(copy);
-  const here = armed.port === port;
-  const rows = PORTS.flatMap(slot => {
-    const standing = living.find(item => item.port === slot);
-    if (!standing) return [];
-    const now = p.buffering ? standing.hp : p.ports[slot]?.hpAfter ?? standing.hp;
-    const then = after.buffering ? standing.hp : after.ports[slot]?.hpAfter ?? standing.hp;
-    const falls = !after.buffering && !!after.ports[slot]?.lethal;
-    if (now === then && slot !== port) return [];
-    return [`<li class="${slot === port ? "is-here" : ""}"><span>${esc(title(standing.name))}</span><b>${now}</b><i aria-hidden="true">→</i><b class="${falls ? "is-lethal" : ""}">${then}</b>${falls ? "<em>falls</em>" : ""}</li>`];
-  });
-  const incoming = after.incoming !== p.incoming ? `<li class="ac-incoming"><span>Damage to you</span><b>${p.incoming}</b><i aria-hidden="true">→</i><b>${after.incoming}</b></li>` : "";
-  return `<div class="aim-card" style="--channel:${channelCss(armed.index)}">
-    <div class="hc-head"><i class="dc-swatch" aria-hidden="true">${glyph(armed.primary ? "hexagon" : "diamond", 15)}</i><b>${esc(here ? `${deliveryName(armed)} lands here` : `Aim ${deliveryName(armed)} here`)}</b><strong class="dc-amount">${armed.amount}</strong></div>
-    <div class="dc-lands">${icon("arrow", 13)}<span><b>${esc(title(enemy.name))}</b> · ${port} port</span></div>
-    ${rows.length || incoming ? `<ul class="ac-ports">${rows.join("")}${incoming}</ul>` : ""}
-    <div class="hc-hint">${here ? "Esc puts it down" : "Click to aim · Esc puts it down"}</div>
-  </div>`;
-}
-
 function portCard(r: RunState, p: CombatPreview, port: Port): string | null {
   const living = livingEnemies(r);
   const enemy = living.find(item => item.port === port);
@@ -197,8 +170,8 @@ function portCard(r: RunState, p: CombatPreview, port: Port): string | null {
   if (landing?.overflowOut && landing.overflowTo) extra.push(`overflow ${landing.overflowOut} → ${landing.overflowTo.toUpperCase()}`);
   const landsLine = buffering ? `<div class="hc-lands"><span>Buffering: nothing lands this turn</span></div>`
     : packets.length || extra.length ? `<div class="hc-lands"><span>Lands</span>${packets.join("")}${extra.map(text => `<i>${esc(text)}</i>`).join("")}${landing ? `<b class="hc-total${lethal ? " is-lethal" : ""}">= ${landing.packet}</b>` : ""}</div>`
-      : `<div class="hc-lands"><span>No delivery lands here</span></div>`;
-  const hint = target ? "Your target: unaimed deliveries and overflow land here" : pack ? "Click to target it" : "";
+      : `<div class="hc-lands"><span>Nothing lands here</span></div>`;
+  const hint = target ? "Your target: every channel lands here" : pack ? "Click to target it: every channel lands there" : "";
   return `<div class="hostile-card kind-${read.kind} state-${read.state}${target ? " is-target" : ""}" style="--hostile:${hexOf(enemy.color)}">
     <div class="hc-head">${target ? `<i class="hc-crest" aria-hidden="true">${glyph("crest", 16)}</i>` : ""}<b>${esc(title(enemy.name))}</b><span>${esc(`${ROLE_NAME[enemy.role]} · ${port} port`)}</span></div>
     ${ribbons ? `<div class="hc-ribbons">${ribbons}</div>` : ""}
@@ -212,32 +185,27 @@ function portCard(r: RunState, p: CombatPreview, port: Port): string | null {
   </div>`;
 }
 
+/** One channel of the landing breakdown, read only: its terms, its route, and the packet it joins. */
 function deliveryCard(r: RunState, p: CombatPreview, key: string): string | null {
   const d = p.deliveries.find(item => item.channelKey === key);
   if (!d) return null;
   const enemy = livingEnemies(r).find(item => item.port === d.port);
   const landing = p.ports[d.port];
-  const merged = p.deliveries.filter(item => item.port === d.port && item.channelKey !== key);
+  const merged = p.deliveries.filter(item => item.channelKey !== key);
   const terms = d.terms.filter(term => term.amount !== 0 || d.terms.length === 1);
-  const after = landing ? `${landing.packet} lands${landing.armor ? ` after armor −${landing.armor}` : ""}${landing.lethal ? " · lethal" : ""}.` : "";
+  const after = landing ? `${landing.packet} lands${landing.armor ? ` after armor −${landing.armor}` : ""}${landing.lethal ? ", lethal" : ""}${landing.overflowOut && landing.overflowTo ? `, and ${landing.overflowOut} overflows → ${landing.overflowTo.toUpperCase()}` : ""}.` : "";
   return `<div class="delivery-card${d.primary ? " is-primary" : ""}" style="--channel:${channelCss(d.index)}">
-    <div class="hc-head"><i class="dc-swatch" aria-hidden="true">${glyph(d.primary ? "hexagon" : "diamond", 16)}</i><b>${esc(d.primary ? "Primary delivery" : `Channel ${d.index + 1}`)}</b><strong class="dc-amount">${d.amount}</strong></div>
-    <div class="dc-lands">${icon("arrow", 13)}<span>Lands on <b>${esc(enemy ? title(enemy.name) : d.port.toUpperCase())}</b> · ${d.port} port</span><em>${d.aimed ? "aimed" : "follows the target"}</em></div>
+    <div class="hc-head"><i class="dc-swatch" aria-hidden="true">${glyph(d.primary ? "hexagon" : "diamond", 16)}</i><b>${esc(d.primary ? "Primary channel" : `Channel ${d.index + 1}`)}</b><strong class="dc-amount">${d.amount}</strong></div>
+    <div class="dc-lands">${icon("arrow", 13)}<span>Lands on your target, <b>${esc(enemy ? title(enemy.name) : d.port.toUpperCase())}</b></span></div>
     ${terms.length ? `<ul class="dc-terms">${terms.map(term => `<li><span>${esc(term.label)}</span><b>${term.amount >= 0 ? "+" : ""}${term.amount}</b></li>`).join("")}</ul>` : ""}
-    ${merged.length && landing ? `<p class="hc-copy">Merges with ${esc(merged.map(item => deliveryName(item)).join(" and "))} at ${d.port.toUpperCase()}: ${esc(after)}</p>`
-      : landing?.armor ? `<p class="hc-copy">At ${d.port.toUpperCase()}: ${esc(after)}</p>` : ""}
+    ${landing ? `<p class="hc-copy">${merged.length ? `One packet with ${esc(merged.map(item => deliveryName(item)).join(" and "))}: ` : ""}${esc(after)}</p>` : ""}
     <div class="dc-path">${esc(d.path.map(id => id.toUpperCase()).join(" → "))}</div>
-    <div class="hc-hint">Click it, then click a hostile to aim it · or drag it onto one</div>
   </div>`;
 }
 
-/** The card's inner markup for a hostile or a delivery, or null for no card. `armed` is the delivery
- * the player picked up (clicking a hostile aims it there). */
-export function hoverMarkup(run: RunState, preview: CombatPreview, target: TableHover, armed: string | null = null): string | null {
-  if (target.kind === "port") {
-    const delivery = armed && livingEnemies(run).length > 1 ? preview.deliveries.find(item => item.channelKey === armed) : undefined;
-    return delivery ? aimCard(run, preview, delivery, target.id as Port) : portCard(run, preview, target.id as Port);
-  }
+/** The card's inner markup for a hostile or a channel of the landing breakdown, or null for no card. */
+export function hoverMarkup(run: RunState, preview: CombatPreview, target: TableHover): string | null {
+  if (target.kind === "port") return portCard(run, preview, target.id as Port);
   if (target.kind === "delivery") return deliveryCard(run, preview, target.id);
   return null;
 }

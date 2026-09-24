@@ -326,13 +326,12 @@ dialog .game-card:is(.house-architect, .house-warden, .house-ghost) > .card-head
 .forge-screen .forge-leave { margin-top: 22px; }
 
 /* ------------------------------------------------------------ keeper select: the starting deck */
-.kit-deck .starter-list { display: flex; flex-wrap: wrap; gap: 1px 0; margin-top: 2px; font: 13.5px/1.4 var(--text); color: #b1b1a6; }
+.kit-deck .starter-list { display: flex; flex-wrap: wrap; gap: 1px 0; margin-top: 2px; font: clamp(13px, calc(1.55 * var(--u)), 18.5px)/1.4 var(--text); color: #b1b1a6; }
 .kit-deck .starter-card { white-space: nowrap; }
 .kit-deck .starter-card:not(:last-child)::after { content: "·"; margin: 0 6px; color: #8a6a3a; }
-.kit-deck .starter-card b { margin-left: 3px; font: 600 14px/1 var(--title); font-variant-numeric: tabular-nums; color: #d9c69c; }
+.kit-deck .starter-card b { margin-left: 3px; font: 600 1.05em/1 var(--title); font-variant-numeric: tabular-nums; color: #d9c69c; }
 .kit-deck .starter-card.is-signature { color: color-mix(in srgb, var(--accent) 80%, #fff); text-shadow: 0 0 10px color-mix(in srgb, var(--accent) 45%, transparent); }
-/* The kit reads in full on the chosen keeper; the others keep two lines per rule (tooltips and the
-   aria label keep every word). */
+/* Each rule keeps at most three lines in the kit leaf (tooltips and the aria label keep every word). */
 .archetype .kit-row b + span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
 /* ------------------------------------------------------------ keeper select: the ascension ladder */
@@ -367,16 +366,6 @@ dialog .game-card:is(.house-architect, .house-warden, .house-ghost) > .card-head
 .ascension-panel .asc-summary strong { margin-right: 7px; font: 600 17px/1 var(--title); color: #ead9f7; }
 .asc-includes { display: block; margin-top: 3px; font: italic 13.5px/1.35 var(--text); color: #a99cbd; }
 .asc-earlier { font-style: normal; color: #d6c3ef; border-bottom: 1px dotted #c9a8ea88; }
-/* Room for the starting deck and the ladder: a shorter picture, one line of story, tighter kit rows. */
-.selection-screen .archetype-art { height: clamp(60px, 8.5cqh, 88px); }
-.selection-screen .chosen-story { max-width: 1000px; min-height: 0; }
-.selection-screen .archetypes { margin: clamp(10px, 1.6cqh, 20px) 0 clamp(10px, 1.6cqh, 18px); }
-.selection-screen .kit { gap: 5px; margin-bottom: 8px; }
-.selection-screen .kit-row { padding-top: 6px; }
-.selection-screen .kit-row b { font-size: 18px; }
-.selection-screen .archetype-epithet { margin-bottom: 8px; }
-.selection-screen .archetype .kit-row b + span { -webkit-line-clamp: 2; font-size: 13.5px; line-height: 1.35; }
-.selection-screen .kit-deck .starter-list { font-size: 13px; line-height: 1.3; }
 .selection-screen .selection-footer { align-items: stretch; gap: 18px; }
 .selection-screen .embark { min-width: 240px; padding-inline: 18px; }
 .selection-screen .ascension-panel { gap: 14px; padding-inline: 14px 16px; }

@@ -17,6 +17,7 @@ export const ARCHETYPES: Record<
     relic: RelicId;
     console: ConsoleId;
     integrity: number;
+    /** The keeper's portrait on the selection screen (docs/art-keepers-manifest.json). */
     art: string;
     color: string;
   }
@@ -29,7 +30,7 @@ export const ARCHETYPES: Record<
     relic: "hot-swap",
     console: "patch",
     integrity: 14,
-    art: "router",
+    art: "art/keepers/architect.webp",
     color: "#a7c9c2",
   },
   warden: {
@@ -40,7 +41,7 @@ export const ARCHETYPES: Record<
     relic: "backpressure",
     console: "harden",
     integrity: 15,
-    art: "shield",
+    art: "art/keepers/warden.webp",
     color: "#dfb87a",
   },
   ghost: {
@@ -51,7 +52,7 @@ export const ARCHETYPES: Record<
     relic: "deep-cache",
     console: "buffer",
     integrity: 12,
-    art: "crosslink",
+    art: "art/keepers/ghost.webp",
     color: "#99bcd4",
   },
 };

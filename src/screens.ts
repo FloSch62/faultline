@@ -452,27 +452,37 @@ function starterRow(id: Archetype): string {
   return `<span class="kit-row kit-deck"><i>${icon("deck", 15)}</i><span><em>Starting deck · ${deck.length} cards</em><span class="starter-list">${names}</span></span></span>`;
 }
 
+/** The chosen keeper's leaf, unfolded beside the portrait: their story, then the kit (console, relic,
+ * engine, starting deck). */
+function keeperKit(id: Archetype): string {
+  const a = ARCHETYPES[id], consoleDef = CONSOLES[a.console], engine = ENGINES[id], relic = RELICS[a.relic];
+  // Short console rules read in full; a long one keeps its first sentence (the engine row explains the rest).
+  const consoleSummary = consoleDef.rules.length < 80 ? consoleDef.rules : consoleDef.rules.split(/(?<=\.)\s+/)[0];
+  return `<span class="keeper-kit">
+      <span class="keeper-story">${esc(ARCHETYPE_STORIES[id].story)}</span>
+      <span class="kit">
+        <span class="kit-row"><i>${sicon("console", 16)}</i><span><em>Console · ${consoleDef.cost} energy</em><b>${consoleDef.name}</b><span>${esc(consoleSummary)}</span></span></span>
+        <span class="kit-row"><i>${relicEmblem(a.relic, 15)}</i><span><em>Starting relic</em><b>${relic.name}</b><span>${esc(relic.rules)}</span></span></span>
+        <span class="kit-row"><i>${sicon("engine", 16)}</i><span><em>Engine</em><b>${engine.name}</b><span>${esc(engine.rules)}</span></span></span>
+        ${starterRow(id)}
+      </span>
+    </span>`;
+}
+
 const sentence = (text: string) => text.charAt(0) + text.slice(1).toLowerCase();
+/** Choose Your Keeper: three tall portrait plates, the keeper's name and integrity on the painting's
+ * lower edge. The chosen plate is lit and unfolds its kit; the others stay dim until hovered. */
 export function selectMarkup(selected: Archetype) {
   const ids = Object.keys(ARCHETYPES) as Archetype[];
   const cards = ids.map(id => {
     const a = ARCHETYPES[id], consoleDef = CONSOLES[a.console], engine = ENGINES[id], relic = RELICS[a.relic];
-    // Short console rules read in full; a long one keeps its first sentence (the engine row explains the rest).
-    const consoleSummary = consoleDef.rules.length < 80 ? consoleDef.rules : consoleDef.rules.split(/(?<=\.)\s+/)[0];
-    const deck = starterDeck(id);
-    return `<button class="archetype ${selected === id ? "chosen" : ""}" data-archetype="${id}" aria-pressed="${selected === id}" style="${artStyle(a.art)};--accent:${a.color}" aria-label="${esc(`${a.name}. ${a.title}. Console: ${consoleDef.name}, ${consoleDef.rules} Relic: ${relic.name}, ${relic.rules} Engine: ${engine.name}. Starting deck, ${deck.length} cards: ${STARTER_SIGNATURES[id].map(card => CARDS[card].name).join(" and ")} with the shared ten. ${a.integrity} integrity.`)}">
-      <span class="archetype-art"></span>${selected === id ? '<span class="lit-stone"></span>' : ""}
-      <span class="archetype-copy"><strong>${a.name}</strong><em class="archetype-epithet">${sentence(a.title)}</em>
-        <span class="kit">
-          <span class="kit-row"><i>${sicon("console", 16)}</i><span><em>Console · ${consoleDef.cost} energy</em><b>${consoleDef.name}</b><span>${esc(consoleSummary)}</span></span></span>
-          <span class="kit-row"><i>${relicEmblem(a.relic, 15)}</i><span><em>Starting relic</em><b>${relic.name}</b><span>${esc(relic.rules)}</span></span></span>
-          <span class="kit-row"><i>${sicon("engine", 16)}</i><span><em>Engine</em><b>${engine.name}</b><span>${esc(engine.rules)}</span></span></span>
-          ${starterRow(id)}
-        </span>
-        <span class="archetype-health">${icon("heart", 16)}<b>${a.integrity}</b><small>Integrity</small></span>
-      </span></button>`;
+    const deck = starterDeck(id), chosen = selected === id;
+    return `<button class="archetype ${chosen ? "chosen" : ""}" data-archetype="${id}" aria-pressed="${chosen}" style="--portrait:url('${asset(a.art)}');--accent:${a.color}" aria-label="${esc(`${a.name}. ${a.title}. Console: ${consoleDef.name}, ${consoleDef.rules} Relic: ${relic.name}, ${relic.rules} Engine: ${engine.name}. Starting deck, ${deck.length} cards: ${STARTER_SIGNATURES[id].map(card => CARDS[card].name).join(" and ")} with the shared ten. ${a.integrity} integrity.`)}">
+      <span class="keeper-portrait" aria-hidden="true"></span>${chosen ? '<span class="lit-stone"></span>' : ""}
+      <span class="keeper-name"><strong>${a.name}</strong><em class="archetype-epithet">${sentence(a.title)}</em><span class="archetype-health">${icon("heart", 16)}<b>${a.integrity}</b><small>Integrity</small></span></span>
+      ${chosen ? keeperKit(id) : ""}</button>`;
   }).join("");
-  return `<section class="selection-screen full-screen"><button class="back-control text-button" data-action="title"><kbd>Esc</kbd>Return</button><button class="plate-button deck-plate" data-action="loadout">${icon("deck", 16)}Starting deck</button><div class="screen-heading"><h1>Choose Your Keeper</h1><p class="chosen-story">${esc(ARCHETYPE_STORIES[selected].story)}</p></div><div class="archetypes">${cards}</div><div class="selection-footer">${ascensionPanel(selected)}<button class="gold-button embark" data-action="embark">Enter the Faultline</button></div></section>`;
+  return `<section class="selection-screen full-screen"><button class="back-control text-button" data-action="title"><kbd>Esc</kbd>Return</button><button class="plate-button deck-plate" data-action="loadout">${icon("deck", 16)}Starting deck</button><div class="screen-heading"><h1>Choose Your Keeper</h1></div><div class="archetypes">${cards}</div><div class="selection-footer">${ascensionPanel(selected)}<button class="gold-button embark" data-action="embark">Enter the Faultline</button></div></section>`;
 }
 
 // ------------------------------------------------------------------ header & map

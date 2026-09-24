@@ -125,7 +125,7 @@ for(const scene of ['title','select']){
     await page.setViewportSize({width,height});
     const problems=await page.locator('#screen').evaluate(el=>{
       const issues=[];
-      for(const text of el.querySelectorAll('h1,p,.archetype-copy>strong,.archetype-copy>span,.archetype-copy>em')){
+      for(const text of el.querySelectorAll('h1,p,.keeper-name>strong,.keeper-name>em,.keeper-kit')){
         // Cinzel's em box extends past a heading's line box; visible overflow
         // does not clip the glyphs. Hidden content and horizontal overflow do.
         if(text.scrollWidth>text.clientWidth+2||(getComputedStyle(text).overflowY!=='visible'&&text.scrollHeight>text.clientHeight+2))issues.push(`${text.className||text.tagName}: text overflow`);
@@ -148,7 +148,7 @@ for(const phase of ['map','reward','forge','relic']){
   for(const [width,height] of [[320,740],[390,844],[1024,600],[1242,698],[1440,900]]){
     await page.setViewportSize({width,height});
     const problems=await page.evaluate(()=>{
-      const problems=[];for(const el of document.querySelectorAll('#screen h1,#screen p,.relic-option>strong,.relic-option>span,.forge-options>button>strong,.forge-options>button>small,.forge-options>button>span:not(.forge-art),.card-copy,.archetype-copy')){
+      const problems=[];for(const el of document.querySelectorAll('#screen h1,#screen p,.relic-option>strong,.relic-option>span,.forge-options>button>strong,.forge-options>button>small,.forge-options>button>span:not(.forge-art),.card-copy,.keeper-name,.keeper-kit')){
         if(el.scrollWidth>el.clientWidth+2)problems.push(`${el.className||el.tagName}: horizontal overflow`);
         if(el.scrollHeight>el.clientHeight+2)problems.push(`${el.className||el.tagName}: vertical overflow`);
       }

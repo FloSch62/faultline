@@ -5,6 +5,7 @@ import { newExpedition, type Expedition } from "../src/core/expedition.ts";
 import { makeEnemy } from "../src/core/encounter.ts";
 import { chooseRoom, combatPreview } from "../src/core/run.ts";
 import { ENEMIES } from "../src/core/enemies.ts";
+import { RULES } from "../src/core/cards.ts";
 
 const storage = "faultline-expedition-v2";
 function fixture(id = "core", turn = 4) {
@@ -58,7 +59,7 @@ test("prepare supports keyboard, return, undo and reload without duplicating car
   const r = await saved(page);
   expect(r.preparedCard).toBeNull();
   expect(r.hand[0]).toBe("pulse");
-  expect(r.hand).toHaveLength(6);
+  expect(r.hand).toHaveLength(RULES.handDraw);
 });
 
 test("charge telegraphs the next ultimate, a prepared burst breaks it, and exposure expires", async ({ page }) => {

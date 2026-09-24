@@ -272,6 +272,9 @@ test("damage and shield calculations predict the actual transmission", async ({
 }) => {
   const expedition = fixture();
   expedition.run.hand = ["router", "fiber", "fiber", "guard", "pulse"];
+  // A route, a block and a burst in one turn: Hot Swap pays one fiber, and the turn has the energy for
+  // the rest (an energy relic's turn). The test reads the calculation, not the economy.
+  expedition.run.energy = CARDS.router.cost + CARDS.fiber.cost + CARDS.guard.cost + CARDS.pulse.cost;
   expedition.run.enemies[0].hp = expedition.run.enemies[0].maxHp = 100;
   expedition.run.enemies[0].id = "leech";
   expedition.run.enemies[0].turn = 0;
@@ -386,7 +389,7 @@ test("separated circuits defend even when a central route is first, and relocati
   await page.locator('[data-manage-node="router3"]').click();
   await page.locator('[data-relocate-zone="center"]').click();
   await page.locator("#relocate-confirm [data-relocate-confirm]").click();
-  await expect(page.locator(".energy-orb strong")).toHaveText("4");
+  await expect(page.locator(".energy-orb strong")).toHaveText(String(RULES.baseEnergy - RULES.relocateCost));
   await expect(page.locator(".forecast-net b")).toHaveText("2");
   await expect(page.locator(".shield-resource strong")).toHaveText("0");
   const moved = JSON.parse((await saved(page))!).run.topology.nodes.find(
@@ -394,7 +397,7 @@ test("separated circuits defend even when a central route is first, and relocati
   );
   expect(Math.abs(moved.z)).toBeLessThanOrEqual(1.3);
   await page.keyboard.press("z");
-  await expect(page.locator(".energy-orb strong")).toHaveText("5");
+  await expect(page.locator(".energy-orb strong")).toHaveText(String(RULES.baseEnergy));
   await expect(page.locator(".forecast-net b")).toHaveText("0");
   await expect(page.locator(".shield-resource strong")).toHaveText(String(RULES.separatedCircuitShield));
   const restored = JSON.parse((await saved(page))!).run;
@@ -477,7 +480,7 @@ test("Wireshark captures the active route, draws, boosts its transmission, and e
   await expect(page.locator(".transmit-power strong")).toHaveText(String(before));
   await choose(page, "wireshark");
   await expect(page.locator("[data-hand]")).toHaveCount(2);
-  await expect(page.locator(".energy-orb strong")).toHaveText("4");
+  await expect(page.locator(".energy-orb strong")).toHaveText(String(RULES.baseEnergy - CARDS.wireshark.cost));
   await expect(page.locator(".transmit-power strong")).toHaveText(String(after));
   const capture = JSON.parse((await saved(page))!).run;
   expect(capture.hand).toEqual(["guard", "pulse"]);
@@ -505,7 +508,7 @@ test("leaving Field Training preserves the real expedition's undo history", asyn
   await page.locator('[data-action="continue"]').click();
   await choose(page, "router");
   await page.getByRole("button", { name: /Deploy in a free socket/ }).click();
-  await expect(page.locator(".energy-orb strong")).toHaveText("3");
+  await expect(page.locator(".energy-orb strong")).toHaveText(String(RULES.baseEnergy - CARDS.router.cost));
   const before = await saved(page);
   await page.locator('[data-action="enemy-dossier"]').first().click();
   await page.locator('dialog [data-action="help"]').click();
@@ -520,9 +523,9 @@ test("leaving Field Training preserves the real expedition's undo history", asyn
     "battle",
   );
   expect(await saved(page)).toBe(before);
-  await expect(page.locator(".energy-orb strong")).toHaveText("3");
+  await expect(page.locator(".energy-orb strong")).toHaveText(String(RULES.baseEnergy - CARDS.router.cost));
   await page.keyboard.press("z");
-  await expect(page.locator(".energy-orb strong")).toHaveText("5");
+  await expect(page.locator(".energy-orb strong")).toHaveText(String(RULES.baseEnergy));
   expect(JSON.parse((await saved(page))!).run.topology.nodes).toHaveLength(2);
 });
 
@@ -550,7 +553,7 @@ test("undo cancels a dragged hardware card so its later release cannot deploy st
   await expect(page.locator(".drag-ghost")).toHaveCount(1);
   await page.keyboard.press("z");
   await expect(page.locator(".drag-ghost")).toHaveCount(0);
-  await expect(page.locator(".energy-orb strong")).toHaveText("5");
+  await expect(page.locator(".energy-orb strong")).toHaveText(String(RULES.baseEnergy));
   const afterUndo = await saved(page);
   await page.mouse.up();
   expect(await saved(page)).toBe(afterUndo);
@@ -690,11 +693,11 @@ test("a physical device drag cancelled by blur never spends energy or commits it
   await page.mouse.move(x + 110, hitY! + 45);
   await page.mouse.up();
   expect(await saved(page)).toBe(before);
-  await expect(page.locator(".energy-orb strong")).toHaveText("5");
+  await expect(page.locator(".energy-orb strong")).toHaveText(String(RULES.baseEnergy));
   await page.locator('[data-relocate-zone="north"]').click();
-  await expect(page.locator(".energy-orb strong")).toHaveText("5");
+  await expect(page.locator(".energy-orb strong")).toHaveText(String(RULES.baseEnergy));
   await page.locator("#relocate-confirm [data-relocate-confirm]").click();
-  await expect(page.locator(".energy-orb strong")).toHaveText("4");
+  await expect(page.locator(".energy-orb strong")).toHaveText(String(RULES.baseEnergy - RULES.relocateCost));
 });
 
 test("all card rules fit without clipping across narrow, short, zoomed and desktop windows", async ({

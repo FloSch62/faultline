@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import { atRoom, expect, install, STORAGE, test } from "./helpers.ts";
+import { CARDS, RULES } from "../src/core/cards.ts";
 
 const TRAINING = "faultline-training-v1";
 
@@ -123,7 +124,8 @@ test("Field Training: lessons 1 and 3 complete through the real controls; exit r
   await expect(page.locator(".title-screen")).toBeVisible();
   await expect(page.locator(".lesson-end")).toHaveCount(0);
 
-  // Lesson 3: a second channel through its own router plus an armed Failover Policy survive the cut.
+  // Lesson 3: a second channel through its own router is the whole three-energy turn; it survives
+  // the cut, and next turn Hot Patch restores the cut line.
   await page.locator('[data-action="tutorial"]').first().click();
   await page.locator('dialog button[data-lesson="reroute"]').click();
   await lessonReady(page, "reroute");
@@ -136,10 +138,14 @@ test("Field Training: lessons 1 and 3 complete through the real controls; exit r
   const second = (await dockNodes(page)).find(id => !existing.includes(id))!;
   await cable(page, "alpha", second);
   await cable(page, second, "omega");
-  await expect(page.locator(".training-panel")).toContainText(/.+/);
-  await page.locator('[data-hand][data-card-id="failover-policy"]').first().click();
-  await expect(page.locator(".protocol-slot.armed")).toHaveCount(1);
+  // The route took every energy: the spotlight goes to Transmit, never to an unaffordable Failover Policy.
+  await expect(page.locator(".energy-orb strong")).toHaveText(String(RULES.baseEnergy - CARDS.router.cost - 2 * CARDS.fiber.cost));
+  await expect(page.locator(".transmit-button.lesson-focus")).toBeVisible();
+  await expect(page.locator('[data-hand][data-card-id="failover-policy"].lesson-focus')).toHaveCount(0);
   await transmitLesson(page);
+  await expect(page.locator(".training-meter")).toHaveAttribute("aria-valuenow", "2");
+  await expect(page.locator('[data-hand][data-card-id="patch"].lesson-focus')).toBeVisible();
+  await page.locator('[data-hand][data-card-id="patch"]').first().click();
   await lessonOver(page, "Online Devices");
   expect(JSON.parse((await page.evaluate(key => localStorage.getItem(key), TRAINING))!)).toEqual(expect.arrayContaining(["first-signal", "reroute"]));
 

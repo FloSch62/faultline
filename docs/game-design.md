@@ -1,19 +1,19 @@
-# FAULTLINE — game design (v4 · Under Quarantine)
+# FAULTLINE — game design (v5 · Three Energy)
 
-The player restores a living network while the quarantine tries to cut it apart. Each turn spends five energy on competing needs: grow the network, keep it alive under announced disruption, defend against the announced attacks, maintain the table the enemy is building on, or spend a burst to end the encounter first. The network is your army. Devices are permanents that work while they are reachable; more independent paths mean more bandwidth, and every channel is a delivery that lands on the player's target; every enemy question has more than one answer. Every number on screen has a visible cause.
+The player restores a living network while the quarantine tries to cut it apart. Each turn spends **three energy** on competing needs: grow the network, keep it alive under announced disruption, defend against the announced attacks, maintain the table the enemy is building on, or spend a burst to end the encounter first. The network is your army. Devices are permanents that work while they are reachable; more independent paths mean more bandwidth, and every channel is a delivery that lands on the player's target; every enemy question has more than one answer. Every number on screen has a visible cause.
 
-v4 keeps every v3 rule and adds four systems on top of it: **packs and ports** (up to three hostiles at the far rail, one delivery per channel, the target and overflow), **the table front** (hostile installations with integrity, device condition, breakdown, repair and scrub), **escalation** (the leader's disruption grows in three levels; guardians charge when wounded and raise adds), and **designations and surprises** (one-line variants on leaders, announced reinforcements, crates, undelivered messages and signals). A fight against one undesignated hostile that never installs or overloads is numerically the v3 fight.
+v5 keeps every v4 rule (packs and ports, the table front, escalation, designations and surprises, all described below) and rebuilds the economy and the card game on the Slay the Spire model: **three energy and five cards a turn** (`baseEnergy`, `handDraw`), energy relics at boss tier that raise the turn's base to at most five (`relicEnergyCap`) with temporary energy uncapped on top, **twelve-card starters**, **keywords** (Exhaust, Retain, Innate, Volatile, Armed) and a new card type, the **Daemon**, a shared **colorless** pool beside **23 cards per keeper in three build paths**, **curses** as the price of deals, rarity-driven rewards and **four ascension levels**. Saves from v4 are not continued (no players yet, so no migration).
 
-This document describes the implemented v4 rules and is the balance reference for tuning. Every tunable combat number lives in the `RULES` object in `src/core/cards.ts`; card text, relic text, trait text, the HUD and the Handbook all read it. Where this document quotes a number it names the `RULES` key beside it, so a tuning change can be checked against the code. Card and relic definitions live in `src/core/cards.ts`; hostiles, designations, pack templates, signals and message options in `src/core/enemies.ts`; encounter plans (who stands at the rail, health, crates, arrivals, signals, credits) in `src/core/encounter.ts`; combat and its forecast share one resolver in `src/core/combat/resolve.ts` (with `board.ts`, `network.ts`, `intent.ts` and `surprises.ts` beside it), and `src/core/run.ts` keeps the public API (`combatPreview`, `endTurn`, the play actions). The expedition layer (rooms, rewards, market, sanctuary, events) lives in `src/core/meta.ts` and `src/core/events.ts`; the route chart and its v4 rolls in `src/core/map.ts`; encounter terrain in `src/core/terrain.ts`; ascension in `src/core/ascension.ts`.
+This document describes the implemented v5 rules and is the balance reference for tuning. Every tunable combat number lives in the `RULES` object in `src/core/rules.ts` (re-exported by `cards.ts` and `run.ts`); card text, relic text, trait text, the HUD and the Handbook all read it. Where this document quotes a number it names the `RULES` key beside it, so a tuning change can be checked against the code. Card definitions are data, one file per owner in `src/core/cards/` (`colorless.ts`, `architect.ts`, `warden.ts`, `ghost.ts`, `curses.ts`), with faces generated from each card's `values`; their behaviour and the daemon hooks live beside them in `src/core/effects/`; `src/core/cards.ts` merges them into `CARDS` (every `+` version included) and holds the starter decks, the reward pool and the relics; `src/core/rewards.ts` rolls card offers and market slots. The card, relic, starter, ascension and health tables below are **generated from that data** by `.work/docs/card-tables.ts` (between `<!-- generated:… -->` markers), so they cannot drift from a tuning pass. Hostiles, designations, pack templates, signals and message options live in `src/core/enemies.ts`; encounter plans (who stands at the rail, health, crates, arrivals, signals, credits) in `src/core/encounter.ts`; combat and its forecast share one resolver in `src/core/combat/resolve.ts` (with `board.ts`, `network.ts`, `intent.ts` and `surprises.ts` beside it), and `src/core/run.ts` keeps the public API (`combatPreview`, `endTurn`, the play actions, `playDaemon`). The expedition layer (rooms, rewards, market, sanctuary, events) lives in `src/core/meta.ts` and `src/core/events.ts`; the route chart and its rolls in `src/core/map.ts`; encounter terrain in `src/core/terrain.ts`; ascension in `src/core/ascension.ts`.
 
 Design pillars (Slay the Spire, Hearthstone, Gwent, Magic and Into the Breach are the reference points):
 
 1. Every draw is a real decision; few cards go dead once the first route stands.
 2. Devices are permanents with abilities. They only work while online, so disruption is removal and redundancy protects an engine. Wear gives the permanent a life bar; breakdown is a telegraphed, per-encounter loss.
-3. Synergy scales without artificial "max +2 / once" caps. Natural limits do the balancing: fourteen table sockets, four installations, energy, and the enemy's disruption.
+3. Synergy scales without artificial "max +2 / once" caps. Natural limits do the balancing: three energy, fourteen table sockets, four installations and the enemy's disruption. A small energy budget and small starter decks make every card choice and every removal count.
 4. Readable threats with several answers. Enemy traits, installations and designations are questions (graded armor, band attacks, decoy-able disruption, kill order), not single-key taxes.
 5. Tension between acting now and investing: tempo versus a network that pays every turn. Maintenance is the fourth use of energy and stays a choice: a fast kill is the cheapest maintenance.
-6. Meaningful choices between fights: upgrades, a market, events, rule-bending boss relics, ascension, and a route chart that scouts packs and designations.
+6. Meaningful choices between fights: a build path to commit to, upgrades, removals, a market, events that trade in curses, rule-bending boss relics, ascension, and a route chart that scouts packs and designations.
 7. Rules a network engineer could guess: "a device works while reachable", "more paths, more bandwidth", "multipath delivers to several destinations", "a buffer can lose packets", "a honeypot attracts attackers", "a jammer next to a router jams it", "a firewall next to a rogue device quarantines it", "hardware under load wears".
 8. Surprise without hidden dice. Everything on the table resolves with the forecast's numbers; arrivals are announced ahead with their exact effect; rewards are revealed on death or offered as named choices (see [The surprise contract](#the-surprise-contract)).
 
@@ -23,11 +23,13 @@ Design pillars (Slay the Spire, Hearthstone, Gwent, Magic and Into the Breach ar
 
 One expedition crosses **three stages of seven sectors**. Choose one reachable room per sector. Each stage has its own route chart, encounter pool, chapter names and guardian.
 
-| Stage | Region | Encounters | Elites | Guardian | Guardian health |
-| --- | --- | --- | --- | --- | ---: |
-| I | The Copper Reach | Packet Leech, Cable Wraith, Rust Prophet, Coil Serpent, Ash Moth | Gate Sentinel, Ferric Colossus, Wire Weaver | The Iron Regent | 67 |
-| II | The Glass Cathedral | Null Storm, Prism Widow, Null Marshal, Glass Choir, Wire Weaver, Static Nest | Null Marshal, Prism Widow, Ferric Colossus, Scrap Foreman | The Hollow Choir | 96 |
-| III | The Blackout Heart | Ferric Colossus, Grave Reaver, Coil Serpent, Null Marshal, Glass Choir, Wire Weaver, Ash Moth, Prism Widow, Static Nest, Root Blight | Grave Reaver, Ferric Colossus, Gate Sentinel, Scrap Foreman, Demolition Engine | Blackout Core | 132 |
+| Stage | Region | Encounters | Elites | Guardian |
+| --- | --- | --- | --- | --- |
+| I | The Copper Reach | Packet Leech, Cable Wraith, Rust Prophet, Coil Serpent, Ash Moth | Gate Sentinel, Ferric Colossus, Wire Weaver | The Iron Regent |
+| II | The Glass Cathedral | Null Storm, Prism Widow, Null Marshal, Glass Choir, Wire Weaver, Static Nest | Null Marshal, Prism Widow, Ferric Colossus, Scrap Foreman | The Hollow Choir |
+| III | The Blackout Heart | Ferric Colossus, Grave Reaver, Coil Serpent, Null Marshal, Glass Choir, Wire Weaver, Ash Moth, Prism Widow, Static Nest, Root Blight | Grave Reaver, Ferric Colossus, Gate Sentinel, Scrap Foreman, Demolition Engine | Blackout Core |
+
+Guardian health is `guardianHealth` per stage and every room's health is a `RULES` formula (see [Enemy health](#enemy-health)).
 
 A normal room that rolls a pack keeps its pooled hostile when that hostile leads a template of the rolled shape; otherwise a template is drawn, never repeating a leader already on that floor. So a stage II pack can be led by Packet Leech (a stage II template leader outside the stage II pool), and the machines that fight alone as normals (Null Marshal in stage II; Ferric Colossus, Grave Reaver and Null Marshal in stage III) never lead a normal pack.
 
@@ -74,102 +76,150 @@ Integrity persists between rooms. Topology, condition, installations, faults, fi
 | Salvage cache | 15 |
 | Credit Line relic | +15 after every won battle (not scaled by ascension) |
 
-Ascension 7 multiplies earned credits by 0.9 (rounded), crates and messages included. Credits banked during a fight (crates, a message's Credit) are paid with the room's credits. The reward screen shows an itemised ledger ("+16 credits · 14 room · 2 pack"). The v4 credit values were cut in balance so a run earns about 10 % more than v3 (the design values ran +21 %).
+Ascension 2 (Lean Supply, `leanMarkets`) multiplies earned credits by 0.9 (rounded), crates and messages included. Credits banked during a fight (crates, a message's Credit) are paid with the room's credits. The reward screen shows an itemised ledger ("+16 credits · 14 room · 2 pack"). The v4 credit values were cut in balance so a run earns about 10 % more than v3 (the design values ran +21 %).
 
 ### Rewards
 
-A battle, elite, guardian, event fight or cache offers **three different cards**; take one or skip. Offers never include basics, junk or curses, and archetype cards only appear for their own archetype. Every v4 card is in the reward pool from stage I. Each slot rolls a rarity: normal slots **49.5 % common, 38 % uncommon, 12 % rare, 0.5 % legendary**; for elites, guardians and event fights the first slot is guaranteed rare and the others roll **23 % / 50 % / 25 % / 2 %**. A slot falls back to any offerable card when its rarity is exhausted. In stage II, 10 % of offered cards arrive already upgraded; in stage III, 20 %.
+A battle, elite, guardian, event fight or cache offers **three different cards** (two with the Air Gap boss relic); take one or skip. Offers never include basics, junk, curses or tokens. Each slot rolls, in order, from the expedition RNG (`src/core/rewards.ts`):
 
-After an elite, choose one of **three unowned common relics**. After the stage I and II guardians, choose one of **three unowned boss relics**. The final guardian awards a card only. An undelivered message still waiting when the fight ends opens on the reward screen; a crate's card choice is dropped (its card was for this encounter only).
+1. **The pool**: the keeper's own cards with `keeperShare`, otherwise the colorless pool.
+2. **The rarity** from `rewardRarity` by room kind: `normal` (normal fights and caches), `elite` (elites and Signal in the Static; the first slot is uncommon or better) and `guardian` (every slot rare). `legendaryShare` of the rare band of the same roll becomes legendary (Clabernetes), so it costs no extra draw.
+3. **The card**: one of that rarity in the chosen pool, else the other pool, else any rarity (chosen pool first); never a card already offered in this reward.
+4. **The pre-upgrade**: `upgradedOfferRate` by stage (none in stage I).
+
+Crate cards roll the same slot with the crate's own seeded stream. After an elite, choose one of **three unowned common relics**. After the stage I and II guardians, choose one of **three unowned boss relics**. The final guardian awards a card only. An undelivered message still waiting when the fight ends opens on the reward screen; a crate's card choice is dropped (its card was for this encounter only).
+
+**Progression intent** (the Slay the Spire arc): stage I builds the first engine piece and one or two keeper cards; stage II commits to a build path, and the boss relic often adds energy; stage III pays the path off. A typical winning deck ends at 22–30 cards after three to six removals.
 
 ### Sanctuary
 
 Choose **one** service:
 
-- **Repair**: restore 30 % of maximum integrity, at least 4 (ascension 3: ×0.75, rounded down).
+- **Repair**: restore 30 % of maximum integrity, at least 4 (Lean Supply, `scarceParts`: ×0.75, rounded down). Refused under Legacy Mainframe, with the reason; a sanctuary with no possible service then offers **Move on**.
 - **Upgrade**: one deck card becomes its `+` version. The picker shows the before → after change.
 - **Remove**: one deck card leaves the deck.
 - **Salvage**: permanently lose 2 maximum integrity (must leave at least 6), then choose one of three unowned common relics.
 
-Removal (at a sanctuary, market or event) keeps at least 10 cards, one router card (Core Router or Hardened Router) and two cabling cards. Curses can always be removed, even from a 10-card deck.
+Removal (at a sanctuary, market or event) keeps at least `deckFloor` (8) cards, one router card (Core Router or Hardened Router) and two cabling cards, so a twelve-card starter can be trimmed. **Curses can always be removed**, whatever the size of the deck.
 
 ### Market
 
 The market (`phase: "shop"`) sells:
 
-- **Hardware bench**: a Core Router for 30. Routers are never card rewards, and wide networks need more than the two starter routers.
-- **Five cards**: common, common, uncommon, uncommon, rare (6 % chance the rare slot is legendary). Prices: common 35, uncommon 55, rare 85, legendary 140, each with seeded ±5 jitter. 15 % of market cards are pre-upgraded for +20.
-- **Two common relics** for 100–130 (steps of 5).
-- **Card removal** for 50, +25 for every earlier *market* removal this expedition.
-- **Card upgrade** for 40.
+- **Hardware bench**: a Core Router. Routers are never card rewards, and wide networks need more than the two starter routers.
+- **Five cards** in fixed slots (`MARKET_SLOTS`): keeper common, colorless common, keeper uncommon, colorless uncommon, keeper rare. A slot whose pool is empty at its rarity takes the other pool. The rare slot is legendary 6 % of the time; 15 % of market cards are pre-upgraded.
+- **Two common relics**.
+- **Card removal**, +1 step for every earlier *market* removal this expedition.
+- **Card upgrade**.
 
-Each service can be bought once per visit. Ascension 7 raises every price 20 %; all prices round to 5. Purchases are refused, with the shortfall stated, when credits are insufficient.
+<!-- generated:market -->
+Card prices: common 35, uncommon 55, rare 85, legendary 140 (`CARD_PRICES`), each with a seeded −5 / 0 / +5; a pre-upgraded card costs +20. Relics 100–130 in steps of 5. Removal 50, +25 for every earlier market removal. Upgrade 40. The bench's Core Router 30.
+<!-- /generated:market -->
+
+Each service can be bought once per visit. Lean Supply (ascension 2, `leanMarkets`) raises every price 20 %; all prices round to 5. Purchases are refused, with the shortfall stated, when credits are insufficient.
 
 ### Unknown signals (events)
 
-An event (`phase: "event"`) is drawn from the unseen events valid for the stage; the stage's story beat is three times as likely as any other. Events never repeat within an expedition (general events may repeat only if every eligible one was seen). Seeded picks (a named card, relic or card set) are rolled when the event opens and are named in the choice text; no choice hides a coin flip. After a choice resolves, the outcome is shown with a Continue button.
+An event (`phase: "event"`) is drawn from the unseen events valid for the stage; the three story beats (`story: true`) are three times as likely as any other. An event with a `stage` appears only in that stage. Events never repeat within an expedition (general events may repeat only if every eligible one was seen). Seeded picks (a named card, relic, curse or card set) are rolled when the event opens and are named in the choice text; no choice hides a coin flip. **Every choice that costs a curse names it.** After a choice resolves, the outcome is shown with a Continue button. Events hold up to four choices; "Walk on" is always last.
 
 | Event | Choices |
 | --- | --- |
 | The Unpatched Server | Take a named rare card **and** a CVE curse · lose 3 integrity to upgrade a chosen card · walk on |
 | The Abandoned Rack | Take a named device card (Honeypot, Cache Server, PoE Injector or Load Balancer) · 45 credits |
-| The Firmware Mirror | Upgrade two named cards for 3 integrity · pay 25 to upgrade a chosen card · walk on |
+| The Firmware Mirror | Upgrade two named cards for 3 integrity · pay 25 to upgrade a chosen card · **upgrade three named cards and take a Bitrot** · walk on |
 | The Operator's Log | Restore 5 integrity · remove a card |
 | Rogue DHCP | Transform a card into a random card one rarity higher (curses become commons; upgraded cards stay upgraded) · 20 credits |
-| Cold Storage | Lose 2 maximum integrity (must leave 6) for a named common relic · walk on |
-| The Echo Chamber | Pay 30 to duplicate a card (not a curse) · restore 2 integrity |
-| The Quiet Broker | Sell your newest non-starter relic for 80 · buy a named uncommon card for 45 · walk on |
-| Signal in the Static | Fight a named stage encounter at `eventHealthScale` (1.4) × a normal room's health for 40 credits and a rare-first card reward (no relic) · walk on. The fight rolls its pack, designations, reinforcement and signal like the stage's normals, from its own seed stream, and pays their credits. |
-| The Copper Letters (stage I) | +1 maximum integrity and restore 3 · upgrade a named card |
-| The Bell-Ringer's Rest (stage II) | Take a named upgraded protocol card · restore 6 integrity |
-| The Last Acknowledgement (stage III) | +2 maximum integrity and restore 2 · 60 credits |
+| Cold Storage | Lose 2 maximum integrity (must leave 6) for a named common relic · **take the named relic and a Memory Leak** (no integrity cost) · walk on |
+| The Echo Chamber | Pay 30 to duplicate a card (not a curse) · **duplicate a card for nothing and take a Kernel Panic** · restore 2 integrity |
+| The Quiet Broker | Sell your newest non-starter relic for 80 · buy a named uncommon card for 45 · **take a named rare card and a Backdoor** · walk on |
+| Signal in the Static | Fight a named stage encounter at `eventHealthScale` × a normal room's health for 40 credits and an elite-odds card reward (no relic) · walk on. The fight rolls its pack, designations, reinforcement and signal like the stage's normals, from its own seed stream, and pays their credits. |
+| **The Zombie Farm** (stage II) | Take 60 credits and a Zombie Process · lose 3 integrity to remove a named curse from your deck (closed without a curse, or at 3 integrity or less) · walk on |
+| The Copper Letters (stage I story) | +1 maximum integrity and restore 3 · upgrade a named card |
+| The Bell-Ringer's Rest (stage II story) | Take a named upgraded protocol card · restore 6 integrity |
+| The Last Acknowledgement (stage III story) | +2 maximum integrity and restore 2 · 60 credits |
 
-Event prices and credit gains follow the ascension 7 multipliers. Choices that cannot be taken show why (not enough credits, integrity too low, nothing upgradable).
+The curse deals' numbers live in `CURSE_DEALS` in `events.ts` (`unsignedUpgrades` 3, `farmCredits` 60, `farmKillIntegrity` 3). Event prices and credit gains follow the Lean Supply multipliers. Choices that cannot be taken show why (not enough credits, integrity too low, nothing upgradable, no curse to remove).
 
 ### Three keepers
 
-| Archetype | Integrity | Starter relic | Console | Engine | Deck variation (from the shared 17) |
-| --- | ---: | --- | --- | --- | --- |
-| Architect | 14 | Hot Swap | Patch Cable | Mesh — width, bandwidth, balancers; width is destinations | Fiber → Duplex Link ×1 · Edge Switch → Signal Relay · Packet Guard → Load Balancer ×1 |
-| Warden | 15 | Backpressure | Harden | Fortress — shield that turns into damage, returned to every attacker; Harden grows with the pack | Core Router → Hardened Router ×1 · Trust Gate → Bastion Firewall · Packet Burst → Trust Gate |
-| Ghost | 12 | Deep Cache | Buffer | Surge — store transmissions, release one targeted spike | Fiber → Crosslink ×2 · Hot Patch → Deep Scan · Packet Guard → Store and Forward ×1 |
+Every keeper starts with **twelve cards**: the shared ten plus two signature cards (`STARTER_DECK`, `STARTER_SIGNATURES` in `cards.ts`).
 
-The shared starter deck (17 cards): Core Router ×2, Edge Switch, Trust Gate, Optic Fiber ×4, Hot Patch, Packet Guard ×2, Packet Burst, Startup Config, Resonance Field, Purge Field, Clab Inspect, Failover Policy.
+<!-- generated:starters -->
+The shared ten: Core Router ×2, Optic Fiber ×3, Packet Guard ×2, Packet Burst ×2, Hot Patch.
 
-Opening hands guarantee one router card and two cabling cards when present (Spare Parts adds an extra Optic Fiber), then fill to the draw count. A Core Router plus two Optic Fibers costs 4 before discounts and deals 5. Containerlab and Clabernetes never start in a deck and are never guaranteed draws.
+| Keeper | Integrity | Starter relic | Console (cost) | Signature cards |
+| --- | ---: | --- | --- | --- |
+| Architect | 14 | Hot Swap | Patch Cable (1) | Edge Switch, Branch Line |
+| Warden | 15 | Backpressure | Harden (1) | Trust Gate, Deep Packet Inspection |
+| Ghost | 12 | Deep Cache | Buffer (0) | Store and Forward, Dark Fiber |
+<!-- /generated:starters -->
+
+| Keeper | Engine | Build paths (see [Keeper cards](#keeper-cards)) |
+| --- | --- | --- |
+| Architect — "Make a way through" | Width: Hot Swap makes the first link card each turn cost 0, the Patch Cable console lays a cable without a card, so routers become channels quickly | **Mesh** (channels and width) · **Backbone** (one long, upgraded primary route) · **Deployment** (hardware tempo, clusters, device triggers) |
+| Warden — "Hold what remains" | Fortress: shield that turns into damage (Backpressure), returned to every attacker; Harden grows with the pack | **Fortress** (block that becomes backpressure, block that stays) · **Firewall wall** (many firewalls, per-firewall payoffs) · **Protocols** (armed traps and retaliation) |
+| Ghost — "Find the hidden path" | Surge: store transmissions, release one targeted spike (Buffer); Deep Cache draws one more | **Buffer** (store, multiply, release) · **Evasion** (misses, dodges, phantoms, cut-proof lines) · **Payloads** (tokens, card chains, exhaust) |
+
+Opening hands draw every **Innate** card first (beyond the draw count if needed; hand limit 10), then guarantee one router card (Core Router or Hardened Router) and two link cards when the deck holds them (Spare Parts adds an extra Optic Fiber), then fill to the draw count. At three energy a Core Router plus two Optic Fibers is exactly one turn and deals 5; the Architect has one energy spare thanks to Hot Swap. Containerlab and Clabernetes never start in a deck and are never guaranteed draws.
 
 ---
 
 ## Turn rules and resources
 
-- **Energy**: 5 per turn. +1 Anycast, +1 Jumbo Frames, +1 Storm Control. First turn of a battle: +1 Cold Start, −1 SDN Controller. Later turns add reserved energy (Power Capacitor), up to 2 unspent energy with Reserve Cell, and **+1 per PoE Injector online at the start of the turn**. Other unused energy is lost.
-- **Draw**: 6 per turn. +1 Deep Cache, −1 Jumbo Frames, **+1 per Cache Server online at the start of the turn**, +1 Fanout while 3+ channels are live. Hand limit 10; cards beyond the limit stay in the draw pile. An empty draw pile reshuffles the discard pile with the expedition RNG.
-- **Prepare**: set one hand card aside at no cost; it becomes the first card of your next hand, replacing one draw. Return it before transmitting if you have hand space. Junk cannot be prepared. The slot clears on victory.
-- **Playing a card** spends its energy and removes it from hand. Normal cards go to discard; Exhaust cards go to the exhausted pile for the rest of the encounter; armed protocols wait in the protocol slots. Unplayed cards go to discard at end of turn, except Packet Loss, which exhausts.
+- **Energy**: `baseEnergy` (3) every turn. Energy relics raise that **turn base** by 1 each, never above `relicEnergyCap` (5): `turnEnergyBase = min(relicEnergyCap, baseEnergy + energy relics owned)`. The energy relics are the boss relics Anycast, Jumbo Frames, Storm Control, Air Gap, Legacy Mainframe and Overvolt (`ENERGY_RELICS`). **Temporary energy comes on top of the base and is never capped**: next-turn energy (Power Capacitor, kept in `reserveEnergy`), up to 2 unspent energy carried by Reserve Cell, **+1 per PoE Injector online at the start of the turn**, and energy a card gives now (Power Surge). First turn of a battle: +1 Cold Start, −1 SDN Controller. Memory Leak takes 1 when drawn (never below 0). Other unused energy is lost. The energy orb reads `current / base` (`2/3`); energy above the base glows with a lit rise marker, and its tooltip names every source. Energy devices are a legitimate build and are priced in: PoE Injector is rare and costs 2.
+- **Draw**: `handDraw` (5) per turn. +1 Deep Cache, −1 Jumbo Frames, **+1 per Cache Server online at the start of the turn**, +1 Fanout while 3+ channels are live, plus next-turn draw (`nextTurn.draw`). Hand limit `handLimit` (10); cards beyond the limit stay in the draw pile. An empty draw pile reshuffles the discard pile with the expedition RNG.
+- **Keywords** (capitalised on the face, explained by a glossary tooltip; long exceptions live in a card's `detail`, shown when it is inspected): **Exhaust** leaves play for the rest of the encounter; **Retain** stays in hand at the end of the turn (it does not replace a draw); **Innate** starts in the opening hand; **Volatile** exhausts if it is still in hand at the end of the turn; **Armed** is a protocol waiting in its slot. See [Keywords, Daemons and tokens](#keywords-daemons-and-tokens).
+- **Prepare**: set one hand card aside at no cost; it becomes the first card of your next hand, replacing one draw (a hand already full of retained cards leaves it on top of the draw pile). Return it before transmitting if you have hand space. Junk and curses cannot be prepared. The slot clears on victory.
+- **Playing a card** spends its energy and removes it from hand. Normal cards go to discard; Exhaust cards and tokens go to the exhausted pile for the rest of the encounter; armed protocols wait in the protocol slots; **daemons** join the daemon strip and run until the encounter ends. Unplayed cards go to discard at end of turn, except Retain cards (kept) and Volatile ones (exhausted). While Kernel Panic is in hand you can play at most 3 cards that turn (console, scrub, repair and relocation are not card plays; deleting a Worm is).
+- **Modified costs** are shown on the card's cost gem with their cause: Hot Swap (the first link card each turn costs 0), a free link (Patch Panel), a hardware discount (Rack and Stack), discounted or free hand cards (Blueprint, Rapid Redeploy, Rearm) and Zero Trust (+1 on cable cards and Patch Cable).
 - **Console command**: one archetype action per turn without a card (see Consoles).
 - **Target**: free, and changeable until the transmission (see [Target and overflow](#target-and-overflow)). Undoable.
 - **Relocate** a deployed device: 1 energy (`relocateCost`); unchanged positions are free. Relocation does not repair. A drop or a device-dock band never pays at once: the table shows the device at its new socket (its old socket keeps a faint ring) and a plate beside it names the move with its before → after forecast. **Relocate** (Enter) pays and moves it, undoable; **Cancel** (Esc, Z, right-click, a click elsewhere, or playing a card or transmitting) puts it back for free. A drop back in its own socket asks nothing.
 - **Scrub** an installation: 1 energy per integrity point (`scrubCost`); 2 per point while a Quarantine Drone lives (`quarantineScrubCost`).
 - **Repair** a worn device: 1 energy per condition point (`repairCost`); Field Engineer makes the first repair each turn free.
 - **Offers** (a crate's card choice, an undelivered message) open at the start of the player turn, before the hand is dealt; up to 8 may wait in order.
-- Hardware, cables and upgrades stay on the table for the encounter unless a device breaks. Block and burst last for the current turn only.
+- Hardware, cables and upgrades stay on the table for the encounter unless a device breaks. Block and burst last for the current turn only (Persistent State keeps block; Brace adds next-turn block).
 - Jams and cuts last for the following player turn (an escalated level-1 jam lasts two). Hot Patch, Fast Reroute and Link Recovery clear **every** active jam and cut at once; Faraday Shell clears its target's jam; Purge Field clears jams in its band. Old faults clear once at the start of the enemy phase, then each hostile installs its own.
 - Scoring: +1 per card played, +10 per point of transmitted damage (all ports), +100 + 5 × integrity per victory.
 
+The v5 economy, reward and health keys (generated from `RULES`):
+
+<!-- generated:rules -->
+| `RULES` key | Value | Meaning |
+| --- | --- | --- |
+| `baseEnergy` | 3 | Energy every turn before relics |
+| `relicEnergyCap` | 5 | Energy relics raise the turn base, never above this |
+| `handDraw` | 5 | Cards drawn every turn |
+| `handLimit` | 10 | Most cards in hand |
+| `deckFloor` | 8 | Removal keeps at least this many cards (curses can always go) |
+| `keeperShare` | 0.55 | A reward slot draws from the keeper pool at this share, else colorless |
+| `rewardRarity` | {normal: [0.58, 0.37, 0.05], elite: [0.45, 0.42, 0.13], guardian: [0, 0, 1]} | [common, uncommon, rare] per reward kind |
+| `legendaryShare` | 0.05 | Share of rare rolls that become legendary |
+| `upgradedOfferRate` | [0, 0.12, 0.25] | Share of offered cards that arrive upgraded, per stage |
+| `normalHealth` | [14, 4, 11] | Normal room: [base, per floor, per stage], floors and stages zero-based |
+| `eliteHealth` | [27, 2, 9] | Elite room: [base, per floor, per stage] |
+| `guardianHealth` | [60, 86, 118] | Guardian per stage |
+| `eventHealthScale` | 1.4 | Signal in the Static: × a normal room |
+| `payloadDamage` | 2 | Payload token: damage this turn |
+| `maxProtocols` | 2 | Protocol slots (Policy Engine adds more) |
+| `bufferMultiplier` | 2 | Buffer console: stored × this (Deep Queue raises it) |
+| `backpressureRatio` | 0.5 | Backpressure relic: share of prevented damage stored (Flow Control raises it) |
+<!-- /generated:rules -->
+
 ### End-turn order (forecast and resolution)
 
-`combatPreview` is pure: it consumes no RNG and mutates nothing. It runs the same resolver as `endTurn` on a copy of the state, and `endTurn` then performs only the RNG steps (junk positions, rewards, draws). Every number the forecast shows is therefore the number resolution uses: per port, per hostile, per installation, per worn device.
+`combatPreview` is pure: it consumes no RNG and mutates nothing. It runs the same resolver as `endTurn` on a copy of the state, and `endTurn` then performs only the RNG steps (junk positions, rewards, draws). Every number the forecast shows is therefore the number resolution uses: per port, per hostile, per installation, per worn device. Every enemy-phase effect of a daemon, a curse in hand or a turn effect is computed inside the resolver and appears in the forecast as a labelled term, wear record or evasion; the only exception is a daemon's `turnStart` gain (Keepalive's block, Trickle's buffer, Botnet's Payload), which happens after the draw and is not part of `nextTurn`.
 
-1. **The board as transmitted.** Routes, channels and the primary route; each living hostile's intent in port order (cadence, escalation, designations, riders); deliveries, merged packets per port, armor and overflow; disruption targets planned in port order against this board; every installation's next effect; quarantine targets; wear and breakdowns; Reclaim; arrivals and the signal; next turn's energy and draw on the post-phase board.
-2. **Transmit.** Each living port takes its packet (after armor and overflow). Buffering (Ghost) stores the whole network sum ×2 and deals 0 to every port; stored backpressure is consumed into it. A transmission with a live route clears buffer and backpressure.
-3. **Lethal per hostile.** A hostile at 0 health does nothing: its attack, fault, field, junk and installation are cancelled (Spiteful is the printed exception). A guardian whose own port took at least its break threshold on the ultimate turn is interrupted. If no hostile stands, rewards open and Repair Drone restores 1 integrity.
-4. **Traps and quarantine.** Honeypot decoys bite each attacker; protocols fire (once per phase each); each firewall online at transmission time quarantines the nearest installation within reach; a destroyed installation grants Reclaim. A hostile killed here is cancelled; if none stands, you win. Then Phantom Nodes absorb the first remaining installations and disruptions in port order.
+1. **The board as transmitted.** Routes, channels and the primary route; each living hostile's intent in port order (cadence, escalation, designations, riders); deliveries, merged packets per port (daemon terms included: Carrier Grade's route term, Deep Buffers per switch, Fabric Controller per bandwidth delivery, Datacenter per cluster, Payloads and Exploit Kit), armor and overflow; disruption targets planned in port order against this board; every installation's next effect; quarantine targets; wear and breakdowns; Reclaim; arrivals and the signal; next turn's energy, draw and block on the post-phase board.
+2. **Transmit.** Each living port takes its packet (after armor and overflow). Buffering (Ghost) stores the whole network sum × the buffer multiplier (`bufferMultiplier`; Deep Queue raises it) and deals 0 to every port; stored backpressure is consumed into it. A transmission with a live route clears buffer and backpressure.
+3. **Lethal per hostile.** A hostile at 0 health does nothing: its attack, fault, field, junk and installation are cancelled (Spiteful is the printed exception). A guardian whose own port took at least its break threshold on the ultimate turn is interrupted. If no hostile stands, rewards open and Repair Drone restores 1 integrity (curses in hand then cost nothing: the enemy phase never happens).
+4. **Traps and quarantine.** Honeypot decoys bite each attacker; protocols fire (once per phase each; Tripwire and Port Security deal their damage here, Incident Response adds its retaliation to every protocol that fires); each firewall online at transmission time quarantines the nearest installation within reach; a destroyed installation grants Reclaim. A hostile killed here is cancelled; if none stands, you win. Then **misses** (Spoof, Obfuscation) take the first remaining jams and cuts, and Phantom Nodes absorb the first remaining installations and disruptions, in port order.
 5. **Installs and heals.** Per hostile in port order: its installations are planted (a honeypot bite applies on arrival); Packet Leech, Tap Spinner and Static Nest heal; Hungry heals.
-6. **Faults, fields and the table front.** Old faults clear once (a level-1 jam in its second turn stays); temporary fields tick down (not in an anchored band) and expire. Per hostile in port order: its field, its jams, its cuts (with level-1 frays), its overload, the ascension 6 wear riders and Total Blackout's wear. Then every installation in placement order: Jammer jams, Spike wear, Breaker Charge tick or detonation. Breakdowns apply at once: wreckage lands, routes are recomputed.
+6. **Faults, fields and the table front.** Old faults clear once (a level-1 jam in its second turn stays); temporary fields tick down (not in an anchored band) and expire. Per hostile in port order: its field, its jams, its cuts (with level-1 frays), its overload, The Last Signal's wear riders and Total Blackout's wear. Then every installation in placement order: Jammer jams, Spike wear, Breaker Charge tick or detonation. Then a Bitrot in hand wears the first router on the primary route. Breakdowns apply at once: wreckage lands, routes are recomputed.
 7. **Junk** is inserted into the draw pile per caster, at seeded positions (the only RNG in the enemy phase).
-8. **Attacks.** In port order, against one shared shield pool plus each attack's own firewall and protocol shield; corrosion, Worms and chip attach once, to the first attack that lands; Storm Control's damage comes last. Integrity loses what gets through. Backpressure stores half of everything prevented across the phase.
+8. **Attacks.** In port order, against one shared shield pool plus each attack's own firewall and protocol shield; **dodges** (Ghost Protocol) make the first strikes or breaches deal 0, and Null Route cancels a breach's damage (its riders still resolve); corrosion, Worms and chip attach once, to the first attack that lands; Storm Control's damage comes last, and a Backdoor in hand costs its integrity with the attacks (unblockable). Integrity loses what gets through. Backpressure stores `backpressureRatio` (half; Flow Control: all) of everything prevented across the phase.
 9. **Exposed on interrupt**, on the guardian's port; adds act regardless. Action counters advance (escalation, the guardian's step machine) and the phase's attackers are recorded for the Warden's release.
-10. **End of the phase, next turn.** A reinforcement whose count reaches zero takes the first empty port; a guardian whose charge is now announced raises its adds; a signal is announced or fires. Fallen hostiles open crates, Laden messages and Salvaged drops (salvage lands on the table now). Next turn: energy and draw from the forecast on the post-phase board; if no live route exists now, a remaining buffer is lost (**packet loss**); block, burst, console uses, repairs and buffering reset (Grounded Core renews 1 block); a dead target moves on (see [Target and overflow](#target-and-overflow)); the hand is discarded and redrawn with the prepared card first; waiting offers open before the hand is dealt.
+10. **End of the phase, next turn.** A reinforcement whose count reaches zero takes the first empty port; a guardian whose charge is now announced raises its adds; a signal is announced or fires. Fallen hostiles open crates, Laden messages and Salvaged drops (salvage lands on the table now). Next turn: energy (`turnEnergyBase` + next-turn energy + Reserve Cell's carry + online PoE Injectors), draw (`handDraw` ± relics + online Cache Servers + Fanout + next-turn draw) and block (Grounded Core 1 + what Persistent State carries + next-turn block) from the forecast on the post-phase board; if no live route exists now, a remaining buffer is lost (**packet loss**); burst, console uses, repairs, buffering and this turn's effects reset; a dead target moves on (see [Target and overflow](#target-and-overflow)); the hand keeps its Retain cards, exhausts its Volatile ones and discards the rest; the prepared card comes first and the hand is redrawn; then running daemons act (`turnStart`); waiting offers open before the hand is dealt.
 11. Zero integrity ends the expedition.
 
 A hostile forecast as defeated shows no incoming damage and no disruption; the others keep theirs (Spiteful prints "resolves anyway"). A half-health threshold crossed by this transmission changes the *next* intent, never the one already forecast.
@@ -184,7 +234,7 @@ An encounter holds one to three hostiles at three ports: **left, centre, right**
 
 - Every hostile has its own health, pattern, traits, enrage and action counter; leaders and singles carry designations (see [Designations](#designations)).
 - Hostiles act in **port order**: left, centre, right.
-- **Escorts and adds do not escalate.** They receive no stage bonus, no pressure and no enrage, and never reach an escalation level. Ascension 4 (+1), BGP Hijack (+2) and Ingress Filter (−1) still apply to their attacks.
+- **Escorts and adds do not escalate.** They receive no stage bonus, no pressure and no enrage, and never reach an escalation level. Sharper Teeth (ascension 3, +1), BGP Hijack (+2) and Ingress Filter (−1) still apply to their attacks.
 - **Escorts act on alternate enemy phases.** The left escort acts on odd phases (1, 3, 5, …), the right escort on even ones; a dormant escort shows DORMANT and does nothing. In a trio exactly one escort acts each phase; a lone escort acts every other phase. Its pattern advances only on the phases it acts. Adds act every phase from the ultimate turn.
 - A hostile at 0 health before its action resolves does nothing (Spiteful excepted). The encounter ends when every hostile is defeated; rewards, credits and Repair Drone trigger once. A guardian's death does not end the fight while its adds live.
 
@@ -227,13 +277,13 @@ A pack's summed health is `packHealthScale` (1.15) × the room's single-hostile 
 | Pair | leader + one escort (left) | 0.75 H · 0.40 H |
 | Trio | leader + two escorts | 0.63 H · 0.26 H · 0.26 H |
 
-Each member's health is H × `packHealthScale` × share ÷ (sum of the shape's shares), rounded; with the shipped shares that is exactly share × H, and `packHealthScale` remains the single lever. Hardened adds 20 % to its carrier; ascension 1 (elites) and 2 (normals) scale H as usual, so they reach every pack member and reinforcement. Example: a stage II floor 3 room (H = 39) as Static Nest + Tap Spinner is 29 / 16.
+Each member's health is H × `packHealthScale` × share ÷ (sum of the shape's shares), rounded; with the shipped shares that is exactly share × H, and `packHealthScale` remains the single lever. Hardened adds 20 % to its carrier; Hardened Quarantine (ascension 1: elites `hardenedElites`, normals `stubbornSignals`) scales H as usual, so it reaches every pack member and reinforcement. Example: a stage II floor 3 room (H = 39) as Static Nest + Tap Spinner is 29 / 16.
 
-Adds have fixed health: Gate Warden 8, Chorister 10, Quarantine Drone 14 (`addHealth`); ascension 6 multiplies it by `ascensionAddHealth` (1: unchanged, although the guardian gains 15 %).
+Adds have fixed health: Gate Warden 8, Chorister 10, Quarantine Drone 14 (`addHealth`); The Last Signal (ascension 4, `ancientGuardians`) multiplies it by `ascensionAddHealth` (1: unchanged, although the guardian gains 15 %).
 
 ### Pack frequency, templates and budget
 
-Normal rooms hold a pack at `packRate` 25 % / 40 % / 55 % by stage (stage I from floor 3, `packFromFloor`); 40 % of stage III packs are trios (`trioShare`); ascension 9 adds 15 points (`packRateAscensionBonus`). Every elite from stage II leads its escort. Stage I elites and guardians fight alone. Signal in the Static rolls like the stage's normals.
+Normal rooms hold a pack at `packRate` 25 % / 40 % / 55 % by stage (stage I from floor 3, `packFromFloor`); 40 % of stage III packs are trios (`trioShare`); Sharper Teeth (ascension 3, `lingeringCorruption`) adds 15 points (`packRateAscensionBonus`). Every elite from stage II leads its escort. Stage I elites and guardians fight alone. Signal in the Static rolls like the stage's normals.
 
 Composition: an escort at most twice per pack, never two Splicers, never a Splicer and a Ward Node in one trio. Every template fits the threat budget: ≤ 1.3 × the stage's average single threat (`threatBudget`); reinforced fights ≤ 1.45 × (`reinforcedThreatBudget`). Threat is scored per three-action cycle (raw strike and breach damage, +2 per cut, jam or overload, +1 per field, junk batch or install, twin cut 3, a Breaker Charge 4; escorts over 1.5 actions per cycle). Headroom is the bad-designation weight a template can still carry; a bad designation that would exceed it falls back to Laden or Salvaged. Null Storm + Splicer (10.75 against a 10.5 budget) is the one template kept over budget.
 
@@ -267,7 +317,7 @@ Enumeration keeps one strongest representative per visited device set and endpoi
 | Term | Amount | Carried by | Stacking |
 | --- | ---: | --- | --- |
 | Live router route (primary) | +5 (`baseRouteDamage`) | primary | Once |
-| Edge switches on the primary route | +1 each (Packet Lens: +2 each) | primary | No cap |
+| Edge switches on the primary route | +1 each (Packet Lens: +2 each; Deep Buffers daemon: +1 more each per copy) | primary | No cap |
 | Startup Config routers on the primary route | +1 each | primary | No cap |
 | Overclocked routers on the primary route | +2 each | primary | No cap |
 | Compressed switches on the primary route | +2 each | primary | No cap |
@@ -276,14 +326,16 @@ Enumeration keeps one strongest representative per visited device set and endpoi
 | Resonance on a band crossed by primary-route hardware | +3 | primary | Per field per band (terrain, cast and signal fields stack) |
 | Suppression on a band crossed by primary-route hardware | −3 | primary | Per field per band |
 | Spanning Tree (boss relic) | + the route subtotal above (×2) | primary; bandwidth deliveries carry 0 | Replaces bandwidth and balancers |
-| **Bandwidth** | +3 per channel beyond the first (Parallel Core: +4) | each bandwidth delivery | No cap |
+| Carrier Grade (daemon) | +1 per device on the primary route, per copy | primary; it also counts when the primary route is chosen | No cap |
+| **Bandwidth** | +3 per channel beyond the first (Parallel Core: +4; Fabric Controller daemon: +2 more per copy) | each bandwidth delivery | No cap |
 | **Load Balancers** online | +1 per balancer | every delivery | No cap |
-| **Cluster**: a band holding 3+ online devices (racks count) | +2 per band | primary | Terminals excluded |
+| **Cluster**: a band holding 3+ online devices (racks count) | +2 per band (Datacenter daemon: +3 more per copy) | primary | Terminals excluded |
 | Siphon Taps on the table | −2 each | primary first, then bandwidth deliveries in channel order | At most 4 installations |
-| Burst this turn (cards) | Card amounts | primary | This turn only |
+| Burst this turn (cards; per-channel, per-device, per-firewall and per-card burst is counted when the card is played) | Card amounts | primary | This turn only |
+| Payload tokens played this turn | `payloadDamage` each (Payload+ 3; Exploit Kit daemon: +1 more each per copy) | primary, as the terms "Payload ×N" and "Exploit Kit · Payloads ×N" | This turn only |
 | BGP Hijack (boss relic) | +3 | primary | Every transmission |
 | Backpressure (Warden) | Stored amount | primary; or in full on every port that attacked last phase (packs) | Consumed by the transmission |
-| Buffer release (Ghost) | Whole buffer | primary | When not buffering |
+| Buffer release (Ghost) | Whole buffer | primary | When not buffering; Exfiltrate deals it at once instead, ignoring armor |
 | Priority Queue (relic) | +1 | primary, when the target has the least health (ties count) | — |
 | Every port (Broadcast Storm, Packet Storm, Flood Fill) | Card amount | every living port | This turn only |
 | Target packet (Traffic Shaping, Demolition Charge) | Card amount | the target's port | This turn only |
@@ -299,7 +351,8 @@ Examples:
 - Three channels and one online Load Balancer: primary 5 + 1 and two bandwidth deliveries of 3 + 1: **6 / 4 / 4 = 14** on the target.
 - Against a Spark Mite + Splicer duo, two channels: all 8 on the target, and anything beyond its health overflows to the other.
 - Containerlab: an overclocked router cabled to both terminals, **7**.
-- Ghost buffers an 8-damage turn: **+16** stored; next turn **8 + 16 = 24** on the target.
+- Ghost buffers an 8-damage turn: **+16** stored (Deep Queue: **+24**); next turn **8 + 16 = 24** on the target.
+- A Ghost plays Fork Bomb and its three Payloads with Exploit Kit running: **+3 × (2 + 1) = +9** on the primary delivery.
 
 ### Defense: why integrity damage is blocked
 
@@ -307,18 +360,21 @@ Each attack's raw damage is its intent amount (after pressure, stage threat, enr
 
 | Shield term | Amount | Scope |
 | --- | ---: | --- |
-| Block this turn (cards, Harden) | Card amount | pool |
-| **Online firewalls** vs a breach / strike | 2 / 1 each; Stateful ×2; Zero Trust ×2; Bulkhead +1 per firewall; stacking | every attack |
+| Block this turn (cards, Harden with Hardening Guide's bonus, daemons' turn-start block such as Keepalive) | Card amount | pool |
+| Block carried (Persistent State daemon) and next-turn block (Brace) | What the attacks left of last turn's block, then the card amount | pool |
+| **Online firewalls** vs a breach / strike | 2 / 1 each; Stateful ×2; Zero Trust ×2; Bulkhead and Defense in Depth +1 per firewall per attack (the daemon per copy); stacking | every attack |
 | Separated circuits: two disjoint channels, one with a North router and one with a South router | 3 | pool |
 | Aegis field: an online device in the band | 3 | pool |
 | Null field: any hardware in the band | 2 | pool |
-| Protocols: Failover Policy (on a cut), Rate Limiter (strike), IPS Signature (breach) | 3 (6+), 5 (8+), 6 | the action it fired on |
+| Protocols: Failover Policy (on a cut), Rate Limiter (strike), IPS Signature (breach) | as printed | the action it fired on |
+| Null Route (Warden protocol) | cancels a breach's damage; its riders still resolve | the breach it fired on |
+| Dodges: Ghost Protocol | the first N strikes or breaches this enemy phase deal 0 | in port order |
 | Honeynet: a honeypot absorbed a disruption | 2 each | pool |
 | Reclaim: an installation was destroyed | 2 each (`reclaimShield`; Sentry quarantine +2) | pool |
 | Watchdog: first transmission of the battle with no live route | 5 | pool |
 | Shield Array: first hit that gets through each battle | up to 2 | once per battle |
 
-Firewalls only block strikes and breaches, and not on an interrupted ultimate. Faraday Shell is **jam protection**, Armored Fiber / VXLAN / Dark Fiber are **cut protection**, not block; jam protection does not stop an overload. An ordinary jam against an empty table, or a cut against a table without cables, deals 1 exposed-backbone damage; if a grid exists but every target is protected, the disruption fails harmlessly. Null Storm's and Ash Moth's band jams are exempt: an empty band is a successful dodge.
+Firewalls only block strikes and breaches, and not on an interrupted ultimate. **Misses** (Spoof, Obfuscation) are not shield: the next jams or cuts of the phase miss, taken after protocols and before Phantom Nodes; they never take overloads or installations, and a Jammer's jam can miss. Faraday Shell is **jam protection**, Armored Fiber / VXLAN / Dark Fiber are **cut protection**, not block; jam protection does not stop an overload. An ordinary jam against an empty table, or a cut against a table without cables, deals 1 exposed-backbone damage; if a grid exists but every target is protected, the disruption fails harmlessly. Null Storm's and Ash Moth's band jams are exempt: an empty band is a successful dodge.
 
 ---
 
@@ -340,7 +396,7 @@ An installation stands at a table position, blocks placement within 1.3 (like wr
 | Jammer | 2 | Each enemy phase it jams the nearest unprotected device within reach. A cabled honeypot decoys it and bites it; Port Security cancels it and hurts it. | reach socket beside its target | Static Nest, Quarantine Drone, Nesting and level 3 (stage III) |
 | Spike | 2 (3 from a Rigger Drone while a leader lives) | Each enemy phase it wears the nearest device within reach by 1 (honeypots included, no bite; ties: primary route, then earliest installed) | reach socket | Scrap Foreman, Rigger Drone, Rigged |
 | Anchor | 3 | Hostile fields in its band do not tick down. Purge Field on that band destroys the Anchor and nothing else. | band socket (Root Blight: the band it corroded) | Root Blight |
-| Breaker Charge | 1 | Countdown 2 (`breakerCountdown`), shown on the table; it ticks each enemy phase once active. At 0 it detonates: every device within reach breaks regardless of condition (racks in the blast break too; a device sheltered by a rack outside it passes 1 wear to that rack instead), and its socket becomes wreckage. | reach socket (Demolition Engine: beside the device with the most cables) | Demolition Engine, ascension 10 guardian charges |
+| Breaker Charge | 1 | Countdown 2 (`breakerCountdown`), shown on the table; it ticks each enemy phase once active. At 0 it detonates: every device within reach breaks regardless of condition (racks in the blast break too; a device sheltered by a rack outside it passes 1 wear to that rack instead), and its socket becomes wreckage. | reach socket (Demolition Engine: beside the device with the most cables) | Demolition Engine, guardian charges at ascension 4 |
 
 **Placement.** At most 4 installations stand at once (`maxInstallations`). An install against a full table instead gives the oldest installation +1 integrity (maximum 3); the forecast states which. Band sockets use the v3 malware rule: the free socket nearest the centre of the busiest band, Center then North then South on ties. Reach sockets choose a target device first (by default the most valuable primary-route router, ties: earliest installed; Rigger Drone: the device the leader's action names this phase; Demolition Engine: the most cabled device; Rigged: the cut cable's nearer device), then the first legal point of twelve compass points at 1.6 from it, starting at the point facing the far rail and turning clockwise, then the same twelve at 2.0 (`reachRings`); if none is legal, the band-socket rule applies. One install per hostile action, plus riders; a lethal packet on the planter cancels it.
 
@@ -360,7 +416,7 @@ An installation stands at a table position, blocks placement within 1.3 (like wr
 
 - Every deployed device has condition 2 (`deviceCondition`); salvage pre-placed by terrain, dropped from crates or by a Salvaged hostile has 1 (`salvageCondition`). A Server Rack has 3 (`rackCondition`). Reinforced Frame adds 1 (`reinforcedFrameCondition`); Scorched Earth removes 1 (`scorchedEarthCondition`, minimum 1); Redundant PSU raises a device's maximum to 3 for the battle (`psuCondition`). Terminals and Phantom Nodes have no condition.
 - **Overload** is an intent kind: no integrity damage, 1 wear to its target. It follows the jam rule: a cabled honeypot outside a rack's ring first (it bites for 3, Honeynet applies), then a primary-route device, then the first eligible device. Jam protection does not stop it; racks and phantoms are never its target. Scrap Foreman's overload prefers the most worn primary-route device.
-- **Spikes** wear 1 each phase; a **detonation** breaks everything within reach; the enraged Blackout Core's **Total Blackout** wears every primary-route device by 1 (`blackoutWear`), before the right-port add acts; at ascension 6 the Regent's CLOSE THE GATES and the Choir's STOLEN VOICE also wear their target.
+- **Spikes** wear 1 each phase; a **detonation** breaks everything within reach; the enraged Blackout Core's **Total Blackout** wears every primary-route device by 1 (`blackoutWear`), before the right-port add acts; at ascension 4 (The Last Signal) the Regent's CLOSE THE GATES and the Choir's STOLEN VOICE also wear their target.
 - **Racks shelter.** A device within reach of a Server Rack cannot be overloaded, spiked or detonated: the nearest rack takes the wear instead.
 - **Breakdown** at condition 0: the device is removed with all its cables, its upgrades (configured, overclocked, amplified, shielded); its socket becomes wreckage for the encounter (fresh, tinted in its role's colour), with the usual 1.3 clearance and fraying. Hardware cards already cycle to the discard pile when played, so a breakdown changes no pile; Containerlab, Emergency Rebuild and Clabernetes deployments are gone for the encounter anyway. Racks and phantoms leave no wreckage. Wreckage from terrain, breakdowns, detonations and COLLAPSE shares a cap of 6 (`wreckCap`); beyond it the socket is simply freed. Routes, channels and online state are recomputed at once; a breakdown that removes the only route causes packet loss at the start of the next turn.
 - **Repair**: click a worn device (or its Repair plate): 1 energy restores 1 condition. Hot Patch, Fast Reroute, Link Recovery and Harden also restore 1 (`faultClearRepair`) on the most worn device (ties: primary route first). Field Repair restores every device; Redundant PSU restores one to full. Condition resets when the encounter ends.
@@ -384,7 +440,7 @@ The enemy plate carries a three-pip gauge, and the intent panel names the next l
 
 ### Guardian charge timing
 
-A guardian charges on its fifth action **or** on its first action after falling to half health (the enrage threshold: 50 %, 60 % at ascension 10), whichever comes first; the ultimate follows on the next action; the pattern then resumes where the charge pre-empted it. The half-health trigger only pre-empts the first charge of the fight; an early charge spends that cycle's charge and ultimate. The forecast labels an early charge "WOUNDED". The guardian's escalation counter keeps running through the charge: in stage III the Blackout Core reaches level 2 on its fifth action, so Total Blackout's corrosion lasts a turn longer and its next jam hits two devices.
+A guardian charges on its fifth action **or** on its first action after falling to half health (the enrage threshold: 50 %, 60 % at ascension 4), whichever comes first; the ultimate follows on the next action; the pattern then resumes where the charge pre-empted it. The half-health trigger only pre-empts the first charge of the fight; an early charge spends that cycle's charge and ultimate. The forecast labels an early charge "WOUNDED". The guardian's escalation counter keeps running through the charge: in stage III the Blackout Core reaches level 2 on its fifth action, so Total Blackout's corrosion lasts a turn longer and its next jam hits two devices.
 
 **Adds.** When a guardian's charge is announced (the end of the phase before the charge), it raises two adds at the empty side ports. They stand on the charge turn with their intents shown (RISING, dormant through the charge phase) and can be killed there; they act from the ultimate turn, the left one before the guardian and the right one after, then every phase until killed. The next charge raises adds only at empty ports.
 
@@ -394,7 +450,7 @@ A guardian charges on its fifth action **or** on its first action after falling 
 | Chorister ×2 | The Hollow Choir, ONE LAST BREATH | 10 | DESCANT strike 2 + 1 Packet Loss | HELD NOTE strike 2 every phase | +4 break each. While any lives the Choir's plating is 3 (`choirAddPlating`). |
 | Quarantine Drone ×2 | Blackout Core, EVENT HORIZON | 14 | ISOLATE: plants a Jammer at 1.6 from the primary router | SEAL THE SHELL strike 3 every phase | +4 break each. While one lives, scrubbing costs 2 per point. |
 
-Each add alive when the ultimate resolves raises the break threshold by 4 (`addBreakBonus`, raised from the design's 3 in balance; ascension 10: 5, `addBreakBonusLate`): Regent 12 → 16 → 20, Choir 15 → 19 → 23, Core 18 → 22 → 26. Interrupting the ultimate cancels the guardian's action only; the adds still act. Adds are hostiles, not installations: they cannot be scrubbed and carry no crates and no designations.
+Each add alive when the ultimate resolves raises the break threshold by 4 (`addBreakBonus`, raised from the design's 3 in balance; ascension 4: 5, `addBreakBonusLate`): Regent 12 → 16 → 20, Choir 15 → 19 → 23, Core 18 → 22 → 26. Interrupting the ultimate cancels the guardian's action only; the adds still act. Adds are hostiles, not installations: they cannot be scrubbed and carry no crates and no designations.
 
 ---
 
@@ -415,7 +471,7 @@ A designation is one modifier on a leader or single hostile, never on an escort,
 | LADEN | Carries an undelivered message: defeating it drops a message you answer with a named choice. | good | 0 | 1.5 | Every leader and single |
 | SALVAGED | On defeat it drops salvage hardware at the first free auto-deploy socket, condition 1. | good | 0 | 1.5 | Every leader and single |
 
-**Rolling.** Designations are rolled with the chart. A leader or single carries one at `designationRate` 20 % / 35 % / 50 % by stage (stage I from floor 3, `designationFromFloor`); every elite from stage II carries one; duos carry none. Bad and good roll from one weighted table (bad 1 each, Laden and Salvaged 1.5 each). A bad designation heavier than the template's headroom falls back to Laden or Salvaged, so the heaviest packs most often carry cargo. Ascension 7 gives elites a second designation half the time (`eliteSecondDesignation` 0.5); ascension 10 lets normals roll a second at half the room's designation chance (`normalSecondDesignation` 0.5). Two designations never repeat, never pair Stoked with Shedding, are never both good, and ignore the ascension 0 budget.
+**Rolling.** Designations are rolled with the chart. A leader or single carries one at `designationRate` 20 % / 35 % / 50 % by stage (stage I from floor 3, `designationFromFloor`); every elite from stage II carries one; duos carry none. Bad and good roll from one weighted table (bad 1 each, Laden and Salvaged 1.5 each). A bad designation heavier than the template's headroom falls back to Laden or Salvaged, so the heaviest packs most often carry cargo. Sharper Teeth (ascension 3) gives elites a second designation half the time (`eliteSecondDesignation` 0.5); The Last Signal (ascension 4) lets normals roll a second at half the room's designation chance (`normalSecondDesignation` 0.5). Two designations never repeat, never pair Stoked with Shedding, are never both good, and ignore the ascension 0 budget.
 
 **Reveal.** The chart shows the ribbon when the room is scouted. In an interference room (`hiddenShare` 30 % / 40 % / 50 % of designated rooms by stage) the chart shows UNKNOWN DESIGNATION instead; the ribbon is revealed at the entrance line, before the first player turn, and the first forecast already includes it. Good and bad hide equally; Spiteful is never hidden.
 
@@ -467,9 +523,9 @@ Dropped by Laden hostiles and by one in four non-empty crates. A message is a jo
 | --- | ---: | --- |
 | Restore | 3 | Restore 2 integrity now (`messageRestore`). |
 | Reinforce | 1 | +1 maximum integrity, permanently (`messageMaxIntegrity`); it heals nothing. |
-| Credit | 3 | 6 credits (`messageCredits`; ascension 7 applies), banked if taken mid-fight. |
+| Credit | 3 | 6 credits (`messageCredits`; Lean Supply applies), banked if taken mid-fight. |
 | Recover | 2 | A named rare card enters your hand for this encounter only; it exhausts when played. Left out when no hostile is standing. |
-| Purge | 2 | Every junk card leaves your piles for this encounter, and one CVE leaves your deck permanently if you carry one. |
+| Purge | 2 | Every junk card leaves your piles for this encounter, and one curse leaves your deck permanently if you carry one, named in the option (`PURGE_ORDER`: CVE, Zombie Process, Kernel Panic, Backdoor, Bitrot, Memory Leak; one copy also leaves this battle's piles). |
 
 ### Signals
 
@@ -490,15 +546,15 @@ A signal is a one-time change to the ground or the leader. It is announced at th
 
 | Role | Cards | Ability |
 | --- | --- | --- |
-| Router | Core Router, Hardened Router (jam-protected), Containerlab/Emergency Rebuild (auto-cabled), Clabernetes (clone) | Every route needs one. Configured +1, overclocked +2 on the primary route. |
-| Switch | Edge Switch, Signal Relay (jam-protected), Linux Bridge (auto-cabled), Spine-Leaf (cabled to every router) | +1 on the primary route; compressed +2 more. |
-| Firewall | Trust Gate, Bastion (jam-protected), Stateful Firewall (blocks double), Sentry Firewall (quarantine 2; jam-protected when upgraded) | Online: blocks 2 of every breach or 1 of every strike; firewalls stack. Online: quarantines the nearest installation within reach each phase. No damage bonus. |
+| Router | Core Router, Hardened Router (jam-proof), Standby Router (Architect; cabled to its nearest device, two when upgraded), Containerlab/Emergency Rebuild (auto-cabled), Clabernetes (clone) | Every route needs one. Configured +1, overclocked +2 on the primary route. |
+| Switch | Edge Switch, Signal Relay (jam-proof), Linux Bridge (auto-cabled), Spine-Leaf (Architect; cabled to every router), Rack and Stack (Architect), Splice (Architect; spliced into the primary route's longest cable) | +1 on the primary route; compressed +2 more. |
+| Firewall | Trust Gate (colorless), ACL Gate (Warden; cabled to its nearest device), Bastion (Warden; jam-proof), Stateful Firewall (Warden; blocks double), Sentry Firewall (Warden; quarantine 2; jam-proof when upgraded) | Online: blocks 2 of every breach or 1 of every strike; firewalls stack. Online: quarantines the nearest installation within reach each phase. No damage bonus. |
 | Honeypot | Honeypot | While it has at least one cable, jams, cuts and overloads target it first (at most one per hostile action) and each absorbed disruption deals 3 to the attacker (Honeynet +2 and 2 shield); it decoys a Jammer's jam and bites the Jammer. Installations planted within reach arrive with 1 less integrity. Works offline. Cable Wraith's cut ignores honeypots. |
 | Cache | Cache Server | Online at the start of your turn: draw 1 more. |
 | Power | PoE Injector | Online at the start of your turn: +1 energy. |
 | Balancer | Load Balancer | Online: +1 damage on every delivery. |
 | Rack | Server Rack | Never cabled, carries no signal. Devices within reach cannot be overloaded, spiked or detonated: the nearest rack takes the wear. Condition 3. Counts toward its band's cluster and corrosion. Leaves no wreckage. |
-| Phantom | Phantom Node | Never cabled, on no route. Absorbs the next jam, cut, overload or installation aimed at your table (first in port order; two when upgraded), then fades. |
+| Phantom | Phantom Node, Decoy Swarm (Ghost; two phantoms, three upgraded, at free auto-deploy sockets) | Never cabled, on no route. Absorbs the next jam, cut, overload or installation aimed at your table (first in port order; Phantom Node+ two), then fades. |
 
 "Start of your turn" is evaluated on the post-phase board, after new faults and breakdowns, so a cut, a jam or a breakdown can take a cache or injector offline for that turn. The forecast shows next turn's energy and draw.
 
@@ -509,7 +565,7 @@ A signal is a one-time change to the ground or the leader. It is announced at th
 - **Overload**: a cabled honeypot outside a rack's ring → (Scrap Foreman) the most worn primary-route device → a primary-route device → the first eligible device.
 - **Hostile field**: suppression targets the band holding the most primary-route hardware; corrosion the band holding the most deployed hardware. Ties prefer Center, North, then South. Band jams with a field use the jam band. Root Blight's CORRODE picks the busiest band and remembers it; SPREAD corrodes the adjacent band with the most hardware.
 - **Installations**: band and reach sockets as in [The table front](#installations); a Jammer jams the nearest unprotected device within reach; a Spike wears the nearest device within reach.
-- **Answer order** within a phase: honeypot decoys (targeting), then protocols (first matching action in port order), then Phantom Nodes (the first remaining unit in port order: within a hostile, its install, jams, cuts, overload). A Port Security left unfired by the hostiles may cancel a Jammer's jam later in the phase.
+- **Answer order** within a phase: honeypot decoys (targeting), then protocols (first matching action in port order), then misses (Spoof, Obfuscation: the next jams or cuts), then Phantom Nodes (the first remaining unit in port order: within a hostile, its install, jams, cuts, overload). A Port Security left unfired by the hostiles may cancel a Jammer's jam later in the phase, and Incident Response also hits a Jammer that Port Security answered.
 
 Every card play, target, relocation, repair and scrub updates the forecast before you commit.
 
@@ -517,38 +573,90 @@ Every card play, target, relocation, repair and scrub updates the forecast befor
 
 ## Consoles and engines
 
-Each archetype has one console command, usable once per turn (SDN Controller: twice, except Buffer), shown in the battle command dock (key **C**).
+Each archetype has one console command, usable once per turn (SDN Controller: twice, except Buffer), shown in the battle command dock (key **C**). Console uses are not card plays (Kernel Panic ignores them).
 
 | Console | Cost | Rule |
 | --- | ---: | --- |
-| Patch Cable (Architect) | 1 (+1 Zero Trust) | Connect two devices with a standard cable. It is not an Optic Fiber, so Hot Swap does not apply. |
-| Harden (Warden) | 1 | Gain 2 block, +1 per online firewall, +1 per hostile on the field beyond the first, +1 more per living guardian add, and restore 1 condition on your most worn device. |
+| Patch Cable (Architect) | 1 (+1 Zero Trust) | Connect two devices with a standard cable. It is not a link card, so Hot Swap and Patch Panel do not apply. |
+| Harden (Warden) | 1 | Gain `hardenShield` (2) block, +1 per online firewall (`hardenPerFirewall`), +1 per hostile on the field beyond the first (`hardenPerHostile`), +1 more per living guardian add (`hardenPerAdd`), + Hardening Guide's bonus per copy, and restore 1 condition on your most worn device. Double Shift runs the same Harden without using the console. |
 | Buffer (Ghost) | 0 | Toggle: this turn's transmission is stored instead of dealt. Use again before transmitting to cancel and refund the use. |
 
-**Mesh (Architect).** Width is power and destinations: every channel beyond the first adds a delivery, Load Balancers add a point to every delivery, clusters reward crowded bands, and Hot Swap plus Patch Cable make cables cheap. Three channels and a balancer deliver 6 / 4 / 4, enough to finish an escort and press the leader in one turn; Flood Fill cashes width in on every port, and Rapid Redeploy rebuilds a broken router the same turn. The cost is exposure: more cables to cut, more devices inside reach rings, Weaver's tension trap and corrosion on crowded bands.
+**Mesh (Architect).** Width is power and destinations: every channel beyond the first adds a delivery, Load Balancers add a point to every delivery, clusters reward crowded bands, and Hot Swap plus Patch Cable make cables cheap. Three channels and a balancer deliver 6 / 4 / 4, enough to finish an escort and press the leader in one turn; Flood Fill cashes width in on every port, and Rapid Redeploy rebuilds a broken router the same turn. At three energy a new channel (a router and two links) is a whole turn, so the Architect's cheap links (Hot Swap, Patch Panel, Branch Line, Standby Router) are its tempo. The cost is exposure: more cables to cut, more devices inside reach rings, Weaver's tension trap and corrosion on crowded bands.
 
-**Harden against packs (v4 balance addition, pending the user's approval).** Harden's +1 per hostile beyond the first (`hardenPerHostile`) and +1 more per living guardian add (`hardenPerAdd`) are not in the Proposal 4 design: the balance probe found the Warden far below the target band (17 % at ascension 0 against 30–36 %), losing mostly to guardians whose adds and escalation stretch its fights into a second charge cycle, and no number alone fixed it (see [Balance evidence](#balance-evidence-v4)). With one hostile and no adds Harden is the v3 console; both keys at 0 restore the design's Harden.
+**Harden against packs (v4 balance addition, pending the user's approval).** Harden's +1 per hostile beyond the first (`hardenPerHostile`) and +1 more per living guardian add (`hardenPerAdd`) are not in the Proposal 4 design: the v4 balance probe found the Warden far below the target band, losing mostly to guardians whose adds and escalation stretch its fights into a second charge cycle, and no number alone fixed it (see [Balance evidence (v4, history)](#balance-evidence-v4-history)). With one hostile and no adds Harden is the v3 console; both keys at 0 restore the design's Harden.
 
-**Fortress (Warden) — Backpressure.** Half the damage your shield prevents during an enemy phase (rounded up, `backpressureRatio`) is stored and added to your next transmission as "Backpressure", then consumed. Against a pack it lands in full on every port whose hostile struck or breached you last phase. It persists while you have no live route. Reflect doubles it. Prevented damage counts every raw source (attacks, corrosion, Worms, chip); Reclaim shield feeds it like block. Harden repairs 1 per use, so a Spike-plus-overload cadence costs the Warden nothing extra, and its block grows with the number of attackers.
+**Fortress (Warden) — Backpressure.** `backpressureRatio` (half, rounded up; Flow Control running: all) of the damage your shield prevents during an enemy phase is stored and added to your next transmission as "Backpressure", then consumed. Against a pack it lands in full on every port whose hostile struck or breached you last phase. It persists while you have no live route. Pushback adds to it, Vent turns it into block (and keeps it), Reflect doubles it. Prevented damage counts every raw source (attacks, corrosion, Worms, chip); Reclaim shield feeds it like block. Harden repairs 1 per use, so a Spike-plus-overload cadence costs the Warden nothing extra, and its block grows with the number of attackers.
 
-**Surge (Ghost) — Buffer.** While buffering with a live route, the transmission stores `⌊max(0, sum) × 2⌋` (`bufferMultiplier`), where the sum is every delivery (backpressure and burst included) plus every-port and target bonuses, before armor and the exposed bonus (stored packets meet armor when released). The target does not matter while buffering: a buffered turn deals 0 to every port. The next normal transmission with a live route releases the whole buffer with the primary delivery ("Buffer release"), on the target; it counts toward interrupting an ultimate, and Spearhead makes it ignore armor and plating. **Packet loss**: if you would start a turn with a positive buffer and no live route (a cut, a jam or a breakdown), the buffer is lost; the forecast warns ahead. Store and Forward adds 4 (6+) directly; Replay Attack doubles the buffer. A buffered turn deals 0 to every port, so Packet Leech and a Hungry hostile heal. The buffer resets at encounter end.
+**Surge (Ghost) — Buffer.** While buffering with a live route, the transmission stores `⌊max(0, sum) × multiplier⌋` (`bufferMultiplier`, 2; each running Deep Queue adds 1: ×3, ×4), where the sum is every delivery (backpressure, burst and Payloads included) plus every-port and target bonuses, before armor and the exposed bonus (stored packets meet armor when released). The target does not matter while buffering: a buffered turn deals 0 to every port. The next normal transmission with a live route releases the whole buffer with the primary delivery ("Buffer release"), on the target; it counts toward interrupting an ultimate, and Spearhead makes it ignore armor and plating. Exfiltrate deals the buffer to the target at once, ignoring armor (not a transmission). **Packet loss**: if you would start a turn with a positive buffer and no live route (a cut, a jam or a breakdown), the buffer is lost; the forecast warns ahead. Store and Forward, Jitter Buffer, Hold Queue (while buffering), Trickle (each turn) and Man-in-the-Middle (per card played) add to the buffer directly; Replay Attack doubles it. A buffered turn deals 0 to every port, so Packet Leech and a Hungry hostile heal. The buffer resets at encounter end.
 
 ---
 
 ## Protocols
 
-Protocol cards (keyword **ARMED**) are paid and armed face down in one of **two** protocol slots (`maxProtocols`). They persist across turns until a matching hostile action triggers them, then go to discard. Unfired protocols vanish at encounter end (the deck is the master list). Each trigger fires **once per enemy phase**, on the first matching action in port order; among armed protocols of the same trigger, arming order decides. The forecast names every protocol that will trigger and includes its effect in every number.
+Protocol cards (keyword **Armed**) are paid and armed face down in one of **two** protocol slots (`maxProtocols`; each running Policy Engine adds one, `protocolLimit`). They persist across turns until a matching hostile action triggers them, then go to discard (Rearm returns the last one, free this turn). Unfired protocols vanish at encounter end (the deck is the master list). Each trigger fires **once per enemy phase**, on the first matching action in port order; among armed protocols of the same trigger, arming order decides. The forecast names every protocol that will trigger and includes its effect in every number. A protocol's effect is data (`protocol`: its trigger; `cancels`; `values.shield` / `reduce`; `values.damage` in the trap step), so the resolver needs no code per card.
 
-| Protocol | Cost | Trigger → effect |
-| --- | ---: | --- |
-| Failover Policy | 1 | A hostile action would cut a cable → cancel all of that action's cuts (and any Rigged Spike), gain 3 shield for it (6+) |
-| Port Security | 1 | A hostile action would jam a device → cancel all of that action's jams, the attacker takes 4 (7+); unfired by the hostiles, it cancels a Jammer's jam and the Jammer takes the damage |
-| Rate Limiter | 1 | A strike hits → 5 shield against it (8+) |
-| IPS Signature | 2 (1+) | A breach hits → 6 shield against it |
-| Quarantine Rule | 1 (0+) | A hostile casts a field → cancel the field |
-| Tarpit | 1 | A guardian charges or unleashes an ultimate → it takes 8 (12+) |
+<!-- generated:protocols -->
+| Protocol | Card | Cost | Rarity | Trigger | Face | Upgrade (+) |
+| --- | --- | ---: | --- | --- | --- | --- |
+| Failover Policy | Colorless | 1 | common | cut | Armed. When a hostile would cut a cable: cancel its cuts and gain 3 shield. | Armed. When a hostile would cut a cable: cancel its cuts and gain 6 shield. |
+| Port Security | Colorless | 1 | uncommon | jam | Armed. When a hostile would jam: cancel its jams; it takes 4. | Armed. When a hostile would jam: cancel its jams; it takes 7. |
+| Rate Limiter | Colorless | 1 | common | strike | Armed. When a hostile strikes: gain 5 shield against it. | Armed. When a hostile strikes: gain 8 shield against it. |
+| IPS Signature | Colorless | 1 | uncommon | breach | Armed. When a hostile breaches: gain 6 shield against it. | Armed. When a hostile breaches: gain 9 shield against it. |
+| Quarantine Rule | Colorless | 1 | uncommon | field | Armed. When a hostile casts a field: cancel it. | cost 1 → 0 |
+| Tarpit | Colorless | 1 | rare | ultimate | Armed. When a guardian charges or unleashes its ultimate: it takes 8. | Armed. When a guardian charges or unleashes its ultimate: it takes 12. |
+| Tripwire | Warden | 1 | common | strike | Armed. When a hostile strikes: it takes 5. | Armed. When a hostile strikes: it takes 8. |
+| Null Route | Warden | 2 | rare | breach | Armed. When a hostile breaches: cancel the breach. | cost 2 → 1 |
+<!-- /generated:protocols -->
 
-Details: protocols do not fire on a disruption a honeypot already absorbed; a lethal packet on a hostile fires none against it; on an interrupted ultimate no attack remains to trigger them. Protocol shield belongs to the attack it fired on. Honeypot, Port Security and Tarpit damage resolves in the trap step, before any hostile acts; if it defeats a hostile, that hostile's action is cancelled, and if none stands, you win.
+Details: protocols do not fire on a disruption a honeypot already absorbed; a lethal packet on a hostile fires none against it; on an interrupted ultimate no attack remains to trigger them. Protocol shield belongs to the attack it fired on. A cancelled strike or breach (Null Route) deals 0, but its riders (fields, faults, junk, installations) still resolve; the breach trigger also matches an ultimate's breach. Honeypot, Port Security, Tripwire, Tarpit and Incident Response damage resolves in the trap step, before any hostile acts; if it defeats a hostile, that hostile's action is cancelled, and if none stands, you win.
+
+---
+
+## Keywords, Daemons and tokens
+
+Card faces stay short (≤ 90 characters where possible, never above 130) and use one vocabulary ("+3 damage this turn.", "Gain 4 block.", "Draw 2.", "Next turn: +1 energy.", "Deploy a router.", "Link two devices.", "jam-proof", "cut-proof"); numbers are read from the card's `values`, so tuning changes the face. Long exceptions live in the card's `detail`, shown when it is inspected and in the tables below. Keywords are capitalised words with a glossary tooltip, read from the card's flags (`src/card-marks.ts`), never parsed from the face:
+
+| Keyword | Rule | Data |
+| --- | --- | --- |
+| **Exhaust** | Leaves play for the rest of the encounter. | `exhaust` |
+| **Retain** | Stays in your hand at the end of your turn (it does not replace a draw). | `retain` |
+| **Innate** | Starts in your opening hand, drawn before the guaranteed router and links, beyond the draw count if needed (hand limit 10). | `innate` |
+| **Volatile** | If it is still in your hand at the end of your turn, it exhausts. | `volatile` (Packet Loss) |
+| **Armed** | A protocol waiting in its slot; it fires once, by itself, on its trigger. | `target: "protocol"` |
+| **Daemon** | A card type: playing it starts a process that runs for the rest of the encounter; it never goes to the discard pile. Copies stack (each adds its effect). | `target: "daemon"`, `RunState.daemons` |
+| **Token** | Made for this encounter only: it exhausts when played and never enters the deck. | `token` (Payload) |
+| **Curse** | Unplayable, permanent until removed at a Sanctuary or Market, even at the deck floor. | `curse` |
+
+**Daemons.** `playDaemon` pays for the card and pushes it to `RunState.daemons` (cleared at encounter start and end). The **daemon strip** beside the protocol dock shows each running daemon as a plate with its name, copies (×2) and effect line; the tooltip and inspect show the full text and `detail`. Every hook receives the number of running copies of its id (a base and its `+` are separate ids and separate terms). Player-turn hooks: `turnStart` (after the draw: Keepalive, Trickle, Botnet), `cardPlayed`, `deviceDeployed` (Provisioning Script, Zero-Touch Provisioning), `linkPlaced`, `channelsGained` (Peering Session), `cardExhausted` (Cover Tracks). Pure resolver hooks, printed as labelled forecast terms: `routeTerms` (Carrier Grade), `bandwidthBonus` (Fabric Controller), `switchBonus` (Deep Buffers), `clusterBonus` (Datacenter), `payloadBonus` (Exploit Kit), `firewallBonus` (Defense in Depth), `hardenBonus` (Hardening Guide), `backpressureRatio` (Flow Control; highest wins), `bufferMultiplier` (Deep Queue), `protocolSlots` (Policy Engine), `protocolFired` (Incident Response), `blockCarry` (Persistent State), `missDisruptions` (Obfuscation).
+
+<!-- generated:daemons -->
+| Daemon | Card | Cost | Rarity | Face | Upgrade (+) |
+| --- | --- | ---: | --- | --- | --- |
+| Keepalive | Colorless | 1 | uncommon | Daemon. At the start of your turn, gain 2 block. | Daemon. At the start of your turn, gain 3 block. |
+| Peering Session | Architect | 1 | uncommon | Daemon. Whenever you add a channel, gain 3 block. | Daemon. Whenever you add a channel, gain 4 block. |
+| Fabric Controller | Architect | 2 | rare | Daemon. Every channel beyond the first deals +2 more. | cost 2 → 1 |
+| Deep Buffers | Architect | 1 | uncommon | Daemon. Switches on your primary route deal +1 more. | cost 1 → 0 |
+| Carrier Grade | Architect | 2 | rare | Daemon. Your primary route deals +1 per device on it. | cost 2 → 1 |
+| Provisioning Script | Architect | 1 | uncommon | Daemon. Whenever you deploy a device, gain 2 block. | Daemon. Whenever you deploy a device, gain 3 block. |
+| Zero-Touch Provisioning | Architect | 1 | rare | Daemon. Whenever you deploy a device, draw 1. | cost 1 → 0 |
+| Datacenter | Architect | 2 | rare | Daemon. Every cluster deals +3 more. | cost 2 → 1 |
+| Defense in Depth | Warden | 2 | rare | Daemon. Each online firewall blocks 1 more per attack. | cost 2 → 1 |
+| Hardening Guide | Warden | 1 | uncommon | Daemon. Harden gains 3 more block. | cost 1 → 0 |
+| Persistent State | Warden | 2 | rare | Daemon. Your block no longer expires after the enemy phase. | cost 2 → 1 |
+| Flow Control | Warden | 2 | rare | Daemon. Backpressure stores all the damage your shield prevents, not half. | cost 2 → 1 |
+| Policy Engine | Warden | 1 | uncommon | Daemon. You can arm 1 more protocol. | cost 1 → 0 |
+| Incident Response | Warden | 1 | rare | Daemon. Whenever a protocol fires, the hostile that set it off takes 3. | Daemon. Whenever a protocol fires, the hostile that set it off takes 5. |
+| Trickle | Ghost | 1 | uncommon | Daemon. At the start of your turn, add 2 to your buffer. | Daemon. At the start of your turn, add 3 to your buffer. |
+| Deep Queue | Ghost | 2 | rare | Daemon. Buffering stores ×3 instead of ×2. | cost 2 → 1 |
+| Obfuscation | Ghost | 2 | rare | Daemon. The first jam or cut each enemy phase misses. | cost 2 → 1 |
+| Exploit Kit | Ghost | 1 | uncommon | Daemon. Payloads deal +1 more. | Daemon. Payloads deal +2 more. |
+| Botnet | Ghost | 1 | uncommon | Daemon. At the start of your turn, add a Payload to your hand. | Daemon. Innate. At the start of your turn, add a Payload to your hand. |
+| Cover Tracks | Ghost | 1 | uncommon | Daemon. Whenever a card exhausts, gain 1 block. | Daemon. Whenever a card exhausts, gain 2 block. |
+<!-- /generated:daemons -->
+
+**Payload** is the Ghost's token (`payload`, rarity `special`, cost 0): "+`payloadDamage` damage this turn. Exhaust." Fork Bomb, Shell Access and Botnet add Payloads to the hand as encounter-only cards (a full hand sends the rest to the discard pile, where they return with a shuffle); played, each counts in the forecast as "Payload ×N" (Payload+ from Firmware Update deals +1 more), and Exploit Kit adds to each. Payloads are not Volatile.
+
+**Turn effects** (reset every turn, `TurnEffects`): `freeLinks` (Patch Panel; Hot Swap is spent first), `hardwareDiscount` (Rack and Stack), `discounted` (Blueprint, Rapid Redeploy: these hand ids cost 1 less), `freeCards` (Rearm), `misses` and `dodges` (Spoof, Ghost Protocol, labelled by source), `mitm` (Man-in-the-Middle), `payloads` / `payloadDamage`, `cardsPlayed` (the ids in order: Rollback, Side Channel's count). Next-turn gains live in `RunState.nextTurn` (`block`: Brace; `draw`); next-turn energy keeps using `reserveEnergy` (Power Capacitor).
 
 ---
 
@@ -564,14 +672,14 @@ Crowding versus spreading is the band tension (Gwent rows):
 
 | Field | Effect |
 | --- | --- |
-| Resonance Field · 1 (0+) | +3 when the primary route crosses the band. 3 turns. |
-| Aegis Field · 1 (0+) | +3 shield while an online device sits in the band. 3 turns. |
-| Null Field · 1 (0+) | +2 shield while any of your hardware occupies the band. 3 turns. |
-| Purge Field · 0 | Destroy every installation in the band and remove hostile fields (including terrain interference) and jams in it. An Anchor takes the whole purge alone. Draw 1 (2+). Exhaust. |
+| Resonance Field | +3 (`resonanceDamage`) when the primary route crosses the band. `alliedFieldTurns` (3) turns. |
+| Aegis Field | +3 shield (`aegisShield`) while an online device sits in the band. 3 turns. |
+| Null Field | +2 shield (`nullFieldShield`) while any of your hardware occupies the band. 3 turns. |
+| Purge Field | Destroy every installation in the band and remove hostile fields (including terrain interference) and jams in it. An Anchor takes the whole purge alone. Draw 1 (2+). Exhaust. |
 | Corrosion (hostile) | +2 incoming damage while your hardware occupies the band. |
 | Suppression (hostile) | −3 when the primary route crosses the band. |
 
-Each band holds one temporary allied and one temporary hostile field; recasting replaces that side, and a second hostile caster on a band replaces the first. Terrain fields and signal fields keep their own slots. Allied fields affect three transmissions; hostile fields are installed after the action that casts them and affect the next two turns (`hostileFieldTurns`; three at ascension 9; one more at escalation level 2). Fields in a band with an active Anchor do not tick down; when the Anchor dies they resume from their remaining turns. A lethal packet on the caster or Quarantine Rule cancels an incoming field. Dragging a device previews destination band, damage, shield and integrity loss; the drop then asks on the relocation plate before paying the relocation energy.
+Each band holds one temporary allied and one temporary hostile field; recasting replaces that side, and a second hostile caster on a band replaces the first. Terrain fields and signal fields keep their own slots. Allied fields affect three transmissions; hostile fields are installed after the action that casts them and affect the next two turns (`hostileFieldTurns`; three from ascension 3; one more at escalation level 2). Fields in a band with an active Anchor do not tick down; when the Anchor dies they resume from their remaining turns. A lethal packet on the caster or Quarantine Rule cancels an incoming field. Dragging a device previews destination band, damage, shield and integrity loss; the drop then asks on the relocation plate before paying the relocation energy.
 
 Deterministic auto-deployment (Containerlab, Emergency Rebuild, Clabernetes replicas, crate salvage, Salvaged drops, COLD START landings) uses the first legal socket in the order x ∈ {0, −2.5, 2.5, −5, 5, −1.25, 1.25, −3.75, 3.75, −7, 7}, z ∈ {0, 2.4, −2.4, 4.2, −4.2, 1.2, −1.2}.
 
@@ -590,19 +698,48 @@ Every battle starts on a different table (`src/core/terrain.ts`), generated from
 ## Siphon Taps, junk and curses
 
 - **Siphon Tap** (Packet Leech's SIPHON TAP, Tap Spinner, Static Nest's LAY A TAP, the enraged Blackout Core's jam, Nesting and level 3 in stages I–II): the v3 malware, now an installation with integrity 1. Each Tap costs −2 damage per transmission and occupies its socket. Scrub it for 1 energy, purge its band, quarantine it with a firewall, or let a honeypot bite it on arrival. Packet Leech and Tap Spinner heal 1 per Tap after they act.
-- **Packet Loss** (junk): unplayable; exhausts at end of turn if still in hand.
-- **Worm** (junk): pay 1 to delete it (exhaust). Each Worm in your hand when you transmit adds 2 to the enemy phase's first attack (blockable, forecast).
-- **CVE** (curse): unplayable, permanent. Enters the deck from The Unpatched Server or ascension 5. Remove it at a sanctuary, market or event; Rogue DHCP transforms it into a common; a message's Purge removes one.
+- **Junk** (Packet Loss, Worm) is inserted into the draw pile at seeded positions when the action resolves and never enters the deck; every encounter rebuilds its piles from the deck. Packet Loss is Volatile; each Worm in your hand when you transmit adds `wormDamage` to the enemy phase's first attack (blockable, forecast); pay 1 to delete it.
+- **Curses** are the price of deals: unplayable, `curse: true`, permanent until removed. Removal at a Sanctuary or Market ignores the deck floor; a message's Purge removes one (`PURGE_ORDER`), Rogue DHCP transforms one into a common, and The Zombie Farm kills a named one for 3 integrity. Curses cannot be prepared. Their end-of-turn effects are forecast (Backdoor as an unblockable "Backdoor ×N · in hand" term, Bitrot as a wear record); a transmission that ends the battle spares you.
 
-Junk is inserted into the draw pile at seeded positions when the action resolves and never enters the deck; every encounter rebuilds its piles from the deck.
+| Curse | Comes from |
+| --- | --- |
+| CVE | Lean Supply (ascension 2, `knownVulnerability`) · The Unpatched Server |
+| Zombie Process | The Zombie Farm |
+| Kernel Panic | The Echo Chamber |
+| Backdoor | Overvolt (on pickup and after every elite you defeat) · The Quiet Broker |
+| Bitrot | The Firmware Mirror |
+| Memory Leak | Cold Storage |
+
+<!-- generated:curses -->
+| Card | Kind | Cost | Flags | Face | Detail (inspect) |
+| --- | --- | ---: | --- | --- | --- |
+| CVE | curse | 0 | unplayable | Unplayable. | A permanent vulnerability. Remove it at a Sanctuary or Market, whatever the size of your deck. |
+| Zombie Process | curse | 0 | unplayable, innate | Unplayable. Innate. | Innate: it starts every battle in your opening hand and counts toward its draws. Remove it at a Sanctuary or Market, whatever the size of your deck. |
+| Kernel Panic | curse | 0 | unplayable | Unplayable. While it is in your hand, you can play at most 3 cards. | Per turn, counting the cards you played before it arrived. Your console, scrubbing, repairs and moving devices are not card plays; deleting a Worm is. Remove it at a Sanctuary or Market, whatever the size of your deck. |
+| Backdoor | curse | 0 | unplayable | Unplayable. End of turn in hand: lose 1 integrity. | Unblockable: block and shield never stop it. It resolves with the hostiles' attacks, so a transmission that ends the battle spares you. Remove it at a Sanctuary or Market, whatever the size of your deck. |
+| Bitrot | curse | 0 | unplayable | Unplayable. End of turn in hand: the first router on your primary route loses 1 condition. | The router nearest ALPHA wears in the enemy phase, after the installations; at 0 it breaks. A Server Rack's ring takes the wear instead. No primary route: nothing happens. Remove it at a Sanctuary or Market, whatever the size of your deck. |
+| Memory Leak | curse | 0 | unplayable | Unplayable. When you draw it, lose 1 energy. | Never below 0. Drawn into your opening hand, it takes the energy from your first turn. Remove it at a Sanctuary or Market, whatever the size of your deck. |
+| Packet Loss | junk | 0 | unplayable, volatile | Unplayable. Volatile. Removed after the encounter. | Volatile: if it is still in your hand at the end of your turn, it exhausts. |
+| Worm | junk | 1 | — | Pay 1 to delete it. If it is in your hand when you transmit, the enemy phase's first attack deals 2 extra damage. |  |
+<!-- /generated:curses -->
 
 ---
 
 ## Enemies and pressure
 
-Normal health is `16 + 5 × floor + 13 × stage` (zero-based); elite health `30 + 2 × floor + 10 × stage`; guardians 67, 96 and 132; Signal in the Static ×1.4. A pack shares that health (see [Pack shapes and health](#pack-shapes-and-health)). Ascension multiplies them (below). Patterns repeat in order.
+### Enemy health
 
-**Pressure** is `floor(actions already taken / 3)`. The strikes and breaches of leaders, singles and guardians add pressure plus the stage index (+1 in stage II, +2 in stage III), enrage and escalation level 3 (+1); every hostile's attacks add ascension 4 (+1) and BGP Hijack (+2) and lose 1 to Ingress Filter.
+Every room's single-hostile health is a `RULES` formula, read live so the balance probe can `--rule` it (`encounterHealth` in `map.ts`, floors and stages zero-based): normal `normalHealth` [base, per floor, per stage]; elite `eliteHealth`; guardians `guardianHealth` per stage; Signal in the Static `eventHealthScale` × a normal room. A pack shares that health (see [Pack shapes and health](#pack-shapes-and-health)). Ascension multiplies it (Hardened Quarantine: normals ×1.1, elites ×1.15; The Last Signal: guardians ×1.15). v4 was 16 / 5 / 13, 30 / 2 / 10 and 67 / 96 / 132; v5 starts lower because a three-energy turn deals less. Patterns repeat in order.
+
+<!-- generated:health -->
+| Stage | Normal, floors 1–5 | Elite, floors 4 / 6 | Guardian | Signal in the Static, floors 2 / 5 |
+| --- | --- | --- | --- | --- |
+| I | 14 / 18 / 22 / 26 / 30 | 33 / 37 | 60 | 25 / 42 |
+| II | 25 / 29 / 33 / 37 / 41 | 42 / 46 | 86 | 41 / 57 |
+| III | 36 / 40 / 44 / 48 / 52 | 51 / 55 | 118 | 56 / 73 |
+<!-- /generated:health -->
+
+**Pressure** is `floor(actions already taken / 3)`. The strikes and breaches of leaders, singles and guardians add pressure plus the stage index (+1 in stage II, +2 in stage III), enrage and escalation level 3 (+1); every hostile's attacks add Sharper Teeth (ascension 3, +1) and BGP Hijack (+2) and lose 1 to Ingress Filter. Break thresholds, pressure, escalation and hostile damage are unchanged from v4.
 
 ### Leaders and singles
 
@@ -649,133 +786,427 @@ Combined intents (a fault with a field, junk or an installation) are announced t
 
 ### Guardian ultimates and exposed windows
 
-Every guardian follows four normal actions with a **charge** turn, then an **ultimate**; a wounded guardian charges early (see [Guardian charge timing](#guardian-charge-timing)). The charge deals no direct damage and raises the adds; the forecast shows the coming ultimate's damage and the adds' intents. Deal the break threshold (12 / 15 / 18, +4 per living add; ascension 10: +5) in **one transmission on the ultimate turn**, on the guardian's own port, after armor and suppression, to interrupt it: the guardian's attack and its new field are cancelled, existing fields still resolve, the adds still act, and the guardian is **exposed** for one transmission (armor ignored, +3 damage on its port). Interrupting is optional: shields, firewalls, protocols and integrity can absorb the ultimate. Tarpit punishes the charge or ultimate itself. A buffer release counts toward the break. The break meter shows one extra segment per add, lit while the add lives.
+Every guardian follows four normal actions with a **charge** turn, then an **ultimate**; a wounded guardian charges early (see [Guardian charge timing](#guardian-charge-timing)). The charge deals no direct damage and raises the adds; the forecast shows the coming ultimate's damage and the adds' intents. Deal the break threshold (12 / 15 / 18, +4 per living add; ascension 4: +5) in **one transmission on the ultimate turn**, on the guardian's own port, after armor and suppression, to interrupt it: the guardian's attack and its new field are cancelled, existing fields still resolve, the adds still act, and the guardian is **exposed** for one transmission (armor ignored, +3 damage on its port). Interrupting is optional: shields, firewalls, protocols and integrity can absorb the ultimate. Tarpit punishes the charge or ultimate itself. A buffer release counts toward the break. The break meter shows one extra segment per add, lit while the add lives.
 
 ---
 
 ## Cards
 
-Basic cards form the reliable starter infrastructure. Commons are efficient turn tools. Uncommons reward specialization or protect an investment. Rares provide orchestration, burst or recovery. Legendary Clabernetes is the single exceptionally scarce reward. Rarity never implies unconditional superiority. Every non-junk card has a `+` version (72 of 75), shown with a `+` and a gleam; upgrades change cost or numbers only, and card text always states the upgraded rule. Fourteen cards arrived with v4: for packs and ports, Broadcast Storm, Traffic Shaping, Flood Fill (Architect), Bulkhead (Warden), Spearhead (Ghost), Packet Storm and Quorum; for the table front, Server Rack, Redundant PSU, Sentry Firewall (Warden), Demolition Charge, Field Repair, Rapid Redeploy (Architect) and Phantom Node (Ghost). Each is useful in a single-hostile fight without installations.
+<!-- generated:counts -->
+**137 cards**: 60 colorless, 23 / 23 / 23 for the Architect / Warden / Ghost (the Ghost's count includes the Payload token), 6 curses and 2 junk cards. 129 have an upgraded `+` version (every card but curses and junk). 119 can be offered as rewards (never basics, curses, junk or tokens; keeper cards only to their keeper).
+<!-- /generated:counts -->
 
-Card targets: **ground** places hardware (including racks and phantoms), **link** connects two devices without an existing cable, **node** upgrades a valid device, **instant** resolves immediately (Demolition Charge then asks for an installation), **zone** chooses a band, **protocol** arms, **junk** deletes a Worm. Invalid targets spend neither energy nor cards. Overclock requires an unmodified router, Compression an unamplified switch, Startup Config an unconfigured router, Faraday Shell an unprotected device, Mesh Weave a device with an unconnected neighbour, Mirror Protocol two or more channels, Equal-Cost Multipath, Flood Fill and Wireshark a live route, Salvage Cycle a discarded cable card, Rapid Redeploy a discarded hardware card, Reflect stored backpressure, Replay Attack a non-empty buffer.
+Rarity per keeper is about 1 basic / 7–8 common / 8 uncommon / 6–7 rare. Basic cards form the reliable starter infrastructure and are never offered (Packet Guard and Packet Burst are basics now). Commons are efficient turn tools. Uncommons reward specialization or protect an investment. Rares provide orchestration, burst, daemons or recovery. Legendary Clabernetes is the single exceptionally scarce reward. Rarity never implies unconditional superiority. Every card but curses and junk has a `+` version, shown with a `+` and a gleam; upgrades change cost, numbers or a keyword (Botnet+ is Innate), and the face always states the upgraded rule. Each card is useful in a single-hostile fight without installations.
 
-| Card | Cost | Rarity | Target | Pool | Rules | Upgrade (+) |
-| --- | ---: | --- | --- | --- | --- | --- |
-| Core Router | 2 | basic | ground | all | Place a router. Every route needs one: ALPHA → router → OMEGA deals 5. | cost 2 → 1 |
-| Edge Switch | 1 | basic | ground | all | Place a switch. +1 damage while it is on your primary route. | Place a switch. +1 damage while it is on your primary route. Gain 3 block. |
-| Hot Patch | 1 | basic | instant | all | Clear every active jam and cut cable. Restore 1 condition on your most worn device. Draw 1. | Clear every active jam and cut cable. Restore 1 condition on your most worn device. Draw 2. |
-| Optic Fiber | 1 | basic | link | all | Connect two devices with a live cable. | Connect two devices with a live cable. Draw 1. |
-| Clab Inspect | 0 | common | instant | all | Draw 2 if a route is live; otherwise draw 1. Exhaust. | Draw 3 if a route is live; otherwise draw 2. Exhaust. |
-| Deep Packet Inspection | 1 | common | instant | warden | Gain 2 block for every online firewall (at least 2). | Gain 3 block for every online firewall (at least 3). |
-| Deep Scan | 1 | common | instant | all | Draw 3 cards. Your hand holds at most 10. | Draw 4 cards. Your hand holds at most 10. |
-| Demolition Charge | 1 | common | instant | all | Your target's packet deals +2 this turn. If an installation stands, destroy one of your choice. Exhaust. | Your target's packet deals +4 this turn. If an installation stands, destroy one of your choice. Exhaust. |
-| Duplex Link | 1 | common | link | all | Connect two devices. Gain 3 block this turn. | Connect two devices. Gain 5 block this turn. |
-| Failover Policy | 1 | common | protocol | all | Arm. When a hostile action would cut a cable: cancel all of that action's cuts and gain 3 shield for that action. | Arm. When a hostile action would cut a cable: cancel all of that action's cuts and gain 6 shield for that action. |
-| Field Repair | 0 | common | instant | all | Restore every device to full condition. Gain 2 block. Exhaust. | Restore every device to full condition. Gain 4 block. Draw 1. Exhaust. |
-| Honeypot | 1 | common | ground | all | Place a decoy. Cabled, it takes each action's jam, cut or overload and deals 3. Installations within 2.0 lose 1. Works offline. | cost 1 → 0 |
-| Link Recovery | 1 | common | instant | all | Clear every active jam and cut cable. Restore 1 condition on your most worn device. Gain 3 block. | Clear every active jam and cut cable. Restore 1 condition on your most worn device. Gain 6 block. |
-| Linux Bridge | 1 | common | ground | all | Place a switch automatically cabled to its nearest device (+1 on the primary route). | Place a switch automatically cabled to its two nearest devices (+1 on the primary route). |
-| Packet Burst | 1 | common | instant | all | Your transmission deals +3 this turn. | Your transmission deals +5 this turn. |
-| Packet Guard | 1 | common | instant | all | Gain 4 block this turn. | Gain 7 block this turn. |
-| Power Capacitor | 0 | common | instant | all | Gain 3 block now and +2 energy next turn. Exhaust. | Gain 5 block now and +2 energy next turn. Exhaust. |
-| Purge Field | 0 | common | zone | all | Cleanse a band: destroy its installations, hostile fields and jams (an Anchor takes the whole purge). Draw 1. Exhaust. | Cleanse a band: destroy its installations, hostile fields and jams (an Anchor takes the whole purge). Draw 2. Exhaust. |
-| Quorum | 1 | common | instant | all | Gain 3 block, +2 for every other hostile on the field. Draw 1. | Gain 5 block, +3 for every other hostile on the field. Draw 1. |
-| Rate Limiter | 1 | common | protocol | all | Arm. When a hostile strikes: gain 5 shield for that action. | Arm. When a hostile strikes: gain 8 shield for that action. |
-| Redundant PSU | 1 | common | node | all | Restore a device to full condition and raise its maximum condition to 3 this battle. Gain 2 block. Exhaust. | cost 1 → 0 |
-| Resonance Field | 1 | common | zone | all | Choose a band. Your primary route deals +3 for each resonant band it crosses. 3 turns. | cost 1 → 0 |
-| Salvage Cycle | 0 | common | instant | all | Return up to 2 of your most recently discarded cable cards to your hand. Exhaust. | Return up to 3 of your most recently discarded cable cards to your hand. Exhaust. |
-| Signal Relay | 2 | common | ground | all | Place a jam-protected switch (+1 on the primary route). Draw 1. | cost 2 → 1 |
-| Startup Config | 1 | common | node | all | Configure a router: +1 while it is on your primary route. Gain 1 block. Exhaust. | cost 1 → 0 |
-| Store and Forward | 1 | common | instant | ghost | Add 4 damage to your buffer. | Add 6 damage to your buffer. |
-| Traffic Shaping | 0 | common | instant | all | Your target's packet deals +2 this turn. Draw 1. Exhaust. | Your target's packet deals +4 this turn. Draw 1. Exhaust. |
-| Aegis Field | 1 | uncommon | zone | all | Choose a band. While an online device sits in it, gain 3 shield each turn. 3 turns. | cost 1 → 0 |
-| Aegis Protocol | 2 | uncommon | instant | all | Gain 8 block this turn. | Gain 12 block this turn. |
-| Amplified Fiber | 1 | uncommon | link | all | Connect two devices. This cable adds +1 while on your primary route. | cost 1 → 0 |
-| Armored Fiber | 1 | uncommon | link | all | Connect two devices with a cable immune to cuts and fraying. | cost 1 → 0 |
-| Broadcast Storm | 1 | uncommon | instant | all | Your transmission deals +2 to every port this turn. | Your transmission deals +3 to every port this turn. |
-| Bulkhead | 1 | uncommon | instant | warden | Gain 3 block. This enemy phase every online firewall blocks 1 more against each attack. | Gain 5 block. This enemy phase every online firewall blocks 1 more against each attack. |
-| Cache Server | 2 | uncommon | ground | all | Place a cache server. Online at the start of your turn: draw 1 more card. | cost 2 → 1 |
-| Crosslink | 0 | uncommon | link | all | Connect two devices for free. Draw 1. Exhaust. | Connect two devices for free. Draw 2. Exhaust. |
-| Dark Fiber | 0 | uncommon | link | ghost | Connect two devices with a cut- and fray-proof cable. Exhaust. | Connect two devices with a cut- and fray-proof cable. Draw 1. Exhaust. |
-| Emergency Rebuild | 2 | uncommon | instant | all | Deploy a router cabled to both terminals: a new 5-damage route. Exhaust. | cost 2 → 1 |
-| Equal-Cost Multipath | 1 | uncommon | instant | architect | Needs a live route. +2 burst for every live channel. | Needs a live route. +3 burst for every live channel. |
-| Faraday Shell | 1 | uncommon | node | all | Protect a device from jams this battle and clear its jam. Exhaust. | cost 1 → 0 |
-| Fast Reroute | 0 | uncommon | instant | all | Clear every active jam and cut cable. Restore 1 condition on your most worn device. Gain 2 block. Draw 1. Exhaust. | Clear every active jam and cut cable. Restore 1 condition on your most worn device. Gain 4 block. Draw 1. Exhaust. |
-| Flood Fill | 1 | uncommon | instant | architect | Needs a live route. +1 damage per live channel to every port. | Needs a live route. +2 damage per live channel to every port. |
-| Hardened Router | 2 | uncommon | ground | all | Place a router protected from jams. Gain 2 block. | Place a router protected from jams. Gain 5 block. |
-| IPS Signature | 2 | uncommon | protocol | all | Arm. When a hostile breaches: gain 6 shield for that action. | cost 2 → 1 |
-| Load Balancer | 2 | uncommon | ground | all | Place a load balancer. While online: +1 damage for every live channel. | cost 2 → 1 |
-| Mesh Weave | 1 | uncommon | node | architect | Cable the chosen device to its two nearest unconnected devices. | Cable the chosen device to its three nearest unconnected devices. |
-| Mirror Protocol | 1 | uncommon | instant | all | Needs 2+ channels. +2 burst and +2 block for every live channel. | Needs 2+ channels. +3 burst and +3 block for every live channel. |
-| Null Field | 1 | uncommon | zone | all | Choose a band. While any of your hardware occupies it, gain 2 shield each turn. 3 turns. | cost 1 → 0 |
-| Packet Compression | 1 | uncommon | node | all | Amplify a switch: +2 while it is on your primary route. Exhaust. | cost 1 → 0 |
-| Phantom Node | 0 | uncommon | ground | ghost | Place a phantom off every route. It absorbs the next jam, cut, overload or installation, then fades. Exhaust. | Place a phantom off every route. It absorbs the next two jams, cuts, overloads or installations, then fades. Exhaust. |
-| PoE Injector | 2 | uncommon | ground | all | Place a power injector. Online at the start of your turn: +1 energy. | cost 2 → 1 |
-| Port Security | 1 | uncommon | protocol | all | Arm. When a hostile action would jam a device: cancel all of that action's jams; the attacker takes 4. | Arm. When a hostile action would jam a device: cancel all of that action's jams; the attacker takes 7. |
-| Power Surge | 0 | uncommon | instant | all | Gain 2 energy. Draw 2. Exhaust. | Gain 3 energy. Draw 2. Exhaust. |
-| Quarantine Rule | 1 | uncommon | protocol | all | Arm. When a hostile casts a field: cancel the field. | cost 1 → 0 |
-| Rapid Redeploy | 1 | uncommon | instant | architect | Put a hardware card from your discard pile into your hand; it costs 1 less this turn. Exhaust. | Put a hardware card from your discard pile into your hand; it costs 1 less this turn. Draw 1. Exhaust. |
-| Sentry Firewall | 2 | uncommon | ground | warden | Place a firewall (online: blocks 2 breach / 1 strike). Its quarantine deals 2, not 1; each installation it destroys: +2 shield. | Place a jam-protected firewall. Online, its quarantine deals 2, not 1; each installation it destroys grants +2 shield. |
-| Server Rack | 2 | uncommon | ground | all | Place an uncabled rack: overloads, Spikes and blasts within 2.0 wear it instead. Condition 3, no wreckage. Gain 3 block. | cost 2 → 1 |
-| Spearhead | 1 | uncommon | instant | ghost | Your buffer release this turn ignores armor and plating. | cost 1 → 0 |
-| Stateful Firewall | 2 | uncommon | ground | warden | Place a firewall that blocks double: 4 of a breach or 2 of a strike while online. | Place a jam-protected firewall that blocks double: 4 of a breach or 2 of a strike while online. |
-| Trust Gate | 2 | uncommon | ground | all | Place a firewall. While online it blocks 2 of a breach or 1 of a strike. Firewalls stack. | Place a firewall. While online it blocks 2 of a breach or 1 of a strike. Firewalls stack. Gain 3 block. |
-| VXLAN Tunnel | 2 | uncommon | link | all | Connect two devices with a cut- and fray-proof cable that adds +1 on your primary route. | cost 2 → 1 |
-| Wireshark | 1 | uncommon | instant | all | Capture your primary route: draw 2 and +1 burst for every distinct device type on it. Exhaust. | Capture your primary route: draw 3 and +1 burst for every distinct device type on it. Exhaust. |
-| Bastion Firewall | 3 | rare | ground | all | Place a jam-protected firewall (online: blocks 2 breach / 1 strike). Gain 5 block. | Place a jam-protected firewall (online: blocks 2 breach / 1 strike). Gain 8 block. |
-| Containerlab | 3 | rare | instant | all | Deploy an overclocked router cabled to both terminals: a 7-damage route. Exhaust. | cost 3 → 2 |
-| Emergency Repair | 2 | rare | instant | all | Restore 3 integrity. Gain 3 block. Exhaust. | Restore 5 integrity. Gain 5 block. Exhaust. |
-| Overclock | 1 | rare | node | all | Overclock a router: +2 while it is on your primary route. Exhaust. | cost 1 → 0 |
-| Packet Storm | 2 | rare | instant | all | Your transmission deals +5 to every port this turn. Exhaust. | Your transmission deals +7 to every port this turn. Exhaust. |
-| Reflect | 1 | rare | instant | warden | Double your stored backpressure. Exhaust. | cost 1 → 0 |
-| Replay Attack | 1 | rare | instant | ghost | Double your buffer. Exhaust. | cost 1 → 0 |
-| Spine-Leaf | 2 | rare | ground | architect | Place a switch cabled to every router on the table (+1 on the primary route). | cost 2 → 1 |
-| Tarpit | 1 | rare | protocol | all | Arm. When a guardian charges or unleashes an ultimate: it takes 8. | Arm. When a guardian charges or unleashes an ultimate: it takes 12. |
-| Zero Day | 2 | rare | instant | all | Your transmission deals +8 this turn. Exhaust. | Your transmission deals +12 this turn. Exhaust. |
-| Clabernetes | 2 | legendary | node | all | Clone a router with its cables and upgrades. Both become jam-protected — instant bandwidth. Exhaust. | cost 2 → 1 |
-| CVE | 0 | special | junk | curse | Unplayable. A permanent vulnerability. Remove it at a Sanctuary or Market. | — |
-| Packet Loss | 0 | special | junk | junk | Unplayable. Vanishes at the end of your turn. Removed after the encounter. | — |
-| Worm | 1 | special | junk | junk | Pay 1 to delete it. If it is in your hand when you transmit, the enemy phase's first attack deals 2 extra damage. | — |
+**Pools.** Colorless cards (no `archetype`) are the shared pool every keeper can be offered; keeper cards are offered only to their keeper, and each keeper has three **build paths**, each with enablers, payoffs and at least one colorless partner (the grouping lives in `src/tutorial/paths.ts`, shared with the Handbook; every keeper card belongs to exactly one path). Mirror Protocol moved to the Architect and Bastion Firewall to the Warden; Store and Forward and Deep Packet Inspection became their keepers' basics.
 
-Clabernetes clones a router with its cables, configuration and overclock into the first free socket; both routers become jam-protected, and the new disjoint path is instant bandwidth. Wireshark counts distinct device roles on the primary route (router, switch, firewall, cache, power, balancer, honeypot) with no cap. Linux Bridge and Mesh Weave cable to the nearest devices not already connected (distance ties use device IDs). Rapid Redeploy takes the most recently discarded hardware card; its discount is spent by the first matching card played this turn. Crate cards and Recover cards enter the hand for the encounter only, exhaust when played and never enter the deck.
+Card targets: **ground** places hardware (including racks and phantoms; `values.links` auto-cables the device to its nearest devices: Linux Bridge, Standby Router, ACL Gate), **link** connects two devices without an existing cable, **node** upgrades or repairs a valid device, **instant** resolves immediately (Demolition Charge then asks for an installation), **zone** chooses a band, **protocol** arms, **daemon** starts a process, **junk** deletes a Worm. Invalid targets and refused plays spend neither energy nor cards, and every refusal states its reason. Overclock requires an unmodified router, Compression an unamplified switch, Startup Config an unconfigured router, Faraday Shell an unprotected device, Hotfix a worn device, Mesh Weave a device with an unconnected neighbour, Mirror Protocol two or more channels, Flood Fill and Wireshark a live route, Splice and Line Rate a primary route (Line Rate also something on it still to upgrade), Salvage Cycle a discarded link card, Rapid Redeploy a discarded hardware card, Rearm a discarded protocol, Rollback a card played this turn still in the discard pile, Firmware Update an upgradable card in hand, Reflect stored backpressure, Entrench block, Replay Attack, Flush and Exfiltrate a non-empty buffer, Decoy Swarm, Containerlab and Emergency Rebuild a free auto-deploy socket.
+
+The tables below are generated from `CARDS` (face and `+` face as the game prints them; "cost 2 → 1" when only the cost changes).
+
+### Keeper cards
+
+#### The Architect
+
+<!-- generated:architect -->
+##### Mesh
+
+Channels and width: every channel beyond the first is another delivery. Standby Router, Branch Line and Patch Panel make channels cheap; Peering Session and Redundant Paths pay block for them; Equal-Cost Multipath, Flood Fill, Mirror Protocol and Fabric Controller cash the width in.
+
+| Card | Cost | Rarity | Target | Face | Upgrade (+) |
+| --- | ---: | --- | --- | --- | --- |
+| Branch Line | 1 | basic | link | Link two devices. If this adds a channel, draw 1. | Link two devices. If this adds a channel, draw 2. |
+| Patch Panel | 1 | common | link | Link two devices. Your next link card this turn costs 0. | Link two devices. Your next link card this turn costs 0. Draw 1. |
+| Redundant Paths | 1 | common | instant | Gain 2 block per live channel. | Gain 3 block per live channel. |
+| Standby Router | 1 | common | ground · router | Deploy a router linked to its nearest device. | Deploy a router linked to its two nearest devices. |
+| Equal-Cost Multipath | 1 | uncommon | instant | +2 damage this turn per live channel. | +3 damage this turn per live channel. |
+| Flood Fill | 1 | uncommon | instant | +1 damage to every hostile per live channel this turn. | +2 damage to every hostile per live channel this turn. |
+| Mesh Weave | 1 | uncommon | node | Link a device to its two nearest unlinked devices. | Link a device to its three nearest unlinked devices. |
+| Mirror Protocol | 1 | uncommon | instant | Needs 2 channels. +2 damage and 2 block per live channel. | Needs 2 channels. +3 damage and 3 block per live channel. |
+| Peering Session | 1 | uncommon | daemon | Daemon. Whenever you add a channel, gain 3 block. | Daemon. Whenever you add a channel, gain 4 block. |
+| Fabric Controller | 2 | rare | daemon | Daemon. Every channel beyond the first deals +2 more. | cost 2 → 1 |
+| Spine-Leaf | 1 | rare | ground · switch | Deploy a switch linked to every router (+1 on your primary route). | cost 1 → 0 |
+
+Colorless partners: Load Balancer (2), Linux Bridge (1), Crosslink (0), Duplex Link (1).
+
+Edge cases (`detail`, shown when the card is inspected):
+
+- **Branch Line**: It draws when the live channel count after the cable is higher than before it.
+- **Patch Panel**: The next link card uses it, even one that already costs 0; it lasts until the end of your turn. While Hot Swap's free link is unspent, Hot Swap pays first and this one waits.
+- **Redundant Paths**: Counts your live channels when you play it; with no live route it gives nothing.
+- **Standby Router**: It links to the nearest devices it is not already cabled to, ALPHA and OMEGA included (distance ties: device ids).
+- **Flood Fill**: Needs a live route.
+- **Mesh Weave**: Distance ties: device ids.
+- **Peering Session**: It pays for every channel added. Any card, console use or relocation of yours that raises your live channel count counts, clearing a jam or a cut too.
+- **Fabric Controller**: Each channel beyond the first is a bandwidth delivery of +3; this adds to every one of them. Under Spanning Tree bandwidth gives nothing, and neither does this.
+
+##### Backbone
+
+One long, upgraded primary route that hits harder every turn. Splice lengthens the route, Line Rate upgrades all of it at once; Deep Buffers and Carrier Grade make every device on it count; Trunk Line and Traceroute read it as burst.
+
+| Card | Cost | Rarity | Target | Face | Upgrade (+) |
+| --- | ---: | --- | --- | --- | --- |
+| Splice | 1 | common | instant | Deploy a switch into the longest cable of your primary route. | cost 1 → 0 |
+| Traceroute | 0 | common | instant | Draw 1. +1 damage this turn per switch on your primary route. | Draw 2. +1 damage this turn per switch on your primary route. |
+| Trunk Line | 1 | common | instant | +1 damage this turn per device on your primary route. | +1 damage this turn per device on your primary route. Draw 1. |
+| Deep Buffers | 1 | uncommon | daemon | Daemon. Switches on your primary route deal +1 more. | cost 1 → 0 |
+| Carrier Grade | 2 | rare | daemon | Daemon. Your primary route deals +1 per device on it. | cost 2 → 1 |
+| Line Rate | 2 | rare | instant | Overclock every router and compress every switch on your primary route. Exhaust. | cost 2 → 1 |
+
+Colorless partners: Packet Compression (1), Overclock (1), Wireshark (1), Amplified Fiber (1).
+
+Edge cases (`detail`, shown when the card is inspected):
+
+- **Splice**: The cable becomes two cables through a new switch (+1 on your primary route) at the free socket nearest its middle; both keep armor and amplification. Ties: the cable nearest ALPHA.
+- **Traceroute**: Counts the switches on your primary route when you play it.
+- **Trunk Line**: Counts the devices on your primary route when you play it; ALPHA and OMEGA are not devices.
+- **Deep Buffers**: A switch on your primary route deals +1 (compressed +2 more); this adds to each.
+- **Carrier Grade**: ALPHA and OMEGA are not devices. Your primary route is still the route that deals the most, this bonus included.
+- **Line Rate**: Overclocked routers deal +2 and compressed switches +2 while on your primary route. Needs a router or switch there that is not upgraded yet.
+
+##### Deployment
+
+Hardware tempo: cheap deploys, clusters and device triggers. Rack and Stack, Blueprint and Rapid Redeploy discount hardware; Provisioning Script and Zero-Touch Provisioning pay for every deploy; Datacenter rewards crowded bands.
+
+| Card | Cost | Rarity | Target | Face | Upgrade (+) |
+| --- | ---: | --- | --- | --- | --- |
+| Blueprint | 1 | common | instant | Draw 2. Hardware drawn this way costs 1 less this turn. | Draw 3. Hardware drawn this way costs 1 less this turn. |
+| Rack and Stack | 1 | common | ground · switch | Deploy a switch. Your next hardware card this turn costs 1 less. | cost 1 → 0 |
+| Provisioning Script | 1 | uncommon | daemon | Daemon. Whenever you deploy a device, gain 2 block. | Daemon. Whenever you deploy a device, gain 3 block. |
+| Rapid Redeploy | 1 | uncommon | instant | Return your last discarded hardware card to hand. It costs 1 less this turn. Exhaust. | Return your last discarded hardware card to hand. It costs 1 less this turn. Draw 1. Exhaust. |
+| Datacenter | 2 | rare | daemon | Daemon. Every cluster deals +3 more. | cost 2 → 1 |
+| Zero-Touch Provisioning | 1 | rare | daemon | Daemon. Whenever you deploy a device, draw 1. | cost 1 → 0 |
+
+Colorless partners: PoE Injector (2), Cache Server (2), Emergency Rebuild (1), Containerlab (2), Clabernetes (2).
+
+Edge cases (`detail`, shown when the card is inspected):
+
+- **Blueprint**: Hardware cards are the ones that deploy a device.
+- **Rack and Stack**: The switch deals +1 on your primary route. Hardware cards are the ones that deploy a device. The next one uses the discount, even one that already costs 0; it lasts until the end of your turn.
+- **Provisioning Script**: Every device your cards deploy counts, auto-deployed ones too (Emergency Rebuild, Containerlab, Clabernetes, Splice); salvage does not.
+- **Datacenter**: A cluster is a band holding 3 or more online devices (Server Racks count); each deals +2 on your primary route, and this adds to each.
+- **Zero-Touch Provisioning**: Every device your cards deploy counts, auto-deployed ones too (Emergency Rebuild, Containerlab, Clabernetes, Splice); salvage does not.
+<!-- /generated:architect -->
+
+#### The Warden
+
+<!-- generated:warden -->
+##### Fortress
+
+Block that becomes backpressure, and block that stays. Brace, Stand Firm, Pushback and Double Shift raise the wall; Hardening Guide grows every Harden; Persistent State keeps the block, Entrench doubles it; Flow Control, Vent and Reflect turn what it stopped into damage.
+
+| Card | Cost | Rarity | Target | Face | Upgrade (+) |
+| --- | ---: | --- | --- | --- | --- |
+| Brace | 1 | common | instant | Gain 5 block. Next turn, gain 3 block. | Gain 7 block. Next turn, gain 4 block. |
+| Double Shift | 1 | common | instant | Harden once, without using your console. Draw 1. | cost 1 → 0 |
+| Pushback | 1 | common | instant | Gain 4 block. Add 2 to your backpressure. | Gain 6 block. Add 3 to your backpressure. |
+| Stand Firm | 2 | common | instant | Gain 11 block. | Gain 15 block. |
+| Vent | 0 | common | instant | Gain block equal to your backpressure. | Gain block equal to your backpressure. Draw 1. |
+| Entrench | 2 | uncommon | instant | Double your block. | cost 2 → 1 |
+| Hardening Guide | 1 | uncommon | daemon | Daemon. Harden gains 3 more block. | cost 1 → 0 |
+| Flow Control | 2 | rare | daemon | Daemon. Backpressure stores all the damage your shield prevents, not half. | cost 2 → 1 |
+| Persistent State | 2 | rare | daemon | Daemon. Your block no longer expires after the enemy phase. | cost 2 → 1 |
+| Reflect | 1 | rare | instant | Retain. Double your backpressure. Exhaust. | cost 1 → 0 |
+
+Colorless partners: Aegis Protocol (2), Aegis Field (1), Null Field (1), Quorum (1), Duplex Link (1).
+
+Edge cases (`detail`, shown when the card is inspected):
+
+- **Double Shift**: Harden: gain 2 block, +1 per online firewall, +1 per hostile beyond the first, +1 more per guardian add, and repair your most worn device by 1. Your console stays free this turn.
+- **Pushback**: Your next transmission with a live route releases your backpressure.
+- **Vent**: Your backpressure stays stored: the next transmission still releases it.
+- **Entrench**: Needs block. Shield from fields, Reclaim and firewalls is not block.
+- **Hardening Guide**: It raises your Harden console and every Double Shift. Copies stack.
+- **Flow Control**: It changes your Backpressure relic's share. More copies add nothing.
+- **Persistent State**: Attacks spend your other shield (fields, circuits, Reclaim) before your block; what they leave of your block carries into your next turn. More copies add nothing.
+- **Reflect**: Needs stored backpressure.
+
+##### Firewall wall
+
+Many firewalls online, and cards that pay per firewall. ACL Gate, Stateful, Sentry and Bastion firewalls fill the route; Deep Packet Inspection and Perimeter pay per online firewall; Bulkhead and Defense in Depth make every firewall block more.
+
+| Card | Cost | Rarity | Target | Face | Upgrade (+) |
+| --- | ---: | --- | --- | --- | --- |
+| Deep Packet Inspection | 1 | basic | instant | Gain 3 block, +2 per online firewall. | Gain 5 block, +3 per online firewall. |
+| ACL Gate | 1 | common | ground · firewall | Deploy a firewall linked to its nearest device. | Deploy a firewall linked to its nearest device. Gain 3 block. |
+| Bulkhead | 1 | uncommon | instant | Gain 3 block. This enemy phase, each online firewall blocks 1 more per attack. | Gain 5 block. This enemy phase, each online firewall blocks 1 more per attack. |
+| Perimeter | 1 | uncommon | instant | +2 damage this turn per online firewall. | +3 damage this turn per online firewall. |
+| Sentry Firewall | 1 | uncommon | ground · firewall | Deploy a firewall whose quarantine deals 2; each installation it destroys gives +2 shield. | Deploy a jam-proof firewall whose quarantine deals 2; each installation it destroys gives +2 shield. |
+| Stateful Firewall | 2 | uncommon | ground · firewall | Deploy a firewall that blocks double: 4 of each breach, 2 of each strike. | Deploy a jam-proof firewall that blocks double: 4 of each breach, 2 of each strike. |
+| Bastion Firewall | 2 | rare | ground · firewall | Deploy a jam-proof firewall. Gain 6 block. | Deploy a jam-proof firewall. Gain 9 block. |
+| Defense in Depth | 2 | rare | daemon | Daemon. Each online firewall blocks 1 more per attack. | cost 2 → 1 |
+
+Colorless partners: Trust Gate (1), Honeypot (1), Server Rack (1), Hardened Router (1).
+
+Edge cases (`detail`, shown when the card is inspected):
+
+- **ACL Gate**: Online, it blocks 2 of each breach and 1 of each strike like any firewall. It links to the nearest device it is not already cabled to (distance ties: device ids).
+- **Perimeter**: It counts the firewalls online when you play it. The damage rides your primary route.
+- **Sentry Firewall**: Online, it blocks 2 of each breach and 1 of each strike like any firewall; its quarantine deals 2 instead of 1.
+- **Defense in Depth**: Attacks are strikes and breaches, from any hostile. Copies stack.
+
+##### Protocols
+
+Armed traps that answer the forecast and hit back. Policy Engine opens more slots and Rearm replays the best protocol; Tripwire and Null Route punish and cancel; Incident Response makes every protocol that fires deal damage.
+
+| Card | Cost | Rarity | Target | Face | Upgrade (+) |
+| --- | ---: | --- | --- | --- | --- |
+| Tripwire | 1 | common | protocol · strike | Armed. When a hostile strikes: it takes 5. | Armed. When a hostile strikes: it takes 8. |
+| Policy Engine | 1 | uncommon | daemon | Daemon. You can arm 1 more protocol. | cost 1 → 0 |
+| Rearm | 0 | uncommon | instant | Return your last discarded protocol to hand. It costs 0 this turn. | Return your last discarded protocol to hand. It costs 0 this turn. Draw 1. |
+| Incident Response | 1 | rare | daemon | Daemon. Whenever a protocol fires, the hostile that set it off takes 3. | Daemon. Whenever a protocol fires, the hostile that set it off takes 5. |
+| Null Route | 2 | rare | protocol · breach | Armed. When a hostile breaches: cancel the breach. | cost 2 → 1 |
+
+Colorless partners: Failover Policy (1), Port Security (1), Rate Limiter (1), IPS Signature (1), Quarantine Rule (1), Tarpit (1).
+
+Edge cases (`detail`, shown when the card is inspected):
+
+- **Tripwire**: It fires in the trap step, before the strike lands: a hostile it kills never acts. Otherwise the strike still lands.
+- **Policy Engine**: You arm 2 protocols without it. Copies stack.
+- **Rearm**: Fired protocols go to your discard pile. Needs a protocol there.
+- **Incident Response**: It strikes in the trap step, before the action lands (a Jammer Port Security answers takes it too). Copies stack.
+- **Null Route**: The breach deals 0; its riders (fields, faults, junk, installations) still resolve.
+<!-- /generated:warden -->
+
+#### The Ghost
+
+<!-- generated:ghost -->
+##### Buffer
+
+Store transmissions, multiply them, release one spike. Store and Forward, Jitter Buffer, Hold Queue and Trickle fill the buffer; Deep Queue multiplies what the console stores; Replay Attack doubles it, Spearhead and Exfiltrate land it through armor; Flush is burst while it waits.
+
+| Card | Cost | Rarity | Target | Face | Upgrade (+) |
+| --- | ---: | --- | --- | --- | --- |
+| Store and Forward | 1 | basic | instant | Add 4 to your buffer. | Add 6 to your buffer. |
+| Flush | 0 | common | instant | Needs a buffer. +4 damage this turn. | Needs a buffer. +6 damage this turn. |
+| Hold Queue | 1 | common | instant | Gain 4 block. If you are buffering, add 4 to your buffer. | Gain 6 block. If you are buffering, add 6 to your buffer. |
+| Jitter Buffer | 1 | common | instant | Add 3 to your buffer. Draw 1. | Add 5 to your buffer. Draw 1. |
+| Spearhead | 1 | uncommon | instant | Your buffer release this turn ignores armor. | cost 1 → 0 |
+| Trickle | 1 | uncommon | daemon | Daemon. At the start of your turn, add 2 to your buffer. | Daemon. At the start of your turn, add 3 to your buffer. |
+| Deep Queue | 2 | rare | daemon | Daemon. Buffering stores ×3 instead of ×2. | cost 2 → 1 |
+| Exfiltrate | 1 | rare | instant | Retain. Deal your buffer to your target now, ignoring armor. Exhaust. | cost 1 → 0 |
+| Replay Attack | 1 | rare | instant | Retain. Double your buffer. Exhaust. | cost 1 → 0 |
+
+Colorless partners: Zero Day (2), Traffic Shaping (0), Deep Scan (1).
+
+Edge cases (`detail`, shown when the card is inspected):
+
+- **Flush**: It does not spend the buffer. On a buffering turn the damage is stored with the rest.
+- **Hold Queue**: Buffering: your Buffer console is armed this turn. Arm it before you play this.
+- **Spearhead**: Armor and plating: the released buffer lands in full; the rest of the packet still pays them.
+- **Trickle**: It fills after the packet-loss check: a turn that starts without a live route still loses the old buffer.
+- **Deep Queue**: Copies stack: each running copy raises the multiplier again.
+- **Exfiltrate**: Needs a buffer, and empties it. Not a transmission: the surplus overflows as usual, but it never breaks an ultimate.
+- **Replay Attack**: Needs a buffer.
+
+##### Evasion
+
+Misses, dodges, phantoms and cut-proof lines. Spoof and Obfuscation make jams and cuts miss; Phantom Node and Decoy Swarm absorb disruption; Dark Fiber lays lines that cannot be cut; Ghost Protocol makes the biggest hit deal 0.
+
+| Card | Cost | Rarity | Target | Face | Upgrade (+) |
+| --- | ---: | --- | --- | --- | --- |
+| Spoof | 1 | common | instant | Gain 3 block. The next jam or cut this enemy phase misses. | Gain 5 block. The next jam or cut this enemy phase misses. |
+| Dark Fiber | 0 | uncommon | link | Link two devices with a cut-proof cable. Exhaust. | Link two devices with a cut-proof cable. Draw 1. Exhaust. |
+| Decoy Swarm | 1 | uncommon | instant | Deploy 2 phantoms off every route. Exhaust. | Deploy 3 phantoms off every route. Exhaust. |
+| Phantom Node | 0 | uncommon | ground · phantom | Deploy a phantom. It absorbs the next jam, cut, overload or installation. Exhaust. | Deploy a phantom. It absorbs the next two jams, cuts, overloads or installations. Exhaust. |
+| Ghost Protocol | 2 | rare | instant | The first strike or breach this enemy phase deals 0. Exhaust. | cost 2 → 1 |
+| Obfuscation | 2 | rare | daemon | Daemon. The first jam or cut each enemy phase misses. | cost 2 → 1 |
+
+Colorless partners: Armored Fiber (1), Faraday Shell (1), Failover Policy (1).
+
+Edge cases (`detail`, shown when the card is inspected):
+
+- **Spoof**: A miss answers after your protocols and before a Phantom Node. It never stops an overload or an installation.
+- **Dark Fiber**: A cut-proof cable never frays over wreckage either.
+- **Decoy Swarm**: They take free sockets on their own. Each absorbs the next jam, cut, overload or installation, then fades. A full table deploys fewer.
+- **Phantom Node**: A phantom is never cabled: it sits off every route and fades once spent.
+- **Ghost Protocol**: In port order. Its fields, faults, junk and installations still land.
+- **Obfuscation**: Copies stack. A miss answers after your protocols and before a Phantom Node; it never stops an overload or an installation.
+
+##### Payloads
+
+Payload tokens, long card chains and exhaust. Fork Bomb, Shell Access and Botnet make Payloads; Exploit Kit makes each hit harder; Side Channel and Man-in-the-Middle pay for every card played; Cover Tracks pays for every card exhausted.
+
+| Card | Cost | Rarity | Target | Face | Upgrade (+) |
+| --- | ---: | --- | --- | --- | --- |
+| Fork Bomb | 1 | common | instant | Add 3 Payloads to your hand. | Add 4 Payloads to your hand. |
+| Shell Access | 1 | common | instant | Gain 4 block. Add a Payload to your hand. | Gain 6 block. Add a Payload to your hand. |
+| Side Channel | 1 | common | instant | +1 damage this turn per card you played this turn. | cost 1 → 0 |
+| Botnet | 1 | uncommon | daemon | Daemon. At the start of your turn, add a Payload to your hand. | Daemon. Innate. At the start of your turn, add a Payload to your hand. |
+| Cover Tracks | 1 | uncommon | daemon | Daemon. Whenever a card exhausts, gain 1 block. | Daemon. Whenever a card exhausts, gain 2 block. |
+| Exploit Kit | 1 | uncommon | daemon | Daemon. Payloads deal +1 more. | Daemon. Payloads deal +2 more. |
+| Man-in-the-Middle | 1 | rare | instant | This turn, every card you play adds 2 to your buffer. Exhaust. | This turn, every card you play adds 3 to your buffer. Exhaust. |
+| Payload | 0 | special | instant | +2 damage this turn. Exhaust. | +3 damage this turn. Exhaust. |
+
+Colorless partners: Crosslink (0), Clab Inspect (0), Ping (0), Hotfix (0).
+
+Edge cases (`detail`, shown when the card is inspected):
+
+- **Fork Bomb**: Payload: +2 damage this turn. Exhaust. A full hand sends the rest to your discard pile.
+- **Shell Access**: Payload: +2 damage this turn. Exhaust.
+- **Side Channel**: Counts the cards played so far this turn, itself and Payloads included.
+- **Botnet**: A full hand sends the Payload to your discard pile.
+- **Cover Tracks**: Played Exhaust cards, Payloads, and Volatile cards at the end of your turn.
+- **Exploit Kit**: Every Payload played this turn counts, even one played before the Kit started.
+- **Man-in-the-Middle**: Counts the cards played after it this turn, Payloads included.
+- **Payload**: A token for this encounter only: it never enters your deck.
+<!-- /generated:ghost -->
+
+### Colorless cards
+
+<!-- generated:colorless -->
+| Card | Cost | Rarity | Target | Face | Upgrade (+) |
+| --- | ---: | --- | --- | --- | --- |
+| Core Router | 1 | basic | ground · router | Deploy a router. ALPHA → router → OMEGA is a route that deals 5. | Deploy a router. ALPHA → router → OMEGA is a route that deals 5. Gain 3 block. |
+| Edge Switch | 0 | basic | ground · switch | Deploy a switch: +1 damage while on your primary route. | Deploy a switch: +1 damage while on your primary route. Gain 3 block. |
+| Hot Patch | 1 | basic | instant | Clear every jam and cut. Repair your most worn device by 1. Draw 1. | Clear every jam and cut. Repair your most worn device by 1. Draw 2. |
+| Optic Fiber | 1 | basic | link | Link two devices. | Link two devices. Draw 1. |
+| Packet Burst | 1 | basic | instant | +3 damage this turn. | +5 damage this turn. |
+| Packet Guard | 1 | basic | instant | Gain 4 block. | Gain 7 block. |
+| Amplified Fiber | 1 | common | link | Link two devices: +1 damage while on your primary route. | cost 1 → 0 |
+| Armored Fiber | 1 | common | link | Link two devices with a cut-proof cable. | cost 1 → 0 |
+| Clab Inspect | 0 | common | instant | Draw 2 (1 without a live route). Exhaust. | Draw 3 (2 without a live route). Exhaust. |
+| Deep Scan | 1 | common | instant | Draw 3. | Draw 4. |
+| Demolition Charge | 1 | common | instant | Destroy an installation. +2 damage to your target this turn. Exhaust. | Destroy an installation. +4 damage to your target this turn. Exhaust. |
+| Duplex Link | 1 | common | link | Link two devices. Gain 3 block. | Link two devices. Gain 5 block. |
+| Failover Policy | 1 | common | protocol · cut | Armed. When a hostile would cut a cable: cancel its cuts and gain 3 shield. | Armed. When a hostile would cut a cable: cancel its cuts and gain 6 shield. |
+| Field Repair | 0 | common | instant | Restore every device to full condition. Gain 2 block. Exhaust. | Restore every device to full condition. Gain 4 block. Draw 1. Exhaust. |
+| Honeypot | 1 | common | ground · honeypot | Deploy a decoy. Linked, it draws each jam, cut and overload and hits back for 3. | cost 1 → 0 |
+| Hotfix | 0 | common | node | Repair a device by 1. Draw 1. | Repair a device by 2. Draw 1. |
+| Link Recovery | 1 | common | instant | Clear every jam and cut. Repair your most worn device by 1. Gain 3 block. | Clear every jam and cut. Repair your most worn device by 1. Gain 6 block. |
+| Linux Bridge | 1 | common | ground · switch | Deploy a switch linked to its two nearest devices. | cost 1 → 0 |
+| Ping | 0 | common | instant | +1 damage this turn. Draw 1. | +2 damage this turn. Draw 1. |
+| Power Capacitor | 0 | common | instant | Gain 3 block. Next turn: +1 energy. Exhaust. | Gain 6 block. Next turn: +1 energy. Exhaust. |
+| Purge Field | 0 | common | zone | Cleanse a band: destroy its installations, hostile fields and jams. Draw 1. Exhaust. | Cleanse a band: destroy its installations, hostile fields and jams. Draw 2. Exhaust. |
+| Quorum | 1 | common | instant | Gain 3 block, +2 per other hostile. Draw 1. | Gain 5 block, +3 per other hostile. Draw 1. |
+| Rate Limiter | 1 | common | protocol · strike | Armed. When a hostile strikes: gain 5 shield against it. | Armed. When a hostile strikes: gain 8 shield against it. |
+| Redundant PSU | 1 | common | node | Restore a device fully; its maximum condition is 3 this battle. Gain 2 block. Exhaust. | cost 1 → 0 |
+| Resonance Field | 1 | common | zone | Choose a band. For 3 turns, your primary route deals +3 while it crosses it. | cost 1 → 0 |
+| Salvage Cycle | 0 | common | instant | Return your 2 most recent link cards from discard to hand. Exhaust. | Return your 3 most recent link cards from discard to hand. Exhaust. |
+| Signal Relay | 1 | common | ground · switch | Deploy a jam-proof switch: +1 damage while on your primary route. Draw 1. | cost 1 → 0 |
+| Startup Config | 0 | common | node | Configure a router: +1 damage while on your primary route. Exhaust. | Configure a router: +1 damage while on your primary route. Gain 4 block. Exhaust. |
+| Traffic Shaping | 0 | common | instant | +2 damage to your target this turn. Draw 1. Exhaust. | +4 damage to your target this turn. Draw 1. Exhaust. |
+| Trust Gate | 1 | common | ground · firewall | Deploy a firewall. Online, it blocks 2 of each breach and 1 of each strike. | Deploy a firewall. Online, it blocks 2 of each breach and 1 of each strike. Gain 3 block. |
+| Aegis Field | 1 | uncommon | zone | Choose a band. For 3 turns, gain 3 shield each turn while an online device is in it. | cost 1 → 0 |
+| Aegis Protocol | 2 | uncommon | instant | Gain 9 block. | Gain 13 block. |
+| Broadcast Storm | 1 | uncommon | instant | +2 damage to every hostile this turn. | +3 damage to every hostile this turn. |
+| Cache Server | 2 | uncommon | ground · cache | Deploy a cache server. Online: draw 1 more card each turn. | cost 2 → 1 |
+| Crosslink | 0 | uncommon | link | Link two devices. Draw 1. Exhaust. | Link two devices. Draw 2. Exhaust. |
+| Emergency Rebuild | 1 | uncommon | instant | Deploy a router linked to ALPHA and OMEGA: a new 5-damage route. Exhaust. | cost 1 → 0 |
+| Faraday Shell | 1 | uncommon | node | Make a device jam-proof and clear its jam. Exhaust. | cost 1 → 0 |
+| Fast Reroute | 0 | uncommon | instant | Clear every jam and cut. Repair your most worn device by 1. Gain 2 block. Draw 1. Exhaust. | Clear every jam and cut. Repair your most worn device by 1. Gain 4 block. Draw 1. Exhaust. |
+| Hardened Router | 1 | uncommon | ground · router | Deploy a jam-proof router. Gain 3 block. | Deploy a jam-proof router. Gain 6 block. |
+| IPS Signature | 1 | uncommon | protocol · breach | Armed. When a hostile breaches: gain 6 shield against it. | Armed. When a hostile breaches: gain 9 shield against it. |
+| Keepalive | 1 | uncommon | daemon | Daemon. At the start of your turn, gain 2 block. | Daemon. At the start of your turn, gain 3 block. |
+| Load Balancer | 2 | uncommon | ground · balancer | Deploy a load balancer. Online: +1 damage per live channel. | cost 2 → 1 |
+| Null Field | 1 | uncommon | zone | Choose a band. For 3 turns, gain 2 shield each turn while your hardware is in it. | cost 1 → 0 |
+| Packet Compression | 1 | uncommon | node | Compress a switch: +2 damage while on your primary route. Exhaust. | cost 1 → 0 |
+| Port Security | 1 | uncommon | protocol · jam | Armed. When a hostile would jam: cancel its jams; it takes 4. | Armed. When a hostile would jam: cancel its jams; it takes 7. |
+| Quarantine Rule | 1 | uncommon | protocol · field | Armed. When a hostile casts a field: cancel it. | cost 1 → 0 |
+| Rollback | 1 | uncommon | instant | Return the last non-Exhaust card you played this turn to your hand. Exhaust. | cost 1 → 0 |
+| Server Rack | 1 | uncommon | ground · rack | Deploy a rack: devices within 2.0 pass their wear to it. Gain 3 block. | cost 1 → 0 |
+| VXLAN Tunnel | 1 | uncommon | link | Link two devices with a cut-proof cable: +1 damage while on your primary route. | cost 1 → 0 |
+| Wireshark | 1 | uncommon | instant | Draw 2. +1 damage this turn per device type on your primary route. Exhaust. | Draw 3. +1 damage this turn per device type on your primary route. Exhaust. |
+| Containerlab | 2 | rare | instant | Deploy an overclocked router linked to ALPHA and OMEGA: a new 7-damage route. Exhaust. | cost 2 → 1 |
+| Emergency Repair | 2 | rare | instant | Restore 3 integrity. Gain 3 block. Exhaust. | Restore 5 integrity. Gain 5 block. Exhaust. |
+| Firmware Update | 1 | rare | instant | Upgrade every card in your hand for this battle. Exhaust. | cost 1 → 0 |
+| Overclock | 1 | rare | node | Overclock a router: +2 damage while on your primary route. Exhaust. | cost 1 → 0 |
+| Packet Storm | 2 | rare | instant | +5 damage to every hostile this turn. Exhaust. | +7 damage to every hostile this turn. Exhaust. |
+| PoE Injector | 2 | rare | ground · power | Deploy a power injector. Online: +1 energy each turn. | cost 2 → 1 |
+| Power Surge | 0 | rare | instant | Gain 1 energy. Draw 2. Exhaust. | Gain 2 energy. Draw 2. Exhaust. |
+| Tarpit | 1 | rare | protocol · ultimate | Armed. When a guardian charges or unleashes its ultimate: it takes 8. | Armed. When a guardian charges or unleashes its ultimate: it takes 12. |
+| Zero Day | 2 | rare | instant | +10 damage this turn. Exhaust. | +14 damage this turn. Exhaust. |
+| Clabernetes | 2 | legendary | node | Clone a router with its cables and upgrades. Both become jam-proof. Exhaust. | cost 2 → 1 |
+
+
+Edge cases (`detail`, shown when the card is inspected):
+
+- **Armored Fiber**: A cut-proof cable never frays over wreckage either.
+- **Deep Scan**: Your hand holds at most 10 cards; draws beyond it stay in the draw pile.
+- **Demolition Charge**: Playable without an installation on the table: then it only adds the damage.
+- **Honeypot**: It works offline while it has a cable, taking one disruption per hostile action (Cable Wraith's cut ignores it). Installations planted within 2.0 of it arrive with 1 less integrity.
+- **Hotfix**: Choose a worn device; a repair never lifts it above its maximum condition. Jams stay.
+- **Linux Bridge**: It links to the nearest devices it is not already cabled to (distance ties: device ids).
+- **Purge Field**: An Anchor takes the whole purge: on an anchored band, Purge Field destroys the Anchor and nothing else; purge again for the fields.
+- **Resonance Field**: A band counts once per field: a cast Resonance Field and a Crystal vein on the same band stack.
+- **Salvage Cycle**: Playable only with a link card in your discard pile; a full hand takes fewer.
+- **Startup Config**: Once per router. It stacks with Overclock.
+- **Trust Gate**: Firewalls stack, block attacks from every hostile, and quarantine the nearest installation within reach each enemy phase.
+- **Broadcast Storm**: It rides your transmission: every living hostile's packet grows by it, and with no live route it deals nothing.
+- **Emergency Rebuild**: The router takes the first free auto-deploy socket; with none, it cannot be played.
+- **Faraday Shell**: Jam-proof does not stop an overload. A device that is already jam-proof cannot be chosen.
+- **Keepalive**: Every running copy adds its block, after your draw. The block expires after the enemy phase like any other.
+- **Packet Compression**: Once per switch.
+- **Port Security**: Unfired by the hostiles, it cancels a Jammer's jam later in the phase, and the Jammer takes the damage.
+- **Rollback**: It takes the most recent card you played this turn that is still in your discard pile (daemons and armed protocols never are); replaying it costs its energy again. With none, Rollback cannot be played.
+- **Server Rack**: Condition 3. Never cabled: it carries no signal and leaves no wreckage. Overloads, Spikes and blasts aimed at a device in its ring wear the rack instead. It counts toward its band's cluster.
+- **VXLAN Tunnel**: A cut-proof cable never frays over wreckage either.
+- **Wireshark**: Playable only with a live route. Device types: router, switch, firewall, cache, power, balancer, honeypot.
+- **Containerlab**: The router takes the first free auto-deploy socket; with none, it cannot be played.
+- **Firmware Update**: Each card in your hand becomes its + version until the battle ends; your deck keeps the originals. Curses and upgraded cards stay as they are. With nothing to upgrade, it cannot be played.
+- **Overclock**: Once per router. It stacks with Startup Config.
+- **Packet Storm**: It rides your transmission: every living hostile's packet grows by it, and with no live route it deals nothing.
+- **PoE Injector**: Online at the start of your turn. This energy comes on top of your turn's base and is never capped.
+- **Clabernetes**: The replica takes the first free auto-deploy socket; the new disjoint path is instant bandwidth.
+<!-- /generated:colorless -->
+
+### Tokens
+
+<!-- generated:tokens -->
+| Card | Cost | Rarity | Target | Face | Upgrade (+) |
+| --- | ---: | --- | --- | --- | --- |
+| Payload | 0 | special | instant | +2 damage this turn. Exhaust. | +3 damage this turn. Exhaust. |
+
+
+Edge cases (`detail`, shown when the card is inspected):
+
+- **Payload**: A token for this encounter only: it never enters your deck.
+<!-- /generated:tokens -->
+
+Clabernetes clones a router with its cables, configuration and overclock into the first free socket; both routers become jam-proof, and the new disjoint path is instant bandwidth. Wireshark counts distinct device roles on the primary route (router, switch, firewall, cache, power, balancer, honeypot) with no cap. Linux Bridge, Standby Router, ACL Gate and Mesh Weave cable to the nearest devices not already connected (distance ties use device IDs). Rapid Redeploy takes the most recently discarded hardware card; its discount is spent by the first matching card played this turn. Crate cards and Recover cards enter the hand for the encounter only, exhaust when played and never enter the deck.
 
 ---
 
 ## Relics
 
-All relics are unique within a run; offers only contain unowned relics. v4 adds six common relics (Round Robin, Ingress Filter, Priority Queue, Reinforced Frame, Field Engineer, Bill of Lading) and two boss relics (Storm Control, Scorched Earth). Starter relics are never offered. Boss relics are strong rule changes with a real drawback and appear only after the stage I and II guardians.
+All relics are unique within a run; offers only contain unowned relics. Starter relics are never offered. Boss relics are strong rule changes with a real drawback and appear only after the stage I and II guardians. **Energy relics are boss tier only**: each gives +1 energy every turn by raising the turn's base, capped by `relicEnergyCap` (two energy relics make the base 5; a third adds nothing; the cap never limits temporary energy). v5 adds three: **Air Gap** (card rewards offer one card fewer), **Legacy Mainframe** (sanctuaries cannot repair; a sanctuary with no other possible service offers Move on) and **Overvolt** (a Backdoor curse on pickup and after every elite you defeat). Hot Swap now makes the first **link card** each turn cost 0 (it was Optic Fiber only). Cold Start (+1 energy on the first turn) and Reserve Cell (carry up to 2) stay common; SDN Controller keeps its rule.
 
-| Relic | Tier | Rule |
-| --- | --- | --- |
-| Cold Start | common | +1 energy on the first turn of each battle. |
-| Hot Swap | starter | The first Optic Fiber you play each turn costs 0. |
-| Parallel Core | common | Bandwidth gives +4 per channel beyond the first instead of +3. |
-| Shield Array | common | Prevent up to 2 damage from the first unblocked hit each battle. |
-| Deep Cache | starter | Draw one extra card every turn. |
-| Grounded Core | common | Start every turn with 1 block. |
-| Packet Lens | common | Switches on your primary route deal +2 each instead of +1. |
-| Repair Drone | common | Restore 1 integrity after winning an encounter. |
-| Reserve Cell | common | Carry up to 2 unspent energy into the next turn. |
-| Backpressure | starter | Half the damage (rounded up) your shield prevents during an enemy action is stored and added to your next transmission. |
-| Honeynet | common | Honeypots deal +2 damage and grant 2 shield whenever they absorb an attack. |
-| Fanout | common | Draw 1 extra card at the start of your turn while 3 or more channels are live. |
-| Spare Parts | common | Start every battle with an extra Optic Fiber in hand. |
-| Credit Line | common | Gain 15 extra credits after each won battle. |
-| Watchdog | common | The first time each battle you transmit with no live route, gain 5 shield. |
-| Spanning Tree | boss | Your primary route's damage is doubled. Bandwidth and Load Balancers give nothing. |
-| Anycast | boss | +1 energy every turn. You cannot place firewalls. |
-| Jumbo Frames | boss | +1 energy every turn. Draw 1 fewer card every turn. |
-| BGP Hijack | boss | +3 damage every transmission. Enemy strikes and breaches deal +2. |
-| SDN Controller | boss | Patch Cable and Harden can be used twice per turn (Buffer stays once). Start each battle with 1 less energy. |
-| Zero Trust | boss | Firewalls block double. Cable cards and Patch Cable cost 1 more. |
-| Round Robin | common | At the start of each battle every hostile takes 2 damage (reinforcements on arrival). |
-| Ingress Filter | common | Every strike and breach against you deals 1 less. |
-| Priority Queue | common | Your transmission deals +1 to its target while the target is the hostile with the least remaining health. |
-| Reinforced Frame | common | Every device you deploy has 1 more condition (3; salvage and crate hardware 2). |
-| Field Engineer | common | The first repair each turn costs 0. |
-| Bill of Lading | common | Crates are never empty (the empty share becomes credits) and undelivered messages offer three choices. |
-| Storm Control | boss | +1 energy every turn. Every hostile jam or cut that lands also deals 1 damage to you. |
-| Scorched Earth | boss | Whenever one of your actions or devices destroys an installation, its planter takes 4 (your target if the planter is dead). Your devices deploy with 1 less condition. |
+<!-- generated:relics -->
+| Relic | Tier | Energy base | Rule |
+| --- | --- | --- | --- |
+| Backpressure | starter |  | Half the damage (rounded up) your shield prevents during an enemy action is stored and added to your next transmission. |
+| Deep Cache | starter |  | Draw one extra card every turn. |
+| Hot Swap | starter |  | The first link card you play each turn costs 0. |
+| Bill of Lading | common |  | Crates are never empty (the empty share becomes credits) and undelivered messages offer three choices. |
+| Cold Start | common |  | +1 energy on the first turn of each battle. |
+| Credit Line | common |  | Gain 15 extra credits after each won battle. |
+| Fanout | common |  | Draw 1 extra card at the start of your turn while 3 or more channels are live. |
+| Field Engineer | common |  | The first repair each turn costs 0. |
+| Grounded Core | common |  | Start every turn with 1 block. |
+| Honeynet | common |  | Honeypots deal +2 damage and grant 2 shield whenever they absorb an attack. |
+| Ingress Filter | common |  | Every strike and breach against you deals 1 less. |
+| Packet Lens | common |  | Switches on your primary route deal +2 each instead of +1. |
+| Parallel Core | common |  | Bandwidth gives +4 per channel beyond the first instead of +3. |
+| Priority Queue | common |  | Your transmission deals +1 to its target while the target is the hostile with the least remaining health. |
+| Reinforced Frame | common |  | Every device you deploy has 1 more condition (3; salvage and crate hardware 2). |
+| Repair Drone | common |  | Restore 1 integrity after winning an encounter. |
+| Reserve Cell | common |  | Carry up to 2 unspent energy into the next turn. |
+| Round Robin | common |  | At the start of each battle every hostile takes 2 damage (reinforcements on arrival). |
+| Shield Array | common |  | Prevent up to 2 damage from the first unblocked hit each battle. |
+| Spare Parts | common |  | Start every battle with an extra Optic Fiber in hand. |
+| Watchdog | common |  | The first time each battle you transmit with no live route, gain 5 shield. |
+| Air Gap | boss | +1 | +1 energy every turn. Card rewards offer one card fewer. |
+| Anycast | boss | +1 | +1 energy every turn. You cannot place firewalls. |
+| BGP Hijack | boss |  | +3 damage every transmission. Enemy strikes and breaches deal +2. |
+| Jumbo Frames | boss | +1 | +1 energy every turn. Draw 1 fewer card every turn. |
+| Legacy Mainframe | boss | +1 | +1 energy every turn. Sanctuaries cannot repair. |
+| Overvolt | boss | +1 | +1 energy every turn. Gain a Backdoor curse now and after every elite you defeat. |
+| Scorched Earth | boss |  | Whenever one of your actions or devices destroys an installation, its planter takes 4 (your target if the planter is dead). Your devices deploy with 1 less condition. |
+| SDN Controller | boss |  | Patch Cable and Harden can be used twice per turn (Buffer stays once). Start each battle with 1 less energy. |
+| Spanning Tree | boss |  | Your primary route's damage is doubled. Bandwidth and Load Balancers give nothing. |
+| Storm Control | boss | +1 | +1 energy every turn. Every hostile jam or cut that lands also deals 1 damage to you. |
+| Zero Trust | boss |  | Firewalls block double. Cable cards and Patch Cable cost 1 more. |
+<!-- /generated:relics -->
 
 Round Robin never ends a fight before it starts: a hostile keeps at least 1. Priority Queue's ties count (any hostile at the least health). Storm Control counts landing jams, cuts and Jammer jams, not decoyed ones. Bill of Lading is worth nothing in fights without escorts or Laden hostiles.
 
@@ -783,30 +1214,26 @@ Round Robin never ends a fight before it starts: a hostile keeps at least 1. Pri
 
 ## Ascension
 
-Win an expedition at ascension N with an archetype to unlock N + 1 for that archetype (stored locally in `faultline-progress-v1`). Levels are cumulative.
+Ascension has **four** cumulative levels (§6b of the v5 contract, the user's decision): each level includes every earlier one, and the ten v4 rules fold into them. Win an expedition at ascension N with a keeper to unlock N + 1 for that keeper (stored locally in `faultline-progress-v1`). Call sites never name a level: they ask `ascends(ascension, "sharperTeeth")`, and `ASCENSION_RULES` maps every named rule to the level that brings it, so a rule can move between levels by changing one line. `MAX_ASCENSION` is 4; stored progress outside 0–4 is clamped on read.
 
-| Level | Name | Rule |
-| ---: | --- | --- |
-| 1 | Hardened Elites | Elite hostiles have 15 % more integrity. |
-| 2 | Stubborn Signals | Normal hostiles have 10 % more integrity: every member of a pack and every reinforcement. |
-| 3 | Scarce Parts | Sanctuary repair restores 25 % less integrity. |
-| 4 | Sharper Teeth | Hostile strikes and breaches deal 1 more damage. |
-| 5 | Known Vulnerability | Begin the expedition with a CVE curse in your deck. |
-| 6 | Ancient Guardians | Stage guardians have 15 % more integrity. Close the Gates and Stolen Voice also wear their target by 1. |
-| 7 | Lean Markets | Market prices rise 20 %. Credits earned fall 10 %, crates and messages included. Elites carry a second designation 50 % of the time. |
-| 8 | Worn Backbone | Begin with 2 less maximum integrity. |
-| 9 | Lingering Corruption | Hostile fields last 3 turns instead of 2. Packs are 15 points more common in every stage. |
-| 10 | The Last Signal | Guardians enrage at 60 % integrity and their ultimates deal 2 more damage. Each living add raises the break by 5 instead of 4. Normal hostiles may carry a second designation. Every guardian's charge also plants a Breaker Charge beside your primary router. |
+<!-- generated:ascension -->
+| Level | Name | Rules | Named rules (`ASCENSION_RULES`) |
+| ---: | --- | --- | --- |
+| 1 | Hardened Quarantine | Normal hostiles have 10% more integrity (every pack member and reinforcement); elites 15% more. | `stubbornSignals`, `hardenedElites` |
+| 2 | Lean Supply | Sanctuary repair restores 25% less integrity. Market prices rise 20% and credits earned fall 10%, crates and messages included. Begin with a CVE curse in your deck. | `scarceParts`, `leanMarkets`, `knownVulnerability` |
+| 3 | Sharper Teeth | Hostile strikes and breaches deal 1 more damage. Hostile fields last 3 turns instead of 2. Packs are 15 points more common in every stage. Elites carry a second designation 50% of the time. | `sharperTeeth`, `lingeringCorruption`, `eliteSecondDesignation` |
+| 4 | The Last Signal | Stage guardians have 15% more integrity; they enrage at 60% integrity and their ultimates deal 2 more damage. Each living add raises the break by 5 instead of 4. Close the Gates and Stolen Voice also wear their target by 1. Every guardian's charge also plants a Breaker Charge beside your primary router. Normal hostiles may carry a second designation. Begin with 2 less maximum integrity. | `ancientGuardians`, `lastSignal`, `wornBackbone` |
+<!-- /generated:ascension -->
 
-Ascension 2 reaches every pack member and reinforcement. The v4 riders are `RULES` keys that the level texts read, tuned in the ascension pass (the design values left ascension 10 at 2 / 4 / 4 %): ascension 6's adds gain nothing (`ascensionAddHealth` 1; the design had ×1.15) while the wear rider stays (`ascensionRiderWear` 1); ascension 7's second elite designation rolls at 50 % (`eliteSecondDesignation`; design: always); ascension 9's extra installation integrity is 0 (`ascensionInstallationIntegrity`; design: +1, applied before a honeypot bite); ascension 10's second normal designation rolls at half the room's chance (`normalSecondDesignation`), and its charge Breaker Charge stays (`ascensionChargeBreaker` 1): it ticks on the ultimate turn and detonates in the phase after it unless it is scrubbed, purged or quarantined first.
+The riders keep their v4 `RULES` keys and their v4 tuning: the adds gain nothing at The Last Signal (`ascensionAddHealth` 1) while the Close the Gates / Stolen Voice wear stays (`ascensionRiderWear` 1); the second elite designation rolls at 50 % (`eliteSecondDesignation`); the extra installation integrity of the old level 9 is 0 (`ascensionInstallationIntegrity`); the second normal designation rolls at half the room's chance (`normalSecondDesignation`), and the guardian charge's Breaker Charge stays (`ascensionChargeBreaker` 1): it ticks on the ultimate turn and detonates in the phase after it unless it is scrubbed, purged or quarantined first. Hardened Quarantine reaches every pack member and reinforcement.
 
 ---
 
 ## Save compatibility and deterministic behaviour
 
-Expeditions save as **version 4** (still under the `faultline-expedition-v2` storage key). A version 3 save is a strict subset and migrates in memory, one way: the single hostile stands at the centre as a `single` (uid `h1`), malware becomes Siphon Taps (integrity 1, active, owned by `h1`), the single jam and cut become lists, every deployed device gets its condition (salvage 1, otherwise 2), the focus is the centre, the enemy-phase and action counters take the hostile's action count, and every other v4 field takes its empty value. Saves before version 3 predate the network redesign and are not continued; the title screen simply offers a new expedition. Local run records (`faultline-records-v2`) and progress (`faultline-progress-v1`) are unchanged.
+Expeditions save as **version 5** (`EXPEDITION_VERSION`, still under the `faultline-expedition-v2` storage key). There is **no compatibility** (the user's decision: no players yet): a save from any other version, v4 included, is simply not loaded, and the title screen offers a new expedition; the v3 → v4 migration was removed. Local run records (`faultline-records-v2`) keep their format; stored ascension progress (`faultline-progress-v1`) is clamped to 0–4 on read.
 
-Validation covers every field: archetype and ascension, credits and removals, shop offers and prices, event state and picks, protocols (≤ 2), console uses (≤ 2), buffer and backpressure, field slots (one allied, one hostile, one terrain and one signal field per band), the chart (19 rooms, exits, packs of escorts, 1–2 designations, hidden and reinforced flags), piles, relics and topology references; hostiles (0–3, 1–3 in battle, distinct ports and uids, at most one leader or single, roles matching their definitions, cadence, designations, crates, guardian step state); installations (≤ 4, valid kinds, integrity 1–3, countdown 1–2 on Breaker Charges only, points inside the grid); device condition (0 to its maximum, maximum ≤ 4), phantom charges and deploying cards; faults naming existing devices; the target a port or none (per-channel `aims` from older saves are dropped, not validated); wrecks (≤ 6, inside the grid); the reinforcement (an escort, count −1 to 3, health, crate); the signal; offers (≤ 8, two named cards or 1–3 message options); encounter cards and the credit ledger. Invalid values reject the save.
+Validation covers every field: archetype and ascension, credits and removals, shop offers and prices, event state and picks, protocols (≤ 8, the save cap for Policy Engine slots), running daemons (daemon cards only), next-turn gains (`nextTurn.block`, `nextTurn.draw`), this turn's effects (free links, discounts, misses, dodges, Man-in-the-Middle, Payloads, the cards played), console uses (≤ 2), buffer and backpressure, field slots (one allied, one hostile, one terrain and one signal field per band), the chart (19 rooms, exits, packs of escorts, 1–2 designations, hidden and reinforced flags), piles, relics and topology references; hostiles (0–3, 1–3 in battle, distinct ports and uids, at most one leader or single, roles matching their definitions, cadence, designations, crates, guardian step state); installations (≤ 4, valid kinds, integrity 1–3, countdown 1–2 on Breaker Charges only, points inside the grid); device condition (0 to its maximum, maximum ≤ 4), phantom charges and deploying cards; faults naming existing devices; the target a port or none (per-channel `aims` from older saves are dropped, not validated); wrecks (≤ 6, inside the grid); the reinforcement (an escort, count −1 to 3, health, crate); the signal; offers (≤ 8, two named cards or 1–3 message options); encounter cards and the credit ledger. Invalid values reject the save.
 
 Maps (packs, designations, hidden flags and reinforced elites included) derive from seed + stage; encounter plans (health, crates, reinforcements, signals, message options, salvage roles) from seed + stage + room; terrain from seed + stage + room; all use local generators. Card draws, rewards, market stock, events and junk positions use the expedition RNG. Daily seeds derive from the UTC date; identical seed, archetype, ascension and decisions repeat the expedition. There is no remote leaderboard.
 
@@ -815,6 +1242,9 @@ Maps (packs, designations, hidden flags and reinforced elites included) derive f
 ## Presentation, learning and feedback contract
 
 - **Every number has a cause.** Every number the interface shows comes from `combatPreview`, the same pure forecast that `endTurn` resolves; an element may summarise, but it never hides a number that resolution uses. The battle HUD shows signal damage, shield, burst, routes and channels ("4 routes · 3 channels", one diamond per channel colour, the shared devices named in its tooltip) and bandwidth, online and offline devices, clusters on the band seals (with an installation count and an anchor glyph for a pinned field), the Ghost buffer (stored, gain, packet-loss risk), the Warden's stored backpressure, the console command (cost, uses, Buffer state), armed protocols with "will trigger" highlights, trap damage, installations, wear and junk in the intent panel, and next turn's energy and draw.
+- **Energy and the next turn (v5).** The energy orb reads `current / base`, the base being `turnEnergyBase`; energy above the base glows with a lit rise marker (`+N`), and the tooltip names the base, each energy relic (and the cap), PoE Injectors online and next turn's parts. The **Next** chip shows next turn's energy, cards and block, each with a rise marker when above normal; its tooltip splits them (next-turn energy, Reserve Cell, injectors, next-turn draw, Cache Servers and Fanout, next-turn block, block carried, Grounded Core).
+- **Cards (v5).** Three separate channels on every card, in every view: the **frame** shows the owner (Architect teal-cyan, Warden warm amber, Ghost pale violet with a teal inner edge, colorless brass; no keeper sigils on cards), the **footer gem** the rarity, the **nameplate** the kind (teal for protocols, violet for daemons). The type line carries the kind word and **keyword markers** (Retain, Innate, Volatile, Exhaust, Armed, Token) with glossary tooltips, read from the flags. A **modified cost** lights the cost gem (teal down, red up) over the struck printed cost, the tooltip naming the cause. **Curses** look cold (frost rim, desaturated art); **Payload tokens** look temporary (stitched etch, translucent picture, "Token" footer); **Kernel Panic** stamps "N plays left" over its art. A missing painting falls back to a plate in the owner's colour with the card's kind engraved. Inspect adds glossary rows and the card's `detail`.
+- **Daemon strip (v5).** The running daemons form the last column of the field-seal band, directly above the protocol dock (it takes no space while none runs): each is a plate with a turning cog, its name, `×N` and its effect line (full plates for up to 2, half plates for 3–4, name tokens for 5 or more), a button that Tab reaches and right-click inspects. The forecast names evasions ("0 · dodged", "misses · Spoof", "cancelled · Null Route"), protocol retaliation ("Tripwire + Incident Response 3"), curses in hand (cold lines under the survival forecast: "Backdoor −1 integrity", "Bitrot wears ROUTER1") and block carried; Details adds a Running Daemons ledger and marks daemon terms with a violet bead.
 - **The far rail.** Up to three hostiles stand at the rail as whole **portraits** in the band above the table, the leader at the centre and tallest (a guardian taller still), escorts and adds to either side at most 0.8 and 0.72 of its height; nothing is ever drawn over a portrait. The rail is laid out in screen space for the resting camera: each sprite is sized so its painted body fills the room above its plate, clear of the header's items (a portrait under one may lean in over its plate, and the whole rail may slide a little off centre to let it stand taller), and a lunge, rear or swell lifts the body rather than letting its foot sink onto the plate. Under each portrait hangs one engraved brass **plate** (`#intent-layer`, placed every frame from the 3D rail, for one hostile or three): its **next move** (`.hostile-intent[data-port]`, the part lessons spotlight) with a big glyph, the number after every term (strike and breach) and a short verb in the move's colour (STRIKE 7, BREACH 5, JAM ROUTER1, CUT ROUTER1 ↔ SWITCH1, CORRODE NORTH, PLANT JAMMER · NORTH, OVERLOAD, CHARGE · ultimate next turn, the ultimate's own name) with its target and riders on one line (a field beside a fault, extra plantings, junk, healing), a leader's three escalation pips, RESTS · acts next phase for a dormant escort, FALLS THIS TURN (struck through in gold), FALLS · ACTS ANYWAY for a Spiteful hostile and BROKEN for an interrupted ultimate; then its **health bar** in the hostile's colour with its name and integrity engraved in it, the forecast loss as the striped band and the loss beside it (−10), or LETHAL in gold. A dashed ARRIVES plate holds a port an announced reinforcement will take. The plates stay while the enemy phase plays out: health drops as packets land, the moves still to come rest dim, the hostile acting now is lit, and a falling hostile's plate leaves as it starts to fall. The **target** (the focus) wears a lit brass rim, brass corner brackets and the crest jewel on its plate's crown; a click on a hostile's portrait, plate or port row targets it. Far-row device nameplates, their junction seals and installation tags that would rise into the plates hang at their device's foot instead. Hovering a hostile (portrait or plate) opens its card: the full forecast sentences, designations and rules, riders, shield terms, escalation, health now → after the transmission, and the channels and overflow that land on it. Hostiles still read as sprites with rim lighting, embers, anticipation and lunges; guardians are larger with a presence seal.
 - **The port strip and the transmission line.** With two or more hostiles, the right plate gains a **port strip**: one row per port in phase order, with health, intent and the states (acting, "rests", "falls", "broken"); the whole row targets its hostile, the target's row carries a lit brass rim and the crest, and hovering a row opens that hostile's card. Under the target's medallion, the **Transmission** line adds up what lands: one chip per live channel in its channel's colour (a hexagon for the primary delivery, a diamond for bandwidth) with its amount, joined by +, then the target's bonus and its armor (paid once, a steel shield), then "= packet" (gold when lethal); a second line names the overflow ("overflow 3 → CENTRE"). Hovering a chip opens that channel's card (its terms, its route and the packet it joins). There is nothing to pick up or aim: every channel lands on the target. The transmit dial adds "overflow → CENTRE" when the surplus flows on. On the table the channels' packets fly along their cables in their colours and cross to the target when you transmit; the overflow leaps on to its port.
 - **Intent panel.** The selected port's medallion adds install and overload kinds; an escalation gauge of three diamonds sits beside the pressure warning and names the next level two actions ahead; designation ribbons (coral for bad, teal for good, a static pattern for UNKNOWN until the entrance) sit under the hostile's name with the rule on hover; extras list installs, wear, crates and a named signal; the guardian window reads "12 / 20 damage · +4 per living add" with one break segment per add; a Spiteful port keeps its intent under LETHAL with "acts anyway".
@@ -827,30 +1257,67 @@ Maps (packs, designations, hidden flags and reinforced elites included) derive f
 - **Details dialog.** Deliveries (one trace per channel with its port and amount, per-port totals with armor and lethal marks, overflow), Defenses (each attack in port order against the shared pool, with per-attack firewall and protocol terms), The Table Front (every installation with pips and next effect, every worn device with its repair cost, each firewall's quarantine target), and a five-step sequence: your signal per port · traps and quarantine · hostiles act in port order · installations act · recharge and draw. Nothing in it is computed in the dialog.
 - **Route chart, entrance and reward.** Pack ordinals (×2, ×3), designation diamonds and the UNKNOWN glyph with the map legend; the encounter title card adds the revealed designation and the reinforcement warning ("SIGNAL DETECTED · a Splicer arrives in 2 actions"), also logged; the guardian intro adds the adds and the threshold. The reward screen itemises credits and names the pack ("Static Nest and escort silenced").
 - **Reduced motion and fast mode.** Arrivals and crates appear in place with one pulse and the toast; the countdown changes without a pulse; the designation reveal swaps text and plays its cue; the target reticle rests; worn devices keep the rim colour without sparks; fast mode combines per-port impacts with stacked numbers.
-- **Field Training** (`src/tutorial.ts`, `src/tutorial/lessons.ts`): a lesson menu of 14 entries in 12 chapters (13 short, hand-built practice battles and an illustrated expedition walkthrough), played through the real rules with hard rails (only the current step's action is playable; everything else is blocked and parked, with a spotlight on the one control): The First Signal; Read the Enemy; When the Line Is Cut (rerouting, bandwidth); Online Devices; Hold the Ground (bands and fields); Traps & Decoys; three console lessons (Architect, Warden, Ghost); Danger & Guardians (charge, ultimate, Siphon Taps, junk, Prepare); the expedition walkthrough; and three v4 drills: **Choose the Target** (a full rail of three hostiles, one idea per step: read each port's next move, click the Relay Drone to target it so every channel lands there, transmit and watch the surplus of the kill overflow into the leader, then retarget the Spark Mite that bites next and overflow again; the lesson id stays `aim-signal` so stored completion survives), **Clear the Ground** (scrub a Jammer twice, repair a worn router, Purge Field the band where the next Jammer lands) and **The Crown and Its Wardens** (read the break meter, target the left Gate Warden on the charge turn so it falls and its surplus overflows into the Regent, prepare Packet Burst, break Crownfall). The rails cover the target, repair and scrub like any card; the drills follow the board, so Z reopens a step. A reading step is met by Got it or a click on its spotlit control, which then does nothing else. When the last goal is met the lesson is over: the board freezes (no card, console, device, target, relocation, transmission or shortcut plays), and a beat later, once the final transmission or card has landed, a completion plate shows the steps and the takeaway with Next lesson, Replay (a fresh board) and Training menu (which leaves the lesson). The expedition guide ends the same way. Completion is stored in `faultline-training-v1`. Lesson runs never touch the saved expedition. Tests play every lesson to completion.
-- **Handbook** (`src/tutorial/handbook.ts`): 16 illustrated chapters (first turn, routes and channels, online devices, intents and shield, bands and fields, rerouting, protocols and console, **Packs & Ports**, **The Table Front**, **Escalation & Designations**, **Crates, Messages & Signals**, the three keepers, a Danger Playbook with a Breaker Charge beside your router, a Jammer you cannot reach and a Spiteful hostile at lethal, guardians, cards and keywords, the expedition). Every number is read from `RULES`, `CARDS`, `RELICS`, `ENEMIES`, `DESIGNATIONS`, `SIGNALS`, `CONSOLES`, the ascension levels and market constants.
-- **Screens** (`src/screens.ts`): title (continue with ascension, Field Training, Handbook), archetype select with console, engine and an ascension selector, route chart with packs, ribbons, market and event rooms, reward (itemised credits, upgraded cards), relic (boss relics show the drawback in red, v4 relics have their own glyphs), sanctuary with a deck picker showing upgrade before → after, market, illustrated events, outcome with ascension unlocks.
+- **Field Training** (`src/tutorial.ts`, `src/tutorial/lessons.ts`): a lesson menu of 14 entries in 12 chapters, every lesson turn at an expedition turn's energy (`baseEnergy`; Clear the Ground's first turn fits two scrubs and a repair) (13 short, hand-built practice battles and an illustrated expedition walkthrough), played through the real rules with hard rails (only the current step's action is playable; everything else is blocked and parked, with a spotlight on the one control): The First Signal; Read the Enemy; When the Line Is Cut (rerouting, bandwidth); Online Devices; Hold the Ground (bands and fields); Traps & Decoys; three console lessons (Architect, Warden, Ghost); Danger & Guardians (charge, ultimate, Siphon Taps, junk, Prepare); the expedition walkthrough; and three v4 drills: **Choose the Target** (a full rail of three hostiles, one idea per step: read each port's next move, click the Relay Drone to target it so every channel lands there, transmit and watch the surplus of the kill overflow into the leader, then retarget the Spark Mite that bites next and overflow again; the lesson id stays `aim-signal` so stored completion survives), **Clear the Ground** (scrub a Jammer twice, repair a worn router, Purge Field the band where the next Jammer lands) and **The Crown and Its Wardens** (read the break meter, target the left Gate Warden on the charge turn so it falls and its surplus overflows into the Regent, prepare Packet Burst, break Crownfall). The rails cover the target, repair and scrub like any card; the drills follow the board, so Z reopens a step. A reading step is met by Got it or a click on its spotlit control, which then does nothing else. When the last goal is met the lesson is over: the board freezes (no card, console, device, target, relocation, transmission or shortcut plays), and a beat later, once the final transmission or card has landed, a completion plate shows the steps and the takeaway with Next lesson, Replay (a fresh board) and Training menu (which leaves the lesson). The expedition guide ends the same way. Completion is stored in `faultline-training-v1`. Lesson runs never touch the saved expedition. Tests play every lesson to completion. v5 at three energy: The First Signal teaches that a route (a router and two links, 3 energy) is a whole turn; When the Line Is Cut spends that turn on the second channel, lets the cut land on one channel and patches it next turn (Failover Policy is the optional step only when a turn can afford it, otherwise it is named for a quieter turn); Online Devices wires two dark devices already on the table, the Trust Gate on turn one and the Cache Server on turn two; every coach text reads its costs and numbers from `CARDS` and `RULES`.
+- **Handbook** (`src/tutorial/handbook.ts`): 17 illustrated chapters (first turn, with the three-energy turn, where energy comes from and the twelve-card starter; routes and channels; online devices; intents and shield; bands and fields; rerouting; protocols and console; **Keywords & Daemons**, the cards' own glossary from `KEYWORDS` in `src/card-marks.ts` and every daemon with its running effect; **Packs & Ports**; **The Table Front**; **Escalation & Designations**; **Crates, Messages & Signals**; the three keepers with their starters and **three build paths each** from `src/tutorial/paths.ts`; a Danger Playbook with a Breaker Charge beside your router, a Jammer you cannot reach, a Spiteful hostile at lethal and a curse in hand; guardians; **Cards & Curses**, with every curse, its fine print and where it comes from; the expedition, with the v5 reward odds, the market's slots, the energy boss relics and the four ascension levels). Every number is read from `RULES`, `CARDS`, `RELICS`, `ENEMIES`, `DESIGNATIONS`, `SIGNALS`, `CONSOLES`, `EVENTS`, the ascension levels and market constants.
+- **Screens** (`src/screens.ts`): title (continue with ascension, Field Training, Handbook), archetype select with console, engine, a "Starting deck · 12 cards" row (signatures lit) and an ascension ladder of five rungs (0 Standard and the four named levels, each rung's rules in its tooltip), the archive sectioned by owner (the three keepers, Colorless, Curses, Junk & Tokens), market shelf labels (Bench, Colorless, the keeper), an Air Gap plate where the missing reward card would be, a Legacy Mainframe sanctuary that greys Repair with the reason, route chart with packs, ribbons, market and event rooms, reward (itemised credits, upgraded cards), relic (boss relics show the drawback in red, v4 relics have their own glyphs), sanctuary with a deck picker showing upgrade before → after, market, illustrated events, outcome with ascension unlocks.
 - **Audio cue contract** (`src/audio-effects.ts`, 58 cues, 98 stereo masters from six CC0 Kenney packs, loudness-matched by tier). One cue per moment: `pickup` when a card is lifted (never a shuffle), `undo` on cancel/undo, card plays sound by effect (`deploy`, `connect`, `protocol`, `field`, `cleanse`, `block`, `instant`), `route` when a route or extra channel comes online, `move` on relocation, `console`, `scrub`, `transmit` on launch, `buffer`/`release` for the Ghost, `trigger` for protocols and honeypots, `hit` on packet arrival, enemy action cues on the contact frame, `malware` when a Siphon Tap is planted and `junk` from the turn result, `deal` for the new hand and `shuffle` **only** when the discard pile is actually reshuffled, `navigate` then `turn`/`event`/`coins` when a room is chosen, `coins` for purchases, `upgrade` for upgrades, `reward` for rewards. v4 adds `arrive` (an escort, reinforcement or add takes a port), `dormant`, `aim` (the target changed), `install` (Jammer, Spike, Anchor, Breaker Charge), `wear`, `breakdown`, `repair`, `quarantine`, `detonate`, `crate` (its master chosen by contents), `message` (a fragment drops, and again when the choice resolves), `reveal` (a hidden designation), `warning` (a reinforcement announced) and `signal`. Hover sounds only on meaningful controls, including port rows and the rail's plates.
 
 ---
 
 ## Strategies and balance intent
 
-**Mesh (Architect).** Build a second and third disjoint channel early; place routers North and South for separated-circuit shield or crowd a band for a cluster; Load Balancers and Parallel Core scale the payoff; Equal-Cost Multipath, Mirror Protocol and Flood Fill cash it in. Width is destinations: split deliveries to finish an escort and press the leader in the same turn. Market routers feed the width; Rapid Redeploy answers a breakdown. Cost: more exposed cables, more devices inside reach rings, Weaver's tension trap and corrosion on crowded bands.
+Three energy makes every turn a budget: a new route is a whole turn, a two-cost card is two thirds of one, and a daemon trades this turn's tempo for every later turn. Small starters (twelve cards) and removals down to eight keep the deck's best cards coming; the reward odds make commons the backbone and rares an event. Each keeper has three build paths; a path is a plan, not a lock, and every path borrows from the colorless pool.
 
-**Fortress (Warden).** Keep firewalls online on any live route, Harden (+1 per extra hostile and per add) and block exactly what the intents need; every prevented point returns as backpressure, in full on every attacker. Firewalls also quarantine installations for free, and Sentry Firewall doubles it; Harden repairs. Stateful firewalls, Deep Packet Inspection, Bulkhead and Reflect scale it; protocols answer in advance. Cost: the shield pool is shared, two breaches drain it faster than one, and backpressure needs the enemy to attack.
+**Architect.**
+- **Mesh** — build a second and third disjoint channel early (Standby Router, Branch Line, Patch Panel and Hot Swap make links cheap); place routers North and South for separated-circuit shield or crowd a band for a cluster; Load Balancers, Parallel Core and Fabric Controller scale the payoff; Equal-Cost Multipath, Mirror Protocol, Flood Fill and Redundant Paths cash it in. Width is destinations: finish an escort and press the leader in the same turn. Peering Session pays block for every channel added.
+- **Backbone** — one long primary route, upgraded: Splice lengthens it, Line Rate overclocks and compresses all of it, Deep Buffers and Carrier Grade make every device on it count, Trunk Line and Traceroute read it as burst; Packet Compression, Overclock, Amplified Fiber and Wireshark are its partners.
+- **Deployment** — hardware tempo: Rack and Stack, Blueprint and Rapid Redeploy discount the next device; Provisioning Script and Zero-Touch Provisioning pay block and cards for every deploy; Datacenter rewards crowded bands. PoE Injectors, Cache Servers, Emergency Rebuild, Containerlab and Clabernetes are its partners.
+- Cost: more exposed cables, more devices inside reach rings, Weaver's tension trap and corrosion on crowded bands.
 
-**Surge (Ghost).** Protect the line (Failover Policy, armored or dark fiber, a second channel, Phantom Node), buffer on turns where no intent can break every route, then flush one targeted spike: delete the escort whose death matters, or hold it for a guardian's ultimate turn and break through both adds. Spearhead removes armor from the release. Store and Forward and Replay Attack amplify it. Cost: buffered turns deal nothing, so Packet Leech and Hungry hostiles heal, Tap Spinner and Static Nest keep what they heal, and every escort gets a free action; a cut or a breakdown on your only route loses everything.
+**Warden.**
+- **Fortress** — Harden (+1 per extra hostile and per add, Hardening Guide more) and block exactly what the intents need; every prevented point returns as backpressure, in full on every attacker. Brace, Stand Firm and Pushback raise the wall, Persistent State keeps it, Entrench doubles it, Flow Control stores all of it and Vent and Reflect cash it in.
+- **Firewall wall** — keep many firewalls online on any live route (ACL Gate, Stateful, Sentry, Bastion, the colorless Trust Gate); Deep Packet Inspection and Perimeter pay per online firewall; Bulkhead and Defense in Depth make each block more. Firewalls also quarantine installations for free, and Sentry Firewall doubles it.
+- **Protocols** — answer the forecast in advance: Tripwire hurts strikers, Null Route cancels a breach (an ultimate's too), Policy Engine opens slots, Rearm replays the best protocol for free, Incident Response makes every firing hurt.
+- Cost: the shield pool is shared, two breaches drain it faster than one, and backpressure needs the enemy to attack.
+
+**Ghost.**
+- **Buffer** — protect the line (Failover Policy, Dark Fiber, a second channel, Phantom Node), buffer on turns where no intent can break every route, then release one targeted spike: delete the escort whose death matters, or hold it for a guardian's ultimate turn and break through both adds. Store and Forward, Jitter Buffer, Hold Queue and Trickle fill it; Deep Queue and Replay Attack multiply it; Spearhead and Exfiltrate land it through armor.
+- **Evasion** — make the enemy phase miss: Spoof and Obfuscation take jams and cuts, Phantom Node and Decoy Swarm absorb disruption and installations, Ghost Protocol makes the heaviest hit deal 0, Dark Fiber and Armored Fiber cannot be cut. Its value depends on the enemy mix (misses never stop overloads or installations; dodges cover strikes and breaches only).
+- **Payloads** — long, cheap turns: Fork Bomb, Shell Access and Botnet make Payload tokens, Exploit Kit makes each hit harder, Side Channel and Man-in-the-Middle pay for every card played, Cover Tracks for every card exhausted; Ping, Hotfix, Crosslink and Clab Inspect keep the chain going.
+- Cost: buffered turns deal nothing, so Packet Leech and Hungry hostiles heal, Tap Spinner and Static Nest keep what they heal, and every escort gets a free action; a cut or a breakdown on your only route loses everything. Kernel Panic punishes the Payload chain hardest.
 
 **All keepers — the charge turn.** Kill the adds now (spread), brace (block, firewalls, protocols, then repair the wear), or break at +4 per add. Each keeper has one natural line and can borrow the others with cards.
 
-No build requires a specific rare; Containerlab and Clabernetes are optional discoveries. Honeypots, protocols, fields, racks and firewall placement give every archetype answers to disruption and to the table front. Persistent structures give each turn a changing context; exhausted orchestration prevents rebuilding a board every shuffle; fourteen sockets, four installations and enemy disruption, not artificial caps, bound the ceiling. Every new threat has at least two answers from different pools, one of them in the shared starter deck or a starter console.
+**Energy devices.** PoE Injector (rare, 2) is a legitimate build: every injector online adds 1 energy on top of the turn base, uncapped. The balance phase measures runs that deploy two or more injectors per fight against their keeper's rate.
+
+No build requires a specific rare; Containerlab and Clabernetes are optional discoveries. Honeypots, protocols, fields, racks and firewall placement give every keeper answers to disruption and to the table front. Persistent structures give each turn a changing context; exhausted orchestration prevents rebuilding a board every shuffle; fourteen sockets, four installations, three energy and enemy disruption, not artificial caps, bound the ceiling. Every new threat has at least two answers from different pools, one of them in the shared starter deck or a starter console.
 
 Intended arc of a pack fight: turn one reads up to three intents and builds the classic route; from turn two the forecast shows the target, what every channel adds to its packet and the first installation; around turn three a kill first overflows into the next body, the first escort dies and its crate opens; then escalation and arrivals push the enemy phase back up around turn four or five, the intended kill window.
 
 ---
 
-## Balance evidence (v4)
+## Balance evidence (v5)
+
+> **Stub: the v5 balance phase is still running.** The record will be `docs/balance-v5.json` (tactical bot, 150 seeds per keeper for iteration, 600 for the final record); this section will report it against the targets below, with every lever tuned and every lever rejected. The card, health and ascension tables in this document are generated from the live data and will be regenerated with the tuned numbers.
+
+| Metric | Target |
+| --- | --- |
+| Win rate, ascension 0 | 32–42 % per keeper, spread ≤ 8 points |
+| Win rate, ascension 2 | 16–26 % per keeper |
+| Win rate, ascension 4 | 5–12 % per keeper |
+| Turns per normal / elite / guardian fight | 3.5–5 / 5–7 / 7–10 |
+| Build paths | a path-focused bot (reward priorities per path) wins ≥ 60 % and ≤ 140 % of its keeper's overall rate, for all nine paths |
+| Energy devices | runs that deploy 2+ PoE Injectors per fight on average win ≤ 1.3 × their keeper's rate |
+| Guardian ultimates | reached ≥ 70 %; pooled interrupts 35–70 % |
+| Deck size at a win | 20–32 |
+
+Levers, in order: enemy health keys (`normalHealth`, `eliteHealth`, `guardianHealth`), card numbers in `values`, card costs, rarities, reward rates, break thresholds.
+
+---
+
+## Balance evidence (v4, history)
+
+The v4 record below measured the five-energy, seventeen-card game (`baseEnergy` 5, `handDraw` 6) with ascension 0–10; it is kept as history and as the baseline for the v5 targets.
 
 `node --experimental-strip-types scripts/balance.ts <seeds> [--ascension=N] [--policy=..] [--archetype=..] [--elite] [--no-signature] [--summary]` plays complete three-stage expeditions with deterministic bots (`scripts/bot.ts` for combat, `scripts/bot-meta.ts` for every non-battle phase). The v4 tactical line reads every choice from `combatPreview`: it tries every living hostile as the target (every delivery lands there; overflow carries the rest) and keeps the one with the best outlook (damage, kills weighted by threat, adds before the ultimate, an interrupt, minus incoming damage, disruption and installs; `--kill-order=leader` keeps the leader targeted instead); it places a phantom before a disruption, saves a device the forecast breaks, scrubs or demolishes installations by value per energy (charges, then Jammers, Spikes, Taps), steps a device out of reach when that is cheaper, repairs a worn primary-route device, racks threatened devices, bursts on the ultimate turn only when that reaches the break (otherwise braces), and answers offers by a fixed priority. Experiment flags `--hp-scale=N` (normal battles), `--boss-scale=N` (guardians) and `--rule=key:value,…` (override any `RULES` number; `a/b/c` for arrays, `packShares.trio:0.6/0.3/0.3` for nested keys) probe alternatives without editing the game. Metrics per profile include turns per fight by shape (single, duo, pair, trio), kill order, installations planted and destroyed, wear, repairs and breakdowns, maintenance share of energy, crates by contents, messages chosen, reinforcement fights, designation win rates, guardian interrupts versus braces with adds alive, and integrity lost per stage. Results are recorded in [balance-v4.json](balance-v4.json).
 
@@ -931,16 +1398,31 @@ The core tests verify forecast purity and exact agreement with resolution on 160
 
 ## Implementation readings
 
-Where the Proposal 4 design was silent, ambiguous or superseded by a measurement, the implementation chose as follows (the rules above already state the result):
+Where the Proposal 4 design was silent, ambiguous or superseded by a measurement, the implementation chose as follows (the rules above already state the result). The v5 readings follow in their own list.
 
 - **Pack health** follows the stated shares (duo 0.575 H, pair 0.75 / 0.40 H, trio 0.63 / 0.26 / 0.26 H), not the design's 11.2 table, whose pair and trio numbers applied 1.15 twice; worked example B's 34 / 18 becomes 29 / 16.
 - **Pack rooms may substitute the rolled leader** with a template of the rolled shape; stage II elite reinforcements (15 %) are decided by the chart like stage III's, so no path crosses two reinforced elites in any stage.
-- **Budgets**: the 1.3 × headroom fallback applies to pack templates only (a single has no headroom limit); the 1.45 × band is checked for pack rooms; a bad signal that would push a pack over its budget becomes a good one; second designations (ascension 7 and 10) ignore the ascension 0 budget.
-- **Crates** roll from their own seeded streams; crate credits are stored with ascension 7 applied; a crate card still pending at victory is dropped. **Messages** leave Recover out when no hostile stands; Reinforce raises maximum integrity only. The designation credit is paid once per room; the reinforced credit only for a rolled arrival.
+- **Budgets**: the 1.3 × headroom fallback applies to pack templates only (a single has no headroom limit); the 1.45 × band is checked for pack rooms; a bad signal that would push a pack over its budget becomes a good one; second designations (ascension 3 and 4) ignore the ascension 0 budget.
+- **Crates** roll from their own seeded streams; crate credits are stored with the Lean Supply credit multiplier applied; a crate card still pending at victory is dropped. **Messages** leave Recover out when no hostile stands; Reinforce raises maximum integrity only. The designation credit is paid once per room; the reinforced credit only for a rolled arrival.
 - **Rigger Drone** strikes with PRY (the design's 4.6 one-liner said BARB). A reinforcement taking the centre port gets the odd cadence.
 - **Breakdown** returns no card: hardware cards already cycle to the discard pile when played, so the text reads "breaks Core Router · wreckage remains".
 - **Targets** are planned after the transmission, in port order, against the board as transmitted; a Jammer's jam is decoyed by any cabled, unshielded honeypot (one per honeypot per phase); chip attaches to the first hostile that takes its turn; a full table boosts the oldest installation; a rack whose ring holds a wear target takes the wear.
 - **Escalation** counts the hostile's own actions; the escalation flag also turns off the guardians' charge at half health. **Adds rise** when the charge is announced and act from the ultimate turn. **Shedding** arms at the half crossing and its escort appears at the end of that enemy phase.
 - **Crate salvage and Salvaged drops** land at the end of the enemy phase; card and message offers open before the next hand (or on the victory screen); once the fight is over, salvage yields its credits.
-- **Balance** changed numbers, not rules, except one addition: the break bonus per add (4, ascension 10: 5), the v4 credit sources and four ascension riders were tuned (see [Balance evidence](#balance-evidence-v4)); the Warden's Harden gained +1 block per extra hostile and per living add, **pending the user's approval**.
+- **Balance** changed numbers, not rules, except one addition: the break bonus per add (4, ascension 4: 5), the v4 credit sources and four ascension riders were tuned (see [Balance evidence (v4, history)](#balance-evidence-v4-history)); the Warden's Harden gained +1 block per extra hostile and per living add, **pending the user's approval**.
 - **Field Training drills**: Choose the Target fights a Rust Prophet (a strike, then a breach: nothing that changes the board) with a Relay Drone and a Spark Mite, so the rail is full from the first step and no arrival interrupts the lesson; the Drone's health is the whole packet less 2 and the Mite's at most 3, so the first kill overflows 2 into the leader and the second more (5 with the shipped numbers). The Wardens drill's left Warden keeps its add health (8) as long as the packet exceeds it by 2, so its kill overflows into the Regent. Clear the Ground adds a Spike beside the worn router, so a breakdown is telegraphed (twice, and never happens) although the Static Nest has no wear of its own; The Crown and Its Wardens prepares Packet Burst before the charge-turn transmission (a prepared card arrives next turn), and its thresholds are read from `RULES` (20 → 16 with the tuned add bonus, not the design's 18 → 15).
+
+### v5 readings
+
+Where the v5 contract was silent or a card's rule needed a choice, the implementation chose as follows (each is also in the card's `detail`):
+
+- **Energy**: the orb's base is `turnEnergyBase`; Cold Start and SDN Controller change the first turn only and do not count toward the base. The cap limits relic energy only; PoE Injectors, next-turn energy, Reserve Cell and cards come on top.
+- **Opening hand**: Innate cards are drawn first, beyond the draw count if needed, then the guaranteed router card (Core Router or Hardened Router, not Standby Router) and two link cards. Zombie Process counts toward the hand's draws.
+- **Hot Swap and free links**: Hot Swap is spent before Patch Panel's free link; Patch Panel's and Rack and Stack's discounts are spent by the next matching card even when it already costs 0. `costFor` shows every link card at 0 while Hot Swap is unspent, and a Blueprint or Rapid Redeploy discount (`discounted`) applies to every hand copy of that id and always takes off exactly 1 (the faces print `values.discount`).
+- **Architect**: Splice takes the primary route's longest cable (ties: nearest ALPHA), deploys the switch at the free socket nearest its midpoint (up to 3.5 away) and both halves keep armor and amplification. Line Rate refuses when nothing on the primary route is left to upgrade. Trunk Line, Traceroute, Redundant Paths, Equal-Cost Multipath and Perimeter count when played (no live route: 0). Peering Session pays for every channel a player action raises, restoring a cut or a jam included.
+- **Warden**: Bulkhead's face says "online" firewalls. Entrench (×`values.amount`) refuses at 0 block; Vent leaves the backpressure stored; Rearm is not Exhaust and makes the returned protocol free this turn. Flow Control needs the Backpressure relic and its ratio does not stack (highest wins); Persistent State carries what the attacks left of the block (non-block pool terms spend first). Null Route's breach trigger also matches an ultimate's breach.
+- **Ghost**: "Buffering" (Hold Queue) means the Buffer console is armed this turn. Flush needs a buffer but does not spend it. Deep Queue copies stack additively (×3, ×4, base and `+` together). Payloads count through `turnEffects.payloads`, never `burst`, so the forecast prints them. Phantom Node's "off every route" moved to its `detail`.
+- **Colorless**: Hotfix targets only a worn device (a jam stays). Rollback returns the most recent non-Exhaust card played this turn that is still in the discard pile (not daemons, armed protocols or junk) and it costs its energy again. Firmware Update upgrades every upgradable hand card for the battle (tokens stay encounter-only; discounts move to the new id). Salvage Cycle returns link cards.
+- **Curses**: Kernel Panic counts cards played before it arrived; console, scrub, repair and relocation are not card plays, deleting a Worm is; two copies do not stack below 3. Memory Leak never takes energy below 0. Backdoor and Bitrot act only if the enemy phase happens. A message's Purge removes curses in `PURGE_ORDER`.
+- **Daemons**: every hook runs once per distinct running id with its copy count; a daemon never hears its own play. `turnStart` gains are not in `nextTurn`. Misses are taken before Phantom Nodes and never take overloads or installations; Incident Response also hits a Jammer that Port Security answered.
+- **Events**: event choices are resolved by position; the v5 curse deals were inserted before "Walk on" (The Echo Chamber's free echo sits before Listen). Signal in the Static's reward rolls the elite odds (first card uncommon or better), not a guaranteed rare.

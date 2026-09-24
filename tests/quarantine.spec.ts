@@ -8,7 +8,7 @@ import { newExpedition } from "../src/core/expedition.ts";
 import { combatPreview } from "../src/core/run.ts";
 import type { Installation, NetworkNode, RunState } from "../src/core/types.ts";
 import {
-  battle, cuesPlayed, expect, idle, idleOrScreen, install, pack, propTrail, recordCues, recordToasts, resolved, route, saved,
+  ENERGY, battle, cuesPlayed, expect, idle, idleOrScreen, install, pack, propTrail, recordCues, recordToasts, resolved, route, saved,
   tablePoint, tableState, test, toastsSeen, trackProps, transmit, turnOf, watchTable,
 } from "./helpers.ts";
 
@@ -130,7 +130,7 @@ test("installation fight: the ghost beam with its reach ring, a Jammer's ring on
   await plate.locator('[data-scrub="jammer1"]').click();
   await expect.poll(async () => (await saved(page)).installations.length).toBe(0);
   const run = await saved(page);
-  expect(run.energy).toBe(5 - 2 * 1);
+  expect(run.energy).toBe(ENERGY - 2 * 1);
   expect(run.reclaim).toBeGreaterThan(0);
   await expect(plate).toHaveCount(0);
   await expect.poll(async () => (await tableState(page)).installations).toEqual([]);
@@ -157,7 +157,7 @@ test("a worn device opens its repair plate from the table and repairs for its co
   await expect(repair).toContainText("◆◇ → ◆◆");
   await repair.click();
   await expect.poll(async () => (await saved(page)).topology.nodes.find(node => node.id === "router1")!.condition).toBe(2);
-  expect((await saved(page)).energy).toBe(5 - 1);
+  expect((await saved(page)).energy).toBe(ENERGY - 1);
   await expect(plate.locator(".plate-pips")).toHaveText("◆◆");
   await expect(plate.locator(".repair-button")).toBeDisabled();
   await expect(page.locator(".ledger-chip.is-wear")).toHaveCount(0);

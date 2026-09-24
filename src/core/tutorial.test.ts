@@ -76,6 +76,8 @@ test("every battle lesson builds a legal, clean training board", () => {
     assert.ok(progress.coach.length > 20, `${lesson.id}: coach text`);
     assert.ok(progress.hint.length > 10, `${lesson.id}: hint text`);
     if (lesson.archetype) assert.equal(run.archetype, lesson.archetype);
+    // v5: a lesson turn has an expedition turn's energy (Clear the Ground's first turn fits two scrubs and a repair).
+    assert.equal(run.energy, lesson.id === "clear-ground" ? Math.max(RULES.baseEnergy, 2 * RULES.scrubCost + RULES.repairCost) : RULES.baseEnergy, `${lesson.id}: energy`);
   }
 });
 
@@ -117,13 +119,22 @@ test("02 · read the enemy: cover the strike, burst, transmit safely", () => {
   assert.equal(s.last!.integrityDamage, 0);
 });
 
-test("03 · reroute: second channel + Failover Policy survives the cut", () => {
+test("03 · reroute: the second channel is the whole turn; Failover Policy is offered only when it fits", () => {
   const s = new Session("reroute");
+  assert.equal(s.run.energy, RULES.baseEnergy, "a lesson turn has an expedition turn's energy");
   const router = place(s.run, "router", 0, 2.6);
   cable(s.run, "alpha", router);
   cable(s.run, router, "omega");
   assert.ok(s.done("channel"));
   assert.match(lessonById("reroute")!.takeaway, /Every device carries one channel: two routes through the same router or switch count as one channel/);
+  assert.equal(s.run.energy, RULES.baseEnergy - CARDS.router.cost - 2 * CARDS.fiber.cost, "a new route costs a router and two fibers");
+  if (s.run.energy < CARDS["failover-policy"].cost) {
+    assert.equal(s.progress.focus, ".transmit-button", "an unaffordable policy is never the spotlit step");
+    assert.match(s.progress.detail, /Failover Policy/, "it is named for a quieter turn");
+    // A turn with energy to spare (a Power Capacitor, a PoE Injector) makes it the optional step.
+    s.run.energy = CARDS["failover-policy"].cost;
+  }
+  assert.match(s.update().coach, /Optional: arm \*\*Failover Policy\*\*/);
   ok(playProtocol(s.run, index(s.run, "failover-policy")), "arm failover");
   const progress = s.transmit();
   assert.ok(progress.goals.find(goal => goal.id === "survive")!.done);
@@ -143,8 +154,11 @@ test("03 · reroute: without the policy, the second channel survives and Hot Pat
   assert.ok(s.update().complete);
 });
 
-test("04 · online devices: firewall online anywhere, then a cache server", () => {
+test("04 · online devices: firewall online anywhere, then the cache server, each in one three-energy turn", () => {
   const s = new Session("online");
+  assert.equal(s.run.energy, RULES.baseEnergy);
+  assert.ok(s.run.topology.nodes.some(node => node.id === "cache3" && node.role === "cache"), "the Cache Server stands dark on the table");
+  assert.equal(combatPreview(s.run).online.includes("cache3"), false);
   cable(s.run, "alpha", "firewall2");
   cable(s.run, "firewall2", "router1");
   assert.ok(s.done("firewall"));
@@ -153,9 +167,10 @@ test("04 · online devices: firewall online anywhere, then a cache server", () =
   s.transmit();
   assert.ok(s.done("transmit"));
   if (s.run.faultLinks.length || s.run.faultNodes.length) ok(playInstant(s.run, index(s.run, "patch")), "patch the cut");
-  const cache = place(s.run, "cache-server", -2.6, 2.6);
-  cable(s.run, "alpha", cache);
-  cable(s.run, cache, "router1");
+  assert.equal(s.run.energy, RULES.baseEnergy, "the second turn has three energy too");
+  assert.match(s.progress.coach, /Cable the \*\*Cache Server\*\*/);
+  cable(s.run, "alpha", "cache3");
+  cable(s.run, "cache3", "router1");
   assert.ok(s.update().complete);
   assert.ok(combatPreview(s.run).nextTurn.draw > RULES.handDraw, "cache server draws next turn");
 });

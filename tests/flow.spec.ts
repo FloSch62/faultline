@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { CARDS, baseCard } from "../src/core/cards.ts";
-import { newExpedition } from "../src/core/expedition.ts";
+import { EXPEDITION_VERSION, newExpedition } from "../src/core/expedition.ts";
 import {
   battle, connect, deploy, expect, handIndex, idle, install, playCard, resolved, route, saved, test, transmit,
 } from "./helpers.ts";
@@ -72,8 +72,9 @@ test("save → reload restores the exact expedition and the same battle screen",
   await expect(page.getByRole("meter", { name: "Hostile integrity", exact: true })).toHaveAttribute("aria-valuenow", String(before.enemies[0].hp));
 });
 
-test("a version 2 save is rejected gracefully: the title offers a new expedition, nothing breaks", async ({ page }) => {
-  const legacy = { ...newExpedition("architect", 42), version: 2, cardSet: 2 };
+// v5 keeps no compatibility (no players yet): a save from any other version, the v4 one included, is not loaded.
+for (const version of [2, 4]) test(`a version ${version} save is rejected gracefully: the title offers a new expedition, nothing breaks`, async ({ page }) => {
+  const legacy = { ...newExpedition("architect", 42), version, cardSet: 2 };
   await install(page, legacy as never, { enter: false });
   await expect(page.locator(".title-screen")).toBeVisible();
   await expect(page.locator('[data-action="continue"]')).toHaveCount(0);
@@ -83,7 +84,7 @@ test("a version 2 save is rejected gracefully: the title offers a new expedition
   await expect(page.locator(".map-screen")).toBeVisible();
   const run = await saved(page);
   expect(run.archetype).toBe("architect");
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("faultline-expedition-v2")!).version)).toBe(4);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("faultline-expedition-v2")!).version)).toBe(EXPEDITION_VERSION);
 });
 
 for (const [width, height] of [[1280, 720], [1440, 900], [1920, 1080]] as const) {

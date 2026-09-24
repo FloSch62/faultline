@@ -42,7 +42,7 @@ export const BUILD_PATHS: Record<Archetype, readonly BuildPath[]> = {
   warden: [
     {
       id: "fortress", name: "Fortress", idea: "Block that becomes backpressure, and block that stays.",
-      play: "Brace, Stand Firm, Pushback and Double Shift raise the wall; Hardening Guide grows every Harden; Persistent State keeps the block, Entrench doubles it; Flow Control, Vent and Reflect turn what it stopped into damage.",
+      play: "Brace, Stand Firm, Pushback and Double Shift raise the wall; Hardening Guide grows every Harden; Persistent State carries part of it into the next turn, Entrench doubles it; Flow Control, Vent and Reflect turn what it stopped into damage.",
       cards: ["brace", "pushback", "stand-firm", "vent", "double-shift", "hardening-guide", "entrench", "persistent-state", "flow-control", "reflect"],
       partners: ["barrier", "aegis-field", "null-field", "quorum", "duplex"],
     },

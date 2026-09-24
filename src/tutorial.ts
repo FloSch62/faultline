@@ -196,7 +196,7 @@ export const WALKTHROUGH_PAGES: readonly WalkthroughPage[] = [
   },
   {
     title: "Rewards", art: "art/relay-interior.png", body: () => `
-      <p>After a battle, choose one of three cards — or skip. A lean deck draws its best cards more often. Elites offer an uncommon or better first and a relic; guardians offer rares.</p>
+      <p>After a battle, choose one of three cards — or skip. A lean deck draws its best cards more often. Elites offer an uncommon or better first and a relic; guardians offer ${RULES.rewardRarity.guardian[0] ? "their best" : RULES.rewardRarity.guardian[1] ? "uncommons and rares" : "rares"}.</p>
       <ul class="walk-list"><li><b>Rarity</b> Common, uncommon, rare, legendary — power, not obligation.</li><li><b>Upgrades (+)</b> Lower cost, bigger numbers or extra draw. Later rewards sometimes arrive upgraded.</li><li><b>Keeper cards</b> ${Math.round(RULES.keeperShare * 100)}% of offered cards are your keeper's own; the rest come from the shared colorless pool.</li></ul>`,
   },
   {

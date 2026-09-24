@@ -498,7 +498,7 @@ const CHAPTER_BODIES: Record<string, () => string> = {
         ["Installation", `A hostile permanent on your table with 1–3 integrity. Scrub costs ${R.scrubCost} energy per point.`],
         ["Encounter card", "Offered by a crate or a message. It enters your hand for this encounter only and exhausts when played."],
         ["Keeper card", `Offered only to one keeper. A reward card comes from your keeper's cards ${pct(R.keeperShare)} of the time, else from the colorless pool.`],
-        ["Rarity", `Common, uncommon, rare, legendary. Card rewards roll common / uncommon / rare at ${split(normal)} after a normal fight and ${split(elite)} after an elite or event fight (its first card uncommon or better); guardians offer rares${guardian[0] + guardian[1] > 0 ? ` at ${split(guardian)}` : ""}. ${pct(R.legendaryShare)} of rare rolls are legendary. Rarity is power, not obligation — skipping a reward keeps your deck sharp.`],
+        ["Rarity", `Common, uncommon, rare, legendary. Card rewards roll common / uncommon / rare at ${split(normal)} after a normal fight and ${split(elite)} after an elite or event fight (its first card uncommon or better)${guardian[0] + guardian[1] > 0 ? `, and ${split(guardian)} after a guardian` : "; guardians offer rares"}. ${pct(R.legendaryShare)} of rare rolls are legendary. Rarity is power, not obligation — skipping a reward keeps your deck sharp.`],
       ].map(([term, text]) => `<div class="hb-term"><dt>${term}</dt><dd>${text}</dd></div>`).join("")}
     </div>
     <h4 class="hb-subhead">${icon("warning", 16)} Curses</h4>
@@ -520,7 +520,7 @@ const CHAPTER_BODIES: Record<string, () => string> = {
       ["Market", `Spend credits: a bench router, ${MARKET_SLOTS.length} cards (${MARKET_SLOTS.map(slot => `${slot.pool === "keeper" ? "keeper" : "colorless"} ${slot.rarity}`).join(", ")}; ${CARD_PRICES.common}–${CARD_PRICES.legendary}), relics (${RELIC_PRICE.min}–${RELIC_PRICE.max}), removal (${REMOVE_PRICE.base}, +${REMOVE_PRICE.step} each time), upgrade (${UPGRADE_PRICE}).`],
       ["Salvage cache", "Choose one of three cards, plus a few credits."],
       ["Sanctuary", `One service: repair, upgrade a card, remove a card, or salvage a relic for ${SALVAGE_COST} maximum integrity.`],
-      ["Stage guardian", "The climax. Defeat it for a rare card, a boss relic and a partial repair before the next stage."],
+      ["Stage guardian", `The climax. Defeat it for a card (${R.rewardRarity.guardian[0] + R.rewardRarity.guardian[1] > 0 ? "uncommon or rare" : "rare"}), a boss relic and a partial repair before the next stage.`],
     ])}
     <p>Every card offer rolls, slot by slot, your keeper's pool (${pct(R.keeperShare)}) or the colorless pool, then a rarity, then the card. In stage II ${pct(R.upgradedOfferRate[1])} of offered cards arrive upgraded, in stage III ${pct(R.upgradedOfferRate[2])}. A deck that wins usually ends between 20 and 30 cards after a few removals; removal keeps at least ${R.deckFloor} cards, one router card and two link cards.</p>
     <h4 class="hb-subhead">${icon("crown", 16)} Boss relics</h4>

@@ -12,6 +12,8 @@ import {
   api, chooseRoom, combatPreview, costFor, endTurn, playDaemon, playGround, playInstant, playLink, runningDaemons, useConsole,
 } from "./run.ts";
 import { DAEMON_HOOKS } from "./effects/index.ts";
+/** Tuned numbers are read from the data (balance may change them). */
+const V = (id: CardId) => CARDS[id].values;
 
 // ------------------------------------------------------------------ helpers (engine-v5.test.ts pattern)
 
@@ -171,10 +173,11 @@ test("Flush needs a buffer (refused at no cost) and adds +4 damage this turn wit
   r.buffer = 3;
   play(r, "flush");
   play(r, "flush+");
-  assert.equal(r.packetBoost, 4 + 6);
+  const burst = V("flush").burst! + V("flush+").burst!;
+  assert.equal(r.packetBoost, burst);
   assert.equal(r.buffer, 3, "the buffer stays");
   const { preview } = agree(r);
-  assert.equal(preview.packetDamage, RULES.baseRouteDamage + 10 + 3);
+  assert.equal(preview.packetDamage, RULES.baseRouteDamage + burst + 3);
 });
 
 test("Spearhead: the buffer release ignores armor this turn; the rest of the packet still pays it (cost 0 upgraded)", () => {
@@ -231,15 +234,16 @@ test("Deep Queue: buffering stores ×3, labelled in the forecast; copies stack (
   route(r, "r1", 0);
   r.hand = ["deep-queue", "deep-queue+"];
   play(r, "deep-queue");
-  assert.equal(r.energy, 20 - 2);
+  assert.equal(r.energy, 20 - CARDS["deep-queue"].cost);
   useConsole(r);
   const one = combatPreview(r);
-  assert.equal(one.bufferGain, RULES.baseRouteDamage * (RULES.bufferMultiplier + 1));
-  assert.ok(one.damageTerms.some(item => item.label === `Stored in buffer · +${one.bufferGain} (×3 · Deep Queue)`));
+  const once = RULES.bufferMultiplier + V("deep-queue").amount!;
+  assert.equal(one.bufferGain, Math.floor(RULES.baseRouteDamage * once));
+  assert.ok(one.damageTerms.some(item => item.label === `Stored in buffer · +${one.bufferGain} (×${once} · Deep Queue)`));
   play(r, "deep-queue+");
-  assert.equal(r.energy, 20 - 2 - 1);
+  assert.equal(r.energy, 20 - CARDS["deep-queue"].cost - CARDS["deep-queue+"].cost);
   const { preview } = agree(r);
-  assert.equal(preview.bufferGain, RULES.baseRouteDamage * (RULES.bufferMultiplier + 2), "Deep Queue and Deep Queue+ stack");
+  assert.equal(preview.bufferGain, Math.floor(RULES.baseRouteDamage * (once + V("deep-queue+").amount!)), "Deep Queue and Deep Queue+ stack");
   assert.equal(r.buffer, preview.bufferGain);
   assert.ok(DAEMON_HOOKS["deep-queue"]?.bufferMultiplier, "a pure resolver hook");
 });
@@ -397,18 +401,22 @@ test("Payload: a token for +2 damage this turn, printed as a labelled term (neve
 
 test("Fork Bomb adds 3 Payloads (4 upgraded); a full hand sends the rest to discard", () => {
   const r = table();
+  const t = V("fork-bomb").tokens!, tp = V("fork-bomb+").tokens!;
+  const payloads = (n: number) => `${n} Payload${n === 1 ? "" : "s"}`;
   r.hand = ["fork-bomb", "fork-bomb+"];
   play(r, "fork-bomb");
-  assert.deepEqual(r.hand, ["fork-bomb+", "payload", "payload", "payload"]);
+  assert.deepEqual(r.hand, ["fork-bomb+", ...Array(t).fill("payload")]);
   const result = play(r, "fork-bomb+");
-  assert.match(result.message, /4 Payloads in hand/);
-  assert.equal(r.hand.filter(id => id === "payload").length, 7);
-  r.hand.push("fork-bomb", "guard");
+  assert.match(result.message, new RegExp(`${payloads(tp)} in hand`));
+  assert.equal(r.hand.filter(id => id === "payload").length, t + tp);
+  // A hand one short of room: the last Payload goes to the discard pile.
+  while (r.hand.length < RULES.handLimit - t + 1) r.hand.push("guard");
+  r.hand.push("fork-bomb");
   const full = play(r, "fork-bomb");
-  assert.match(full.message, /2 Payloads in hand, 1 to discard/);
+  assert.match(full.message, new RegExp(`${payloads(t - 1)} in hand, 1 to discard`));
   assert.equal(r.hand.length, RULES.handLimit);
   assert.equal(r.discardPile.filter(id => id === "payload").length, 1);
-  assert.equal(r.encounterCards.filter(id => id === "payload").length, 10, "all of them are encounter-only");
+  assert.equal(r.encounterCards.filter(id => id === "payload").length, 2 * t + tp, "all of them are encounter-only");
 });
 
 test("Shell Access: 4 block and a Payload (6 block upgraded)", () => {
@@ -527,12 +535,14 @@ test("Buffer path: Deep Queue and Trickle running, Hold Queue and Store and Forw
   assert.ok(useConsole(r).ok);
   play(r, "hold-queue");
   play(r, "store-forward");
-  assert.deepEqual([r.buffer, r.block], [4 + 4, 4]);
+  const fed = V("hold-queue").buffer! + V("store-forward").buffer!;
+  assert.deepEqual([r.buffer, r.block], [fed, V("hold-queue").block]);
   const stored = agree(r).preview;
-  assert.equal(stored.bufferGain, RULES.baseRouteDamage * 3, "the route stored ×3");
+  const multiplier = RULES.bufferMultiplier + V("deep-queue").amount!;
+  assert.equal(stored.bufferGain, Math.floor(RULES.baseRouteDamage * multiplier), "the route stored with Deep Queue's multiplier");
   assert.equal(stored.packetDamage, 0);
   // Turn 2: Trickle tops it up at the start of the turn; Spearhead lets it all through the plating.
-  const buffer = 8 + 15 + 2;
+  const buffer = fed + stored.bufferGain + V("trickle").buffer!;
   assert.equal(r.buffer, buffer);
   r.energy = 20;
   play(r, "spearhead");
@@ -541,7 +551,7 @@ test("Buffer path: Deep Queue and Trickle running, Hold Queue and Store and Forw
   assert.equal(preview.bufferRelease, buffer);
   assert.equal(preview.packetDamage, buffer + Math.max(0, RULES.baseRouteDamage - armor), "every stored point lands");
   assert.equal(r.enemies[0].hp, hp - preview.packetDamage);
-  assert.equal(r.buffer, 2, "released, then Trickle starts a new one");
+  assert.equal(r.buffer, V("trickle").buffer, "released, then Trickle starts a new one");
 });
 
 test("Evasion path: Obfuscation and Spoof miss the Splicer's twin cut, Ghost Protocol dodges the Wraith's strike, Dark Fiber holds", () => {
@@ -578,14 +588,16 @@ test("Payloads path: Botnet, Exploit Kit and Cover Tracks running, a Fork Bomb, 
   route(r, "r1", 0);
   r.hand = ["botnet", "exploit-kit", "cover-tracks", "fork-bomb", "side-channel"];
   for (const id of ["botnet", "exploit-kit", "cover-tracks", "fork-bomb"] as CardId[]) play(r, id);
-  for (let i = 0; i < 3; i++) play(r, "payload");
+  const t = V("fork-bomb").tokens!, cards = 5 + t;
+  for (let i = 0; i < t; i++) play(r, "payload");
   play(r, "side-channel");
-  assert.equal(r.block, 3, "Cover Tracks: three Payloads exhausted");
-  assert.equal(r.packetBoost, 8, "Side Channel: eight cards this turn");
+  assert.equal(r.block, t * V("cover-tracks").block!, "Cover Tracks: every Payload exhausted");
+  assert.equal(r.packetBoost, cards * V("side-channel").perCard!, "Side Channel: every card this turn");
   const { preview } = agree(r);
-  assert.equal(term(preview.damageTerms, "Payload ×3"), 3 * RULES.payloadDamage);
-  assert.equal(term(preview.damageTerms, "Exploit Kit · Payloads ×3"), 3);
-  assert.equal(preview.packetDamage, RULES.baseRouteDamage + 3 * RULES.payloadDamage + 3 + 8);
+  const kit = t * V("exploit-kit").amount!;
+  assert.equal(term(preview.damageTerms, `Payload ×${t}`), t * RULES.payloadDamage);
+  assert.equal(term(preview.damageTerms, `Exploit Kit · Payloads ×${t}`), kit);
+  assert.equal(preview.packetDamage, RULES.baseRouteDamage + t * RULES.payloadDamage + kit + cards * V("side-channel").perCard!);
   // The next turn Botnet hands over a fresh Payload.
   assert.equal(r.hand.filter(id => id === "payload").length, 1);
 });

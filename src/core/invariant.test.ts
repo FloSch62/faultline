@@ -86,9 +86,16 @@ test("single-hostile invariant: v4 reproduces the v3 forecast and resolution on 
   // Layers that deliberately change a single hostile's numbers are switched off by their RULES
   // flags: escalation (levels and the guardians' charge at half health) and guardian adds.
   const rules = RULES as unknown as Record<string, number>;
-  const saved = { escalationStart: rules.escalationStart, addBreakBonus: rules.addBreakBonus };
+  // v5 tuning moved the v3 engine numbers the fixture was recorded with: pin them back for the comparison.
+  const saved = {
+    escalationStart: rules.escalationStart, addBreakBonus: rules.addBreakBonus, backpressureRatio: rules.backpressureRatio,
+    bufferMultiplier: rules.bufferMultiplier, hardenShield: rules.hardenShield,
+  };
   rules.escalationStart = 99;
   rules.addBreakBonus = 0;
+  rules.backpressureRatio = 0.5;
+  rules.bufferMultiplier = 2;
+  rules.hardenShield = 2;
   try {
   let compared = 0, changedByDesign = 0;
   for (const { run: r, trial } of boards()) {

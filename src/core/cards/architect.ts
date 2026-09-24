@@ -39,8 +39,8 @@ export const ARCHITECT_CARDS: CardTable<ArchitectCardId> = {
     name: "Redundant Paths", subtitle: "ARCHITECT / FAILOVER", cost: 1, rarity: "common", target: "instant", art: "defense", color: "#7fcfe0", archetype: "architect",
     text: v => `Gain ${v.perChannel} block per live channel.`,
     detail: "Counts your live channels when you play it; with no live route it gives nothing.",
-    values: { perChannel: 2 },
-    upgrade: { values: { perChannel: 3 } },
+    values: { perChannel: 3 },
+    upgrade: { values: { perChannel: 4 } },
   },
   "standby-router": {
     name: "Standby Router", subtitle: "ARCHITECT / STANDBY", cost: 1, rarity: "common", target: "ground", role: "router", art: "hardware", color: "#62e0c4", archetype: "architect",
@@ -52,15 +52,15 @@ export const ARCHITECT_CARDS: CardTable<ArchitectCardId> = {
   ecmp: {
     name: "Equal-Cost Multipath", subtitle: "ARCHITECT / BANDWIDTH", cost: 1, rarity: "uncommon", target: "instant", art: "program", color: "#6fd6ef", archetype: "architect",
     text: v => `+${v.perChannel} damage this turn per live channel.`,
-    values: { perChannel: 2 },
-    upgrade: { values: { perChannel: 3 } },
+    values: { perChannel: 3 },
+    upgrade: { values: { perChannel: 4 } },
   },
   "flood-fill": {
     name: "Flood Fill", subtitle: "ARCHITECT / FLOOD", cost: 1, rarity: "uncommon", target: "instant", art: "program", color: "#e8b562", archetype: "architect",
     text: v => `+${v.perChannelEveryPort} damage to every hostile per live channel this turn.`,
     detail: "Needs a live route.",
-    values: { perChannelEveryPort: 1 },
-    upgrade: { values: { perChannelEveryPort: 2 } },
+    values: { perChannelEveryPort: 2 },
+    upgrade: { values: { perChannelEveryPort: 3 } },
   },
   mirror: {
     name: "Mirror Protocol", subtitle: "ARCHITECT / REDUNDANCY", cost: 1, rarity: "uncommon", target: "instant", art: "program", color: "#bc9fde", archetype: "architect",
@@ -69,7 +69,7 @@ export const ARCHITECT_CARDS: CardTable<ArchitectCardId> = {
     upgrade: { values: { perChannel: 3 } },
   },
   "mesh-weave": {
-    name: "Mesh Weave", subtitle: "ARCHITECT / TOPOLOGY", cost: 1, rarity: "uncommon", target: "node", art: "cable", color: "#6fe3d0", archetype: "architect",
+    name: "Mesh Weave", subtitle: "ARCHITECT / TOPOLOGY", cost: 0, rarity: "uncommon", target: "node", art: "cable", color: "#6fe3d0", archetype: "architect",
     text: v => `Link a device to its ${words[v.links ?? 2] ?? v.links} nearest unlinked devices.`,
     detail: "Distance ties: device ids.",
     values: { links: 2 },
@@ -88,18 +88,18 @@ export const ARCHITECT_CARDS: CardTable<ArchitectCardId> = {
     upgrade: { cost: 0 },
   },
   "fabric-controller": {
-    name: "Fabric Controller", subtitle: "ARCHITECT / CONTROL PLANE", cost: 2, rarity: "rare", target: "daemon", art: "program", color: "#5fc9f0", archetype: "architect",
+    name: "Fabric Controller", subtitle: "ARCHITECT / CONTROL PLANE", cost: 1, rarity: "rare", target: "daemon", art: "program", color: "#5fc9f0", archetype: "architect",
     text: v => `Daemon. Every channel beyond the first deals +${v.perChannel} more.`,
     detail: `Each channel beyond the first is a bandwidth delivery of +${R.bandwidthPerChannel}; this adds to every one of them. Under Spanning Tree bandwidth gives nothing, and neither does this.`,
     values: { perChannel: 2 },
-    upgrade: { cost: 1 },
+    upgrade: { cost: 0 },
   },
   // ---------------------------------------------------------------- Backbone: a long, upgraded primary route
   "trunk-line": {
     name: "Trunk Line", subtitle: "ARCHITECT / TRUNK", cost: 1, rarity: "common", target: "instant", art: "program", color: "#e0bf6a", archetype: "architect",
     text: v => `+${v.perDevice} damage this turn per device on your primary route.${draw(v.draw)}`,
     detail: "Counts the devices on your primary route when you play it; ALPHA and OMEGA are not devices.",
-    values: { perDevice: 1 },
+    values: { perDevice: 2 },
     upgrade: { values: { draw: 1 } },
   },
   splice: {
@@ -112,14 +112,14 @@ export const ARCHITECT_CARDS: CardTable<ArchitectCardId> = {
     name: "Traceroute", subtitle: "ARCHITECT / HOPS", cost: 0, rarity: "common", target: "instant", art: "program", color: "#9ad4e6", archetype: "architect",
     text: v => `Draw ${v.draw}. +${v.perSwitch} damage this turn per switch on your primary route.`,
     detail: "Counts the switches on your primary route when you play it.",
-    values: { draw: 1, perSwitch: 1 },
+    values: { draw: 1, perSwitch: 2 },
     upgrade: { values: { draw: 2 } },
   },
   "deep-buffers": {
     name: "Deep Buffers", subtitle: "ARCHITECT / BUFFERS", cost: 1, rarity: "uncommon", target: "daemon", art: "program", color: "#a7b8f2", archetype: "architect",
     text: v => `Daemon. Switches on your primary route deal +${v.perSwitch} more.`,
     detail: `A switch on your primary route deals +${R.switchDamage} (compressed +${R.compressionDamage} more); this adds to each.`,
-    values: { perSwitch: 1 },
+    values: { perSwitch: 2 },
     upgrade: { cost: 0 },
   },
   "line-rate": {
@@ -129,11 +129,11 @@ export const ARCHITECT_CARDS: CardTable<ArchitectCardId> = {
     upgrade: { cost: 1 },
   },
   "carrier-grade": {
-    name: "Carrier Grade", subtitle: "ARCHITECT / BACKBONE", cost: 2, rarity: "rare", target: "daemon", art: "program", color: "#f0d27e", archetype: "architect",
+    name: "Carrier Grade", subtitle: "ARCHITECT / BACKBONE", cost: 1, rarity: "rare", target: "daemon", art: "program", color: "#f0d27e", archetype: "architect",
     text: v => `Daemon. Your primary route deals +${v.perDevice} per device on it.`,
     detail: "ALPHA and OMEGA are not devices. Your primary route is still the route that deals the most, this bonus included.",
-    values: { perDevice: 1 },
-    upgrade: { cost: 1 },
+    values: { perDevice: 2 },
+    upgrade: { cost: 0 },
   },
   // ---------------------------------------------------------------- Deployment: hardware tempo, clusters, device triggers
   "rack-and-stack": {
@@ -171,10 +171,10 @@ export const ARCHITECT_CARDS: CardTable<ArchitectCardId> = {
     upgrade: { cost: 0 },
   },
   datacenter: {
-    name: "Datacenter", subtitle: "ARCHITECT / DATA HALL", cost: 2, rarity: "rare", target: "daemon", art: "hardware", color: "#7ab8d8", archetype: "architect",
+    name: "Datacenter", subtitle: "ARCHITECT / DATA HALL", cost: 1, rarity: "rare", target: "daemon", art: "hardware", color: "#7ab8d8", archetype: "architect",
     text: v => `Daemon. Every cluster deals +${v.perCluster} more.`,
     detail: `A cluster is a band holding ${R.clusterThreshold} or more online devices (Server Racks count); each deals +${R.clusterDamage} on your primary route, and this adds to each.`,
     values: { perCluster: 3 },
-    upgrade: { cost: 1 },
+    upgrade: { cost: 0 },
   },
 };

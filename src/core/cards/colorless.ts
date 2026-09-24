@@ -196,16 +196,16 @@ export const COLORLESS_CARDS: CardTable<ColorlessCardId> = {
     upgrade: { values: { energy: 2, draw: 2 } },
   },
   containerlab: {
-    name: "Containerlab", subtitle: "SYSTEM / ORCHESTRATION", cost: 2, rarity: "rare", target: "instant", art: "hardware", color: "#e7c37d", exhaust: true,
+    name: "Containerlab", subtitle: "SYSTEM / ORCHESTRATION", cost: 3, rarity: "rare", target: "instant", art: "hardware", color: "#e7c37d", exhaust: true,
     rules: `Deploy an overclocked router linked to ALPHA and OMEGA: a new ${R.baseRouteDamage + R.overclockDamage}-damage route. Exhaust.`,
     detail: "The router takes the first free auto-deploy socket; with none, it cannot be played.",
-    upgrade: { cost: 1 },
+    upgrade: { cost: 2 },
   },
   guard: {
     name: "Packet Guard", subtitle: "BASIC / DEFENSE", cost: 1, rarity: "basic", target: "instant", art: "defense", color: "#82d8ed",
     text: v => `Gain ${v.block} block.`,
-    values: { block: 4 },
-    upgrade: { values: { block: 7 } },
+    values: { block: 3 },
+    upgrade: { values: { block: 5 } },
   },
   pulse: {
     name: "Packet Burst", subtitle: "BASIC / OFFENSE", cost: 1, rarity: "basic", target: "instant", art: "program", color: "#ff9a82",
@@ -246,10 +246,10 @@ export const COLORLESS_CARDS: CardTable<ColorlessCardId> = {
     upgrade: { values: { recover: 3 } },
   },
   rebuild: {
-    name: "Emergency Rebuild", subtitle: "UNCOMMON / DEPLOY", cost: 1, rarity: "uncommon", target: "instant", art: "hardware", color: "#a9cbc2", exhaust: true,
+    name: "Emergency Rebuild", subtitle: "UNCOMMON / DEPLOY", cost: 2, rarity: "uncommon", target: "instant", art: "hardware", color: "#a9cbc2", exhaust: true,
     rules: `Deploy a router linked to ALPHA and OMEGA: a new ${R.baseRouteDamage}-damage route. Exhaust.`,
     detail: "The router takes the first free auto-deploy socket; with none, it cannot be played.",
-    upgrade: { cost: 0 },
+    upgrade: { cost: 1 },
   },
   "zero-day": {
     name: "Zero Day", subtitle: "RARE / OFFENSE", cost: 2, rarity: "rare", target: "instant", art: "program", color: "#ed8e9f", exhaust: true,

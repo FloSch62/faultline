@@ -41,8 +41,8 @@ export const GHOST_CARDS: CardTable<GhostCardId> = {
     name: "Flush", subtitle: "GHOST / RELEASE", cost: 0, rarity: "common", target: "instant", art: "program", color: "#8ad8f0", archetype: "ghost",
     text: v => `Needs a buffer. +${v.burst} damage this turn.`,
     detail: "It does not spend the buffer. On a buffering turn the damage is stored with the rest.",
-    values: { burst: 4 },
-    upgrade: { values: { burst: 6 } },
+    values: { burst: 3 },
+    upgrade: { values: { burst: 5 } },
   },
   spearhead: {
     name: "Spearhead", subtitle: "GHOST / SPEARHEAD", cost: 1, rarity: "uncommon", target: "instant", art: "program", color: "#7cc9e6", archetype: "ghost",
@@ -123,8 +123,8 @@ export const GHOST_CARDS: CardTable<GhostCardId> = {
     name: "Fork Bomb", subtitle: "GHOST / PAYLOADS", cost: 1, rarity: "common", target: "instant", art: "program", color: "#f09ad0", archetype: "ghost",
     text: v => `Add ${payloads(v.tokens)} to your hand.`,
     detail: `Payload: +${RULES.payloadDamage} damage this turn. Exhaust. A full hand sends the rest to your discard pile.`,
-    values: { tokens: 3 },
-    upgrade: { values: { tokens: 4 } },
+    values: { tokens: 2 },
+    upgrade: { values: { tokens: 3 } },
   },
   "shell-access": {
     name: "Shell Access", subtitle: "GHOST / FOOTHOLD", cost: 1, rarity: "common", target: "instant", art: "defense", color: "#d7a2e8", archetype: "ghost",

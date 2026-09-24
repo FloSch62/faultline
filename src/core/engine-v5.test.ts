@@ -610,7 +610,8 @@ test("reward slots: pool, rarity and card, with the keeper share, the rarity tab
   assert.equal(elite.common, 0, "an elite's first slot is uncommon or better");
   assert.equal(tally("elite").common, RULES.rewardRarity.elite[0] * 10000);
   const guardian = tally("guardian");
-  assert.equal(guardian.common + guardian.uncommon, 0, "guardians offer rares");
+  assert.deepEqual([guardian.common, guardian.uncommon, guardian.rare + guardian.legendary], RULES.rewardRarity.guardian.map(share => share * 10000), "guardians follow their table");
+  assert.equal(guardian.common, 0, "guardians never offer commons");
   // A legendary roll finds Clabernetes whichever pool the slot chose (the other pool fills in).
   assert.equal(pickCard(run, sequence(0), "keeper", "legendary"), "clabernetes");
   // Stage upgrades: the roll after the pick.

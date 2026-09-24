@@ -35,6 +35,9 @@ import {
 
 export type WorldPoint = { x: number; z: number };
 export type BoardZone = Zone;
+/** What the pointer rests on over the table: a device, a cable (its linkKey), an installation,
+ * a hostile (its port) or a delivery's packet glyph (its channelKey). */
+export type TableHover = { kind: "node" | "link" | "installation" | "port" | "delivery"; id: string };
 export interface WorldCallbacks {
   onGround: (point: WorldPoint) => void;
   onNode: (id: string) => void;
@@ -46,6 +49,9 @@ export interface WorldCallbacks {
   onAim?: (channelKey: string, port: Port | null) => void;
   /** An installation was clicked: its plate, or a Demolition Charge's target. */
   onInstallation?: (id: string) => void;
+  /** The pointer rests on something on the table (null: on nothing, dragging, placing or
+   * cabling). Client coordinates, for the hover card. */
+  onHover?: (target: TableHover | null, clientX: number, clientY: number) => void;
 }
 /** Anything that may appear in an enemy intent, including the v3 name of an install. */
 export type ActionKind = IntentKind | "infect";
@@ -2185,6 +2191,7 @@ export class World {
   }
   private onPointerDown = (event: PointerEvent) => {
     if (event.button !== 0) return;
+    this.callbacks.onHover?.(null, event.clientX, event.clientY);
     const hit = this.hit(event);
     if (hit.delivery && !this.placementRole && !this.linkSource && this.callbacks.onAim) {
       this.aimDrag = { key: hit.delivery, pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false, over: null };
@@ -2246,6 +2253,7 @@ export class World {
         this.callbacks.onMove(this.pointerDown.id, point, false);
         this.canvas.dataset.cursor = "grabbing";
         this.hover(null);
+        this.callbacks.onHover?.(null, event.clientX, event.clientY);
       }
       return;
     }
@@ -2253,13 +2261,20 @@ export class World {
     if (this.linkSource) {
       const target = this.hit(event).node;
       this.showLinkGhost(target && target !== this.linkSource ? target : null);
+      this.callbacks.onHover?.(null, event.clientX, event.clientY);
     } else if (!this.placementRole) {
       const hit = this.hit(event);
       this.canvas.dataset.cursor = hit.delivery ? "grab"
         : hit.installation && this.targetingInstallations ? "target"
         : hit.node || hit.installation || hit.port ? "pointer" : "grab";
       this.hover(hit.installation ? { kind: "installation", id: hit.installation } : hit.node ? { kind: "node", id: hit.node } : null);
-    }
+      const target: TableHover | null = hit.delivery ? { kind: "delivery", id: hit.delivery }
+        : hit.installation ? { kind: "installation", id: hit.installation }
+        : hit.node ? { kind: "node", id: hit.node }
+        : hit.port ? { kind: "port", id: hit.port }
+        : hit.link ? { kind: "link", id: hit.link } : null;
+      this.callbacks.onHover?.(target, event.clientX, event.clientY);
+    } else this.callbacks.onHover?.(null, event.clientX, event.clientY);
   };
   /** Hover reach rings: an installation's reach (magenta), a firewall's quarantine reach (brass),
    * a Server Rack's shelter (sage), a cabled Honeypot's bite (green). Static under reduced motion. */
@@ -2356,10 +2371,11 @@ export class World {
     if (pointerId !== undefined && this.canvas.hasPointerCapture(pointerId))
       this.canvas.releasePointerCapture(pointerId);
   }
-  private onPointerLeave = () => {
+  private onPointerLeave = (event: PointerEvent) => {
     this.placement.visible = false;
     this.showLinkGhost(null);
     this.hover(null);
+    this.callbacks.onHover?.(null, event.clientX, event.clientY);
   };
 
   // ================================================================ playback primitives

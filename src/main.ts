@@ -3,6 +3,9 @@ import "./alpha.css";
 import "./polish.css";
 import "./battle.css";
 import "./game-ui.css";
+import "./table-ux.css";
+import "./targeting.css";
+import "./relocate.css";
 import { Soundscape, type ScoreScene } from "./audio.ts";
 import type { EffectKind } from "./audio-effects.ts";
 import { ENEMIES } from "./core/enemies.ts";
@@ -67,7 +70,10 @@ import {
 } from "./core/run.ts";
 import type { CardId, Port, RelicId, RunState, Zone } from "./core/types.ts";
 import { chooseOffer } from "./core/encounter.ts";
-import { World, type WorldPoint } from "./three/World.ts";
+import { World, type TableHover, type WorldPoint } from "./three/World.ts";
+import { hideHoverCard, hoverCardKey, moveHoverCard, showHoverCard } from "./hover-card.ts";
+import * as tableCards from "./table-cards.ts";
+import * as hostileCards from "./hostile-cards.ts";
 import { playTurn, syncWorld } from "./battle-playback.ts";
 import { loadAllModels } from "./three/models.ts";
 import * as ui from "./ui.ts";
@@ -162,7 +168,7 @@ let lastScreen = "";
 
 
 $("#app").innerHTML =
-  `<main class="game-root"><div class="scene-backdrop"></div><div class="scene-shade"></div><div class="motes" aria-hidden="true">${Array.from({ length: 22 }, (_, i) => `<i style="--x:${(i * 47) % 100}%;--duration:${14 + (i % 8) * 3}s;--delay:-${i * 2.7}s;--size:${(i % 3) + 1}px"></i>`).join("")}</div><div class="world-stage"><canvas id="world" aria-label="Network battlefield. Use cards and the device targeting controls to build your route."></canvas></div><div class="texture"></div><header id="header" class="game-header"></header><div id="screen"></div><div id="battle-hud"></div><div id="hand-zone"></div><div id="target-dock"></div><div id="battle-foot"></div><div id="lesson-spotlight" aria-hidden="true"><i></i></div><div id="lesson-layer"></div><div id="game-tooltip" role="tooltip"></div><div id="impact-layer" aria-hidden="true"></div><div id="battle-flash"></div><div id="toast" role="status" aria-live="polite"></div><div class="now-playing" id="now-playing"></div></main><dialog id="dialog" aria-label="Field journal"><button class="dialog-close" data-action="close" aria-label="Close dialog">${ui.icon("close", 16)}</button><div class="dialog-surface"><div id="dialog-content"></div></div></dialog>`;
+  `<main class="game-root"><div class="scene-backdrop"></div><div class="scene-shade"></div><div class="motes" aria-hidden="true">${Array.from({ length: 22 }, (_, i) => `<i style="--x:${(i * 47) % 100}%;--duration:${14 + (i % 8) * 3}s;--delay:-${i * 2.7}s;--size:${(i % 3) + 1}px"></i>`).join("")}</div><div class="world-stage"><canvas id="world" aria-label="Network battlefield. Use cards and the device targeting controls to build your route."></canvas></div><div class="texture"></div><header id="header" class="game-header"></header><div id="screen"></div><div id="battle-hud"></div><div id="hand-zone"></div><div id="target-dock"></div><div id="battle-foot"></div><div id="lesson-spotlight" aria-hidden="true"><i></i></div><div id="lesson-layer"></div><div id="game-tooltip" role="tooltip"></div><div id="hover-card" role="tooltip" aria-hidden="true"></div><div id="impact-layer" aria-hidden="true"></div><div id="battle-flash"></div><div id="toast" role="status" aria-live="polite"></div><div class="now-playing" id="now-playing"></div></main><dialog id="dialog" aria-label="Field journal"><button class="dialog-close" data-action="close" aria-label="Close dialog">${ui.icon("close", 16)}</button><div class="dialog-surface"><div id="dialog-content"></div></div></dialog>`;
 const root = $(".game-root"),
   dialog = $<HTMLDialogElement>("#dialog");
 sound.update({});
@@ -236,6 +242,7 @@ function ensureWorld() {
       onPort: selectPort,
       onAim: aimDelivery,
       onInstallation: selectInstallation,
+      onHover: hoverTable,
     });
     world.setBattle(run.topology, run.enemies, run.faultNodes, run.faultLinks);
   } catch (error) {
@@ -246,6 +253,19 @@ function ensureWorld() {
       "error",
     );
   }
+}
+/** Hover cards on the table: devices, cables and installations (table-cards.ts), hostiles and
+ * packet glyphs (hostile-cards.ts). The same target only moves the card; render() hides it. */
+function hoverTable(target: TableHover | null, x: number, y: number) {
+  if (!target || view !== "run" || run.phase !== "battle" || dialog.open) { hideHoverCard(); return; }
+  const key = `${target.kind}:${target.id}`;
+  if (hoverCardKey() === key) { moveHoverCard(x, y); return; }
+  const preview = combatPreview(run);
+  const html = target.kind === "port" || target.kind === "delivery"
+    ? hostileCards.hoverMarkup(run, preview, target)
+    : tableCards.hoverMarkup(run, preview, target);
+  if (html) showHoverCard(key, html, x, y);
+  else hideHoverCard();
 }
 function clearSelection() {
   cancelDrag();
@@ -266,6 +286,8 @@ function playable() {
 }
 function interfaceScale() { return Number.parseFloat(getComputedStyle($("#app")).zoom) || 1; }
 function render(rebuild = true) {
+  // Numbers may have changed under the pointer: the next pointer move rebuilds the hover card.
+  hideHoverCard();
   // A finished training battle stays on its board: the coach panel carries the debrief.
   const debrief = !!practice && view === "run" && run.phase !== "battle" && run.enemies.length > 0;
   const battle = view === "run" && (run.phase === "battle" || debrief);

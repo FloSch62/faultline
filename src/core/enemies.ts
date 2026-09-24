@@ -644,7 +644,7 @@ export const MESSAGE_OPTIONS: Record<MessageOptionId, MessageOptionDefinition> =
   reinforce: { weight: 1, name: "Reinforce", rule: `+${R.messageMaxIntegrity} maximum integrity, permanently.` },
   credit: { weight: 3, name: "Credit", rule: `${R.messageCredits} credits (ascension 7 multiplier applies).` },
   recover: { weight: 2, name: "Recover", rule: "A named rare card from the stage pool enters your hand for this encounter only; it exhausts when played." },
-  purge: { weight: 2, name: "Purge", rule: "Every junk card leaves your piles for this encounter, and one CVE leaves your deck permanently if you carry one." },
+  purge: { weight: 2, name: "Purge", rule: "Every junk card leaves your piles for this encounter, and one curse leaves your deck permanently if you carry one (a CVE first); the message names it." },
 };
 
 /** Reach radius as printed on plates ("2.0"). */

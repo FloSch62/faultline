@@ -23,7 +23,7 @@ import type { CombatPreview } from "../src/core/run.ts";
 import type { BaseCardId, CardId, Enemy, Installation, Port, RunState, Zone } from "../src/core/types.ts";
 import { chooseOffer } from "../src/core/encounter.ts";
 
-/** Answers every waiting offer with a fixed priority: a message purges when a CVE sits in the
+/** Answers every waiting offer with a fixed priority: a message purges when a curse sits in the
  * deck, restores when integrity is at 60 % or less, else takes maximum integrity, credits,
  * the restore, a card for this encounter, a purge; a crate card choice takes the card its
  * keeper's reward priorities rank higher. */
@@ -33,7 +33,7 @@ export function resolveOffers(run: RunState, onChoice?: (kind: string, id: strin
     let index = 0;
     if (offer.kind === "message") {
       const low = run.integrity <= run.maxIntegrity * 0.6 && run.maxIntegrity - run.integrity >= RULES.messageRestore;
-      const cursed = run.deck.includes("cve");
+      const cursed = run.deck.some(id => CARDS[id]?.curse);
       const order = [...(cursed ? ["purge"] : []), ...(low ? ["restore"] : []), "reinforce", "credit", "restore", "recover", "purge"];
       index = Math.max(0, offer.options.map(option => order.indexOf(option.id)).reduce((best, rank, i, ranks) => rank < ranks[best] ? i : best, 0));
     } else {

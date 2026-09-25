@@ -183,6 +183,8 @@ let deviceDragging = false;
 let pendingMove: { id: string; x: number; z: number; origin: Zone; destination: Zone } | null = null;
 let relocateFrame = 0;
 const undoStack: RunState[] = [];
+/** Field Training: the lesson progress before each undoable move, keyed by the board it rewinds to. */
+const lessonUndo = new WeakMap<RunState, training.LessonProgress>();
 /** The screen last shown, so a new one can fade up instead of swapping like a page. */
 let lastScreen = "";
 
@@ -796,6 +798,7 @@ function playAction(action: () => ActionResult, cue?: EffectKind, card?: CardId)
     return false;
   }
   if (!practice) devTools?.afterAction(run, before, card ?? (selected !== null ? before.hand[selected] : undefined));
+  if (practice?.progress) lessonUndo.set(before, practice.progress);
   undoStack.push(before);
   if (undoStack.length > 20) undoStack.shift();
   if (run.block > before.block) world?.pulseNetwork("shield");
@@ -883,6 +886,7 @@ function activateConsole() {
   if (!playable()) return;
   const state = consoleState(run);
   if (consoleTargeting) { clearSelection(); render(false); sound.effect("undo"); return; }
+  if (lessonBlocks({ kind: "console" })) return;
   if (!state.usable) { toast(state.reason || "Console unavailable.", "error"); sound.effect("error"); return; }
   if (state.target === "link") {
     selected = null;
@@ -1371,6 +1375,7 @@ function confirmRelocation() {
   if (!move || !playable()) return;
   pendingMove = null;
   closeRelocationPlate();
+  if (lessonBlocks({ kind: "move", node: move.id, zone: move.destination })) { clearSelection(); render(); return; }
   if (!playAction(() => relocateNode(run, move.id, move.x, move.z), "move")) { clearSelection(); render(); return; }
   if (move.origin === move.destination) return;
   world?.pulseZone(move.destination, "move");
@@ -1410,6 +1415,10 @@ function undo() {
   if (prev.currentRoom !== run.currentRoom || prev.turn !== run.turn) return;
   run = prev;
   expedition!.run = run;
+  // A drill rewinds with its board: a step met by the undone move opens again, and the rails
+  // judge the next move against the restored step, not the undone one.
+  const rewound = practice && lessonUndo.get(prev);
+  if (practice && rewound) { practice.progress = rewound; updateLesson(); }
   clearSelection();
   save();
   render();
@@ -1586,6 +1595,7 @@ async function action(name: string) {
   if (name === "prepare" && run.phase !== "battle") return;
   if (name === "release-prepared" && modal === "prepare") {
     closeModal();
+    if (lessonBlocks({ kind: "release" })) return;
     playAction(() => releasePreparedCard(run), "undo");
     return;
   }
@@ -2548,6 +2558,8 @@ function railHand() {
       !!training.lessonGuard(practice!.id, run, progress, { kind: "card", card: run.hand[index] });
     el.classList.toggle("lesson-parked", parked);
   });
+  const command = document.querySelector<HTMLElement>(".console-button");
+  command?.classList.toggle("lesson-parked", !!progress && !progress.complete && !!training.lessonGuard(practice!.id, run, progress, { kind: "console" }));
 }
 function fitLesson() {
   const plate = document.querySelector<HTMLElement>(".is-practice .battle-left");

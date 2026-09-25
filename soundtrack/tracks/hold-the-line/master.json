@@ -1,32 +1,32 @@
 {
   "source": "audio.flac",
   "generation_version": "v6",
-  "source_sha256": "b4bfb5a377848351aaf057037d5d1fa9860c2ccbc9b6d63ac8e33e7dc1fd1455",
+  "source_sha256": "0c39267d7bd3458b6f0ba431ea058f1b2660b2950d29faa922f13c86b3058192",
   "mix": "complete native YuE2 recording",
   "processing": "lossless FLAC decode to WAV; no source separation or denoising",
   "sample_rate": 48000,
   "channels": 2,
   "subtype": "PCM_24",
-  "frames": 5761856,
-  "duration_seconds": 120.03866666666667,
-  "instrumental_sha256": "d144d4a40a18a5d0b30ca2522646db5d2c8bc311f39f395397aa14686b89eac3",
+  "frames": 5143616,
+  "duration_seconds": 107.15866666666666,
+  "instrumental_sha256": "b9be33ccba8bc63a2dbd09fa7883b58d6bacdf7c8f189936728520b9c7841b9d",
   "verification": {
     "decoded_pcm_equal_to_source": true,
     "max_abs_pcm_error": 0
   },
   "delivery": {
-    "file": "public/audio/copperlight-pursuit-instrumental.ogg",
-    "sha256": "c592cf09220f40f1c6fdd73603ee19f5ca6f25f6b98f46da1febb14570885456",
-    "bytes": 2148726,
+    "file": "public/audio/hold-the-line-instrumental.ogg",
+    "sha256": "d2ef232936ef34db8d6f9715a2a10afdecf4932dfb68cc9bcd226539da8a60de",
+    "bytes": 1701319,
     "codec": "Vorbis",
     "quality": 5,
     "fade_in_seconds": 1.5,
     "fade_out_seconds": 3,
-    "constant_gain_db": -3.6899999999999995,
+    "constant_gain_db": -7.359999999999999,
     "target_lufs": -19,
     "peak_ceiling_dbtp": -2,
     "integrated_lufs": -18.99,
-    "true_peak_dbtp": -4.36,
-    "range_lu": 11.7
+    "true_peak_dbtp": -7.43,
+    "range_lu": 9.9
   }
 }

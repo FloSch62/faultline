@@ -1,0 +1,32 @@
+{
+  "source": "audio.flac",
+  "generation_version": "v6",
+  "source_sha256": "df4058990fea544d7f85b31242e3f61631575d6362c23dceb6a9a29332113a31",
+  "mix": "complete native YuE2 recording",
+  "processing": "lossless FLAC decode to WAV; no source separation or denoising",
+  "sample_rate": 48000,
+  "channels": 2,
+  "subtype": "PCM_24",
+  "frames": 5516096,
+  "duration_seconds": 114.91866666666667,
+  "instrumental_sha256": "ff45ba6e28c7d7d0c2615691b1071fdbeaae46fc4ef0adf4da57ecf35f2230a9",
+  "verification": {
+    "decoded_pcm_equal_to_source": true,
+    "max_abs_pcm_error": 0
+  },
+  "delivery": {
+    "file": "public/audio/kingdom-of-rust-instrumental.ogg",
+    "sha256": "ad36a0b9abc85a5e1e155786df272eaa73c576780767332dc69f92f2eb968cc4",
+    "bytes": 1937229,
+    "codec": "Vorbis",
+    "quality": 5,
+    "fade_in_seconds": 1.5,
+    "fade_out_seconds": 3,
+    "constant_gain_db": -4.98,
+    "target_lufs": -19,
+    "peak_ceiling_dbtp": -2,
+    "integrated_lufs": -19.02,
+    "true_peak_dbtp": -4.79,
+    "range_lu": 16.9
+  }
+}

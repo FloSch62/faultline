@@ -143,7 +143,7 @@ still the maximum number of live router routes sharing no intermediate device.
 - `src/main.ts` — input, view transitions, targeting, undo and autosave.
 - `src/audio.ts`, `src/audio-effects.ts` — music playback, crossfades, sampled effects, voice priority and combat ducking. The CUE GUIDE in `audio-effects.ts` lists exactly when each of the 58 cues plays.
 - `public/art/` — finished game artwork; [original art direction](docs/art-prompts.md) and [fieldcraft artwork prompts](docs/art-polish-prompts.md), and [expedition artwork prompts](docs/art-expedition-prompts.md). The v4 escort, leader and add sheets, the warning plate and the message and crate illustrations are recorded in `docs/art-v4-bodies-manifest.json`, `docs/art-v4-plates-manifest.json` and `docs/art-v4-illustrations-manifest.json` (the fourteen v4 cards in `docs/art-v3-manifest.json`); `uv run scripts/compose_sheet.py` cuts the painted bodies out of their backdrop and rebuilds any sheet from its manifest.
-- `public/audio/` — fifteen instrumental Ogg masters, including exploration and combat themes for each stage, and the material effects bank.
+- `public/audio/` — twenty-one instrumental Ogg masters, including exploration and combat themes for each stage, and the material effects bank.
 - `soundtrack/` — one folder per song in `tracks/`, alongside `effects/` and `licenses/`. Scores, generation metadata and provenance are tracked; large recordings and intermediate arrays remain local and ignored by Git.
 - [Soundtrack production](soundtrack/README.md) and [effects production](soundtrack/effects/README.md) — source material, licenses and reproduction steps.
 - [Third-party notices](THIRD_PARTY_NOTICES.md).

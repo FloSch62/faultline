@@ -81,13 +81,13 @@
       "file": "public/audio/copperlight-pursuit-instrumental.ogg",
       "scene": "Copper Reach battle rotation",
       "source": "soundtrack/tracks/copperlight-pursuit/audio.flac",
-      "source_sha256": "f4537edbfda9305de70d73191a33492a3717b22c354097014effae936375f3c4",
+      "source_sha256": "b4bfb5a377848351aaf057037d5d1fa9860c2ccbc9b6d63ac8e33e7dc1fd1455",
       "master": "soundtrack/tracks/copperlight-pursuit/master.json",
-      "duration_seconds": 100.59866666666667,
+      "duration_seconds": 120.03866666666667,
       "sample_rate": 48000,
       "channels": 2,
-      "bytes": 1974364,
-      "sha256": "2274c4e1ce575fc81d9581926aec9a15d5ac7782f5a9546ace1097f332112c27"
+      "bytes": 2148726,
+      "sha256": "c592cf09220f40f1c6fdd73603ee19f5ca6f25f6b98f46da1febb14570885456"
     },
     {
       "file": "public/audio/ghosts-in-the-relay-instrumental.ogg",
@@ -184,6 +184,78 @@
       "channels": 2,
       "bytes": 1983211,
       "sha256": "20a9f5d99d2ee96926a3a5e1a671fc0a2ed1303988ddd5552533ae41034fd03e"
+    },
+    {
+      "file": "public/audio/kingdom-of-rust-instrumental.ogg",
+      "scene": "Copper Reach battle rotation",
+      "source": "soundtrack/tracks/kingdom-of-rust/audio.flac",
+      "source_sha256": "df4058990fea544d7f85b31242e3f61631575d6362c23dceb6a9a29332113a31",
+      "master": "soundtrack/tracks/kingdom-of-rust/master.json",
+      "duration_seconds": 114.91866666666667,
+      "sample_rate": 48000,
+      "channels": 2,
+      "bytes": 1937229,
+      "sha256": "ad36a0b9abc85a5e1e155786df272eaa73c576780767332dc69f92f2eb968cc4"
+    },
+    {
+      "file": "public/audio/sparks-on-the-wire-instrumental.ogg",
+      "scene": "Copper Reach battle rotation",
+      "source": "soundtrack/tracks/sparks-on-the-wire/audio.flac",
+      "source_sha256": "521ca66c07c29f8e905890226d76431c3ec79b5f3db8fcb5d7cfecf700be786a",
+      "master": "soundtrack/tracks/sparks-on-the-wire/master.json",
+      "duration_seconds": 104.95866666666667,
+      "sample_rate": 48000,
+      "channels": 2,
+      "bytes": 1852707,
+      "sha256": "86ae4e9d72b99e2fa0d6c818e4b4259b9af533cf100456b77d826c09204c247a"
+    },
+    {
+      "file": "public/audio/refraction-instrumental.ogg",
+      "scene": "Glass Cathedral battle rotation",
+      "source": "soundtrack/tracks/refraction/audio.flac",
+      "source_sha256": "ca4c72889f0deaadb88c59387a47d0bfdc481c0cfdb7114e81e7ab2efafd9c7d",
+      "master": "soundtrack/tracks/refraction/master.json",
+      "duration_seconds": 137.47866666666667,
+      "sample_rate": 48000,
+      "channels": 2,
+      "bytes": 2354262,
+      "sha256": "ac6f9af4430db8f2baee1ce7d64597c2d618d7b26b92a886c16ee7e41d68548d"
+    },
+    {
+      "file": "public/audio/bells-of-broken-glass-instrumental.ogg",
+      "scene": "Glass Cathedral battle rotation",
+      "source": "soundtrack/tracks/bells-of-broken-glass/audio.flac",
+      "source_sha256": "1fb5091f7ce267544b0107803abbfc327fd84b215b32268d5859ca8e09c6b5ae",
+      "master": "soundtrack/tracks/bells-of-broken-glass/master.json",
+      "duration_seconds": 103.43866666666666,
+      "sample_rate": 48000,
+      "channels": 2,
+      "bytes": 1716059,
+      "sha256": "59f7ed826b00a6e2b9b0ae547b09fb163de30bda6501d186261c4af3e294ef40"
+    },
+    {
+      "file": "public/audio/quarantine-breach-instrumental.ogg",
+      "scene": "Blackout Heart battle rotation",
+      "source": "soundtrack/tracks/quarantine-breach/audio.flac",
+      "source_sha256": "78072fcf5f4bb75df7c834cc0b6e1d573e95e8e321522db6e1209450d0ec6607",
+      "master": "soundtrack/tracks/quarantine-breach/master.json",
+      "duration_seconds": 99.31866666666667,
+      "sample_rate": 48000,
+      "channels": 2,
+      "bytes": 1675255,
+      "sha256": "6bbc2bb868fef982092436923a4c3869789c5ba37beecc92d9a2c777367522a2"
+    },
+    {
+      "file": "public/audio/hold-the-line-instrumental.ogg",
+      "scene": "Blackout Heart battle rotation",
+      "source": "soundtrack/tracks/hold-the-line/audio.flac",
+      "source_sha256": "0c39267d7bd3458b6f0ba431ea058f1b2660b2950d29faa922f13c86b3058192",
+      "master": "soundtrack/tracks/hold-the-line/master.json",
+      "duration_seconds": 107.15866666666666,
+      "sample_rate": 48000,
+      "channels": 2,
+      "bytes": 1701319,
+      "sha256": "d2ef232936ef34db8d6f9715a2a10afdecf4932dfb68cc9bcd226539da8a60de"
     }
   ]
 }

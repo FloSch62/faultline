@@ -15,14 +15,6 @@
     "language_probability": 0.3531171679496765,
     "segments": []
   },
-  "copperlight-pursuit-instrumental.ogg": {
-    "file": "public/audio/copperlight-pursuit-instrumental.ogg",
-    "sha256": "2274c4e1ce575fc81d9581926aec9a15d5ac7782f5a9546ace1097f332112c27",
-    "model": "Systran/faster-whisper-small",
-    "language": "en",
-    "language_probability": 0.3531171679496765,
-    "segments": []
-  },
   "deliver-the-dawn-instrumental.ogg": {
     "file": "public/audio/deliver-the-dawn-instrumental.ogg",
     "sha256": "20a9f5d99d2ee96926a3a5e1a671fc0a2ed1303988ddd5552533ae41034fd03e",

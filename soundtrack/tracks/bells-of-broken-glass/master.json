@@ -1,0 +1,32 @@
+{
+  "source": "audio.flac",
+  "generation_version": "v6",
+  "source_sha256": "1fb5091f7ce267544b0107803abbfc327fd84b215b32268d5859ca8e09c6b5ae",
+  "mix": "complete native YuE2 recording",
+  "processing": "lossless FLAC decode to WAV; no source separation or denoising",
+  "sample_rate": 48000,
+  "channels": 2,
+  "subtype": "PCM_24",
+  "frames": 4965056,
+  "duration_seconds": 103.43866666666666,
+  "instrumental_sha256": "cecaa26636e0cc3c88d2b2a9863f4a4193b0b779e2635e791632e701bc3e575a",
+  "verification": {
+    "decoded_pcm_equal_to_source": true,
+    "max_abs_pcm_error": 0
+  },
+  "delivery": {
+    "file": "public/audio/bells-of-broken-glass-instrumental.ogg",
+    "sha256": "59f7ed826b00a6e2b9b0ae547b09fb163de30bda6501d186261c4af3e294ef40",
+    "bytes": 1716059,
+    "codec": "Vorbis",
+    "quality": 5,
+    "fade_in_seconds": 1.5,
+    "fade_out_seconds": 3,
+    "constant_gain_db": -6.789999999999999,
+    "target_lufs": -19,
+    "peak_ceiling_dbtp": -2,
+    "integrated_lufs": -19.01,
+    "true_peak_dbtp": -6.43,
+    "range_lu": 12.1
+  }
+}

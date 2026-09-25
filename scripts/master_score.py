@@ -19,7 +19,7 @@ TRACKS = {
     "the-copper-market": ("v3", "Salvage exchange"),
     "a-light-left-on": ("v3", "Sanctuary and relics"),
     "a-thousand-fractures": ("v3", "Copper Reach elites"),
-    "copperlight-pursuit": ("v4", "Copper Reach battle rotation"),
+    "copperlight-pursuit": ("v6", "Copper Reach battle rotation"),
     "ghosts-in-the-relay": ("v4", "Glass Cathedral battle rotation"),
     "redline-protocol": ("v4", "Blackout Heart battle rotation"),
     "paths-of-copper": ("v5", "Copper Reach exploration and rewards"),
@@ -28,6 +28,12 @@ TRACKS = {
     "shatter-the-choir": ("v5", "Glass Cathedral battles, elites and Hollow Choir"),
     "messages-in-the-dark": ("v5", "Blackout Heart exploration and rewards"),
     "deliver-the-dawn": ("v5", "Blackout Heart battles and elites"),
+    "kingdom-of-rust": ("v6", "Copper Reach battle rotation"),
+    "sparks-on-the-wire": ("v6", "Copper Reach battle rotation"),
+    "refraction": ("v6", "Glass Cathedral battle rotation"),
+    "bells-of-broken-glass": ("v6", "Glass Cathedral battle rotation"),
+    "quarantine-breach": ("v6", "Blackout Heart battle rotation"),
+    "hold-the-line": ("v6", "Blackout Heart battle rotation"),
 }
 
 

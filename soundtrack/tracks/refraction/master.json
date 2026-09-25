@@ -1,0 +1,32 @@
+{
+  "source": "audio.flac",
+  "generation_version": "v6",
+  "source_sha256": "ca4c72889f0deaadb88c59387a47d0bfdc481c0cfdb7114e81e7ab2efafd9c7d",
+  "mix": "complete native YuE2 recording",
+  "processing": "lossless FLAC decode to WAV; no source separation or denoising",
+  "sample_rate": 48000,
+  "channels": 2,
+  "subtype": "PCM_24",
+  "frames": 6598976,
+  "duration_seconds": 137.47866666666667,
+  "instrumental_sha256": "ff097b55a11ee46db1927f4bf8c16535709f3af987722881202b0566dadfffb1",
+  "verification": {
+    "decoded_pcm_equal_to_source": true,
+    "max_abs_pcm_error": 0
+  },
+  "delivery": {
+    "file": "public/audio/refraction-instrumental.ogg",
+    "sha256": "ac6f9af4430db8f2baee1ce7d64597c2d618d7b26b92a886c16ee7e41d68548d",
+    "bytes": 2354262,
+    "codec": "Vorbis",
+    "quality": 5,
+    "fade_in_seconds": 1.5,
+    "fade_out_seconds": 3,
+    "constant_gain_db": -6.18,
+    "target_lufs": -19,
+    "peak_ceiling_dbtp": -2,
+    "integrated_lufs": -18.98,
+    "true_peak_dbtp": -5.97,
+    "range_lu": 11.2
+  }
+}

@@ -1349,6 +1349,14 @@ button.lesson-card:hover .lesson-icon,
 .is-practice .card-fan .game-card.lesson-parked:focus-visible {
   filter: grayscale(0.3) brightness(0.85);
 }
+/* The keeper's console rests the same way while another step is current. */
+.is-practice .console-button.lesson-parked {
+  filter: grayscale(0.6) brightness(0.62);
+}
+.is-practice .console-button.lesson-parked:hover,
+.is-practice .console-button.lesson-parked:focus-visible {
+  filter: grayscale(0.3) brightness(0.85);
+}
 
 /* ------------------------------------------------------------------ lesson end */
 /* A finished lesson is over. The scrim takes the pointer from the frozen board the moment the last

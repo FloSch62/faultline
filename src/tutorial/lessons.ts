@@ -11,8 +11,8 @@ import { raiseAdds } from "../core/combat/surprises.ts";
 import { CARDS, RULES } from "../core/cards.ts";
 import { addBreakBonus } from "../core/ascension.ts";
 import {
-  beginBattle, combatPreview, conditionOf, CONSOLES, costFor, createRun, hardenBlock, INSTALLATION_NAMES, isWorn, maxConditionOf, PORTS,
-  repairCost, scrubCost, signalPaths, turnEnergyBase, zoneForNode, type TurnResult,
+  beginBattle, combatPreview, conditionOf, CONSOLES, consoleState, costFor, createRun, hardenBlock, INSTALLATION_NAMES, isWorn, maxConditionOf,
+  playInstant, PORTS, repairCost, scrubCost, signalPaths, turnEnergyBase, zoneForNode, type TurnResult,
 } from "../core/run.ts";
 import type { Archetype, CardId, Enemy, MapRoom, NetworkLink, NetworkNode, Port, RelicId, RunState, Zone } from "../core/types.ts";
 
@@ -1140,7 +1140,7 @@ function coachFor(id: LessonId, ctx: Context, done: Record<string, boolean>): Co
         focus: card("purge-field"),
       };
       if (!done.jam) return {
-        coach: `Get your route out of **${String(preview?.hazardZone ?? "the marked band").toUpperCase()}**: drag the router to another band, then **confirm** — or give it a second channel elsewhere.`,
+        coach: `Get your route out of **${String(preview?.hazardZone ?? "the marked band").toUpperCase()}**: drag the router to another band, then **confirm**.`,
         detail: "The storm strikes every unprotected device in the band it marked.",
         hint: `Drag the router into another band and confirm the move (${RULES.relocateCost} energy).`,
         focus: RELOCATE(preview?.hazardZone ?? "north"),
@@ -1239,9 +1239,15 @@ function coachFor(id: LessonId, ctx: Context, done: Record<string, boolean>): Co
           warning: "Packet loss ahead: the coming cut leaves you with no live route.",
           focus: card("failover-policy"),
         };
+        if (!run.buffering && run.buffer > 0 && lineProtected(run)) return {
+          coach: "The line is protected: switch **Buffer** on again.",
+          detail: `Buffer: ${run.buffer}. The coming cut can no longer silence your line, so a second buffered turn is safe to stack.`,
+          hint: "Click Buffer beside your hand, then Transmit.",
+          focus: CONSOLE,
+        };
         return {
           coach: "Protect the line — arm **Failover Policy** — then switch **Buffer** on again.",
-          detail: `Buffer: ${run.buffer}. A normal transmission now would flush it safely before the cut — the simple answer. The Ghost's real game is stacking a second buffered turn behind a protected line.`,
+          detail: `Buffer: ${run.buffer}. A normal transmission would flush it before the cut, but the Ghost's real game is stacking a second buffered turn behind a protected line.`,
           hint: "Arm Failover Policy (or build a second channel), then click Buffer.",
           focus: card("failover-policy"),
         };
@@ -1360,6 +1366,10 @@ export type LessonAction =
   | { kind: "zone"; card: CardId; zone: Zone }
   | { kind: "move"; node: string; zone: Zone }
   | { kind: "prepare"; card: CardId }
+  /** Take the prepared card back into the hand. */
+  | { kind: "release" }
+  /** The keeper's console: Harden, Buffer, or lifting Patch Cable to choose its two ends. */
+  | { kind: "console" }
   | { kind: "transmit" }
   /** Make a port the target (the rules' focus). */
   | { kind: "focus"; port: Port }
@@ -1369,19 +1379,19 @@ export type LessonAction =
   | { kind: "scrub"; installation: string };
 
 /** Cards (base ids) the CURRENT goal allows — one step at a time, nothing else lifts.
- * "any" marks a step that is the player's own call; a goal missing from its lesson's
- * map needs no cards at all. */
-const GOAL_CARDS: Partial<Record<LessonId, Record<string, readonly string[] | "any">>> = {
+ * A goal missing from its lesson's map needs no cards at all. */
+const GOAL_CARDS: Partial<Record<LessonId, Record<string, readonly string[]>>> = {
   "first-signal": { router: ["router"], source: ["fiber"], route: ["fiber"] },
   "read-the-enemy": { cover: ["guard"], burst: ["pulse"] },
-  reroute: { channel: ["router", "switch", "fiber"], survive: ["failover-policy"], restore: ["patch", "fiber", "router", "switch"] },
+  reroute: { channel: ["router", "fiber"], survive: ["failover-policy"], restore: ["patch"] },
   online: { firewall: ["fiber"], cache: ["fiber", "patch"] },
-  bands: { suppression: ["purge-field"], jam: ["router", "fiber"], resonance: ["resonance-field"] },
+  // The storm's jam is answered by a relocation: no card plays on that step.
+  bands: { suppression: ["purge-field"], resonance: ["resonance-field"] },
   traps: { honeypot: ["honeypot", "fiber"], armed: ["port-security", "rate-limiter", "failover-policy"] },
-  "console-architect": { channels: ["router", "fiber", "load-balancer"] },
+  "console-architect": { channels: ["router", "fiber"] },
   "console-warden": { release: ["pulse"] },
   "console-ghost": { stored: ["pulse"], protect: ["failover-policy", "router", "fiber"], release: ["pulse"] },
-  danger: { charge: "any", ultimate: "any" },
+  danger: { charge: ["guard", "pulse"], ultimate: ["zero-day", "pulse", "barrier", "guard"] },
   // The table-front drills: every step is a move on the board except these two.
   "aim-signal": {},
   "clear-ground": { purge: ["purge-field"] },
@@ -1391,17 +1401,116 @@ const GOAL_CARDS: Partial<Record<LessonId, Record<string, readonly string[] | "a
 const CHANNEL_OBJECTION = "Every device carries one channel: a route through your first router stays one channel. Cable ALPHA to the new router, then the new router to OMEGA.";
 /** Shield is an emergency exit: allowed whenever the coming hit would end the drill. */
 const DEFENSE = ["guard", "barrier"];
+/** The danger drill's answers to the ultimate: burst to break it, shield to brace for it. */
+const ULTIMATE_ANSWERS = ["zero-day", "pulse", "barrier", "guard"];
 
 const affordable = (run: RunState, bases: readonly string[]) =>
   run.hand.some((id, index) => bases.includes(CARDS[id].base) && costFor(run, index) <= run.energy);
+/** Whether the hand holds one card of each base and the energy pays for all of them together.
+ * A link discount (Hot Swap) covers only the first link card. */
+function affordsAll(run: RunState, bases: readonly string[]): boolean {
+  const used = new Set<number>();
+  let total = 0, links = 0;
+  for (const base of bases) {
+    const index = run.hand.findIndex((id, i) => !used.has(i) && CARDS[id].base === base);
+    if (index < 0) return false;
+    used.add(index);
+    const definition = CARDS[run.hand[index]];
+    total += definition.target === "link" && links++ > 0 ? definition.cost : costFor(run, index);
+  }
+  return total <= run.energy;
+}
+const isTerminal = (id: string) => id === "alpha" || id === "omega";
+const linkedTo = (run: RunState, a: string, b: string) =>
+  run.topology.links.some(link => (link.a === a && link.b === b) || (link.a === b && link.b === a));
+/** A router or switch that carries no channel of its own yet: deployed, but not cabled to both ALPHA and OMEGA. */
+const spareDevice = (run: RunState) => run.topology.nodes.find(node =>
+  (node.role === "router" || node.role === "switch") && !(linkedTo(run, node.id, "alpha") && linkedTo(run, node.id, "omega")));
+/** Whether a second channel can still be finished this turn: the new router (in hand, or standing
+ * half-cabled) and the fibers it still needs. */
+function channelOpen(run: RunState): boolean {
+  const spare = spareDevice(run);
+  if (!spare) return affordsAll(run, ["router", "fiber", "fiber"]);
+  return affordsAll(run, ["alpha", "omega"].filter(end => !linkedTo(run, spare.id, end)).map(() => "fiber"));
+}
+/** A cable of the new channel: ALPHA or OMEGA to a router that carries no channel yet. */
+function channelObjection(run: RunState, a: string, b: string): string | null {
+  const live = new Set(signalPaths(run).flat());
+  if ([a, b].some(end => live.has(end) && !isTerminal(end))) return CHANNEL_OBJECTION;
+  const device = isTerminal(a) ? b : a;
+  const role = roleOf(run, device);
+  if (isTerminal(device) || (role !== "router" && role !== "switch") || !isTerminal(isTerminal(a) ? a : b))
+    return "Cable the new router into its own channel: ALPHA → new router, then new router → OMEGA.";
+  return null;
+}
+/** The two sides a dark device is wired in by: ALPHA or OMEGA on one, a router on the other
+ * (a route needs a router; two terminals make none). */
+type WireSide = (run: RunState, end: string) => boolean;
+const WIRE_SIDES: readonly WireSide[] = [(_, end) => isTerminal(end), (run, end) => roleOf(run, end) === "router"];
+const wiredSide = (run: RunState, device: string, side: WireSide) =>
+  run.topology.links.some(link => (link.a === device && side(run, link.b)) || (link.b === device && side(run, link.a)));
+/** A cable that brings the device of `role` onto a route: to a side it is not wired to yet. */
+function wiresIn(run: RunState, role: NetworkNode["role"], a: string, b: string): boolean {
+  const device = run.topology.nodes.find(node => node.role === role)?.id;
+  const other = a === device ? b : b === device ? a : null;
+  if (!device || !other) return false;
+  const side = WIRE_SIDES.find(test => test(run, other));
+  return !!side && !wiredSide(run, device, side);
+}
+/** Whether the device of `role` can still be brought online this turn: the fibers its missing
+ * sides need, or, fully wired behind a cut, a Hot Patch. */
+function wireOpen(run: RunState, role: NetworkNode["role"]): boolean {
+  const device = run.topology.nodes.find(node => node.role === role)?.id;
+  if (!device) return false;
+  const missing = WIRE_SIDES.filter(side => !wiredSide(run, device, side)).length;
+  if (missing) return affordsAll(run, Array(missing).fill("fiber"));
+  return (run.faultLinks.length > 0 || run.faultNodes.length > 0) && affordable(run, ["patch"]);
+}
+/** A cable that closes a route: a router to the terminal it still lacks, when it already reaches the other. */
+function closesRoute(run: RunState, a: string, b: string): boolean {
+  const terminal = isTerminal(a) ? a : isTerminal(b) ? b : null;
+  const router = terminal === a ? b : a;
+  if (!terminal || roleOf(run, router) !== "router") return false;
+  return linkedTo(run, router, terminal === "alpha" ? "omega" : "alpha");
+}
+/** Bands a route's hardware stands in: band fields count only deployed devices, never ALPHA or OMEGA. */
+function routeBands(run: RunState): Set<Zone> {
+  const routed = new Set(signalPaths(run).flat());
+  return new Set(run.topology.nodes.filter(node => !node.fixed && routed.has(node.id)).map(node => zoneForNode(node)));
+}
+/** Whether the ultimate can still be answered from the hand: some order of the answer cards breaks
+ * it or covers the whole blow. Pure: it plays on copies. */
+function answerable(run: RunState, depth = 0): boolean {
+  const preview = combatPreview(run);
+  if (preview.lethal || preview.interrupted || preview.incoming === 0) return true;
+  if (depth >= 4) return false;
+  const tried = new Set<string>();
+  return run.hand.some((id, index) => {
+    if (!ULTIMATE_ANSWERS.includes(CARDS[id].base) || tried.has(id) || costFor(run, index) > run.energy) return false;
+    tried.add(id);
+    const next = structuredClone(run);
+    return playInstant(next, index).ok && answerable(next, depth + 1);
+  });
+}
+/** The Ghost can still guard the line this turn: an affordable Failover Policy, or a whole second channel. */
+const canProtect = (run: RunState) => affordable(run, ["failover-policy"]) || channelOpen(run);
+/** The Ghost's line would hold through the coming cut with Buffer on (a second channel, an armed policy). */
+function lineProtected(run: RunState): boolean {
+  if (run.buffering) return !combatPreview(run).bufferAtRisk;
+  const buffered = structuredClone(run);
+  buffered.buffering = true;
+  return !combatPreview(buffered).bufferAtRisk;
+}
+/** The protect step can still be made this turn: a buffer to stack behind it, Buffer to switch on
+ * (it is free), and a line that is guarded or can still be. */
+const protectOpen = (run: RunState) =>
+  run.buffer > 0 && (run.buffering || consoleState(run).usable) && (lineProtected(run) || canProtect(run));
 
 /** Whether a player action is off the drill's script. Returns the coach's objection —
  * with the way forward — or null to allow it. Every block leaves an affordable way to
  * continue, so the guard can never strand a lesson. */
 export function lessonGuard(id: LessonId, run: RunState, progress: LessonProgress, action: LessonAction): string | null {
   if (progress.complete || run.phase !== "battle" || !run.enemies.length) return null;
-  const done: Record<string, boolean> = {};
-  for (const goal of progress.goals) done[goal.id] = goal.done;
   const preview = combatPreview(run);
 
   if (action.kind === "card") {
@@ -1411,127 +1520,20 @@ export function lessonGuard(id: LessonId, run: RunState, progress: LessonProgres
     if (!goals) return null;
     const current = progress.goals[progress.current];
     const allowed = current ? goals[current.id] ?? [] : [];
-    if (allowed === "any" || allowed.includes(definition.base)) return null;
-    if (preview.incoming >= run.integrity && DEFENSE.includes(definition.base)) return null;
-    return `Keep ${definition.name} for later — the current step: ${current?.label ?? "finish the drill"}.`;
+    const lethal = preview.incoming >= run.integrity && DEFENSE.includes(definition.base);
+    if (!allowed.includes(definition.base)) return lethal ? null : `Keep ${definition.name} for later — the current step: ${current?.label ?? "finish the drill"}.`;
+    // The ultimate turn: burst and shield are both answers, but a card that leaves neither is not.
+    if (id === "danger" && current?.id === "ultimate" && preview.intent?.ultimate && !lethal) {
+      const index = run.hand.indexOf(action.card);
+      const next = structuredClone(run);
+      if (index >= 0 && answerable(run) && (!playInstant(next, index).ok || !answerable(next)))
+        return `${definition.name} would leave Crownfall unanswered. ${DANGER_HINT}`;
+    }
+    return null;
   }
 
   if (FRONT_LESSONS.includes(id)) return frontGuard(id, run, progress, action, preview);
-  if (action.kind === "focus" || action.kind === "repair") return null;
-  if (action.kind === "scrub") {
-    const current = progress.goals[progress.current];
-    return id !== "danger" || current?.id === "scrub" ? null : `Not now — the current step: ${current?.label ?? "finish the drill"}.`;
-  }
-
-  if (action.kind === "link") {
-    const role = (end: string) => run.topology.nodes.find(node => node.id === end)?.role;
-    const touches = (wanted: NetworkNode["role"]) => role(action.a) === wanted || role(action.b) === wanted;
-    switch (id) {
-      case "first-signal":
-      case "console-architect": {
-        // The classic dead end: a cable that touches no router carries nothing.
-        const building = id === "first-signal" ? !done.route : !done.patch;
-        if (building && !touches("router"))
-          return "A route needs a router in the middle — a straight ALPHA → OMEGA cable carries no signal. Connect to your router.";
-        if (id === "console-architect" && !done.channels) {
-          const taken = new Set(signalPaths(run).flat());
-          if ([action.a, action.b].some(end => taken.has(end) && !["alpha", "omega"].includes(end)))
-            return CHANNEL_OBJECTION;
-        }
-        return null;
-      }
-      case "reroute": {
-        if (done.channel) return null;
-        const taken = new Set(signalPaths(run).flat());
-        if ([action.a, action.b].some(end => taken.has(end) && !["alpha", "omega"].includes(end)))
-          return CHANNEL_OBJECTION;
-        return null;
-      }
-      case "online":
-        if (!done.firewall && !touches("firewall"))
-          return "Cable the Trust Gate first: ALPHA → firewall, then firewall → router.";
-        if (done.firewall && done.transmit && !done.cache && !touches("cache"))
-          return "Cable the Cache Server into a route: ALPHA → cache → router works.";
-        return null;
-      case "traps":
-        if (!done.honeypot) {
-          if (!hasRole(run, "honeypot")) return "Deploy the Honeypot first — then cable it.";
-          if (!touches("honeypot")) return "Cable the Honeypot, so the jam finds the decoy instead of your router.";
-        }
-        return null;
-      default:
-        return null;
-    }
-  }
-
-  if (action.kind === "ground" || action.kind === "move") {
-    // Holding the ground is lesson five's whole point: never into the storm's band.
-    if (id === "bands" && !done.jam) {
-      const marked = preview.hazardZone;
-      if (marked && action.zone === marked)
-        return `The storm strikes ${marked.toUpperCase()} next — put your hardware in another band.`;
-    }
-    return null;
-  }
-
-  if (action.kind === "zone") {
-    if (id !== "bands") return null;
-    const base = CARDS[action.card].base;
-    if (base === "purge-field" && !run.zoneEffects.some(effect => effect.zone === action.zone))
-      return "Purge cleanses a hostile field — cast it on the band where the suppression sits.";
-    if (base === "resonance-field") {
-      const crossed = new Set(signalPaths(run).flat()
-        .map(end => run.topology.nodes.find(node => node.id === end))
-        .filter(node => !!node)
-        .map(node => zoneForNode(node)));
-      if (crossed.size && !crossed.has(action.zone))
-        return "Your route doesn't cross that band — cast Resonance where your signal runs.";
-    }
-    return null;
-  }
-
-  if (action.kind === "prepare") {
-    if (id === "danger" && !done.prepare && !["zero-day", "pulse"].includes(CARDS[action.card].base))
-      return "Hold your answer to the ultimate: prepare Zero Day, your biggest burst.";
-    return null;
-  }
-
-  // Transmissions that would waste the drill's setup, each with an affordable escape.
-  switch (id) {
-    case "first-signal":
-      if (!done.route && affordable(run, hasRole(run, "router") ? ["fiber"] : ["router"]))
-        return "Not yet — without a live route the transmission does nothing. Finish ALPHA → router → OMEGA first.";
-      break;
-    case "read-the-enemy":
-      if (!done.cover && preview.incoming > 0 && affordable(run, ["guard"]))
-        return `You would lose ${preview.incoming} integrity. Play Packet Guard until the forecast reads 0, then transmit.`;
-      break;
-    case "reroute":
-      if (!done.channel && affordable(run, ["router", "switch", "fiber"]))
-        return "The coming cut would silence your only route. Build the second channel first, then transmit.";
-      break;
-    case "online":
-      if (!done.firewall && affordable(run, ["fiber"]))
-        return "The Trust Gate is still offline, so the breach will land. Cable it into your route first.";
-      break;
-    case "bands":
-      if (!done.jam && run.energy >= RULES.relocateCost)
-        return `The storm would jam your route where it stands. Move your router out of the marked band first (${RULES.relocateCost} energy).`;
-      break;
-    case "traps":
-      if ((!done.honeypot && affordable(run, ["honeypot", "fiber"])) || (!done.armed && affordable(run, ["port-security", "rate-limiter", "failover-policy"])))
-        return "Set the trap before the attack: a cabled Honeypot and an armed protocol. Then transmit.";
-      break;
-    case "console-architect":
-      if (!done.patch && run.consoleUses === 0 && run.energy >= 1)
-        return "The route is unfinished, so a transmission does nothing. Use Patch Cable beside your hand to close it first.";
-      break;
-    case "console-ghost":
-      if (run.buffering && preview.bufferAtRisk)
-        return "Packet loss ahead: the coming cut would spill the whole buffer. Protect the line first — or click Buffer again to cancel and flush now.";
-      break;
-  }
-  return lethalTransmission(run, preview);
+  return classicGuard(id, run, progress, action, preview);
 }
 
 /** Every rail's last word on a transmission: never walk into a loss while a shield answer remains. */
@@ -1539,6 +1541,186 @@ function lethalTransmission(run: RunState, preview: Preview): string | null {
   if (preview.incoming >= run.integrity && !preview.lethal && !preview.enemyDefeatedByTraps && affordable(run, DEFENSE))
     return `That transmission would end the drill: ${preview.incoming} incoming against ${run.integrity} integrity. Shield first, or undo (Z).`;
   return null;
+}
+
+/** Rails of the classic drills (chapters 1–8), for every move but cards: as in the table-front
+ * drills, only the current step's move is playable, and it must land where the step needs it (a
+ * cable into the new channel, a relocation out of the marked band). Transmit waits while the step
+ * can still be made this turn, so a drill never runs on past a step it can no longer teach. */
+function classicGuard(id: LessonId, run: RunState, progress: LessonProgress, action: LessonAction, preview: Preview): string | null {
+  const step = progress.goals[progress.current];
+  const now = step?.id ?? "";
+  const next = `the current step: ${step?.label ?? "finish the drill"}.`;
+  switch (action.kind) {
+    // One hostile: the target never changes a classic drill.
+    case "focus":
+      return null;
+    case "scrub":
+      return id === "danger" && now === "scrub" ? null : `Leave the installation for now — ${next}`;
+    case "repair":
+      return `Not now — ${next}`;
+    case "prepare":
+      if (id === "danger" && now === "prepare")
+        return ["zero-day", "pulse"].includes(CARDS[action.card]?.base) ? null : "Hold your answer to the ultimate: prepare Zero Day, your biggest burst.";
+      return `Keep your hand as it is — ${next}`;
+    case "release":
+      return `Keep the prepared card where it is — ${next}`;
+    case "console": {
+      const buffering = consoleState(run).active;
+      switch (id) {
+        case "console-architect":
+          return now === "patch" ? null : `Patch Cable is spent for this drill — ${next}`;
+        case "console-warden":
+          // Harden again on the release turn keeps the cycle going, as the coach says.
+          return now === "harden" || now === "release" ? null : `Harden waits — ${next}`;
+        case "console-ghost":
+          if (buffering) return now === "release" || (now === "protect" && !protectOpen(run)) ? null : `Keep Buffer on — ${next}`;
+          if (now === "release") return "Flush it: leave Buffer off and Transmit.";
+          return now === "buffer" || now === "protect" ? null : `Not now — ${next}`;
+        default:
+          return `Your keeper's console has its own lesson (chapter 7) — ${next}`;
+      }
+    }
+    case "link": {
+      const { a, b } = action;
+      switch (id) {
+        case "first-signal":
+          if (now === "source")
+            return [a, b].includes("alpha") && [a, b].some(end => roleOf(run, end) === "router") ? null
+              : [a, b].includes("omega") && [a, b].includes("alpha") ? "A route needs a router in the middle — a straight ALPHA → OMEGA cable carries no signal. Connect to your router."
+                : "Cable ALPHA to your router first: click ALPHA, then the router.";
+          if (now === "route") return closesRoute(run, a, b) ? null : "Now cable your router to OMEGA: that closes ALPHA → router → OMEGA.";
+          break;
+        case "console-architect":
+          if (now === "patch") return closesRoute(run, a, b) ? null : "A route needs a router in the middle. Patch your router to OMEGA.";
+          if (now === "channels") return channelObjection(run, a, b);
+          break;
+        case "reroute":
+          if (now === "channel") return channelObjection(run, a, b);
+          break;
+        case "console-ghost":
+          if (now === "protect") return channelObjection(run, a, b);
+          break;
+        case "online":
+          if (now === "firewall")
+            return wiresIn(run, "firewall", a, b) ? null : "Cable the Trust Gate into your route: ALPHA → firewall, then firewall → router.";
+          if (now === "cache")
+            return wiresIn(run, "cache", a, b) ? null : "Cable the Cache Server into a route: ALPHA → cache, then cache → router.";
+          break;
+        case "traps":
+          if (now === "honeypot") {
+            if (!hasRole(run, "honeypot")) return "Deploy the Honeypot first — then cable it.";
+            if (roleOf(run, a) !== "honeypot" && roleOf(run, b) !== "honeypot") return "Cable the Honeypot, so the jam finds the decoy instead of your router.";
+            return null;
+          }
+          break;
+      }
+      return `No new cables now — ${next}`;
+    }
+    case "ground": {
+      const base = CARDS[action.card]?.base;
+      if (id === "first-signal" && now === "router" && !hasRole(run, "router")) return null;
+      if (id === "traps" && now === "honeypot" && !hasRole(run, "honeypot")) return null;
+      const building = (id === "reroute" && now === "channel") || (id === "console-architect" && now === "channels") || (id === "console-ghost" && now === "protect");
+      if (building && base === "router") {
+        const spare = spareDevice(run);
+        return spare ? `Cable ${spare.id.toUpperCase()} first: ALPHA → ${spare.id.toUpperCase()} → OMEGA.` : null;
+      }
+      return `No new hardware now — ${next}`;
+    }
+    case "move": {
+      // Holding the ground is lesson five's whole point: out of the storm's band, and only then.
+      if (id === "bands" && (now === "suppression" || now === "jam")) {
+        const marked = preview.hazardZone;
+        if (marked && action.zone === marked)
+          return `The storm strikes ${marked.toUpperCase()} next — put your hardware in another band.`;
+        return null;
+      }
+      return `Leave the hardware where it stands — ${next}`;
+    }
+    case "zone": {
+      if (id !== "bands") return `Not now — ${next}`;
+      const base = CARDS[action.card]?.base;
+      if (base === "purge-field" && !run.zoneEffects.some(effect => effect.zone === action.zone))
+        return "Purge cleanses a hostile field — cast it on the band where the suppression sits.";
+      if (base === "resonance-field") {
+        const crossed = routeBands(run);
+        if (!crossed.has(action.zone))
+          return `Your route doesn't cross that band — cast Resonance where your router stands${crossed.size ? ` (${[...crossed].map(zone => zone.toUpperCase()).join(" or ")})` : ""}.`;
+      }
+      return null;
+    }
+    case "card":
+      return null;
+    case "transmit":
+      break;
+  }
+
+  // Transmit: only when it is the step, or the step can no longer be made this turn.
+  switch (id) {
+    case "first-signal":
+      if (now !== "transmit" && affordable(run, hasRole(run, "router") ? ["fiber"] : ["router"]))
+        return "Not yet — without a live route the transmission does nothing. Finish ALPHA → router → OMEGA first.";
+      break;
+    case "read-the-enemy":
+      if (now === "cover" && preview.incoming > 0 && affordable(run, ["guard"]))
+        return `You would lose ${preview.incoming} integrity. Play Packet Guard until the forecast reads 0, then transmit.`;
+      if (now === "burst" && affordable(run, ["pulse"]))
+        return "Play Packet Burst first: energy left unspent is damage lost.";
+      break;
+    case "reroute":
+      if (now === "channel" && channelOpen(run))
+        return "The coming cut would silence your only route. Build the second channel first, then transmit.";
+      if (now === "restore" && (run.faultLinks.length || run.faultNodes.length) && affordable(run, ["patch"]))
+        return "Play Hot Patch first: it reconnects the cut line.";
+      break;
+    case "online":
+      if (now === "firewall" && wireOpen(run, "firewall"))
+        return "The Trust Gate is still offline, so the breach will land. Cable it into your route first.";
+      if (now === "cache" && wireOpen(run, "cache"))
+        return "Cable the Cache Server into a route first: ALPHA → cache, then cache → router.";
+      break;
+    case "bands":
+      if ((now === "suppression" || now === "jam") && run.energy >= RULES.relocateCost)
+        return `The storm would jam your route where it stands. Move your router out of the marked band first (${RULES.relocateCost} energy).`;
+      if (now === "resonance" && affordable(run, ["resonance-field"]) && routeBands(run).size > 0)
+        return "Play Resonance Field on your router's band first: it adds to this transmission.";
+      break;
+    case "traps":
+      if ((now === "honeypot" && affordable(run, ["honeypot", "fiber"])) || (now === "armed" && affordable(run, ["port-security", "rate-limiter", "failover-policy"])))
+        return "Set the trap before the attack: a cabled Honeypot and an armed protocol. Then transmit.";
+      break;
+    case "console-architect":
+      if (now === "patch" && consoleState(run).usable)
+        return "The route is unfinished, so a transmission does nothing. Use Patch Cable beside your hand to close it first.";
+      if (now === "channels" && channelOpen(run))
+        return "Go wide first: deploy the second Core Router and cable it ALPHA → router → OMEGA.";
+      break;
+    case "console-warden":
+      if (now === "harden" && consoleState(run).usable)
+        return "Use Harden first: the shield it gives is what Backpressure stores.";
+      break;
+    case "console-ghost":
+      if (run.buffering && preview.bufferAtRisk)
+        return "Packet loss ahead: the coming cut would spill the whole buffer. Protect the line first — or click Buffer again to cancel and flush now.";
+      if (now === "buffer" && consoleState(run).usable)
+        return "Switch on Buffer first: this turn's transmission is stored, not dealt.";
+      if (now === "protect" && protectOpen(run))
+        return lineProtected(run) ? "The line is protected: switch Buffer on again, then transmit."
+          : "Protect the line with Failover Policy, then switch Buffer on again — then transmit.";
+      break;
+    case "danger":
+      if (now === "scrub" && run.installations.length && run.energy >= scrubCost(run))
+        return "Scrub the Siphon Tap first: it drains every transmission.";
+      if (now === "worm" && affordable(run, ["worm"]))
+        return `Delete the Worm first: held when you transmit, it deals ${RULES.wormDamage} to you.`;
+      if (now === "prepare" && !run.preparedCard && run.hand.some(card => ["zero-day", "pulse"].includes(CARDS[card].base)))
+        return "Prepare Zero Day first (P): next turn is the ultimate.";
+      if (now === "ultimate" && preview.intent?.ultimate && answerable(run) && !(preview.lethal || preview.interrupted || preview.incoming === 0))
+        return `Crownfall would land for ${preview.incoming}. ${DANGER_HINT}`;
+      break;
+  }
+  return lethalTransmission(run, preview);
 }
 
 /** Rails of the table-front drills (chapters 10–12), for every move but cards: only the current
@@ -1597,7 +1779,10 @@ function frontGuard(id: LessonId, run: RunState, progress: LessonProgress, actio
     case "link":
     case "ground":
     case "move":
+    case "console":
       return `Your network is already built: this drill needs no new cables, hardware or moves. ${next[0].toUpperCase()}${next.slice(1)}`;
+    case "release":
+      return `Keep the prepared card where it is — ${next}`;
     case "card":
       return null;
     case "transmit":

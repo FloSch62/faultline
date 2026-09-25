@@ -4,8 +4,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  combatPreview, endTurn, isWorn, livingEnemies, playGround, playInstant, playJunk, playLink, playProtocol, playZone,
-  prepareCard, relocateNode, repairNode, scrubInstallation, setFocus, signalPaths, useConsole, zoneForNode, type TurnResult,
+  combatPreview, consoleState, endTurn, isBlocked, isWorn, livingEnemies, playGround, playInstant, playJunk, playLink, playProtocol,
+  playZone, prepareCard, releasePreparedCard, relocateNode, repairNode, scrubInstallation, setFocus, signalPaths, useConsole, zoneForNode,
+  type TurnResult,
 } from "./run.ts";
 import { CARDS, RULES } from "./cards.ts";
 import { ENEMIES } from "./enemies.ts";
@@ -340,8 +341,14 @@ test("training rails: ground is held in the bands lesson", () => {
 
 test("training rails: the danger drill guards the prepare slot", () => {
   const s = new Session("danger");
+  assert.ok(guard(s, { kind: "prepare", card: "zero-day" }), "one step at a time: the scrub comes first");
+  ok(scrubInstallation(s.run, "tap1"), "scrub");
+  ok(playJunk(s.run, index(s.run, "worm")), "delete worm");
   assert.ok(guard(s, { kind: "prepare", card: "guard" }), "the slot is for the burst answer");
   assert.equal(guard(s, { kind: "prepare", card: "zero-day" }), null);
+  assert.ok(guard(s, { kind: "transmit" }), "the answer is held before the charge turn ends");
+  ok(prepareCard(s.run, index(s.run, "zero-day")), "prepare zero day");
+  assert.ok(guard(s, { kind: "release" }), "and it stays held");
 });
 
 test("training rails: junk is always deletable, and a lethal turn always frees the shield", () => {
@@ -375,12 +382,142 @@ test("training rails: the ghost cannot transmit into packet loss", () => {
 });
 
 test("training rails: a lethal transmission is stopped only while a shield answer remains", () => {
-  const s = new Session("console-warden");
+  const s = new Session("first-signal");
+  const router = place(s.run, "router", 0, 0);
+  cable(s.run, "alpha", router);
+  cable(s.run, router, "omega");
   s.run.integrity = 1;
+  s.run.energy = CARDS.guard.cost;
   assert.ok(combatPreview(s.run).incoming >= 1, "the strike would finish the drill");
   assert.ok(guard(s, { kind: "transmit" }), "the coach stops the loss");
   s.run.hand = s.run.hand.filter(card => card !== "guard");
   assert.equal(guard(s, { kind: "transmit" }), null, "with no shield left the drill may play out");
+});
+
+test("training rails: Transmit waits while the current step can still be made", () => {
+  // Lesson 5, as a player met it: out of the storm's band, then Transmit instead of Resonance, turn
+  // after turn, until the Null Storm fell with the step still open.
+  const bands = new Session("bands");
+  ok(relocateNode(bands.run, "router1", 0, 0), "relocate to center");
+  assert.equal(bands.update().goals[bands.progress.current].id, "resonance");
+  assert.match(guard(bands, { kind: "transmit" }) ?? "", /Resonance Field/, "the resonance step holds the transmission");
+  ok(playZone(bands.run, index(bands.run, "resonance-field"), "center"), "resonance");
+  assert.equal(guard(bands, { kind: "transmit" }), null);
+
+  const read = new Session("read-the-enemy");
+  while (combatPreview(read.run).incoming > 0) ok(playInstant(read.run, index(read.run, "guard")), "guard");
+  assert.ok(guard(read, { kind: "transmit" }), "the burst step comes before the transmission");
+
+  const warden = new Session("console-warden");
+  assert.ok(guard(warden, { kind: "transmit" }), "Harden comes first");
+  const ghost = new Session("console-ghost");
+  assert.ok(guard(ghost, { kind: "transmit" }), "Buffer comes first");
+  const architect = new Session("console-architect");
+  ok(useConsole(architect.run, "router1", "omega"), "patch cable");
+  assert.ok(guard(architect, { kind: "transmit" }), "the second channel comes first");
+
+  const danger = new Session("danger");
+  assert.ok(guard(danger, { kind: "transmit" }), "scrub first");
+  ok(scrubInstallation(danger.run, "tap1"), "scrub");
+  assert.ok(guard(danger, { kind: "transmit" }), "delete the worm first");
+
+  const online = new Session("online");
+  cable(online.run, "alpha", "firewall2");
+  cable(online.run, "firewall2", "router1");
+  online.update();
+  online.transmit();
+  if (online.run.faultLinks.length || online.run.faultNodes.length) ok(playInstant(online.run, index(online.run, "patch")), "patch the cut");
+  assert.ok(guard(online, { kind: "transmit" }), "the Cache Server is wired in first");
+
+  const reroute = new Session("reroute");
+  const router = place(reroute.run, "router", 0, 2.6);
+  cable(reroute.run, "alpha", router);
+  cable(reroute.run, router, "omega");
+  reroute.update();
+  reroute.transmit();
+  assert.ok(reroute.run.faultLinks.length, "the cut landed");
+  assert.ok(guard(reroute, { kind: "transmit" }), "Hot Patch comes first");
+});
+
+test("training rails: the console, relocations, scrubs, repairs and the prepare slot wait for their own step", () => {
+  for (const lesson of LESSONS.filter(item => item.kind === "battle")) {
+    const s = new Session(lesson.id);
+    const console = guard(s, { kind: "console" });
+    if (lesson.id === "console-architect" || lesson.id === "console-warden" || lesson.id === "console-ghost")
+      assert.equal(console, null, `${lesson.id}: the keeper's console is step one`);
+    else assert.ok(console, `${lesson.id}: the console waits for its own lesson`);
+    const device = s.run.topology.nodes.find(node => !node.fixed);
+    if (device) {
+      const move = guard(s, { kind: "move", node: device.id, zone: "south" });
+      if (lesson.id === "bands") assert.equal(move, null, "bands: moving out of the marked band is step one");
+      else assert.ok(move, `${lesson.id}: the hardware stays where it stands`);
+      assert.ok(guard(s, { kind: "repair", node: device.id }), `${lesson.id}: nothing to repair`);
+    }
+    if (lesson.id !== "danger" && lesson.id !== "clear-ground")
+      for (const item of s.run.installations) assert.ok(guard(s, { kind: "scrub", installation: item.id }), `${lesson.id}: scrubbing is not the step`);
+    assert.ok(guard(s, { kind: "prepare", card: s.run.hand[0] }), `${lesson.id}: the hand stays as it is`);
+    assert.ok(guard(s, { kind: "release" }), `${lesson.id}: a prepared card stays prepared`);
+  }
+});
+
+test("training rails: cables and fields must land where the step needs them", () => {
+  const first = new Session("first-signal");
+  const router = place(first.run, "router", 0, 0);
+  assert.ok(guard(first, { kind: "link", card: "fiber", a: router, b: "omega" }), "ALPHA → router is the step, not router → OMEGA");
+  const reroute = new Session("reroute");
+  place(reroute.run, "router", 0, 2.6);
+  assert.ok(guard(reroute, { kind: "link", card: "fiber", a: "alpha", b: "omega" }), "a terminal-to-terminal cable is no channel");
+  const online = new Session("online");
+  assert.ok(guard(online, { kind: "link", card: "fiber", a: "firewall2", b: "cache3" }), "the firewall is wired to a route, not to the cache");
+  cable(online.run, "alpha", "firewall2");
+  assert.ok(guard(online, { kind: "link", card: "fiber", a: "firewall2", b: "omega" }), "ALPHA → firewall → OMEGA has no router");
+  assert.equal(guard(online, { kind: "link", card: "fiber", a: "firewall2", b: "router1" }), null);
+  const architect = new Session("console-architect");
+  assert.ok(guard(architect, { kind: "link", a: "alpha", b: "omega" }), "Patch Cable closes the route through the router");
+  assert.equal(guard(architect, { kind: "link", a: "router1", b: "omega" }), null);
+
+  // Band fields count deployed hardware only: ALPHA and OMEGA stand in CENTER but claim no band.
+  const bands = new Session("bands");
+  ok(relocateNode(bands.run, "router1", 0, 2.5), "relocate to south");
+  assert.ok(guard(bands, { kind: "zone", card: "resonance-field", zone: "center" }), "CENTER holds no hardware of the route");
+  assert.equal(guard(bands, { kind: "zone", card: "resonance-field", zone: "south" }), null);
+  assert.ok(guard(bands, { kind: "move", node: "router1", zone: "center" }), "once out of the storm's band, the router stays");
+});
+
+test("training rails: the ultimate turn keeps an answer in hand", () => {
+  const s = new Session("danger");
+  ok(scrubInstallation(s.run, "tap1"), "scrub");
+  ok(playJunk(s.run, index(s.run, "worm")), "delete worm");
+  ok(prepareCard(s.run, index(s.run, "zero-day")), "prepare zero day");
+  s.update();
+  s.transmit();
+  assert.ok(combatPreview(s.run).intent?.ultimate);
+  assert.ok(guard(s, { kind: "transmit" }), "Crownfall is not faced unanswered");
+  ok(playInstant(s.run, index(s.run, "pulse")), "packet burst first");
+  // Burst short of the break, then a lone Packet Guard: neither answer would be left in reach.
+  assert.ok(guard(s, { kind: "card", card: "guard" }), "a card that leaves Crownfall unanswered waits");
+  assert.equal(guard(s, { kind: "card", card: "zero-day" }), null);
+  ok(playInstant(s.run, index(s.run, "zero-day")), "zero day");
+  assert.ok(combatPreview(s.run).interrupted);
+  assert.equal(guard(s, { kind: "transmit" }), null);
+});
+
+test("training rails: the Ghost protects the line and buffers again before it transmits", () => {
+  const s = new Session("console-ghost");
+  ok(useConsole(s.run), "buffer on");
+  s.update();
+  s.transmit();
+  // A second channel first (the whole turn's energy), Buffer still off: the free switch is the rest of the step.
+  const router = place(s.run, "router", 0, 2.5);
+  cable(s.run, "alpha", router);
+  cable(s.run, router, "omega");
+  assert.equal(s.done("protect"), false);
+  assert.match(s.progress.coach, /switch \*\*Buffer\*\* on again/);
+  assert.ok(guard(s, { kind: "transmit" }), "a plain flush would skip the step");
+  assert.equal(guard(s, { kind: "console" }), null);
+  ok(useConsole(s.run), "buffer on, protected");
+  assert.ok(s.done("protect"));
+  assert.equal(guard(s, { kind: "transmit" }), null);
 });
 
 test("progress is sticky and the menu order chains lessons", () => {
@@ -709,4 +846,91 @@ test("training rails: the drills keep their escapes — shield at lethal, transm
   const c = new Session("clear-ground");
   c.run.energy = 0;
   assert.equal(guard(c, { kind: "transmit" }), null, "no energy left to scrub: the drill moves on");
+});
+
+// ---------------------------------------------------------------------------
+// No drill can be stranded: every sequence of moves the rails allow ends in a complete lesson.
+
+/** Every move the interface offers on a drill board: what it asks the rails, and how the rules play it.
+ * One socket per band stands in for the whole table (the drills read bands, not exact sockets). */
+function everyMove(run: RunState): { label: string; asks: LessonAction[]; play: (run: RunState) => Result }[] {
+  const moves: ReturnType<typeof everyMove> = [];
+  const zones: Zone[] = ["north", "center", "south"];
+  const rows: Record<Zone, number[]> = { north: [-2.5, -3.6, -1.8], center: [0, 0.9, -0.9], south: [2.5, 3.6, 1.8] };
+  const socket = (zone: Zone, ignore?: string) => rows[zone].flatMap(z => [0, -1.25, 1.25, -2.6, 2.6].map(x => ({ x, z }))).find(p => !isBlocked(run, p.x, p.z, ignore));
+  const pairs: [string, string][] = run.topology.nodes.flatMap((a, i) => run.topology.nodes.slice(i + 1).map(b => [a.id, b.id] as [string, string]));
+  const at = (id: CardId) => (r: RunState) => r.hand.indexOf(id);
+  for (const id of new Set(run.hand)) {
+    const c = CARDS[id], card: LessonAction = { kind: "card", card: id }, i = at(id);
+    if (c.target === "instant") moves.push({ label: `play ${id}`, asks: [card], play: r => playInstant(r, i(r)) });
+    if (c.target === "protocol") moves.push({ label: `arm ${id}`, asks: [card], play: r => playProtocol(r, i(r)) });
+    if (c.target === "junk") moves.push({ label: `delete ${id}`, asks: [card], play: r => playJunk(r, i(r)) });
+    if (c.target === "zone") for (const zone of zones) moves.push({ label: `${id} ${zone}`, asks: [card, { kind: "zone", card: id, zone }], play: r => playZone(r, i(r), zone) });
+    if (c.target === "ground") for (const zone of zones) {
+      const p = socket(zone);
+      if (p) moves.push({ label: `${id} ${zone}`, asks: [card, { kind: "ground", card: id, zone }], play: r => playGround(r, i(r), p.x, p.z) });
+    }
+    if (c.target === "link") for (const [a, b] of pairs) moves.push({ label: `${id} ${a}–${b}`, asks: [card, { kind: "link", card: id, a, b }], play: r => playLink(r, i(r), a, b) });
+  }
+  const command = consoleState(run);
+  if (command.usable && command.target === "link") for (const [a, b] of pairs) moves.push({ label: `patch ${a}–${b}`, asks: [{ kind: "console" }, { kind: "link", a, b }], play: r => useConsole(r, a, b) });
+  else if (command.usable) moves.push({ label: command.id, asks: [{ kind: "console" }], play: r => useConsole(r) });
+  for (const node of run.topology.nodes.filter(node => !node.fixed)) {
+    for (const zone of zones.filter(zone => zone !== zoneForNode(node))) {
+      const p = socket(zone, node.id);
+      if (p) moves.push({ label: `move ${node.id} ${zone}`, asks: [{ kind: "move", node: node.id, zone }], play: r => relocateNode(r, node.id, p.x, p.z) });
+    }
+    moves.push({ label: `repair ${node.id}`, asks: [{ kind: "repair", node: node.id }], play: r => repairNode(r, node.id) });
+  }
+  for (const enemy of livingEnemies(run)) moves.push({ label: `target ${enemy.port}`, asks: [{ kind: "focus", port: enemy.port }], play: r => setFocus(r, enemy.port) });
+  for (const item of run.installations) moves.push({ label: `scrub ${item.id}`, asks: [{ kind: "scrub", installation: item.id }], play: r => scrubInstallation(r, item.id) });
+  if (run.preparedCard) moves.push({ label: "release", asks: [{ kind: "release" }], play: r => releasePreparedCard(r) });
+  else for (const id of new Set(run.hand)) moves.push({ label: `prepare ${id}`, asks: [{ kind: "prepare", card: id }], play: r => prepareCard(r, at(id)(r)) });
+  return moves;
+}
+
+test("training rails: no sequence of allowed moves strands a drill", () => {
+  const TURNS = 6, BUDGET = 5000;
+  for (const lesson of LESSONS.filter(item => item.kind === "battle")) {
+    interface Node { run: RunState; progress: LessonProgress; last?: TurnResult; read: string[]; path: string[] }
+    const keyOf = (node: Node) => JSON.stringify([{ ...node.run, log: [] }, node.progress.goals.map(goal => goal.done), node.read]);
+    const start = createLessonRun(lesson.id);
+    const first: Node = { run: start, progress: lessonProgress(lesson.id, start, undefined, undefined, { read: [] }), read: [], path: [] };
+    const seen = new Map<string, { node: Node; next: string[] }>([[keyOf(first), { node: first, next: [] }]]);
+    const queue = [keyOf(first)];
+    while (queue.length) {
+      const key = queue.shift()!;
+      const entry = seen.get(key)!, { run, progress, last, read, path } = entry.node;
+      const where = `${lesson.id} after ${path.join(" · ") || "the start"}`;
+      if (progress.complete) continue;
+      assert.equal(run.phase, "battle", `${where}: the battle ended with the drill incomplete (${run.phase})`);
+      assert.ok(run.turn <= TURNS, `${where}: still incomplete after ${TURNS} turns`);
+      const follow = (label: string, next: RunState, result: TurnResult | undefined, nextRead = read) => {
+        const node: Node = { run: next, progress: lessonProgress(lesson.id, next, result, progress, { read: nextRead }), last: result, read: nextRead, path: [...path, label] };
+        const k = keyOf(node);
+        entry.next.push(k);
+        if (!seen.has(k)) { seen.set(k, { node, next: [] }); queue.push(k); }
+      };
+      const step = progress.goals[progress.current]?.id;
+      if (progress.reading && step && !read.includes(step)) follow(`read ${step}`, run, last, [...read, step]);
+      for (const move of everyMove(run)) {
+        if (move.asks.some(action => lessonGuard(lesson.id, run, progress, action))) continue;
+        const next = structuredClone(run);
+        if (move.play(next).ok && JSON.stringify(next) !== JSON.stringify(run)) follow(move.label, next, last);
+      }
+      if (!lessonGuard(lesson.id, run, progress, { kind: "transmit" })) {
+        const next = structuredClone(run);
+        follow(`transmit ${run.turn}`, next, endTurn(next));
+      }
+      assert.ok(entry.next.length, `${where}: every move is blocked`);
+      assert.ok(seen.size <= BUDGET, `${lesson.id}: the rails let more than ${BUDGET} boards through; they are no longer one step at a time`);
+    }
+    // Every board must still reach the end: none may sit in a loop of moves that never completes.
+    const done = new Set([...seen].filter(([, entry]) => entry.node.progress.complete).map(([key]) => key));
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const [key, entry] of seen) if (!done.has(key) && entry.next.some(next => done.has(next))) { done.add(key); grew = true; }
+    }
+    for (const [key, entry] of seen) assert.ok(done.has(key), `${lesson.id} after ${entry.node.path.join(" · ")}: the drill can no longer complete`);
+  }
 });

@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """The containerlab mark (public/containerlab-mark.svg, MIT, see its LICENSE file) read as geometry.
 
 No bpy: the tabletop surface (numpy) and the Blender medallion both use it. Coordinates are

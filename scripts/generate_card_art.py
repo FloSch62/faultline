@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Generate review candidates with a local ComfyUI Krea 2 Turbo installation."""
 import argparse
 import hashlib

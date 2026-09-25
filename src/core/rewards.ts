@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** v5 card offers (contract section 4): pools, rarities and pre-upgrades for card rewards, crate
  * cards and the market. Pure given a random source: meta.ts passes the expedition RNG, encounter.ts
  * a crate's own seeded stream, so the RNG discipline is unchanged (nothing here draws on its own).

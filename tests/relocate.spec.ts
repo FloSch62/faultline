@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 // Moving a device asks first: a drop (or a device-dock band) opens the relocation plate beside the
 // device; only Relocate pays the energy. Every test also fails on any page or console error (helpers.ts).
 import type { Page } from "@playwright/test";

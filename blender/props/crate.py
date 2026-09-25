@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Crate: a brass-bound dark iron box (0.7 x 0.5 x 0.45) with ivory hazard stripes round its
 waist and a hinged brass lid. Under the lid the box glows amber from inside.
 

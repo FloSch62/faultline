@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """The tabletop: a machined deck plate, drawn with numpy (no bpy, so it also runs outside Blender).
 
 The textured tabletop fills the well inside every board frame (TABLE_X x TABLE_Y, Blender x and y,

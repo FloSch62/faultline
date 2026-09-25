@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Channels made visible: the forecast counts live routes and names the devices where routes merge
  * (and so carry one channel between them). The channel rule itself is unchanged. */
 import assert from "node:assert/strict";

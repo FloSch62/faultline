@@ -4,7 +4,7 @@
 
 A desktop deckbuilding roguelike set in a ruined orbital relay. Build a living network on a 3D table with three energy a turn: every independent channel adds bandwidth to the transmission you send at your target, every device works while it is reachable, and the quarantine comes in packs, builds on your table and grows with every action it takes. Carry a twelve-card deck through a branching expedition to the Blackout Core and grow it into one of nine builds.
 
-**[Play in your browser](https://flosch62.github.io/faultline/)** · [Contributing](CONTRIBUTING.md) · [MIT license](LICENSE)
+**[Play in your browser](https://flosch62.github.io/faultline/)** · [Contributing](CONTRIBUTING.md) · [GPLv3 + attribution](ATTRIBUTION.md)
 
 An independent open-source fan game in the Containerlab universe. **Playable alpha 0.3**, focused on laptop and desktop.
 
@@ -163,7 +163,11 @@ To publish a fork, enable GitHub Pages with **GitHub Actions** as the source, th
 
 ## License and credits
 
-Project code and project-created assets are available under the [MIT license](LICENSE), to the extent of the contributors' licensable rights. Bundled fonts, the Containerlab mark and third-party libraries retain their [original licenses](THIRD_PARTY_NOTICES.md). YuE2 model weights are not included; their separate license is preserved with the soundtrack provenance.
+**Original FAULTLINE created by [Florian Schwarz](https://flosch.me/).**
+
+Project code and project-created assets are licensed, to the extent of the contributors' licensable rights, under [GNU GPL version 3 only](LICENSE), with [additional attribution terms under section 7(b)](ATTRIBUTION.md). Preserve the original creator's name and website in the material and its displayed legal notices; an accessible Credits/About screen is suitable. Forks may add their own credits. Distribution of covered modified versions must comply with GPLv3, including its corresponding-source requirements. Earlier MIT releases retain their original permissions.
+
+Separately licensed assets and dependencies retain their [original terms](THIRD_PARTY_NOTICES.md). In particular, Krea-generated artwork has separate commercial-use restrictions; the code's open-source license does not remove them. Bundled fonts, the Containerlab mark and third-party libraries also retain their own licenses. YuE2 model weights are not included; their separate license is preserved with the soundtrack provenance.
 
 Artwork was created with OpenAI image generation and local Krea 2 Turbo. The soundtrack preserves the complete native YuE2 recordings, with fades and a constant volume adjustment for game playback. Prompts, score plans and production details are included.
 

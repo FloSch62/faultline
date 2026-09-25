@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** The far rail in the DOM (targeting): one plate per living hostile, hung under its portrait
  * (#intent-layer; main.ts places the plates every frame from World.portAnchor), and the hover cards
  * for hostiles and for the channels of the right plate's landing breakdown. Every number is read

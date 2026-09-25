@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 // Visual review against the actual card renderer. Run after installing the selected PNGs.
 // node --experimental-strip-types dev/review-card-art.ts [baseURL]
 import assert from "node:assert/strict";

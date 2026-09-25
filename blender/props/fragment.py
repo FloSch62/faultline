@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Message fragment: a brass message capsule lying on the table, cracked open along a jagged
 seam that glows from inside. A curl of pale amber ribbon (the undelivered message) rises
 0.8 above it, twisting as it climbs; the ribbon is a floater that turns about its root.

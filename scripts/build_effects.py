@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["numpy==2.2.6", "scipy==1.15.3", "soundfile==0.13.1"]

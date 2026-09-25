@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 import type { Archetype } from "./core/expedition.ts";
 import { RULES } from "./core/cards.ts";
 import type { DesignationId, Intent } from "./core/types.ts";

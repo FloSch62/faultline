@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Spike: an iron spike driven into a cracked deck plate. The octagonal plate is split along
 three radial cracks into buckled shards pushed apart by the blow; the grooves between them
 show the hot underlay. A tapering four-sided spike, leaning a little, carries two ivory

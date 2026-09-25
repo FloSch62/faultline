@@ -25,8 +25,8 @@
     "vite": "^7.1.7"
   },
   "description": "A cinematic Containerlab deckbuilding roguelike. Every connection matters.",
-  "license": "MIT",
-  "author": "Florian Schwarz (FloSch62)",
+  "license": "SEE LICENSE IN ATTRIBUTION.md",
+  "author": "Florian Schwarz (https://flosch.me/)",
   "repository": {
     "type": "git",
     "url": "https://github.com/flosch62/faultline.git"

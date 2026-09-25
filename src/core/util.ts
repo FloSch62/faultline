@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Shared deterministic helpers for combat and expedition rules. */
 import type { RunState } from "./types.ts";
 

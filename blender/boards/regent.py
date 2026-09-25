@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """The Iron Regent's board (the stage I guardian, keeper of the copper gates). The Copper Reach's
 frame turned into a gatehouse: heavy copper, the fascia's modules are riveted gate leaves under
 portcullis bars, the corner blocks are crenellated gate towers with patina-green lamps, copper

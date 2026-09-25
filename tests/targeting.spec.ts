@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Targeting: a click on a hostile (its portrait, its plate or its port-strip row) makes it the
  * target, and every channel's delivery lands there as one packet (no per-channel aiming); the right
  * plate adds it up and names the overflow. Every living hostile stands on the far rail as a portrait

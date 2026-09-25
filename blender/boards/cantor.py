@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """The Hollow Choir's board (the stage II guardian, the silence behind every voice). The Glass
 Cathedral's frame tuned into an instrument: the fascia's modules are ranks of silvered resonator
 pipes against violet glass, the corner blocks carry glass bells, tuning rods run along the side

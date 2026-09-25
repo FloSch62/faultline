@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 // Dev-only screenshot tour of every screen, menu and dialog, for visual review. Not shipped.
 // Usage: node --experimental-strip-types dev/menu-tour.ts <outDir> [WxH] [only,names]
 // BASE defaults to the dev server at http://127.0.0.1:5174/

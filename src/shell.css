@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /* The game shell: title screen, the in-run HUD bar, the soundtrack notice, keeper select,
  * and the Options, Credits and Abandon dialogs. Built from the kit in game-ui.css. */
 
@@ -189,6 +190,9 @@ dialog:has(.credits-copy) { max-width: min(660px, calc(100cqw - 24px)); }
 .credits-copy section + section::before { content: ""; display: block; width: 6px; height: 6px; margin: 16px auto; transform: rotate(45deg); background: #8a6a3a; box-shadow: 0 0 0 1px #0b0906; }
 .credits-copy h3 { margin: 0 0 6px; font: 600 15px/1.3 var(--display); letter-spacing: .07em; color: #dcc28e; }
 .credits-copy p { max-width: 520px; margin: 0 auto; font: 15px/1.6 var(--text); color: var(--text-body); }
+.credits-copy a { color: #dcc28e; text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.credits-copy a:hover { color: #fff0cc; }
+.credits-copy a:focus-visible { outline: 2px solid #dcc28e; outline-offset: 3px; }
 .credits-actions { margin-top: 24px; }
 dialog:has(.confirm-actions) { max-width: min(540px, calc(100cqw - 24px)); }
 .confirm-actions .plate-button { min-height: 50px; padding-inline: 28px; font-size: 14px; }

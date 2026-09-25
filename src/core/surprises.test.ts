@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Designations in combat (section 7) and surprises (section 8): reinforcements and Shedding,
  * crates, undelivered messages, signals — all announced or revealed, never rolled in the fight. */
 import assert from "node:assert/strict";

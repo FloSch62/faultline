@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Field Training and the Handbook — markup for the interface.
  *
  * Lesson logic (setups, goals, coach text) is pure and lives in ./tutorial/lessons.ts;

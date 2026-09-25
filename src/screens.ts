@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Expedition screens: title, archetype selection, map, rewards, relics,
  * sanctuary, market, events and outcomes. Battle UI lives in ui.ts.
  * Screens emit `data-screen` controls; main.ts forwards them to screenAction. */
@@ -864,11 +865,13 @@ export function settingsMarkup(s: AudioSettings, inRun: boolean, preferences: Pr
 export function creditsMarkup() {
   const section = (head: string, body: string) => `<section><h3>${head}</h3><p>${body}</p></section>`;
   return `<div class="panel-head"><h2>Credits</h2></div><div class="credits-copy">${[
+    section("Created by Florian Schwarz", 'Original FAULTLINE created by Florian Schwarz — <a href="https://flosch.me/" target="_blank" rel="noopener noreferrer">flosch.me</a>'),
     section("The Containerlab universe", "Inspired by Containerlab and the networks we build together. FAULTLINE is an independent fan project. The Containerlab mark is used under its original license."),
     section("Original art", "Relay cathedral, the Glass Cathedral and Blackout Heart environments, sanctuary, an expanded illustrated card collection, hostile creatures and painted interface pieces created for this game using OpenAI image generation and local Krea 2 Turbo. Artwork prompts and production details are included in the project."),
     section("Typography", "Cinzel, Grenze, Alegreya and Alegreya Sans SC, under the SIL Open Font License."),
     section("Original score · YuE2", `${Object.values(TRACK_TITLES).join(" · ")}. Generated locally with the official YuE2 model and listening decoder. Original instrumental arrangements retain their complete generated mix. Generation prompts and provenance are included in the project.`),
     section("Sound effects · Kenney", "Recorded card Foley, metal, glass and impact materials from Kenney’s CC0 Casino Audio, Impact Sounds and Sci-fi Sounds packs. Layered and mastered for FAULTLINE; source recordings, licenses and recipes are included."),
+    section("License &amp; source", `Copyright © 2026 Florian Schwarz and FAULTLINE contributors. You may redistribute and modify this work under <a href="${import.meta.env.BASE_URL}LICENSE.txt" target="_blank" rel="noopener noreferrer">GNU GPLv3</a> with <a href="${import.meta.env.BASE_URL}ATTRIBUTION.txt" target="_blank" rel="noopener noreferrer">section 7(b) attribution terms</a>. Distributed without any warranty. <a href="https://github.com/FloSch62/faultline" target="_blank" rel="noopener noreferrer">Source code</a>. Separately licensed materials retain their <a href="${import.meta.env.BASE_URL}THIRD_PARTY_NOTICES.txt" target="_blank" rel="noopener noreferrer">original terms</a>.`),
     section("A real network, in miniature", "Packets and faults are simulated in your browser. You can export the topology to Containerlab; real routing requires device configuration and container images."),
   ].join("")}</div><div class="button-row credits-actions"><button class="plate-button" data-action="settings">Back</button></div>`;
 }

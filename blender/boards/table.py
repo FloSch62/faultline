@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """The tabletop's textures, drawn by surface.py and written as JPEGs next to the board models:
 table-<deck>.jpg (base colour: copper, glass, blackout per stage; regent, cantor, core per guardian),
 table-normal.jpg and table-rm.jpg (G roughness, B metalness), shared by every board. No mesh: World.ts lays them

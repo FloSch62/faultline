@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 import * as THREE from "three";
 import type { Installation, InstallationKind } from "../core/types.ts";
 import { box, cylinder, dashedRing, decal, glow, mat, ring } from "./materials.ts";

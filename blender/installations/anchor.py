@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Anchor: a heavy brass anchor block strapped in bright brass, its two iron claws hooked
 over the ends and into the table. A gibbet post rises from the back of the block; its short
 arm holds a violet lantern out toward the camera, and a chain from the block's mooring eye

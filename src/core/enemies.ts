@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 import type { DesignationId, Intent, InstallationKind, MessageOptionId, SignalId } from "./types.ts";
 import { RULES } from "./cards.ts";
 

@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** The Architect's cards: "Make a way through" (contract section 9.1). Paths: Mesh (channels and
  * width), Backbone (a long, upgraded primary route), Deployment (hardware tempo, clusters, device
  * triggers). DATA ONLY: imports rules.ts and card-types.ts; behaviour lives in

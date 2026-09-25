@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Shared building blocks for FAULTLINE models: devices, installations and props.
 
 Units are game units. Blender is Z-up; the glTF export turns the model Y-up and

@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Phantom Node: the router's silhouette as a ghost. An open wireframe cage traces the hexagonal
 chassis with its port bays, the collar, the deck, six leaning spires and the halo; a faint
 shell gives it volume, and inside the crystal's outline a small solid core floats.

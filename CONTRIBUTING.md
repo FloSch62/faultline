@@ -42,4 +42,4 @@ Include your browser, screen size, expedition seed, architect and the steps to r
 
 ## License
 
-Contributions are submitted under the project's [MIT license](LICENSE), with existing third-party licensing retained.
+Contributions are submitted under [GNU GPL version 3 only](LICENSE) with the project's [section 7(b) attribution terms](ATTRIBUTION.md), with existing third-party licensing retained. Preserve the original creator attribution; contributors may add credit for their own work. Include a notice pointing to `LICENSE` and `ATTRIBUTION.md` in new project source files.

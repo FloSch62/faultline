@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** v4 "Under Quarantine" in the browser (design 15.4): packs on the rail, the table front,
  * designations and messages, the chart, and the reduced-motion equivalents. The 3D table is read
  * through three.js' devtools hook (helpers.watchTable), so these run on the production build too. */

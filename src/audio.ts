@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 import { MusicRotation, sceneTrack, TRACK_TITLES, type ScoreScene } from "./core/music.ts";
 import { STAGES } from "./core/stages.ts";
 import { EffectsPlayer, type EffectKind, type EffectOptions } from "./audio-effects.ts";

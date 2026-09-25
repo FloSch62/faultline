@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Load balancer: a gyroscopic distributor. One stream enters a heavy round hub
 through the port that faces the camera, climbs the spindle to the core orb and
 is flung out along three weighted governor arms (weights 3 : 2 : 1) that turn

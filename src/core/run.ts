@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 import { CARDS, RULES, STARTER_DECK, STARTER_SIGNATURES, baseCard, type CardDefinition, type CardValues } from "./cards.ts";
 import { canLink, cableable, initialTopology, linkKey, paths } from "./graph.ts";
 import { createMap } from "./map.ts";

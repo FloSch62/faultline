@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Field Training: scripted lessons built on the real combat rules.
  *
  * Everything here is pure: lesson setups use the public core API, and every goal

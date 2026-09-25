@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Original instrumental YuE2 scores; vocal channel stays silent in the ABC plan.
 Masters preserve the complete native recording, without source separation.
 """

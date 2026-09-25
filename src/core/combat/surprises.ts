@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Arrivals and surprises (sections 4.5 and 8): reinforcements and Shedding spawns, guardian
  * adds, signals (announced a full turn ahead, fired at the start of the turn they name), and what
  * a fallen hostile leaves behind (crates, Laden messages, Salvaged hardware). Everything here is

@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** The Signal Keeper's Handbook: an illustrated rules reference.
  * Every number is read from the live rules (RULES, CARDS, RELICS, ENEMIES,
  * ascension and market constants), so the handbook cannot drift from balance.

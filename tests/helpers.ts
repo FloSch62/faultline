@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Shared browser-test helpers: deterministic saves, installation and state reads.
  * v4: a battle() fixture is a single hostile at the centre port (the v3 table). */
 import { expect, test as base, type Page } from "@playwright/test";

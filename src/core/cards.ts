@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Cards and relics (v5 · Three Energy). The card definitions live in data-only files per owner
  * (src/core/cards/{colorless,curses,architect,warden,ghost}.ts); this module merges them into
  * CARDS, building every `+` version from its upgrade, and holds the starter decks, the reward

@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Six original YuE2 stage themes; masters preserve the complete native recording."""
 import argparse
 import gc

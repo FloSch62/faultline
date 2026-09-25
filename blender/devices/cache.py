@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Cache server: a tall storage tower. A brass frame holds a dark chassis with a
 bay of hot-swap drive sleds (lever handles, activity LEDs), a segmented fill
 meter and louvred side vents. The frame posts rise past the roof into a lantern

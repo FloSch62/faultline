@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 import type { Page } from "@playwright/test";
 import { RELICS, isUpgraded } from "../src/core/cards.ts";
 import { encounterHealth } from "../src/core/map.ts";

@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** The Warden's cards: "Hold what remains" (contract section 9.2). Paths: Fortress (block that
  * becomes backpressure), Firewall wall (many firewalls, per-firewall payoffs), Protocols (armed traps
  * and retaliation). DATA ONLY: imports rules.ts and card-types.ts; behaviour lives in

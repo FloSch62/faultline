@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Expedition layer: rooms, rewards, credits, sanctuary services, the market,
  * relic choices and events. Combat rules live in run.ts; this module decides
  * what happens between fights. */

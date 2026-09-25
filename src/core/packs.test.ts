@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Packs and ports (design section 4): ports and port order, alternate-phase escorts,
  * deliveries on the target, merging and armor per port, overflow, focus, the enemy phase with
  * several hostiles, and the seven escort traits. */

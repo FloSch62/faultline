@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Client: the signal terminals ALPHA and OMEGA. An octagonal pulpit with a lectern
 console facing the table; four steel buttresses rise into brass arms that cradle
 the floating signal orb inside a turning dashed halo. Each flank carries a NIC."""

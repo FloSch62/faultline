@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Playground operations use the real rules. Only these explicit cheats bypass costs/progression. */
 import { CARDS, RELICS, RULES } from "../core/cards.ts";
 import { analyze } from "../core/combat/network.ts";

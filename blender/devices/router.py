@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Router: a hexagonal relay. Six port-bays ring an armoured chassis; a brass
 crown cradles the floating route crystal inside a slowly turning halo, above a
 deck carrying the router symbol (arrows in and out)."""

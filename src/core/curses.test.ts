@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** v5 · Three Energy curses (contract section 8): Zombie Process, Kernel Panic, Backdoor, Bitrot,
  * Memory Leak and CVE. Faces, the hand hooks through the public play functions, the forecast equal
  * to the resolution for the end-of-turn curses, removal at the deck floor, and Overvolt's Backdoor. */

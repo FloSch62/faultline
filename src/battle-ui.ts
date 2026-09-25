@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** The v3 battle HUD: plates, console command, protocol dock, network ledger,
  * field seals, energy and transmit controls. Every number shown here is read from
  * the same pure forecast (`combatPreview`) that resolves the turn. */

@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Seeded, transparent decisions for everything between fights: route choice,
  * rewards, relics, sanctuaries, markets and events. A regression probe for the
  * balance harness, not an optimal player. Combat turns live in bot.ts.

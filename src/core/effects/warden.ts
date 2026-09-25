@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Warden card effects and daemon hooks (contract section 9.2), merged by effects/index.ts.
  *
  * Cards: Brace (RunState.nextTurn.block), Pushback and Vent (backpressure), Double Shift (api.harden),

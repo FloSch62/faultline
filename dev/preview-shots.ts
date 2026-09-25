@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 // Dev-only captures of dev/world-preview.html. Not shipped.
 // Usage: node --experimental-strip-types dev/preview-shots.ts <outDir> <enemyIds> [scene] [WxH] [action]
 import { chromium } from "@playwright/test";

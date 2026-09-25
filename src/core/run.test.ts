@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 import { reachableRooms } from "./map.ts";
 import assert from "node:assert/strict";
 import test from "node:test";

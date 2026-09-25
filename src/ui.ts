@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 import { CARDS, isUpgraded, type CardDefinition } from "./core/cards.ts";
 import { ARCHETYPES } from "./core/expedition.ts";
 import type { BaseCardId, CardId, RunState } from "./core/types.ts";

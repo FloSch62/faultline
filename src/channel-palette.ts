@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** One colour per channel, shared by the table (cables, device skirts, packet glyphs) and the
  * HUD (delivery rows, the channel chip). Index i is channel i of the forecast's channelPaths and
  * deliveries (0 is the primary channel). Gold and cyan stay the first two, as in v3; the rest

@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
@@ -21,6 +22,7 @@ export default defineConfig({
       generateBundle() {
         for (const [source, filename] of [
           ["LICENSE", "LICENSE.txt"],
+          ["ATTRIBUTION.md", "ATTRIBUTION.txt"],
           ["THIRD_PARTY_NOTICES.md", "THIRD_PARTY_NOTICES.txt"],
           ["node_modules/three/LICENSE", "licenses/three-LICENSE.txt"],
         ]) {

@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 // Stress the real UI, including the CSS viewport sizes produced by 110% zoom.
 import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';

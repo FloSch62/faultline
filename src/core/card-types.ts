@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Card definition types (v5 · Three Energy). The data files in src/core/cards/*.ts import only
  * this module and rules.ts; cards.ts merges them into CARDS, where every definition has its `+`
  * version built from the upgrade. Behaviour lives in src/core/effects/*.ts, keyed by base id. */

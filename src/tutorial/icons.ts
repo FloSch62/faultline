@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Self-contained icon and escaping helpers for the training and handbook markup.
  * Same line icons as the game interface, duplicated so these modules stay
  * independent of ui.ts while the interface is being rebuilt. */

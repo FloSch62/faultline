@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** The keepers' build paths (v5 · Three Energy, contract section 9): three per keeper, each with its
  * keeper cards (enablers and payoffs) and the colorless partners that feed it. Presentation data for
  * the Handbook and the design document's card tables: names, costs, rarities and faces are always

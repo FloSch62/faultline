@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** The Ghost's cards (contract section 9.3): every card plays through the public play functions,
  * prints its numbers, improves with its upgrade; daemons stack; everything that acts in the enemy
  * phase is checked with `agree` (the forecast is pure and equals the resolution). The last three

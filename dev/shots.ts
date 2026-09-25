@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 // Dev-only screenshot driver for visual review. Not shipped.
 // Usage: node --experimental-strip-types dev/shots.ts <outDir> [enemyIds] [WxH,...]
 import { chromium } from "@playwright/test";

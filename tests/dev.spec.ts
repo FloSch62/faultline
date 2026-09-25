@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 import type { Page } from "@playwright/test";
 import { expect, test, STORAGE, SETTINGS, PREFERENCES } from "./helpers.ts";
 import { newExpedition, type Expedition } from "../src/core/expedition.ts";

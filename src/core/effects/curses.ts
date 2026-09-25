@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Curse effects (contract section 8): hand hooks keyed by base id, merged by effects/index.ts.
  * Each curse reads its number from `values.amount` (cards/curses.ts).
  * - Memory Leak: `onDraw` ("When you draw it, lose 1 energy", never below 0).

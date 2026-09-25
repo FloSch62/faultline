@@ -55,7 +55,13 @@ def score_for(track):
     return score
 
 
-def generate(tracks):
+def request_for(track, version=VERSION, score=score_for):
+    return dict(id=track["id"] + "-instrumental-" + version,
+                style=track["style"] + INSTRUMENTAL + f' {track["key"]}, {track["bpm"]} BPM.',
+                lyrics="", cot="full", abc=score(track), seed=track["seed"])
+
+
+def generate(tracks, version=VERSION, score=score_for):
     import torch
     from yue2 import YuE2Pipeline
     for track in tracks:
@@ -63,9 +69,7 @@ def generate(tracks):
         if (destination / "result.json").exists() and (destination / "audio.flac").exists():
             print("Already generated: " + track["id"], flush=True)
             continue
-        request = dict(id=track["id"] + "-instrumental-" + VERSION,
-                       style=track["style"] + INSTRUMENTAL + f' {track["key"]}, {track["bpm"]} BPM.',
-                       lyrics="", cot="full", abc=score_for(track), seed=track["seed"])
+        request = request_for(track, version, score)
         print("Rendering " + track["id"], flush=True)
         with YuE2Pipeline.from_pretrained("m-a-p/YuE2-3B", vae="m-a-p/YuE2-Vae", device="cuda",
                                          memory_budget_gib=16, offload_ar=True) as pipe:

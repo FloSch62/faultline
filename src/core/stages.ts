@@ -7,7 +7,7 @@ export const STAGES = [
     art: { panorama: "relay-cathedral.png", battle: "relay-interior.png" },
     music: {
       explore: "paths-of-copper",
-      battle: ["the-second-way-home", "signal-and-steel", "copperlight-pursuit"],
+      battle: ["the-second-way-home", "signal-and-steel", "copperlight-pursuit", "kingdom-of-rust", "sparks-on-the-wire"],
       elite: "a-thousand-fractures", boss: "the-second-way-home",
     },
     description: "The outer relays have become a kingdom of rust. Reopen the copper gates and carry a living signal past their iron keeper.",
@@ -21,7 +21,7 @@ export const STAGES = [
     art: { panorama: "stages/glass-cathedral.png", battle: "stages/glass-interior.png" },
     music: {
       explore: "prismatic-silence",
-      battle: ["shatter-the-choir", "ghosts-in-the-relay"],
+      battle: ["shatter-the-choir", "ghosts-in-the-relay", "refraction", "bells-of-broken-glass"],
       elite: "shatter-the-choir", boss: "shatter-the-choir",
     },
     description: "Beyond the gate, voices ring through glass routes that no longer lead anywhere. The Hollow Choir turns every answered signal into another layer of silence.",
@@ -36,7 +36,7 @@ export const STAGES = [
     art: { panorama: "stages/blackout-heart.png", battle: "stages/blackout-interior.png" },
     music: {
       explore: "messages-in-the-dark",
-      battle: ["deliver-the-dawn", "redline-protocol"],
+      battle: ["deliver-the-dawn", "redline-protocol", "quarantine-breach", "hold-the-line"],
       elite: "deliver-the-dawn", boss: "the-blackout-core",
     },
     description: "The last messages are still waiting behind the quarantine shell. Cross the failing backbone and show its keeper that a safe route finally exists.",

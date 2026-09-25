@@ -10,7 +10,10 @@ export const TRACK_TITLES: Record<string, string> = {
   "redline-protocol": "Redline Protocol", "paths-of-copper": "Paths of Copper",
   "the-second-way-home": "The Second Way Home", "prismatic-silence": "Prismatic Silence",
   "shatter-the-choir": "Shatter the Choir", "messages-in-the-dark": "Messages in the Dark",
-  "deliver-the-dawn": "Deliver the Dawn",
+  "deliver-the-dawn": "Deliver the Dawn", "kingdom-of-rust": "Kingdom of Rust",
+  "sparks-on-the-wire": "Sparks on the Wire", "refraction": "Refraction",
+  "bells-of-broken-glass": "Bells of Broken Glass", "quarantine-breach": "Quarantine Breach",
+  "hold-the-line": "Hold the Line",
 };
 
 /** A null stage is the title/character-selection screen, outside the expedition. */

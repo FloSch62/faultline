@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Encounter terrain: every fight starts on a different table.
  * Generated from seed + stage + room with a local generator; it never consumes
  * the run's card/threat RNG, so terrain is identical across reloads and choices. */

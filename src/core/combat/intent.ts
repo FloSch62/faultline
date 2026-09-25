@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Per-hostile intents (rules 2–5; sections 6.1, 6.2, 7). One pipeline for every hostile:
  *   1. cadence  — an escort acts on alternate enemy phases, an add from the ultimate turn;
  *                 otherwise DORMANT. RESYNC skips a leader's action (its counter does not move).

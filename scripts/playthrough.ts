@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Full UI expedition audit through the real controls. Only the initial expedition is
  * injected; every card, console command, protocol, scrub, room, market, event and
  * sanctuary choice is clicked in the browser, and every transmission is checked

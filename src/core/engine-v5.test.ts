@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** v5 · Three Energy engine: economy, keywords, daemons and their hooks, the protocol table as
  * data, misses and dodges, curses in hand, relics, rewards, starters and the effect API.
  *

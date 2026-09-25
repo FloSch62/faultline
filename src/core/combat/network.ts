@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Network analysis: routes, the primary route, channels, online devices, clusters and
  * separated circuits, for a given set of faults. Unchanged from v3 except that faults are
  * lists (packs and escalation disrupt several things at once) and a Server Rack counts

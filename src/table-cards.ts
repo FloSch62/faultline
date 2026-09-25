@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Hover cards for the network on the table: devices, cables and installations.
  * Owned by the table-readability work (channels, shared devices, amplified cables). Every number
  * is read from the forecast (`combatPreview`) or from RULES; nothing here computes a rule. */

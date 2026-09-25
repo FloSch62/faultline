@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Stage II, The Glass Cathedral: blue-black steel and silvered trims; the apron's modules hold
 slim lancet lenses of violet optical glass (the only cathedral shape on the board). Pale violet
 lamps and accents. The base of every stage II leader's board."""

@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";

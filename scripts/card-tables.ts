@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** FAULTLINE v5 · the design document's generated blocks, read from the live data.
  *
  * Usage, from the repository root:

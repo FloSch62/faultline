@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** v5 · Three Energy colorless cards (contract section 7): the table is complete, every face is short
  * and speaks one vocabulary, and the five new cards (Ping, Hotfix, Keepalive, Rollback, Firmware
  * Update) do what their faces say through the public play functions. */

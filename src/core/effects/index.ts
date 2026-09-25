@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** The merged effect registry (v5 · Three Energy) and the dispatch helpers the engine calls.
  * Owners register in their own file; nobody edits this one to add a card. See effects/types.ts
  * for the interfaces and .work/engine-report.md for the call sites. */

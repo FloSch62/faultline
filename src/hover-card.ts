@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** The table's hover card: one engraved plate that follows the pointer over a device, cable,
  * installation, hostile or packet glyph on the 3D table. Content comes from table-cards.ts
  * (the network) and hostile-cards.ts (the rail); this module only places and shows it. */

@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Leader crests: what a leader brings to its stage's board (boards/kit.py), one GLB per leader.
 
     crest    (slot "crest")  the leader's sigil on the far rail's mount, behind which it stands

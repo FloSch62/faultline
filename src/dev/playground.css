@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /* A separate tool rail: the game retains its own responsive container and scroll. */
 body.dev-playground {
   --dev-rail: 360px;

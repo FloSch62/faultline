@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Bundled, mastered material recordings. See soundtrack/effects/manifest.json.
  *
  * CUE GUIDE — play exactly one cue per game moment. Masters are loudness matched

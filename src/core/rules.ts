@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Every tunable combat number lives here. Rules code, card text, the HUD and the
  * handbook all read this object, so explanations never drift from balance tuning.
  * v5: moved out of cards.ts (which, like run.ts, re-exports it); the card data files

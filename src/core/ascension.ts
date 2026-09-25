@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Ascension (v5, contract section 6b): four cumulative levels unlocked by winning expeditions.
  * Level N includes every rule from levels 1..N. The v4 ten rules fold into the four; each keeps its
  * RULES key. Call sites never name a level: they ask `ascends(ascension, "sharperTeeth")`, and

@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 import { battle, expect, install, PREFERENCES, test } from "./helpers.ts";
 
 const TRAINING = "faultline-training-v1";

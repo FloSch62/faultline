@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Jammer: a brass surveying tripod carrying a copper-wound coil drum ringed with six cold
 emitter studs. On top a small ivory-rimmed dish on a yoke looks out toward the camera,
 tilted 20 degrees up; the yoke turns slowly so the dish sweeps the table.

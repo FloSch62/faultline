@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Socket budget (design 12.2 "Table crowding", 15.3 phase 2): every terrain layout the
  * generator can produce, with the installation cap (four) and the wreck cap (six) filled,
  * still leaves at least eight legal sockets for the player's hardware.

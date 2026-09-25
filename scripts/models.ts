@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Builds the Blender models into public/models, one Blender process per model.
  * Families: devices (public/models/<role>.glb), installations (public/models/installations/<kind>.glb),
  * props (public/models/props/<name>.glb), boards (public/models/boards/<name>.glb; "table" writes the

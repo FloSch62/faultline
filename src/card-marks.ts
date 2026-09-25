@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** v5 card marks: keyword glossary, keeper sigils, the missing-art fallback, modified costs and
  * Kernel Panic's play limit. Every mark is read from card flags and run state (never parsed from a
  * card's face text), so tuning a card changes its marks with it. Pure presentation helpers. */

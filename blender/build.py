@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Build FAULTLINE models into public/models.
 
     blender -b --factory-startup --python blender/build.py -- router switch

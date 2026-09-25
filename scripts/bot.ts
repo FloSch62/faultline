@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Shared deterministic QA player. It only makes decisions from visible cards,
  * board state and intent; its optional command stream drives browser playthroughs.
  * v3: builds width, arms protocols against visible intents, uses the archetype

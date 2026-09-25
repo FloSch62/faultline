@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** v5 · Three Energy: the Architect's cards (contract section 9.1). One test per card at least (it
  * plays, its numbers, its upgrade), stacking for the daemons, forecast-equals-resolution for every
  * card that acts in the transmission or the enemy phase, and one scripted integration test per build

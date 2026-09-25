@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Unknown signals: short encounters between fights. Every choice states its
  * trade-off; seeded results are rolled when the event opens and named up front.
  * v5: some choices take a curse as their price (contract section 8), and every such

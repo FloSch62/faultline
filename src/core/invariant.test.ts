@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** The single-hostile invariant (design section 4, "a single hostile sees exactly today's
  * transmission"; section 15.4): on the 160 randomized boards of combat.test.ts, a one-hostile
  * encounter's forecast (packet, shield, targets, next turn) and its resolution equal a snapshot

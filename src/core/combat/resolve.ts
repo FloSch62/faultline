@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** The end-turn order, fused (design section 6.4). One resolver computes every step on the
  * state it is given: combatPreview runs it on a copy (pure, no RNG), endTurn runs it on the
  * run itself and then performs only the RNG steps (junk positions, rewards, draws). Every

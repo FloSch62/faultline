@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Breaker Charge: a low brass canister under a red glass cap, standing on four folded legs,
 a rubber fuse wire coiled around its body. A short mast on the cap carries the countdown
 lamp: a luminous housing with a lens that blinks (hook: blinker, speed 1.5, base 0.9).

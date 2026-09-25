@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /**
  * Dev-only harness for the 3D battlefield (not part of the game build).
  * Open /dev/world-preview.html?enemy=core&scene=devices

@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Colorless card effects and daemon hooks (contract section 7). Registered by base id; merged by
  * effects/index.ts. The v4 colorless cards still run on the engine's legacy if-chains in run.ts
  * (their numbers come from their `values`); the v5 cards register here:

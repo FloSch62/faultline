@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Ghost card effects and daemon hooks (contract section 9.3), merged by effects/index.ts. The v4
  * Ghost cards (Store and Forward, Spearhead, Replay Attack, Phantom Node, Dark Fiber) still run on
  * the engine's generic values and legacy branches; everything else registers here. Numbers come

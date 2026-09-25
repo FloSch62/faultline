@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 import "./playground.css";
 import { CARDS, RELICS, RULES } from "../core/cards.ts";
 import { ENEMIES } from "../core/enemies.ts";

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Render the keeper portraits for the selection screen with the local Krea 2 workflow."""
 import argparse
 import hashlib

@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Inline SVG diagrams for the handbook and training walkthrough.
  * Pure strings; colours and type come from CSS classes in tutorial.css, so every
  * label uses the game's bundled faces and every symbol is a drawn icon. Numbers

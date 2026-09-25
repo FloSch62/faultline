@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Colorless cards: the shared pool every keeper can be offered (contract section 7). DATA ONLY:
  * this file imports rules.ts and card-types.ts and nothing else; behaviour lives in
  * src/core/effects/colorless.ts (new cards) or in the engine's legacy if-chains (v4 cards).

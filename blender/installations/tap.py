@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Siphon Tap: the malware prop rebuilt as a model. A seven-sided dark pedestal with glowing
 seams and three claw prongs draws a thin stream up into a floating stellated dodecahedral
 core (it spins inside its bob); five tetrahedral shards orbit it the other way, and a narrow

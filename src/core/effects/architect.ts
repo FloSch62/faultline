@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Architect card effects and daemon hooks (contract section 9.1), merged by effects/index.ts.
  *
  * Registered here: Branch Line, Patch Panel, Redundant Paths, Trunk Line, Splice, Traceroute, Line

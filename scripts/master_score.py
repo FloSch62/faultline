@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Master the complete native YuE2 mix without source separation or denoising."""
 import argparse
 import hashlib

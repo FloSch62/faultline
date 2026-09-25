@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Floors stay local to a stage, so every route chart remains readable. Guardian health lives in
  * RULES.guardianHealth (v5). */
 export const STAGES = [

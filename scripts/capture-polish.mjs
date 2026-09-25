@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 // Reproducible presentation captures. Start the preview server before running.
 import { chromium } from "playwright";
 import { mkdir, writeFile } from "node:fs/promises";

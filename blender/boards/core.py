@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """The Blackout Core's board (the stage III guardian, the source of the signal collapse). The
 Blackout Heart's frame as a reactor's containment: the fascia's modules are shielded portholes
 over hazard bands, the corner blocks are wound with containment coils round a red core, coolant

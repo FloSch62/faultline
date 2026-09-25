@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Power: a PoE injector built as a Tesla coil. A heavy copper winding climbs a
 dark core between porcelain standoffs; a porcelain bushing lifts the crackling
 plasma column into the floating toroidal terminal, while sparks race around it.

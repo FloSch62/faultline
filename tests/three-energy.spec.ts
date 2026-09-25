@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** v5 · Three Energy in the browser: the energy orb (current over the turn's base, temporary energy
  * as a rise), a Daemon on the daemon strip, a Payload token and Retain, played through the real
  * controls on the production build. Every number is read from RULES, CARDS and the forecast.

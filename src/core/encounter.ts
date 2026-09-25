@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Encounter plans: who stands at the rail, with what health, cargo and surprises.
  *
  * Everything here is pure and seeded by (seed, stage, room id) through a local

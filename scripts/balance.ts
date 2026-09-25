@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Seeded balance harness; bots are regression probes, not human playtests.
  * Run: node --experimental-strip-types scripts/balance.ts [seeds-per-profile=100]
  *   [--elite] [--no-signature] [--ascension=N] [--archetype=a,b] [--policy=p,q]

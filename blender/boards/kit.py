@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """The board kit: the battle table's frame, shared by the stage boards and the guardians' boards.
 
 Industrial relay hardware first (machined steel, panel seams, cable troughs, container-like

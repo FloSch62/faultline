@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** v5 · Three Energy: the Warden's cards (contract section 9.2). Every card plays through the public
  * play functions with its printed numbers and its upgrade; daemons stack; everything that acts in
  * the enemy phase is checked with `agree` (the forecast is pure and equals the resolution); and the

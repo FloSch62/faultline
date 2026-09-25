@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Switch: a wide, low 2U rack switch. Two line cards share a brass-bound chassis,
 split by a glowing backplane seam; each carries two rows of RJ45 sockets with
 flickering link LEDs and a brass uplink cage, and a glowing stacking cable loops

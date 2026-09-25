@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 import "./journals.css";
 import { CARD_INSIGHTS } from "./card-insights.ts";
 import { CARDS, RELICS, RULES, baseCard, canUpgrade, isUpgraded, upgraded, BASE_CARD_IDS } from "./core/cards.ts";

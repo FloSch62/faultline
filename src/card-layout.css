@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /* FAULTLINE · the card, one layout for every view (Slay the Spire / Hearthstone style).
    Every card is built once at its design size, 230 × 355, with fixed proportions: a 146 px picture
    window (41 % of the card), a 36 px nameplate, the type line and rules box, a 24 px footer. A view

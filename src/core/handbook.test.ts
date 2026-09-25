@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** The Handbook: every chapter renders, the v4 chapters teach the v4 rules, and every
  * number and table row comes from RULES and the content tables, never from typed copy. */
 import test from "node:test";

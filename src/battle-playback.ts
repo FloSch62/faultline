@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /**
  * The table's side of a battle (world agent): the World sync every render, and the enemy phase
  * played back from the forecast the turn resolved (design 13.1–13.3, 13.9, 13.12).

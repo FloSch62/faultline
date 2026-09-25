@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Optional speech regression check; recognition is not a substitute for listening."""
 from pathlib import Path
 import json, argparse, hashlib

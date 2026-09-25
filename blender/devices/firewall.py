@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Firewall: a pentagonal bastion. Battered armour walls run between five crowned
 corner towers with watch-fires. The camera face holds the gate (an ember passage
 behind a portcullis) under permit / deny lamps; the other faces carry armour plates

@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** The effect and hook interfaces (v5 · Three Energy). Card behaviour is registered per owner in
  * src/core/effects/{colorless,curses,architect,warden,ghost}.ts and merged by effects/index.ts:
  *

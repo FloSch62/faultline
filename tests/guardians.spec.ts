@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 import type { Page } from "@playwright/test";
 // Every test also fails on any page or console error (see helpers.ts).
 import { expect, test } from "./helpers.ts";

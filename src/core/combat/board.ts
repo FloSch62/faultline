@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Shared table rules (v4 · Under Quarantine): ports and hostiles, bands and fields,
  * sockets, installations, condition, wear and breakdown. Pure helpers over RunState;
  * nothing here consumes the RNG, so the forecast can run every one of them. */

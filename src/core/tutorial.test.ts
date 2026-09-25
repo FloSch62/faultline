@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Field Training: every lesson setup must run on the real rules, and its intended
  * solution — played through the public API — must reach `complete`. */
 import test from "node:test";

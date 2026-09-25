@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Server Rack: a squat two-bay brass cabinet on a bright skid. Louvred side plates and iron
 corner posts carry an overhanging riveted roof; the open front shows two dark slots, each
 holding a sled with two amber status lamps that blink slowly out of step. A brass condition

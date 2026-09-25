@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 import { CARDS, RELICS, RULES, STARTER_DECK, STARTER_SIGNATURES } from "./cards.ts";
 import { createRun } from "./run.ts";
 import { DESIGNATIONS, ENEMIES, MESSAGE_OPTIONS, SIGNALS } from "./enemies.ts";

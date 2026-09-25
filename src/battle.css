@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /* FAULTLINE v3 battle layer: console, protocols, daemons, card states.
    Built on the fieldcraft layout variables (--rail, --hand-height, --hand-edge,
    --field-bottom) so it follows every breakpoint of the existing battle table. */

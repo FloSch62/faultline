@@ -1,3 +1,4 @@
+# FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md.
 """Honeypot: a lure. A geodesic honeycomb hive, every cell glowing with honey,
 sits in a brass-lipped cup held by six brass claws. Honey overflows the cup and
 drips down a dark pedestal whose front carries a fake login port (a terminal

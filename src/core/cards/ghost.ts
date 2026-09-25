@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** The Ghost's cards: "Find the hidden path" (contract section 9.3). Paths: Buffer (store, multiply,
  * release), Evasion (misses, dodges, phantoms, cut-proof lines), Payloads (tokens, card chains,
  * exhaust). DATA ONLY: imports rules.ts and card-types.ts; behaviour lives in

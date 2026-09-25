@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Table readability in the browser: the "routes · channels" count on the terminals, one colour per channel on the
  * table, the junction seal where routes merge, the amplified fibre's own colour, and the hover
  * cards for devices and cables. The 3D table is read through helpers.watchTable. */

@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** The table front (design section 5): installations, their placement, timing and effects,
  * scrub, Purge, quarantine, bites and Reclaim; condition, overload, wear, breakdown and repair;
  * the fourteen v4 cards and eight v4 relics. */

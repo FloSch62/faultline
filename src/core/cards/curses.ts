@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Curses (permanent deck clutter, contract section 8) and junk (encounter clutter hostiles inject).
  * DATA ONLY: imports rules.ts and card-types.ts; curse behaviour lives in src/core/effects/curses.ts
  * as hand hooks (onDraw, playLimit, endOfTurn) and keyword flags (innate).

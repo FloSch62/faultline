@@ -1,3 +1,4 @@
+/* FAULTLINE: GPL-3.0-only with section 7(b) attribution terms; see LICENSE and ATTRIBUTION.md. */
 /** Forecast contract (surprise contract rule 1; design 15.4): on randomized pack boards with
  * installations, worn devices, racks and phantoms, combatPreview consumes no RNG and mutates
  * nothing, and endTurn resolves exactly its numbers per port, per hostile and per installation,

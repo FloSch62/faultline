@@ -119,7 +119,7 @@ export const DEFAULT_SETUP: EncounterSetup = {
 };
 
 export function createSandbox(setup: EncounterSetup = DEFAULT_SETUP, previous?: Expedition): Expedition {
-  const e = newExpedition(setup.archetype, setup.seed >>> 0, false, setup.ascension);
+  const e = newExpedition(setup.archetype, setup.seed >>> 0, setup.ascension);
   const r = e.run;
   r.stage = Math.max(0, Math.min(STAGES.length - 1, Math.trunc(setup.stage)));
   r.floor = Math.max(0, Math.min(6, Math.trunc(setup.floor)));

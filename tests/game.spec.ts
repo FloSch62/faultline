@@ -56,6 +56,8 @@ test("a new expedition has working loadouts, map, settings, and isolated saves",
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("./");
   await page.getByRole("button", { name: /New expedition/ }).click();
+  // A first-time player is offered Field Training first.
+  await page.locator('[data-action="skip-training"]').click();
   await page.locator('[data-archetype="warden"]').click();
   await page.getByRole("button", { name: "Enter the Faultline" }).click();
   await expect(page.locator(".game-root")).toHaveAttribute("data-view", "map");

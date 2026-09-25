@@ -86,31 +86,70 @@
 .selection-screen .screen-heading .eyebrow { margin-bottom: 8px; font-size: 13px; }
 .selection-screen h1 { margin: 0; font: 600 clamp(28px, 2.6cqw, 38px)/1.15 var(--display); letter-spacing: .05em; color: var(--text-hi); text-shadow: 0 2px 14px #000; }
 .selection-screen h1::after { content: ""; display: block; width: min(320px, 70%); height: 9px; margin: 10px auto 0; background: radial-gradient(circle at 50% 50%, var(--ember) 0 1.5px, transparent 2.5px), conic-gradient(from 45deg at 50% 50%, var(--brass) 25%, transparent 0 50%, var(--brass) 0 75%, transparent 0) center / 9px 9px no-repeat, linear-gradient(90deg, transparent, #c9a26399 30%, #c9a26399 70%, transparent) center / 100% 1px no-repeat; }
-.selection-screen .chosen-story { max-width: 700px; min-height: 3em; margin: 8px auto 0; font: italic 16px/1.5 var(--text); color: #bdb5a2; text-shadow: 0 1px 6px #000; }
-.archetypes { display: flex; justify-content: center; align-items: stretch; gap: 22px; margin: clamp(14px, 2.4cqh, 28px) 0 clamp(14px, 2.4cqh, 26px); }
-.archetype { position: relative; display: flex; flex-direction: column; width: 340px; text-align: left; color: var(--text-body); background: linear-gradient(170deg, #161d26, #0d1218 70%); border: 1px solid #5c4628; box-shadow: inset 0 0 0 1px #05070a, inset 0 1px 0 #f3dca014, 0 10px 26px #000a; filter: brightness(.8) saturate(.75); transition: transform .25s, border-color .25s, box-shadow .25s, filter .25s; }
-.archetype:hover { filter: brightness(.94) saturate(.9); border-color: #8a6a3a; transform: translateY(-3px); }
-/* The chosen keeper is lit: a bright rim, a warm glow and an ember stone on the top edge. */
-.archetype.chosen { filter: none; transform: translateY(-5px); border-color: var(--brass-hi); box-shadow: inset 0 0 0 1px #05070a, inset 0 0 40px #ffb04a14, 0 0 0 1px #0b0906, 0 0 36px #ffb04a44, 0 14px 30px #000b; }
-.archetype .lit-stone { z-index: 2; }
+/* Keeper plates: the portrait dominates; the chosen plate is lit and unfolds its kit beside the painting.
+   One height for the row, the portrait width follows it (and the space left beside the kit). */
+.selection-screen {
+  --keeper-gap: clamp(14px, 1.3cqw, 26px);
+  --kit-w: clamp(300px, 24cqw, 470px);
+  /* Type unit for the kit leaf: follows the height, unless the screen is narrow for it. */
+  --u: min(1cqh, .7cqw);
+  --plate-h: min(calc(100cqh - 270px), 68cqh);
+  --plate-w: min(calc(var(--plate-h) * .56), calc((100cqw - 60px - var(--kit-w) - 2 * var(--keeper-gap)) / 3));
+  --row-w: calc(3 * var(--plate-w) + var(--kit-w) + 2 * var(--keeper-gap));
+}
+.archetypes { display: flex; justify-content: center; align-items: stretch; gap: var(--keeper-gap); margin: clamp(10px, 2cqh, 28px) 0 clamp(10px, 2cqh, 26px); }
+.archetype { position: relative; display: grid; grid-template: var(--plate-h) / var(--plate-w); padding: 0; text-align: left; color: var(--text-body); background: #07090c; border: 1px solid #5c4628; box-shadow: inset 0 0 0 1px #05070a, 0 12px 28px #000b; transition: transform .25s, border-color .25s, box-shadow .25s; }
+.archetype.chosen { grid-template-columns: var(--plate-w) var(--kit-w); }
+.archetype[data-archetype="architect"] { --focus: 88% 16%; }
+.archetype[data-archetype="warden"] { --focus: 72% 16%; }
+.archetype[data-archetype="ghost"] { --focus: 18% 16%; }
+.keeper-portrait { grid-area: 1 / 1; position: relative; display: block; min-height: 0; background: var(--portrait) var(--focus, 50% 16%) / cover no-repeat; filter: brightness(.6) saturate(.7); transition: filter .25s; }
+/* A dark foot for the name, the keeper's colour rising from it once chosen. */
+.keeper-portrait::before { content: ""; position: absolute; inset: 0; background: linear-gradient(transparent 50%, #05080c80 68%, #05080cf2 100%); }
+/* Engraved brass corners inside the painting's edge. */
+.keeper-portrait::after {
+  --c: #c9a26390;
+  content: ""; position: absolute; inset: 7px;
+  background: linear-gradient(var(--c) 0 0) 0 0 / 22px 1px, linear-gradient(var(--c) 0 0) 0 0 / 1px 22px,
+    linear-gradient(var(--c) 0 0) 100% 0 / 22px 1px, linear-gradient(var(--c) 0 0) 100% 0 / 1px 22px,
+    linear-gradient(var(--c) 0 0) 0 100% / 22px 1px, linear-gradient(var(--c) 0 0) 0 100% / 1px 22px,
+    linear-gradient(var(--c) 0 0) 100% 100% / 22px 1px, linear-gradient(var(--c) 0 0) 100% 100% / 1px 22px;
+  background-repeat: no-repeat; box-shadow: inset 0 0 0 1px #c9a2631c;
+}
+.keeper-name { grid-area: 1 / 1; z-index: 1; align-self: end; display: grid; justify-items: center; gap: 5px; padding: 0 14px clamp(16px, 2.6cqh, 28px); text-align: center; pointer-events: none; }
+.keeper-name strong { font: 600 clamp(25px, min(2cqw, 3.4cqh), 44px)/1.05 var(--title); letter-spacing: .01em; color: #d3c6a8; text-shadow: 0 2px 10px #000, 0 0 3px #000; transition: color .25s; }
+.keeper-name strong::after { content: ""; display: block; width: 70%; height: 7px; margin: 8px auto 0; background: radial-gradient(circle, #8a6a3a 0 1.5px, transparent 2px) center / 7px 7px no-repeat, linear-gradient(90deg, transparent, #8a6a3a 30%, #8a6a3a 70%, transparent) center / 100% 1px no-repeat; }
+.archetype-epithet { margin: 0; font: italic clamp(14px, min(1cqw, 1.6cqh), 20px)/1.3 var(--text); color: color-mix(in srgb, var(--accent) 55%, #b8ad96); text-shadow: 0 1px 6px #000, 0 0 2px #000; }
+.archetype:hover { border-color: #8a6a3a; transform: translateY(-3px); }
+.archetype:hover .keeper-portrait { filter: brightness(.82) saturate(.9); }
+.archetype:hover .keeper-name strong { color: var(--text-hi); }
+/* The chosen keeper is lit: a bright rim, a warm glow, an ember stone over the portrait and its colour at the foot. */
+.archetype.chosen { transform: translateY(-5px); border-color: var(--brass-hi); box-shadow: inset 0 0 0 1px #05070a, 0 0 0 1px #0b0906, 0 0 36px #ffb04a44, 0 14px 30px #000b; }
+.archetype.chosen .keeper-portrait { filter: none; }
+.archetype.chosen .keeper-portrait::before { background: radial-gradient(ellipse 80% 22% at 50% 100%, color-mix(in srgb, var(--accent) 30%, transparent), transparent), linear-gradient(transparent 50%, #05080c80 68%, #05080cf2 100%); }
+.archetype.chosen .keeper-portrait::after { --c: var(--brass-hi); filter: drop-shadow(0 0 3px #ffb04a99); }
+.archetype.chosen .keeper-name strong { color: var(--text-hi); }
+.archetype.chosen .keeper-name strong::after { background: radial-gradient(circle, var(--accent) 0 1.5px, transparent 2.5px) center / 7px 7px no-repeat, linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 70%, #c9a263) 30%, color-mix(in srgb, var(--accent) 70%, #c9a263) 70%, transparent) center / 100% 1px no-repeat; filter: drop-shadow(0 0 4px var(--accent)); }
+.archetype.chosen .archetype-epithet { color: color-mix(in srgb, var(--accent) 70%, #e6dcc4); }
+.archetype .lit-stone { z-index: 2; left: calc(var(--plate-w) / 2); }
 .archetype:focus-visible { outline-offset: 5px; }
-.archetype-art { display: block; flex: none; height: clamp(80px, 13cqh, 124px); background-image: var(--card-image, url("/art/card-atlas.png")); background-size: var(--art-size, 300% 300%); background-position: var(--art-x) var(--art-y); -webkit-mask-image: linear-gradient(#000 45%, transparent); mask-image: linear-gradient(#000 45%, transparent); filter: saturate(.85); transition: filter .3s; }
-.archetype.chosen .archetype-art { filter: saturate(1.05) brightness(1.06); }
-.archetype-copy { position: relative; display: flex; flex-direction: column; flex: 1; margin-top: -26px; padding: 0 20px 15px; }
-.archetype-copy > strong { font: 600 29px/1.05 var(--title); letter-spacing: .01em; color: var(--text-hi); text-shadow: 0 2px 8px #000; }
-.archetype-epithet { margin: 3px 0 12px; font: italic 15px/1.3 var(--text); color: color-mix(in srgb, var(--accent) 65%, #d8cdb4); }
-.kit { display: grid; gap: 9px; margin-bottom: 12px; }
-.kit-row { display: grid; grid-template-columns: 30px 1fr; gap: 12px; align-items: start; padding-top: 9px; border-top: 1px solid #c9a26324; }
+/* The kit leaf, hinged to the portrait by a brass rule with a stone at its middle. */
+.keeper-kit { grid-area: 1 / 2; position: relative; display: flex; flex-direction: column; justify-content: center; min-height: 0; padding: clamp(12px, 2cqh, 22px) 18px clamp(10px, 1.6cqh, 16px) 20px; background: linear-gradient(170deg, #161d26, #0d1218 70%); border-left: 1px solid #c9a26366; box-shadow: inset 1px 0 0 #05070a, inset 0 1px 0 #f3dca014; }
+.keeper-kit::before { content: ""; position: absolute; left: -5px; top: 50%; width: 8px; height: 8px; transform: translateY(-50%) rotate(45deg); background: linear-gradient(135deg, #f3dca0, #8a6a3a); box-shadow: 0 0 0 1px #0b0906, 0 0 8px #ffb04a66; }
+.keeper-story { margin-bottom: clamp(10px, calc(1.8 * var(--u)), 22px); font: italic clamp(14px, calc(1.75 * var(--u)), 21px)/1.5 var(--text); color: #c4bba6; }
+.kit { display: grid; gap: clamp(5px, calc(1.2 * var(--u)), 16px); }
+.kit-row { display: grid; grid-template-columns: 30px 1fr; gap: 12px; align-items: start; padding-top: clamp(6px, calc(1.1 * var(--u)), 13px); border-top: 1px solid #c9a26324; }
 .kit-row > i { display: grid; place-items: center; width: 30px; height: 30px; margin-top: 2px; border-radius: 50%; font-style: normal; color: var(--accent); background: radial-gradient(circle at 50% 35%, #1d2630, #0b1015 75%); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, #5a4322), 0 2px 5px #000a; }
 .kit-row > i .relic-emblem { font-size: 15px; border: 0; box-shadow: none; background: none; }
 .kit-row > span { display: grid; gap: 2px; min-width: 0; }
-.kit-row em { font: 700 12px/1.2 var(--label); letter-spacing: .09em; color: #a4957a; }
-.kit-row b { font: 600 19px/1.1 var(--title); color: #ecdcb8; }
-.kit-row b + span { font: 14px/1.4 var(--text); color: #b1b1a6; }
-.archetype-health { display: flex; align-items: center; gap: 7px; margin-top: auto; padding-top: 10px; border-top: 1px solid #c9a26324; color: #e0806a; }
-.archetype-health b { font: 600 23px/1 var(--title); color: var(--text-hi); }
-.archetype-health small { font: 700 13px/1 var(--label); letter-spacing: .1em; color: #b3a17c; }
-.selection-footer { display: flex; align-items: center; gap: 28px; width: min(1064px, 100%); }
+/* The leaf's type grows with the screen's height, so a tall plate stays filled and legible. */
+.kit-row em { font: 700 clamp(12px, calc(1.35 * var(--u)), 15px)/1.2 var(--label); letter-spacing: .09em; color: #a4957a; }
+.kit-row b { font: 600 clamp(17px, calc(2.1 * var(--u)), 26px)/1.1 var(--title); color: #ecdcb8; }
+.kit-row b + span { font: clamp(13px, calc(1.6 * var(--u)), 19px)/1.38 var(--text); color: #b1b1a6; }
+.keeper-name .archetype-health { display: flex; align-items: center; gap: 7px; margin-top: 3px; color: #e0806a; }
+.archetype-health b { font: 600 clamp(20px, 2.2cqh, 28px)/1 var(--title); color: var(--text-hi); }
+.archetype-health small { font: 700 clamp(13px, 1.25cqh, 16px)/1 var(--label); letter-spacing: .1em; color: #b3a17c; }
+.selection-footer { display: flex; align-items: center; gap: 28px; width: min(var(--row-w), 100%); }
 .embark { flex: none; min-width: 270px; min-height: 58px; font-size: 18px; }
 /* Ascension: a row of diamond pips; the chosen level is lit, locked ones stay dark. */
 .ascension-panel { flex: 1; min-width: 0; display: flex; align-items: center; gap: 20px; padding: 10px 22px 11px 18px; text-align: left; }
@@ -159,7 +198,9 @@ dialog:has(.confirm-actions) { max-width: min(540px, calc(100cqw - 24px)); }
 @container game (max-width: 1250px) {
   .game-header { height: 75px; padding: 0 26px; }
   .selection-screen.full-screen { padding-inline: 26px; }
-  .archetypes { gap: 18px; }
+}
+@container game (max-height: 800px) and (min-width: 901px) {
+  .keeper-story { display: none; }
 }
 @container game (max-height: 760px) and (min-width: 901px) {
   .title-screen { padding-block: 28px; }
@@ -167,15 +208,10 @@ dialog:has(.confirm-actions) { max-width: min(540px, calc(100cqw - 24px)); }
   .selection-screen.full-screen { padding-top: 18px; padding-bottom: 16px; }
   .selection-screen h1 { font-size: 27px; }
   .selection-screen h1::after { margin-top: 7px; }
-  .selection-screen .chosen-story { display: none; }
-  .archetype-copy { margin-top: -24px; padding-bottom: 12px; }
-  .archetype-copy > strong { font-size: 25px; }
-  .archetype-epithet { margin-bottom: 8px; font-size: 14px; }
-  .kit { gap: 6px; margin-bottom: 8px; }
-  .kit-row { padding-top: 6px; }
-  .kit-row b { font-size: 17px; }
-  .kit-row b + span { font-size: 13px; line-height: 1.35; }
-  .archetype-health { padding-top: 7px; }
+  .selection-screen { --plate-h: calc(100cqh - 206px); }
+  .keeper-name strong { font-size: 25px; }
+  .keeper-name strong::after { margin-top: 6px; }
+  .archetype-epithet { font-size: 14px; }
   .ascension-panel { padding-block: 7px 8px; }
   .embark { min-height: 52px; }
   .settings-content .panel-head { margin-bottom: 12px; }
@@ -193,8 +229,14 @@ dialog:has(.confirm-actions) { max-width: min(540px, calc(100cqw - 24px)); }
   .title-screen::before { background: radial-gradient(ellipse 80% 70% at 50% 50%, #04070bc0, transparent 85%); }
   .version-mark { left: 22px; bottom: 16px; }
   .selection-screen.full-screen { padding: 70px 20px 24px; }
+  /* Narrow: the plates stack as painted banners; the chosen one opens its kit below the painting. */
+  .selection-screen { --row-w: 100%; }
   .archetypes { flex-direction: column; align-items: center; width: 100%; }
-  .archetype { width: min(480px, 100%); }
+  .archetype, .archetype.chosen { grid-template: 190px auto / 1fr; width: min(520px, 100%); }
+  .keeper-portrait { background-position: 50% 14%; }
+  .keeper-kit { grid-area: 2 / 1; border-left: 0; border-top: 1px solid #c9a26366; }
+  .keeper-kit::before { left: 50%; top: -5px; transform: translateX(-50%) rotate(45deg); }
+  .archetype .lit-stone { left: 50%; }
   .selection-footer { flex-direction: column; align-items: stretch; }
   .ascension-panel { flex-wrap: wrap; }
   .asc-track { flex-wrap: wrap; }
@@ -213,3 +255,8 @@ dialog:has(.confirm-actions) { max-width: min(540px, calc(100cqw - 24px)); }
   .back-control { left: 14px; top: 16px; }
   .deck-plate { right: 14px; top: 14px; }
 }
+/* A keeper chosen in place: the leaf unfolds with a short fade instead of a rebuilt screen. */
+.keeper-kit { animation: keeper-leaf .24s ease-out; }
+@keyframes keeper-leaf { from { opacity: 0; } }
+.reduced-motion .keeper-kit { animation: none; }
+@media (prefers-reduced-motion: reduce) { .keeper-kit { animation: none; } }

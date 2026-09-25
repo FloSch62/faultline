@@ -20,7 +20,8 @@ export interface EnemyDefinition {
   pattern: Omit<Intent, "pressure">[];
   trait: string;
   badge: string;
-  art: { file: string; columns: number; rows: number; index: number };
+  /** Its portrait under public/art/: one cut-out per hostile (scripts/cut_hostiles.py). */
+  art: string;
   /** "channels": graded, absorbs amount − perChannel × (channels − 1). "firewall": bypassed by any online firewall. */
   armor?: { amount: number; bypass: "channels" | "firewall"; perChannel?: number };
   /** Its jam prefers an online firewall (after honeypots). */
@@ -351,21 +352,7 @@ const properties: Record<string, Partial<EnemyDefinition>> = {
 };
 
 function artFor(id: string): EnemyDefinition["art"] {
-  for (const [file, ids, columns, rows] of [
-    ["hostiles-expedition", ["serpent", "moth", "marshal", "choir", "weaver", "reaver"], 3, 2],
-    ["stage-guardians", ["regent", "cantor"], 2, 1],
-    ["hostiles-zones", ["prophet", "widow", "colossus"], 3, 1],
-    ["hostiles-alpha", ["wraith", "storm"], 2, 1],
-    ["hostiles", ["leech", "sentinel", "core"], 3, 1],
-    // v4 sheets (section 14.4). Cell 7 of the escort sheet is a reserved spare.
-    ["hostiles-escorts", ["spark-mite", "splicer", "relay-drone", "ward-node", "tap-spinner", "glass-echo", "rigger-drone"], 4, 2],
-    ["hostiles-front", ["foreman", "nest", "demolition", "blight"], 4, 1],
-    ["hostiles-adds", ["gate-warden", "chorister", "quarantine-drone"], 3, 1],
-  ] as const) {
-    const index = (ids as readonly string[]).indexOf(id);
-    if (index >= 0) return { file, columns, rows, index };
-  }
-  throw new Error(`Missing enemy artwork: ${id}`);
+  return `hostiles/${id}.webp`;
 }
 
 export const ENEMIES: Record<string, EnemyDefinition> = Object.fromEntries(

@@ -1,6 +1,7 @@
 /** Builds the Blender models into public/models, one Blender process per model.
- * Families: devices (public/models/<role>.glb), installations (public/models/installations/<kind>.glb)
- * and props (public/models/props/<name>.glb); names are unique across families.
+ * Families: devices (public/models/<role>.glb), installations (public/models/installations/<kind>.glb),
+ * props (public/models/props/<name>.glb), boards (public/models/boards/<name>.glb; "table" writes the
+ * tabletop textures) and crests (public/models/boards/crests/<leader>.glb); names are unique across families.
  * Run: npm run models [-- router tap crate] [--render <dir>] [--azimuth 0,30] [--no-export]
  * Set BLENDER to the Blender executable (4.2 or newer) when it is not found automatically.
  * See blender/README.md for the model contract.
@@ -12,15 +13,21 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // Keep in step with blender/build.py.
-const FAMILIES: Record<string, { folder: string; names: string[] }> = {
+const FAMILIES: Record<string, { folder: string; names: string[]; script?: string }> = {
   device: { folder: "devices", names: ["client", "router", "switch", "firewall", "honeypot", "cache", "power", "balancer", "rack", "phantom"] },
   installation: { folder: "installations", names: ["tap", "jammer", "spike", "anchor", "breaker"] },
   prop: { folder: "props", names: ["crate", "fragment"] },
+  board: { folder: "boards", names: ["table", "copper", "glass", "blackout", "regent", "cantor", "core"] },
+  crest: {
+    folder: "boards", script: "crests",
+    names: ["leech", "wraith", "prophet", "serpent", "moth", "sentinel", "colossus", "weaver", "storm", "widow", "marshal", "choir",
+      "reaver", "foreman", "nest", "demolition", "blight"],
+  },
 };
 const NAMES = Object.values(FAMILIES).flatMap((family) => family.names);
 const scriptOf = (name: string) => {
   const family = Object.values(FAMILIES).find((entry) => entry.names.includes(name))!;
-  return path.join(root, "blender", family.folder, `${name}.py`);
+  return path.join(root, "blender", family.folder, `${family.script ?? name}.py`);
 };
 
 function findBlender(): string {

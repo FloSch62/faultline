@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ARCHETYPES, EXPEDITION_VERSION, newExpedition, parseExpedition, dailySeed, starterDeck } from "./expedition.ts";
+import { ARCHETYPES, EXPEDITION_VERSION, newExpedition, parseExpedition, starterDeck } from "./expedition.ts";
 import { ASCENSION_LEVELS, ASCENSION_RULES, MAX_ASCENSION } from "./ascension.ts";
 import { CARDS, STARTER_DECK } from "./cards.ts";
 import { chooseRoom, combatPreview } from "./run.ts";
@@ -41,27 +41,16 @@ test("ascension levels are cumulative expedition rules: four levels, each rule n
   assert.equal(MAX_ASCENSION, 4);
   assert.deepEqual(ASCENSION_LEVELS.map(level => level.level), [1, 2, 3, 4]);
   assert.ok(Object.values(ASCENSION_RULES).every(level => level >= 1 && level <= MAX_ASCENSION));
-  const before = newExpedition("warden", 5, false, ASCENSION_RULES.knownVulnerability - 1).run;
+  const before = newExpedition("warden", 5, ASCENSION_RULES.knownVulnerability - 1).run;
   assert.ok(!before.deck.includes("cve"));
-  const cursed = newExpedition("warden", 5, false, ASCENSION_RULES.knownVulnerability).run;
+  const cursed = newExpedition("warden", 5, ASCENSION_RULES.knownVulnerability).run;
   assert.equal(count(cursed.deck, "cve"), 1);
   assert.equal(cursed.maxIntegrity, 15);
-  const worn = newExpedition("warden", 5, false, ASCENSION_RULES.wornBackbone).run;
+  const worn = newExpedition("warden", 5, ASCENSION_RULES.wornBackbone).run;
   assert.equal(worn.maxIntegrity, 13);
   assert.equal(worn.integrity, 13);
-  assert.equal(newExpedition("ghost", 5, false, 99).run.ascension, MAX_ASCENSION);
-  assert.equal(newExpedition("ghost", 5, false, -3).run.ascension, 0);
-});
-
-test("daily expeditions repeat card draws and threats for the same date and loadout", () => {
-  const seed = dailySeed(new Date("2026-09-22T04:00:00Z"));
-  assert.equal(seed, 20260922);
-  const a = newExpedition("ghost", seed, true),
-    b = newExpedition("ghost", seed, true);
-  b.startedAt = a.startedAt;
-  chooseRoom(a.run, "0-0");
-  chooseRoom(b.run, "0-0");
-  assert.deepEqual(a, b);
+  assert.equal(newExpedition("ghost", 5, 99).run.ascension, MAX_ASCENSION);
+  assert.equal(newExpedition("ghost", 5, -3).run.ascension, 0);
 });
 
 /** A mid-fight v4 state with every new field in use: three hostiles, four installations,

@@ -20,6 +20,11 @@
    every frame, World lays the portraits out above them). Nothing is drawn over a portrait. The layer
    lets the table take every click except on a plate itself. */
 #intent-layer { position: absolute; inset: 0; z-index: 5; overflow: hidden; pointer-events: none; }
+/* The portraits' own layer (World's rail canvas): over the table and its shade, drawn at the
+   device's resolution, never taking the pointer (the table's canvas hit-tests the portraits). It
+   comes and goes with the table. */
+.rail-layer { z-index: 3; opacity: 0; transition: opacity .7s; }
+.is-battle .rail-layer { opacity: 1; }
 .game-root:not(.is-battle) #intent-layer, .game-root.lesson-debrief #intent-layer { display: none; }
 .hostile-plate {
   position: absolute; left: 0; top: 0;

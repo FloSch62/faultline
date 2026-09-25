@@ -4,10 +4,12 @@ Units are game units. Blender is Z-up; the glTF export turns the model Y-up and
 Blender's -Y becomes three.js +Z, the side that faces the table camera. Build
 every body facing -Y.
 
-Three families share the materials, hooks and export:
+Five families share the materials, hooks and export:
   device        origin at the plinth base, body from PLINTH_TOP (the plinth is built in code)
   installation  origin at the table surface, no plinth (hostile permanents: tap, jammer, ...)
   prop          origin at the table surface, no plinth (crate, message fragment)
+  board         the battle table's frame, origin at the centre of the table surface (boards/)
+  crest         a leader's dressing for a stage board: crest and finials (boards/crests.py)
 
 The contract with src/three/models.ts lives in blender/README.md.
 """
@@ -40,11 +42,17 @@ ENVELOPES = {
     "installation": {"bottom": 0.0, "top": 1.9, "radius": 0.6, "orbit": 0.75},
     # Props: small table objects without a label (World.ts labels the crate).
     "prop": {"bottom": 0.0, "top": 1.2, "radius": 0.5, "orbit": 0.5},
+    # Boards and crests are boxes: the frame may reach x 9.45 and y 6.45 (the HUD's side panels) and
+    # stays low on the far side, where the hostile portraits stand (see boards/kit.py).
+    "board": {"bottom": -1.7, "top": 1.0, "x": 9.45, "y": 6.45},
+    "crest": {"bottom": -1.7, "top": 1.0, "x": 9.45, "y": 6.45},
 }
 BUDGETS = {
     "device": {"triangles": 6000, "draw_calls": 20, "bytes": 250 * 1024},
     "installation": {"triangles": 3000, "draw_calls": 8, "bytes": 120 * 1024},
     "prop": {"triangles": 1500, "draw_calls": 4, "bytes": 60 * 1024},
+    "board": {"triangles": 36000, "draw_calls": 28, "bytes": 1100 * 1024},
+    "crest": {"triangles": 8000, "draw_calls": 10, "bytes": 240 * 1024},
 }
 
 # Preview-only copy of COLORS in src/three/devices.ts. The game recolours every
@@ -191,14 +199,14 @@ def material(name, role="router"):
 
 def lit(name, base, metallic, roughness, emission=0x000000, strength=0.0):
     """A one-off lit material. Any name without a glow/wire/role prefix is lit metal in the game."""
-    assert not name.startswith(("glow", "wire", "role_")), name
+    assert not name.startswith(("glow", "wire", "role_", "accent_glow")), name
     return _lit(name, rgba(base)[:3], metallic, roughness, rgba(emission)[:3], strength)
 
 
 def unlit(name, color, opacity=1.0, double_sided=False):
     """A one-off unlit colour. `name` starts with glow_ (solid) or wire_ (wireframe), or with
     role_glow / role_wire to take the role colour in game (`color` is then only for previews)."""
-    assert name.startswith(("glow_", "wire_", "role_glow", "role_wire")), name
+    assert name.startswith(("glow_", "wire_", "role_glow", "role_wire", "accent_glow", "band_")), name
     return _unlit(name, color, opacity, double_sided)
 
 
@@ -506,6 +514,13 @@ def variant(obj, flag):
     return obj
 
 
+def slot(obj, name):
+    """Boards: a dressing slot ("crest", "finial") that a leader's crest model replaces. Never merged
+    into the body; build it under an empty() holder and merge_onto() it."""
+    obj["slot"] = name
+    return obj
+
+
 def part(obj, name):
     """A named moving part that World.ts drives itself (the crate's lid). Like a hooked part it is
     never merged into the static body and keeps identity rotation; its origin is the pivot."""
@@ -572,7 +587,7 @@ def _lineage(obj):
 
 
 def _is_static(obj):
-    if any("hook" in node or "variant" in node or "part" in node for node in _lineage(obj)):
+    if any("hook" in node or "variant" in node or "part" in node or "slot" in node for node in _lineage(obj)):
         return False
     return obj.type == "MESH" and not obj.children
 
@@ -665,17 +680,21 @@ def check_bounds(role, max_top=MAX_TOP, family="device"):
         if obj.type != "MESH":
             continue
         orbit = any("hook" in node or "part" in node for node in _lineage(obj))
-        limit = envelope["orbit"] if orbit else envelope["radius"]
+        box = "x" in envelope
+        limit = None if box else envelope["orbit"] if orbit else envelope["radius"]
         evaluated = obj.evaluated_get(depsgraph)
         mesh = evaluated.to_mesh()
-        radius = top = 0.0
+        radius = top = reach_x = reach_y = 0.0
         bottom = math.inf
         for vertex in mesh.vertices:
             world = obj.matrix_world @ vertex.co
             radius = max(radius, math.hypot(world.x, world.y))
+            reach_x, reach_y = max(reach_x, abs(world.x)), max(reach_y, abs(world.y))
             top, bottom = max(top, world.z), min(bottom, world.z)
         evaluated.to_mesh_clear()
-        if radius > limit + 0.01:
+        if box and (reach_x > envelope["x"] + 0.01 or reach_y > envelope["y"] + 0.01):
+            problems.append(f"{obj.name}: reaches x {reach_x:.2f}, y {reach_y:.2f} > {envelope['x']}, {envelope['y']}")
+        elif not box and radius > limit + 0.01:
             problems.append(f"{obj.name}: radius {radius:.3f} > {limit}")
         if top > max_top + 0.01 or bottom < envelope["bottom"] - 0.01:
             problems.append(f"{obj.name}: z {bottom:.2f}..{top:.2f} outside {envelope['bottom']:g}..{max_top:g}")

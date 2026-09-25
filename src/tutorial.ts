@@ -143,6 +143,14 @@ function lessonCard(lesson: LessonDefinition, completed: Set<string>, recommende
 }
 
 /** The lesson menu (render into the dialog). Buttons carry data-lesson ids. */
+/** A new player's first New expedition: Field Training first (recommended), or straight to the keepers. */
+export function trainingOfferMarkup(): string {
+  const first = LESSONS[0];
+  return `<div class="panel-head"><h2>Field Training</h2></div>
+    <p class="confirm-copy">New to the relay? Field Training teaches the table in short practice battles with a coach at your side. ${esc(first.title)} takes about ${first.minutes} minutes, and nothing there touches your expedition.</p>
+    <div class="confirm-actions button-row training-offer"><button class="gold-button" data-action="training-first"><span>${icon("play", 16)}Begin Field Training</span><small>Recommended</small></button><button class="plate-button" data-action="skip-training">Start the expedition</button></div>`;
+}
+
 export function lessonMenuMarkup(completed: readonly string[]): string {
   const done = new Set(completed);
   const recommended = LESSONS.find(lesson => !done.has(lesson.id))?.id;

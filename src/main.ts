@@ -14,7 +14,6 @@ import { TRACK_TITLES } from "./core/music.ts";
 import { CARDS, RULES, baseCard } from "./core/cards.ts";
 import {
   ARCHETYPES,
-  dailySeed,
   EXPEDITION_VERSION,
   newExpedition,
   parseExpedition,
@@ -121,7 +120,6 @@ try {
 let run = expedition?.run ?? createRun();
 let view: "title" | "select" | "run" = "title";
 let archetype: Archetype = "architect";
-let daily = false;
 let selected: number | null = null;
 let source: string | null = null;
 let selectedNode: string | null = null;
@@ -355,7 +353,7 @@ function render(rebuild = true) {
   if (debrief) screen = "";
   else if (view === "title") screen = screens.titleMarkup(expedition);
   else if (view === "select")
-    screen = screens.selectMarkup(archetype, daily);
+    screen = screens.selectMarkup(archetype);
   else if (run.phase === "map") screen = screens.mapMarkup(expedition!);
   else if (run.phase === "reward") screen = screens.rewardMarkup(run);
   else if (run.phase === "relic") screen = screens.relicMarkup(run);
@@ -410,6 +408,8 @@ function render(rebuild = true) {
     $("#hand-zone").innerHTML = battle ? battleUi.handMarkup(run, selected) : "";
     document.querySelector(".card-fan")?.scrollTo({left:scroll});
     handKey = signature;
+    // The rail measures the hand it stands over: the table may stand lower in a tall window.
+    if (battle) measureRail();
   } else if (battle)
     document
       .querySelectorAll<HTMLElement>("[data-hand]")
@@ -682,6 +682,7 @@ function openModal(type: string) {
   }
   else if (type === "credits") content.innerHTML = screens.creditsMarkup();
   else if (type === "replace") content.innerHTML = screens.replaceMarkup(run);
+  else if (type === "training-offer") content.innerHTML = training.trainingOfferMarkup();
   dialog.className = [
     "deck",
     "collection",
@@ -711,6 +712,28 @@ function closeModal() {
   dialog.className = "";
   render(false);
 }
+/** Picks a keeper without rebuilding the selection screen; the plates glide to their new places. */
+function pickKeeper(id: Archetype) {
+  const plates = Array.from(document.querySelectorAll<HTMLElement>(".selection-screen [data-archetype]"));
+  const before = plates.map(plate => plate.getBoundingClientRect().left);
+  if (!screens.chooseKeeperInPlace(id)) { render(false); return; }
+  if (!sound.settings.motion || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  plates.forEach((plate, i) => {
+    const shift = before[i] - plate.getBoundingClientRect().left;
+    if (Math.abs(shift) > 1) plate.animate([{ translate: `${shift}px 0` }, { translate: "0 0" }], { duration: 260, easing: "cubic-bezier(.2, .7, .2, 1)" });
+  });
+}
+/** A new player (no expedition, record or lesson yet, field notes on) is asked once whether to
+ * take Field Training before the first expedition. */
+function firstExpedition() {
+  return preferences.tips && !preferences.trainingOffered && !expedition && !records.length && !training.loadCompletedLessons().length;
+}
+function chooseKeeper() {
+  clearSelection();
+  archetype = "architect";
+  view = "select";
+  render();
+}
 function begin() {
   if (expedition && !["won", "lost"].includes(run.phase) && !discardArmed) {
     openModal("replace");
@@ -719,10 +742,7 @@ function begin() {
   discardArmed = false;
   expedition = newExpedition(
     archetype,
-    daily
-      ? dailySeed()
-      : (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0,
-    daily,
+    (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0,
     screens.chosenAscension(archetype),
   );
   run = expedition.run;
@@ -955,9 +975,11 @@ function tableAnchors(): string {
   return run.installations.map(item => `<i class="table-anchor" data-anchor-installation="${item.id}" data-x="${item.x}" data-z="${item.z}"></i>`).join("")
     + run.topology.nodes.filter(node => !node.fixed && isWorn(node)).map(node => `<i class="table-anchor" data-anchor-node="${node.id}" data-x="${node.x}" data-z="${node.z}"></i>`).join("");
 }
-/** The rail's frame for the table (client pixels): the span between the side plates, the header's
- * items the portraits stay clear of, and the plates' size (the tallest plate is reserved under every
- * portrait, so all feet stand on one line). */
+/** The rail's frame (client pixels): the span between the side plates, the band's top (the game's
+ * top edge: the portraits have their own layer), the header's items the portraits stay clear of, the
+ * plates' size (the tallest plate is reserved under every portrait, so all feet stand on one line)
+ * and the lowest the table may stand over the hand. */
+let handTop: { size: string; top: number } | null = null;
 function measureRail() {
   const layer = document.getElementById("intent-layer");
   if (!world || !layer || !root.classList.contains("is-battle")) return;
@@ -974,8 +996,14 @@ function measureRail() {
   layer.style.setProperty("--plate-side", `${(side / scale).toFixed(1)}px`);
   const plates = Array.from(layer.querySelectorAll<HTMLElement>(".hostile-plate"));
   const height = Math.max(58 * scale, ...plates.map(plate => plate.getBoundingClientRect().height));
+  // The table may stand lower in a tall window, its front edge 40 px over the resting hand (an empty
+  // hand is not drawn: the last measure at this size holds).
+  const [hand] = rect("#hand-zone"), size = `${box.width}x${box.height}`;
+  if (hand) handTop = { size, top: hand.top - box.top };
   world.setRailFrame({
-    left, right, top: Math.max(canvas.top, box.top) + 6 * scale,
+    left, right, top: box.top + 4 * scale,
+    table: handTop?.size === size ? box.top + handTop.top - 40 * scale : undefined,
+    front: handTop?.size === size ? box.top + handTop.top - 6 * scale : undefined,
     obstacles: rect(".game-header .run-stats, .game-header .header-controls, .is-battle .encounter-heading")
       .map(item => ({ left: item.left, top: item.top, right: item.right, bottom: item.bottom })),
     plate: { width, side, height: Math.ceil(height), gap },
@@ -984,8 +1012,8 @@ function measureRail() {
 addEventListener("resize", () => { measureRail(); placeIntents(); });
 // The plates' type may land after the first render: measure their height again once it has.
 void document.fonts?.ready.then(() => { measureRail(); placeIntents(); });
-/** Hangs each plate under its portrait (the table moves with the camera and the frame). Positions
- * are client pixels, the layer lives inside #app's interface zoom. */
+/** Hangs each plate under its portrait (the rail stands still when the table's camera moves; the
+ * table anchors follow it). Positions are client pixels, the layer lives inside #app's interface zoom. */
 function placeIntents() {
   const layer = document.getElementById("intent-layer");
   if (!layer?.firstElementChild || !world) return;
@@ -1614,13 +1642,18 @@ async function action(name: string) {
     begin();
     return;
   }
+  if (name === "training-first" || name === "skip-training") {
+    preferences.trainingOffered = true;
+    storePreferences(preferences);
+    closeModal();
+    if (name === "training-first") openLesson(training.LESSONS[0].id);
+    else chooseKeeper();
+    return;
+  }
   if (dialog.open && name !== "save-exit" && name !== "export") return;
-  if (name === "new" || name === "daily") {
-    clearSelection();
-    daily = name === "daily";
-    archetype = "architect";
-    view = "select";
-    render();
+  if (name === "new") {
+    if (firstExpedition()) openModal("training-offer");
+    else chooseKeeper();
     return;
   }
   if (name === "title" || name === "save-exit") {
@@ -1786,7 +1819,7 @@ document.addEventListener("click", (event) => {
     .archetype as Archetype | undefined;
   if (character) {
     archetype = character;
-    render(false);
+    pickKeeper(character);
     sound.effect("pickup");
     return;
   }
@@ -1843,6 +1876,8 @@ document.addEventListener("click", (event) => {
       world?.resetCamera();
     }
     if (outcome.changed !== false) save();
+    // An ascension rung on the keeper screen redraws only its panel.
+    if (view === "select" && screenControl.dataset.screen === "ascension" && screens.refreshAscension(archetype)) return;
     render();
     return;
   }
@@ -2259,7 +2294,7 @@ function startLesson(id: training.LessonId) {
   // Short screens start with the coach folded to its current goal; it expands on demand.
   const short = root.getBoundingClientRect().height / interfaceScale() < 780;
   practice = { id, ...parked, progress: null, showHint: false, collapsed: practice?.collapsed ?? short, read: [], plate: false };
-  expedition = { version: EXPEDITION_VERSION, run: lessonRun, archetype: lessonRun.archetype, daily: false, startedAt: Date.now(), recorded: true };
+  expedition = { version: EXPEDITION_VERSION, run: lessonRun, archetype: lessonRun.archetype, startedAt: Date.now(), recorded: true };
   run = lessonRun;
   view = "run";
   busy = false;

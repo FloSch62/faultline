@@ -1,0 +1,69 @@
+{
+  "description": "Keeper portraits for the Choose Your Keeper screen: one distinct person per keeper, the network gear of the cards dressed in brass and chipped ivory, conditioned on the original Switch card crop (the card set's style anchor) with the style-reference LoRA at the card strength. Chosen by the user from run 04 (seed 260924411 for all three).",
+  "local": {
+    "model": "Krea-2-Turbo",
+    "diffusionModel": "krea2_turbo_fp8_scaled.safetensors",
+    "textEncoder": "qwen3vl_4b_fp8_scaled.safetensors",
+    "vae": "qwen_image_vae.safetensors",
+    "width": 1024,
+    "height": 1536,
+    "steps": 8,
+    "cfg": 1,
+    "sampler": "euler",
+    "scheduler": "simple",
+    "modelSource": "https://huggingface.co/Comfy-Org/Krea-2",
+    "modelRevision": "eb1eddd3983a54678545a9b2c178c5853b30f7be",
+    "runtime": "ComfyUI",
+    "runtimeRevision": "b5cc8830279eae909a59de030af1e50761c36751",
+    "styleReference": {
+      "source": "public/art/card-atlas.png",
+      "crop": [
+        418,
+        0,
+        418,
+        418
+      ],
+      "inputName": "faultline-keeper-reference.png",
+      "lora": "krea2_style_reference.safetensors",
+      "strength": 0.8
+    }
+  },
+  "delivery": {
+    "size": [
+      1024,
+      1536
+    ],
+    "format": "webp",
+    "quality": 88,
+    "maxBytes": 400000
+  },
+  "keepers": [
+    {
+      "id": "architect",
+      "name": "The Architect",
+      "seed": 260924411,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference: one character of a ruined orbital relay cathedral, where network hardware became sacred machinery and futuristic technology is dressed in antique brass filigree and chipped ivory. The Architect, a futuristic network engineer who built the return routes: a weathered grey-haired man in his fifties with a lined, thoughtful face. He wears a brass-and-ivory exoskeleton tool harness over a dark technical work coat; spools of glowing teal fibre-optic cable feed from a compact backpack relay unit with short antennas and small amber status lights into ports on his chest plate. His right forearm is an armoured brass gauntlet tool with fine calipers and fibre connectors built in; a monocular optical lens on a brass arm sits before one eye. Above his raised left palm floats a luminous hexagonal teal router crystal, and thin painted lines of teal light spread from it into a branching route between small floating nodes. Behind him, cable-hung gothic vaults of the orbital relay cathedral, stacked ivory relay racks and spires, and a tall pointed window opening onto a sunlit cloud sea and the curve of a planet, with drifting debris. Tall portrait composition: the figure fills the frame from just above the head down to the upper thighs, three-quarter view, the face clearly lit and readable, head and shoulders large in the upper third, a strong clear silhouette. The lower third of the image falls into deep shadow. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates, deep indigo-black shadows, restrained luminous teal and warm gold, dramatic shadow masses and expressive painted light. No medieval fantasy, sword, torch, open flame, oil lantern, parchment scroll, knight's plate armour, stone dungeon, photography, smooth 3D rendering, anime, text, labels, border or interface.",
+      "file": "public/art/keepers/architect.webp",
+      "sha256": "4204539a86f6c419b4523da3a86629de30f1b5604dc9f2fbf5b2279869664b77",
+      "candidate": "artifacts/keeper-art/04-tech-card-080/architect@260924411.png"
+    },
+    {
+      "id": "warden",
+      "name": "The Warden",
+      "seed": 260924411,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference: one character of a ruined orbital relay cathedral, where network hardware became sacred machinery and futuristic technology is dressed in antique brass filigree and chipped ivory. The Warden, the guardian of the cathedral's firewall: a stern woman in her forties, short dark hair streaked with grey, a scarred weathered face and a calm unyielding gaze. She wears heavy powered exo-armour of chipped ivory and tarnished brass plates over dark metal joints, with heat-sink fins and cooling vents on the shoulders, glowing amber seams, small teal status lights and cable conduits running into the backplate. She braces a tall tower shield that is a firewall panel: an armoured slab of dark brass and ivory with a glowing amber lattice grid and louvred vents, warm energy shining through the lattice onto her face, teal indicator lights along its rim. Behind her, a massive sealed bulkhead gate in the cable-hung gothic vaults of the orbital relay cathedral, relay spires and a pointed window onto the cloud sea, drifting sparks and debris. Tall portrait composition: the figure fills the frame from just above the head down to the upper thighs, three-quarter view, the face clearly lit and readable, head and shoulders large in the upper third, a strong clear silhouette. The lower third of the image falls into deep shadow. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates, deep indigo-black shadows, restrained luminous teal and warm gold, dramatic shadow masses and expressive painted light. No medieval fantasy, sword, torch, open flame, oil lantern, parchment scroll, knight's plate armour, stone dungeon, photography, smooth 3D rendering, anime, text, labels, border or interface.",
+      "file": "public/art/keepers/warden.webp",
+      "sha256": "8bf7dc25edf1992579d97c52d9f82691030d4f68b3d539a1284d880b9d0bcc92",
+      "candidate": "artifacts/keeper-art/04-tech-card-080/warden@260924411.png"
+    },
+    {
+      "id": "ghost",
+      "name": "The Ghost",
+      "seed": 260924411,
+      "prompt": "A dark atmospheric science-fantasy collectible-card painting, matching the painted look of the reference: one character of a ruined orbital relay cathedral, where network hardware became sacred machinery and futuristic technology is dressed in antique brass filigree and chipped ivory. The Ghost, an infiltrator of dead networks: a slender figure in a deep hood whose face is hidden behind a smooth optical mask of chipped ivory with a narrow glowing pale-blue visor slit and a small brass respirator. A long cloak woven from dark optical fibre, faint cyan data traces flickering along its threads, over a close-fitting dark stealth suit with brass fittings. A small hovering brass-and-ivory signal drone with a single pale lens floats at the shoulder, casting cold blue light; one gloved hand holds a slim handheld signal instrument with a glowing tuning dial. Thin threads of pale cyan light trail through the darkness like the traces of lost packets. Behind, an abandoned dark relay gallery of the orbital cathedral: dead ivory server racks, hanging cables, a distant gothic window onto a cold blue cloud sea and stars, drifting debris. Tall portrait composition: the figure fills the frame from just above the head down to the upper thighs, three-quarter view, the face clearly lit and readable, head and shoulders large in the upper third, a strong clear silhouette. The lower third of the image falls into deep shadow. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates, deep indigo-black shadows, restrained luminous teal and warm gold, dramatic shadow masses and expressive painted light. No medieval fantasy, sword, torch, open flame, oil lantern, parchment scroll, knight's plate armour, stone dungeon, photography, smooth 3D rendering, anime, text, labels, border or interface.",
+      "file": "public/art/keepers/ghost.webp",
+      "sha256": "7e750be572a5a5a6c844ccf8e1d2e0ab1442a0eb389260909bbca5e02a27eae3",
+      "candidate": "artifacts/keeper-art/04-tech-card-080/ghost@260924411.png"
+    }
+  ]
+}

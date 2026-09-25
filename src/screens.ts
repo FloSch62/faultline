@@ -413,7 +413,7 @@ export function titleMarkup(saved: Expedition | null) {
   const item = (action: string, label: string, extra = "") =>
     `<button class="menu-item" data-action="${action}"><span>${label}</span>${extra}</button>`;
   return `<section class="title-screen"><div class="title-copy"><h1 class="logotype">FAULTLINE</h1><p class="logo-subtitle"><i></i><span>A Containerlab Odyssey</span><i></i></p>
-    <nav class="title-menu" aria-label="Main menu">${canContinue ? item("continue", "Continue expedition", `<small>${where}</small>`) : ""}${item("new", "New expedition")}${item("daily", "Daily expedition")}<i class="menu-gap" aria-hidden="true"></i>${item("tutorial", "Field training")}${item("help", "Handbook")}${item("collection", "Card archive")}${item("settings", "Options")}</nav>
+    <nav class="title-menu" aria-label="Main menu">${canContinue ? item("continue", "Continue expedition", `<small>${where}</small>`) : ""}${item("new", "New expedition")}<i class="menu-gap" aria-hidden="true"></i>${item("tutorial", "Field training")}${item("help", "Handbook")}${item("collection", "Card archive")}${item("settings", "Options")}</nav>
   </div><span class="version-mark">v${__APP_VERSION__}</span></section>`;
 }
 
@@ -452,27 +452,66 @@ function starterRow(id: Archetype): string {
   return `<span class="kit-row kit-deck"><i>${icon("deck", 15)}</i><span><em>Starting deck · ${deck.length} cards</em><span class="starter-list">${names}</span></span></span>`;
 }
 
+/** The chosen keeper's leaf, unfolded beside the portrait: their story, then the kit (console, relic,
+ * engine, starting deck). */
+function keeperKit(id: Archetype): string {
+  const a = ARCHETYPES[id], consoleDef = CONSOLES[a.console], engine = ENGINES[id], relic = RELICS[a.relic];
+  // Short console rules read in full; a long one keeps its first sentence (the engine row explains the rest).
+  const consoleSummary = consoleDef.rules.length < 80 ? consoleDef.rules : consoleDef.rules.split(/(?<=\.)\s+/)[0];
+  return `<span class="keeper-kit">
+      <span class="keeper-story">${esc(ARCHETYPE_STORIES[id].story)}</span>
+      <span class="kit">
+        <span class="kit-row"><i>${sicon("console", 16)}</i><span><em>Console · ${consoleDef.cost} energy</em><b>${consoleDef.name}</b><span>${esc(consoleSummary)}</span></span></span>
+        <span class="kit-row"><i>${relicEmblem(a.relic, 15)}</i><span><em>Starting relic</em><b>${relic.name}</b><span>${esc(relic.rules)}</span></span></span>
+        <span class="kit-row"><i>${sicon("engine", 16)}</i><span><em>Engine</em><b>${engine.name}</b><span>${esc(engine.rules)}</span></span></span>
+        ${starterRow(id)}
+      </span>
+    </span>`;
+}
+
+/** Chooses a keeper on the open selection screen in place, so the portraits stay loaded and the
+ * plates keep their focus and hover: the lit stone and the kit leaf move to the chosen plate and the
+ * ascension panel follows that keeper. False when no selection screen is open. */
+export function chooseKeeperInPlace(selected: Archetype): boolean {
+  const plates = Array.from(document.querySelectorAll<HTMLElement>(".selection-screen [data-archetype]"));
+  if (!plates.length || !document.querySelector(".selection-screen .ascension-panel")) return false;
+  for (const plate of plates) {
+    const chosen = plate.dataset.archetype === selected;
+    if (plate.classList.contains("chosen") === chosen) continue;
+    plate.classList.toggle("chosen", chosen);
+    plate.setAttribute("aria-pressed", String(chosen));
+    plate.querySelector(".lit-stone")?.remove();
+    plate.querySelector(".keeper-kit")?.remove();
+    if (!chosen) continue;
+    plate.querySelector(".keeper-portrait")?.insertAdjacentHTML("afterend", '<span class="lit-stone"></span>');
+    plate.insertAdjacentHTML("beforeend", keeperKit(selected));
+  }
+  return refreshAscension(selected);
+}
+/** Redraws the selection screen's ascension panel for a keeper in place (the focused rung keeps focus). */
+export function refreshAscension(archetype: Archetype): boolean {
+  const panel = document.querySelector(".selection-screen .ascension-panel");
+  if (!panel) return false;
+  const focused = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>(".asc-rung")?.dataset.level;
+  panel.outerHTML = ascensionPanel(archetype);
+  if (focused !== undefined) document.querySelector<HTMLElement>(`.selection-screen .asc-rung[data-level="${focused}"]`)?.focus();
+  return true;
+}
+
 const sentence = (text: string) => text.charAt(0) + text.slice(1).toLowerCase();
-export function selectMarkup(selected: Archetype, daily: boolean) {
+/** Choose Your Keeper: three tall portrait plates, the keeper's name and integrity on the painting's
+ * lower edge. The chosen plate is lit and unfolds its kit; the others stay dim until hovered. */
+export function selectMarkup(selected: Archetype) {
   const ids = Object.keys(ARCHETYPES) as Archetype[];
   const cards = ids.map(id => {
     const a = ARCHETYPES[id], consoleDef = CONSOLES[a.console], engine = ENGINES[id], relic = RELICS[a.relic];
-    // Short console rules read in full; a long one keeps its first sentence (the engine row explains the rest).
-    const consoleSummary = consoleDef.rules.length < 80 ? consoleDef.rules : consoleDef.rules.split(/(?<=\.)\s+/)[0];
-    const deck = starterDeck(id);
-    return `<button class="archetype ${selected === id ? "chosen" : ""}" data-archetype="${id}" aria-pressed="${selected === id}" style="${artStyle(a.art)};--accent:${a.color}" aria-label="${esc(`${a.name}. ${a.title}. Console: ${consoleDef.name}, ${consoleDef.rules} Relic: ${relic.name}, ${relic.rules} Engine: ${engine.name}. Starting deck, ${deck.length} cards: ${STARTER_SIGNATURES[id].map(card => CARDS[card].name).join(" and ")} with the shared ten. ${a.integrity} integrity.`)}">
-      <span class="archetype-art"></span>${selected === id ? '<span class="lit-stone"></span>' : ""}
-      <span class="archetype-copy"><strong>${a.name}</strong><em class="archetype-epithet">${sentence(a.title)}</em>
-        <span class="kit">
-          <span class="kit-row"><i>${sicon("console", 16)}</i><span><em>Console · ${consoleDef.cost} energy</em><b>${consoleDef.name}</b><span>${esc(consoleSummary)}</span></span></span>
-          <span class="kit-row"><i>${relicEmblem(a.relic, 15)}</i><span><em>Starting relic</em><b>${relic.name}</b><span>${esc(relic.rules)}</span></span></span>
-          <span class="kit-row"><i>${sicon("engine", 16)}</i><span><em>Engine</em><b>${engine.name}</b><span>${esc(engine.rules)}</span></span></span>
-          ${starterRow(id)}
-        </span>
-        <span class="archetype-health">${icon("heart", 16)}<b>${a.integrity}</b><small>Integrity</small></span>
-      </span></button>`;
+    const deck = starterDeck(id), chosen = selected === id;
+    return `<button class="archetype ${chosen ? "chosen" : ""}" data-archetype="${id}" aria-pressed="${chosen}" style="--portrait:url('${asset(a.art)}');--accent:${a.color}" aria-label="${esc(`${a.name}. ${a.title}. Console: ${consoleDef.name}, ${consoleDef.rules} Relic: ${relic.name}, ${relic.rules} Engine: ${engine.name}. Starting deck, ${deck.length} cards: ${STARTER_SIGNATURES[id].map(card => CARDS[card].name).join(" and ")} with the shared ten. ${a.integrity} integrity.`)}">
+      <span class="keeper-portrait" aria-hidden="true"></span>${chosen ? '<span class="lit-stone"></span>' : ""}
+      <span class="keeper-name"><strong>${a.name}</strong><em class="archetype-epithet">${sentence(a.title)}</em><span class="archetype-health">${icon("heart", 16)}<b>${a.integrity}</b><small>Integrity</small></span></span>
+      ${chosen ? keeperKit(id) : ""}</button>`;
   }).join("");
-  return `<section class="selection-screen full-screen"><button class="back-control text-button" data-action="title"><kbd>Esc</kbd>Return</button><button class="plate-button deck-plate" data-action="loadout">${icon("deck", 16)}Starting deck</button><div class="screen-heading">${daily ? '<span class="eyebrow">Daily Expedition</span>' : ""}<h1>Choose Your Keeper</h1><p class="chosen-story">${esc(ARCHETYPE_STORIES[selected].story)}</p></div><div class="archetypes">${cards}</div><div class="selection-footer">${ascensionPanel(selected)}<button class="gold-button embark" data-action="embark">Enter the Faultline</button></div></section>`;
+  return `<section class="selection-screen full-screen"><button class="back-control text-button" data-action="title"><kbd>Esc</kbd>Return</button><button class="plate-button deck-plate" data-action="loadout">${icon("deck", 16)}Starting deck</button><div class="screen-heading"><h1>Choose Your Keeper</h1></div><div class="archetypes">${cards}</div><div class="selection-footer">${ascensionPanel(selected)}<button class="gold-button embark" data-action="embark">Enter the Faultline</button></div></section>`;
 }
 
 // ------------------------------------------------------------------ header & map
@@ -536,15 +575,13 @@ function roomDetail(r: RunState, n: MapRoom): string {
     event: "Unknown signal · a short encounter. Every answer states its price before you choose.",
   }[n.type as "forge" | "cache" | "shop" | "event"] ?? "A hostile encounter.";
 }
-/** A hostile's portrait, cropped from its sprite sheet with the same background-position
- * crop as the guardian entrance. A sheet still being painted leaves an empty, sized disc. */
+/** A hostile's portrait (its square cut-out, the rail's own image), as on the guardian entrance.
+ * An unknown hostile leaves an empty, sized disc. */
 export function hostilePortrait(id: string, cls = "hostile-portrait"): string {
   const art = ENEMIES[id]?.art;
   const attr = cls ? ` class="${cls}"` : "";
   if (!art) return `<span${attr}></span>`;
-  const x = art.columns === 1 ? 0 : art.index % art.columns / (art.columns - 1) * 100;
-  const y = art.rows === 1 ? 0 : Math.floor(art.index / art.columns) / (art.rows - 1) * 100;
-  return `<span${attr} style="background-image:url('${asset(`art/${art.file}.png`)}');background-size:${art.columns * 100}% ${art.rows * 100}%;background-position:${x}% ${y}%"></span>`;
+  return `<span${attr} style="background-image:url('${asset(`art/${art}`)}');background-size:contain;background-position:center"></span>`;
 }
 /** The chart's designation glyphs for a room: one diamond per ribbon, or the UNKNOWN static. */
 function roomDesignations(scout: RoomScout): string {

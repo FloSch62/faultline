@@ -185,7 +185,7 @@ for (const archetype of archetypes) {
     const daemons: Record<string, number> = {};
     const V4_TOOLS = new Set(["phantom-node", "server-rack", "redundant-psu", "field-repair", "demolition-charge", "broadcast-storm", "packet-storm", "flood-fill", "traffic-shaping", "quorum", "bulkhead", "spearhead", "sentry-firewall", "rapid-redeploy", "patch", "reroute", "protocol"]);
     for (let seed = 1; seed <= seeds; seed++) {
-      const r = newExpedition(archetype, Math.imul(seed, 0x9e3779b1) >>> 0, false, ascension).run;
+      const r = newExpedition(archetype, Math.imul(seed, 0x9e3779b1) >>> 0, ascension).run;
       r.deck.push(...start);
       let moves = 0, battleTurns = 0, battleKind: Kind = "battle", battleLeader = "";
       let fight: Fight | null = null;

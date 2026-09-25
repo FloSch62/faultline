@@ -712,6 +712,17 @@ function closeModal() {
   dialog.className = "";
   render(false);
 }
+/** Picks a keeper without rebuilding the selection screen; the plates glide to their new places. */
+function pickKeeper(id: Archetype) {
+  const plates = Array.from(document.querySelectorAll<HTMLElement>(".selection-screen [data-archetype]"));
+  const before = plates.map(plate => plate.getBoundingClientRect().left);
+  if (!screens.chooseKeeperInPlace(id)) { render(false); return; }
+  if (!sound.settings.motion || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  plates.forEach((plate, i) => {
+    const shift = before[i] - plate.getBoundingClientRect().left;
+    if (Math.abs(shift) > 1) plate.animate([{ translate: `${shift}px 0` }, { translate: "0 0" }], { duration: 260, easing: "cubic-bezier(.2, .7, .2, 1)" });
+  });
+}
 /** A new player (no expedition, record or lesson yet, field notes on) is asked once whether to
  * take Field Training before the first expedition. */
 function firstExpedition() {
@@ -1808,7 +1819,7 @@ document.addEventListener("click", (event) => {
     .archetype as Archetype | undefined;
   if (character) {
     archetype = character;
-    render(false);
+    pickKeeper(character);
     sound.effect("pickup");
     return;
   }
@@ -1865,6 +1876,8 @@ document.addEventListener("click", (event) => {
       world?.resetCamera();
     }
     if (outcome.changed !== false) save();
+    // An ascension rung on the keeper screen redraws only its panel.
+    if (view === "select" && screenControl.dataset.screen === "ascension" && screens.refreshAscension(archetype)) return;
     render();
     return;
   }

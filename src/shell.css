@@ -255,3 +255,8 @@ dialog:has(.confirm-actions) { max-width: min(540px, calc(100cqw - 24px)); }
   .back-control { left: 14px; top: 16px; }
   .deck-plate { right: 14px; top: 14px; }
 }
+/* A keeper chosen in place: the leaf unfolds with a short fade instead of a rebuilt screen. */
+.keeper-kit { animation: keeper-leaf .24s ease-out; }
+@keyframes keeper-leaf { from { opacity: 0; } }
+.reduced-motion .keeper-kit { animation: none; }
+@media (prefers-reduced-motion: reduce) { .keeper-kit { animation: none; } }

@@ -23,7 +23,12 @@ test("a new expedition: title → archetype and ascension → map → first batt
   await expect(page.locator('[data-action="continue"]')).toHaveCount(0);
   await page.locator('[data-action="new"]').click();
   await expect(page.locator(".selection-screen")).toBeVisible();
+  // Choosing a keeper or an ascension rung changes the screen in place: the plates are never rebuilt.
+  await page.locator(".selection-screen").evaluate(screen => screen.querySelectorAll("[data-archetype]").forEach(plate => ((plate as HTMLElement).dataset.kept = "1")));
   await page.locator('[data-archetype="warden"]').click();
+  await expect(page.locator('[data-archetype="warden"]')).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator('[data-archetype="architect"]')).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("[data-archetype][data-kept]")).toHaveCount(3);
   // Each keeper plate paints its own portrait; only the chosen one unfolds its kit.
   const portraits = await page.locator(".keeper-portrait").evaluateAll(plates =>
     plates.map(plate => getComputedStyle(plate).backgroundImage.match(/url\("(.+)"\)/)?.[1] ?? ""));
@@ -35,6 +40,8 @@ test("a new expedition: title → archetype and ascension → map → first batt
   await expect(page.locator('[data-screen="ascension"][data-for="warden"][data-level="2"]')).toBeDisabled();
   await page.locator('[data-screen="ascension"][data-for="warden"][data-level="0"]').click();
   await page.locator('[data-screen="ascension"][data-for="warden"][data-level="1"]').click();
+  await expect(page.locator('[data-screen="ascension"][data-level="1"]')).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("[data-archetype][data-kept]")).toHaveCount(3);
   await page.locator('[data-action="embark"]').click();
   await expect(page.locator(".map-screen")).toBeVisible();
   let run = await saved(page);

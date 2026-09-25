@@ -469,6 +469,35 @@ function keeperKit(id: Archetype): string {
     </span>`;
 }
 
+/** Chooses a keeper on the open selection screen in place, so the portraits stay loaded and the
+ * plates keep their focus and hover: the lit stone and the kit leaf move to the chosen plate and the
+ * ascension panel follows that keeper. False when no selection screen is open. */
+export function chooseKeeperInPlace(selected: Archetype): boolean {
+  const plates = Array.from(document.querySelectorAll<HTMLElement>(".selection-screen [data-archetype]"));
+  if (!plates.length || !document.querySelector(".selection-screen .ascension-panel")) return false;
+  for (const plate of plates) {
+    const chosen = plate.dataset.archetype === selected;
+    if (plate.classList.contains("chosen") === chosen) continue;
+    plate.classList.toggle("chosen", chosen);
+    plate.setAttribute("aria-pressed", String(chosen));
+    plate.querySelector(".lit-stone")?.remove();
+    plate.querySelector(".keeper-kit")?.remove();
+    if (!chosen) continue;
+    plate.querySelector(".keeper-portrait")?.insertAdjacentHTML("afterend", '<span class="lit-stone"></span>');
+    plate.insertAdjacentHTML("beforeend", keeperKit(selected));
+  }
+  return refreshAscension(selected);
+}
+/** Redraws the selection screen's ascension panel for a keeper in place (the focused rung keeps focus). */
+export function refreshAscension(archetype: Archetype): boolean {
+  const panel = document.querySelector(".selection-screen .ascension-panel");
+  if (!panel) return false;
+  const focused = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>(".asc-rung")?.dataset.level;
+  panel.outerHTML = ascensionPanel(archetype);
+  if (focused !== undefined) document.querySelector<HTMLElement>(`.selection-screen .asc-rung[data-level="${focused}"]`)?.focus();
+  return true;
+}
+
 const sentence = (text: string) => text.charAt(0) + text.slice(1).toLowerCase();
 /** Choose Your Keeper: three tall portrait plates, the keeper's name and integrity on the painting's
  * lower edge. The chosen plate is lit and unfolds its kit; the others stay dim until hovered. */

@@ -1,5 +1,7 @@
 # FAULTLINE: the undelivered
 
+The full canon (world, history, who sends the keepers, open questions) is in [lore.md](lore.md). This page covers how the story is delivered in the game.
+
 The orbital backbone broke when its outer relays were destroyed. Emergency traffic looped through damaged return routes and overwhelmed the surviving network. Human wardens ordered the Blackout Core to isolate the archive until a safe delivery could be confirmed. The route carrying that confirmation never recovered.
 
 The Core has spent the remaining power preserving undelivered messages. Its isolation machinery now blocks the engineer trying to reconnect the station. Defeating it breaks that machinery, not the archive. The final acknowledgement comes from a living destination outside the station. The story leaves the scale of that survival open.

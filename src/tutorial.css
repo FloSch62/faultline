@@ -751,7 +751,7 @@ button.lesson-card:hover .lesson-icon,
     radial-gradient(circle, var(--ember) 0 1.5px, transparent 2.5px) left bottom / 9px 9px no-repeat,
     linear-gradient(90deg, #c9a26399, #c9a26322 80%, transparent) left 12px bottom 4px / calc(100% - 12px) 1px no-repeat;
 }
-.hb-nav button[data-handbook] {
+.hb-nav button:is([data-handbook], [data-lore]) {
   position: relative;
   display: grid;
   grid-template-columns: 36px 1fr;
@@ -762,14 +762,14 @@ button.lesson-card:hover .lesson-icon,
   color: #a8a08c;
   transition: color 0.18s, text-shadow 0.18s;
 }
-.hb-nav button[data-handbook] b {
+.hb-nav button:is([data-handbook], [data-lore]) b {
   font: 600 13px/1 var(--display);
   letter-spacing: 0.04em;
   color: #7d6c4c;
   transition: color 0.18s;
 }
 /* The bookmark stone: unlit brass on hover, burning ember on the open chapter. */
-.hb-nav button[data-handbook]::before {
+.hb-nav button:is([data-handbook], [data-lore])::before {
   content: "";
   position: absolute;
   left: 2px;
@@ -781,9 +781,9 @@ button.lesson-card:hover .lesson-icon,
   box-shadow: 0 0 0 1px #0b0906;
   transition: transform 0.18s, background 0.18s;
 }
-.hb-nav button[data-handbook]:hover { color: #efdcb3; }
-.hb-nav button[data-handbook]:hover b { color: #b39461; }
-.hb-nav button[data-handbook]:hover::before { transform: translateY(-50%) rotate(45deg) scale(0.8); }
+.hb-nav button:is([data-handbook], [data-lore]):hover { color: #efdcb3; }
+.hb-nav button:is([data-handbook], [data-lore]):hover b { color: #b39461; }
+.hb-nav button:is([data-handbook], [data-lore]):hover::before { transform: translateY(-50%) rotate(45deg) scale(0.8); }
 .hb-nav button.current {
   color: #fff0cc;
   text-shadow: 0 0 12px #ffb04a44;
@@ -1216,7 +1216,7 @@ button.lesson-card:hover .lesson-icon,
 
 /* ------------------------------------------------------------------ responsive */
 @container game (max-height: 700px) {
-  .hb-nav button[data-handbook] { padding-top: 5px; padding-bottom: 5px; font-size: 15px; }
+  .hb-nav button:is([data-handbook], [data-lore]) { padding-top: 5px; padding-bottom: 5px; font-size: 15px; }
   .handbook .hb-book-title { margin-bottom: 8px; font-size: 22px; }
   .hb-nav .hb-training { margin-top: 10px; }
   .hb-chapter-head h3 { font-size: 26px; }
@@ -1238,8 +1238,8 @@ button.lesson-card:hover .lesson-icon,
     background: linear-gradient(90deg, transparent, #c9a26366 10%, #c9a26366 90%, transparent) bottom / 100% 1px no-repeat;
   }
   .handbook .hb-book-title { display: none; }
-  .hb-nav button[data-handbook] { flex: none; grid-template-columns: auto auto; gap: 6px; padding: 8px 12px 10px; }
-  .hb-nav button[data-handbook]::before { left: 50%; top: auto; bottom: -1px; transform: translateX(-50%) rotate(45deg) scale(0); }
+  .hb-nav button:is([data-handbook], [data-lore]) { flex: none; grid-template-columns: auto auto; gap: 6px; padding: 8px 12px 10px; }
+  .hb-nav button:is([data-handbook], [data-lore])::before { left: 50%; top: auto; bottom: -1px; transform: translateX(-50%) rotate(45deg) scale(0); }
   .hb-nav button.current::before { transform: translateX(-50%) rotate(45deg) scale(1); }
   .hb-nav .hb-training { flex: none; margin: 0 0 0 8px; }
   .walkthrough.has-art { grid-template-columns: 1fr; }

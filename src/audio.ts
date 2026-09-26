@@ -25,6 +25,8 @@ export class Soundscape {
   private ready = false;
   private fade = 0;
   private transitioning = false;
+  /** Held while something else plays over the game (a lore film). */
+  private held = false;
   onUnavailable: (() => void) | null = null;
   onTrackChange: (() => void) | null = null;
   get trackTitle() { return TRACK_TITLES[this.track]; }
@@ -66,7 +68,7 @@ export class Soundscape {
         void this.ctx?.suspend().catch(() => {});
       } else if (this.ready) {
         void this.ctx?.resume().catch(() => {});
-        if (!this.settings.muted) void this.players[this.active].play().catch(() => {});
+        if (!this.settings.muted && !this.held) void this.players[this.active].play().catch(() => {});
       }
     });
   }
@@ -113,7 +115,7 @@ export class Soundscape {
     next.src = `${import.meta.env.BASE_URL}audio/${this.track}-instrumental.ogg`;
     next.loop = this.scene !== "battle";
     next.volume = 0;
-    if (!this.settings.muted && !document.hidden)
+    if (!this.settings.muted && !document.hidden && !this.held)
       void next.play().catch(() => this.onUnavailable?.());
     const start = performance.now();
     const oldVolume = previous.volume;
@@ -159,8 +161,15 @@ export class Soundscape {
     else if (this.ready) {
       if (!this.transitioning)
         this.players[this.active].volume = this.settings.music * 0.65;
-      void this.players[this.active].play().catch(() => {});
+      if (!this.held) void this.players[this.active].play().catch(() => {});
     }
+  }
+  /** Pauses the score while a film plays, and lets it play on afterwards. */
+  hold(on: boolean) {
+    if (this.held === on) return;
+    this.held = on;
+    if (on) this.players.forEach((p) => p.pause());
+    else if (this.ready && !this.settings.muted && !document.hidden) void this.players[this.active].play().catch(() => {});
   }
   effect(kind: EffectKind, options?: EffectOptions) {
     if (!this.settings.muted) this.effects?.play(kind, options);

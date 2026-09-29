@@ -83,12 +83,15 @@ import * as battleUi from "./battle-ui.ts";
 import * as screens from "./screens.ts";
 import * as alpha from "./alpha-ui.ts";
 import * as training from "./tutorial.ts";
+import * as lore from "./lore.ts";
 import { loadPreferences, storePreferences } from "./preferences.ts";
 import type { DevTools } from "./dev/panel.ts";
 // v5 · Three Energy: card marks, the daemon strip and the v5 screens, over every earlier sheet.
 import "./three-energy.css";
 // The card's one layout, the hand fan and the scale per view, last of all.
 import "./card-layout.css";
+// The Lore book reads in the Handbook's codex.
+import "./lore.css";
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) =>
   document.querySelector<T>(selector)!;
@@ -660,6 +663,8 @@ function renderTargetDock() {
   $("#target-dock").innerHTML = markup;
   $("#target-dock").classList.toggle("is-front", front);
 }
+/** The Lore book opens its ending once any keeper has reached the Heart. */
+const loreAnswered = () => Object.keys(screens.loadProgress().cleared).length > 0;
 function openModal(type: string) {
   if (busy) return;
   modal = type;
@@ -670,6 +675,7 @@ function openModal(type: string) {
   else if (type === "settings")
     content.innerHTML = screens.settingsMarkup(sound.settings, view === "run", preferences, !!document.fullscreenElement);
   else if (type === "help") content.innerHTML = training.handbookMarkup();
+  else if (type === "lore") content.innerHTML = lore.loreMarkup("films", loreAnswered());
   else if (type === "training") content.innerHTML = training.lessonMenuMarkup(training.loadCompletedLessons());
   else if (type === "combat-details") content.innerHTML = alpha.combatDetailsMarkup(run);
   else if (type === "enemy-dossier") content.innerHTML = alpha.enemyDossierMarkup(run, hud.port ?? effectiveFocus(run) ?? undefined);
@@ -695,9 +701,10 @@ function openModal(type: string) {
     "combat-details",
     "loadout",
     "help",
+    "lore",
     "training",
   ].includes(type)
-    ? `wide${type === "help" ? " handbook-dialog" : type === "training" ? " training-dialog" : ""}`
+    ? `wide${type === "help" ? " handbook-dialog" : type === "lore" ? " handbook-dialog lore-dialog" : type === "training" ? " training-dialog" : ""}`
     : type === "devices" || type === "enemy-dossier" ? "medium" : "";
   hideTooltip();
   if (!dialog.open) dialog.showModal();
@@ -710,6 +717,7 @@ function closeModal() {
     run.bossIntroSeen = true;
     save();
   }
+  if (modal === "lore") sound.hold(false);
   modal = "";
   dialog.close();
   dialog.className = "";
@@ -1638,6 +1646,7 @@ async function action(name: string) {
     name === "exhaust-pile" ||
     name === "settings" ||
     name === "help" ||
+    name === "lore" ||
     name === "credits" ||
     name === "collection" ||
     name === "deck" ||
@@ -1764,6 +1773,26 @@ document.addEventListener("click", (event) => {
     $("#dialog-content").innerHTML = training.walkthroughMarkup(Number(page));
     resetDialogScroll();
     sound.effect("select");
+    return;
+  }
+  const loreChapter = target.closest<HTMLElement>("[data-lore]")?.dataset.lore;
+  if (loreChapter && modal === "lore") {
+    sound.hold(false);
+    $("#dialog-content").innerHTML = lore.loreMarkup(loreChapter, loreAnswered());
+    resetDialogScroll();
+    sound.effect("select");
+    return;
+  }
+  const filmId = target.closest<HTMLElement>("[data-lore-play]")?.dataset.lorePlay;
+  const film = lore.LORE_FILMS.find(item => item.id === filmId);
+  if (film && modal === "lore") {
+    const screen = target.closest<HTMLElement>(".lore-film")?.querySelector<HTMLElement>(".lore-screen");
+    const player = lore.filmEmbed(film);
+    if (screen && player) {
+      // The score waits while a film plays; leaving the chapter or the book lets it play on.
+      sound.hold(true);
+      screen.innerHTML = player;
+    }
     return;
   }
   const chapter = target.closest<HTMLElement>("[data-handbook]")?.dataset.handbook;

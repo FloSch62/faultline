@@ -1,0 +1,720 @@
+{
+  "description": "Lore illustrations shown in the main menu's Lore book (src/lore.ts). They are a subset of the 130 plates painted for the two lore films, exported as 1280 px WebP (quality 78). Canon: docs/lore.md.",
+  "local": {
+    "model": "Krea-2-Turbo",
+    "diffusionModel": "krea2_turbo_fp8_scaled.safetensors",
+    "textEncoder": "qwen3vl_4b_fp8_scaled.safetensors",
+    "vae": "qwen_image_vae.safetensors",
+    "runtime": "ComfyUI",
+    "steps": 8,
+    "cfg": 1,
+    "sampler": "euler",
+    "scheduler": "simple",
+    "canvas": [
+      1920,
+      1088
+    ],
+    "recipes": {
+      "env": "environment: relay-cathedral reference, style-reference LoRA ~0.45, constant shift 1.15",
+      "figure": "figure/close shot: original Switch card crop, style-reference LoRA ~0.8; character design images as extra references",
+      "engraving": "antique engraved plate look, no LoRA, P02 as style reference for derived plates",
+      "img2img": "variant or close-up from an existing plate at the listed denoise"
+    }
+  },
+  "delivery": {
+    "size": [
+      1280,
+      726
+    ],
+    "format": "webp",
+    "quality": 78
+  },
+  "images": [
+    {
+      "id": "line-at-dawn",
+      "file": "public/art/lore/line-at-dawn.webp",
+      "sha256": "2e48b4bbf8907c36ba78096f3934c499f07b5b7e3f97fb17d11f7b36f0002be6",
+      "plate": "P01",
+      "recipe": "env",
+      "seed": 26091002,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "cathedral"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.45,
+      "shift": 1.15,
+      "denoise": 1.0,
+      "prompt": "An extraordinarily detailed cinematic matte painting in the exact finished science-fiction environment art direction of the reference: monumental weathered orbital network infrastructure with richly rendered surfaces, precise mechanical engineering and dramatic naturalistic volumetric lighting. The epic establishing view of the Line, a colossal ring of relay machinery circling a cloud-wrapped world at the edge of space, seen from high above at dawn. The ring is a continuous band of dark relay halls, trusses, cable-hung platforms and stacked containers; its long arc sweeps across the upper frame from the left and curves away into the far distance as a thin line of tiny amber lights. Gigantic relay spires, dark industrial lattice towers wrapped in gantries, conduits and lift shafts, rise from an endless sea of clouds far below to meet and hold up the ring; the nearest spire stands in the right middle ground with small warm windows. Far along the arc, immense circular ring gates face outward toward the stars. The first golden sunlight breaks over the horizon of the cloud sea, lighting the cloud tops and the brass edges of the ring; the upper sky is deep blue-black with stars, a large pale planet and a small moon hang in it. Gothic spire shapes appear only as tiny distant silhouettes. Dense layers of trusses, fine gantries, bundled cables and conduits, riveted dark-brass panels, worn ivory ceramic machinery and tiny service lights establish convincing colossal scale. Sophisticated chiaroscuro, deep desaturated midnight-blue shadows, small warm amber highlights and restrained teal signal light, intricate sharp foreground detail gradually lost in immense misty distance. Finished high-end game environment key art with rich oil-painting texture and subtle painterly edge control, never sketchy. Wide 16:9 cinematic composition with the main subject well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface."
+    },
+    {
+      "id": "faultline-from-below",
+      "file": "public/art/lore/faultline-from-below.webp",
+      "sha256": "ab7a7843d1e23097e53ca2ff3253d33ec1cddd929205229faea8faedf0280289",
+      "plate": "P19",
+      "recipe": "env",
+      "seed": 27014221,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "cathedral"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.45,
+      "shift": 1.15,
+      "initImage": "cand:P19/P19-v2-27315191.png",
+      "denoise": 0.9,
+      "inpaintMask": [
+        [
+          360,
+          60,
+          1560,
+          300
+        ]
+      ],
+      "prompt": "An extraordinarily detailed cinematic matte painting in the exact finished science-fiction environment art direction of the reference: monumental weathered orbital network infrastructure with richly rendered surfaces, precise mechanical engineering and dramatic naturalistic volumetric lighting. A dark starry night sky with thin clouds, and very high and far away a thin delicate line of tiny lights, like a string of small pearls, arcing across the sky; in the middle the string of lights is clearly broken by a long dark gap where the lights are missing, then continues on the other side. Palette and light of this sequence: Ember red fading into cold blue-black silence, dust hanging in still air. Dense layers of trusses, fine gantries, bundled cables and conduits, riveted dark-brass panels, worn ivory ceramic machinery and tiny service lights establish convincing colossal scale. Sophisticated chiaroscuro, deep desaturated midnight-blue shadows, small warm amber highlights and restrained teal signal light, intricate sharp foreground detail gradually lost in immense misty distance. Finished high-end game environment key art with rich oil-painting texture and subtle painterly edge control, never sketchy. Wide 16:9 cinematic composition with the main subject well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface.",
+      "note": "sky inpainted for a clear gap in the arc"
+    },
+    {
+      "id": "raising-the-spires",
+      "file": "public/art/lore/raising-the-spires.webp",
+      "sha256": "b96a693039d26656e95bab4ec1d9e252bd76c8485b10bb4d06f15754df26e3ff",
+      "plate": "P02",
+      "recipe": "engr",
+      "seed": 26092102,
+      "size": [
+        1920,
+        1088
+      ],
+      "denoise": 1.0,
+      "prompt": "An antique engraved plate from an ancient technical manual: a finely etched copperplate illustration printed in dark sepia-brown ink on aged ivory paper, with delicate touches of gilt. Dense fine line hatching and cross-hatching, stippled shading, precise mechanical draughtsmanship, the look of a centuries-old engineering folio. The engraving shows the raising of a colossal relay spire out of a sea of clouds, drawn as ancient network machinery rather than a plain tower: a tall tapering spire of trusses bristling with relay dishes, antenna arrays, stacked insulators, cable conduits and relay node housings, wrapped in scaffolding; an enormous curved segment of the orbital ring, carrying bundled fibre conduits and rows of relay node pods, hoisted into place by tall lattice cranes; giant cable drums unreeling thick fibre bundles; tiny hooded figures in sealed work suits with round helmet visors on the scaffolds splicing cable. Gilt touches pick out the relay nodes and the ring. Billowing engraved clouds below, the finished arc of the ring crossing the engraved sky above, a planet disc near the horizon. The engraving fills the whole widescreen frame. No writing, lettering, captions, numbers or labels anywhere. No oil painting, no colour photography, no 3D rendering, no swords, torches, scrolls or medieval props."
+    },
+    {
+      "id": "laying-the-line",
+      "file": "public/art/lore/laying-the-line.webp",
+      "sha256": "ece92e06590457bed0361a1a74c010cbadc7ada9753d01b2febcb2fe0eecbbb0",
+      "plate": "P03",
+      "recipe": "engr",
+      "seed": 27700571,
+      "size": [
+        1920,
+        1088
+      ],
+      "denoise": 1.0,
+      "prompt": "An antique engraved plate from an ancient technical manual: a finely etched copperplate illustration printed in dark sepia-brown ink on aged ivory paper, with delicate touches of gilt. Dense fine line hatching and cross-hatching, stippled shading, precise mechanical draughtsmanship, the look of a centuries-old engineering folio. The First Shift at work: a row of small hooded figures in sealed work suits with round visors and breathing hoses lay a thick bundle of fibre-optic cable along a long lattice gantry that bridges two relay spires above a sea of clouds; cable drums, pulleys, splice boxes and gilt relay nodes along the gantry. Around the central picture the page margins hold small engraved network diagrams: circles as nodes joined by branching lines and loops, concentric ring charts and geometric route figures, like the plates of an ancient engineering manual, without any writing. Antique engraved plate: fine line hatching, sepia ink on aged ivory paper, touches of gilt. The engraving fills the whole widescreen frame. No writing, lettering, captions, numbers or labels anywhere. No oil painting, no colour photography, no 3D rendering, no swords, torches, scrolls or medieval props."
+    },
+    {
+      "id": "outer-relay",
+      "file": "public/art/lore/outer-relay.webp",
+      "sha256": "e19f1738e0e221517e4ae6b8877eb4dd8d4bb7566210ef35bebc9e107c95d2fe",
+      "plate": "P08",
+      "recipe": "env",
+      "seed": 27833121,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "cathedral"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.45,
+      "shift": 1.15,
+      "denoise": 1.0,
+      "prompt": "An extraordinarily detailed cinematic matte painting in the exact finished science-fiction environment art direction of the reference: monumental weathered orbital network infrastructure with richly rendered surfaces, precise mechanical engineering and dramatic naturalistic volumetric lighting. An outer relay ring gate on the far side of the ring, alone at the edge of space: an immense circular gate of dark trusses and ivory machinery, ringed with brass segments and relay dishes, turned away from the world toward the stars. A faint pale beam of light leaves its centre and goes outward into the black starfield, thinning to nothing. The curve of the orbital ring and the golden cloud-wrapped world lie below along the lower part of the frame; deep black space full of stars above. Lonely and immense; tiny warm maintenance lamps on the gate give its scale. Palette and light of this sequence: Warm amber and gold lamplight, ivory and brass, lively, a soft haze of steam and dust. Dense layers of trusses, fine gantries, bundled cables and conduits, riveted dark-brass panels, worn ivory ceramic machinery and tiny service lights establish convincing colossal scale. Sophisticated chiaroscuro, deep desaturated midnight-blue shadows, small warm amber highlights and restrained teal signal light, intricate sharp foreground detail gradually lost in immense misty distance. Finished high-end game environment key art with rich oil-painting texture and subtle painterly edge control, never sketchy. Wide 16:9 cinematic composition with the main subject well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface."
+    },
+    {
+      "id": "shift-change",
+      "file": "public/art/lore/shift-change.webp",
+      "sha256": "dfafbf0323e7274f03dd8b867183cc1b98c2dd5d8913208574ab752e0c754d5a",
+      "plate": "P04",
+      "recipe": "fig",
+      "seed": 27044241,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "card"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.8,
+      "shift": 1.5,
+      "denoise": 1.0,
+      "prompt": "A dark atmospheric science-fiction oil painting matching the painted look of the reference, set on a ruined orbital relay megastructure where worn network hardware and futuristic equipment are dressed in chipped ivory and tarnished dark brass. The Keeping, long before the Blackout: a busy, warm, lamp-lit relay hall aboard the orbital ring, full of life. Tall ivory relay racks with rows of small amber and teal status lamps and neat looms of patch cords line the hall. Linefolk engineers change shift, one crew arriving and one leaving, in patched canvas work coats, padded headsets and cable harnesses with tool pouches and coiled fibre, nodding to each other; a kettle steams on a small brass hot plate on a workbench with mugs beside it; children's crayon drawings of spires and clouds are pinned to an ivory rack door; a large round viewport shows the golden cloud sea. Warm electric lamps hang from cable runs. Composition: a lively view down the hall, eight to twelve people at different depths, nobody at the extreme edges. Palette and light of this sequence: Warm amber and gold lamplight, ivory and brass, lively, a soft haze of steam and dust. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates, deep indigo-black shadows, restrained luminous teal and warm amber gold, dramatic shadow masses and expressive painted light. A finished, richly painted illustration, never sketchy. Wide 16:9 cinematic composition with the essential subject kept well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface."
+    },
+    {
+      "id": "glass-cathedral-singing",
+      "file": "public/art/lore/glass-cathedral-singing.webp",
+      "sha256": "cfaadeba574cc67ef6a026b8380e0307a0b2ee1ad4b1d9718c070c6779440e48",
+      "plate": "P05",
+      "recipe": "env",
+      "seed": 27613991,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "glass-stage"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.45,
+      "shift": 1.15,
+      "denoise": 1.0,
+      "prompt": "An extraordinarily detailed cinematic matte painting in the exact finished science-fiction environment art direction of the reference: monumental weathered orbital network infrastructure with richly rendered surfaces, precise mechanical engineering and dramatic naturalistic volumetric lighting. The Glass Cathedral in its glory, before the Blackout, the same optical switching hall as the reference but alive and brightly lit: vaults of great translucent violet optical glass panes in dark-brass machine frames, fibre-optic bundles and glass circuits carrying bright threads of white and gold light across the vaults so the whole hall glows. Enormous bells of violet optical crystal hang in brass cradles from gantries high above, shimmering with light. On the wide gunmetal floor below, a crowd of linefolk in simple dark clothes with small ivory-and-brass headsets stands still, faces turned upward, listening. Warm gold lamplight along the galleries mixing with the violet glass glow. It is machinery, not a church: no stained-glass pictures, no gothic tracery windows, no pews, no altar. Palette and light of this sequence: Warm amber and gold lamplight, ivory and brass, lively, a soft haze of steam and dust. Dense layers of trusses, fine gantries, bundled cables and conduits, riveted dark-brass panels, worn ivory ceramic machinery and tiny service lights establish convincing colossal scale. Sophisticated chiaroscuro, deep desaturated midnight-blue shadows, small warm amber highlights and restrained teal signal light, intricate sharp foreground detail gradually lost in immense misty distance. Finished high-end game environment key art with rich oil-painting texture and subtle painterly edge control, never sketchy. Wide 16:9 cinematic composition with the main subject well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface.",
+      "note": "glass-interior stage painting as style reference (cathedral ref gave church-like gothic windows)"
+    },
+    {
+      "id": "the-greeting",
+      "file": "public/art/lore/the-greeting.webp",
+      "sha256": "59f42403a3ce60abba5e7d3f468ce9924e3945cfab041bba6072889cb08ecec8",
+      "plate": "P06",
+      "recipe": "fig",
+      "seed": 27922271,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "card"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.8,
+      "shift": 1.5,
+      "denoise": 1.0,
+      "prompt": "A dark atmospheric science-fiction oil painting matching the painted look of the reference, set on a ruined orbital relay megastructure where worn network hardware and futuristic equipment are dressed in chipped ivory and tarnished dark brass. Before the Blackout, an intimate scene: a patient teacher, a woman in a patched work cardigan with a small brass headset, and three young children sit at a small brass-and-ivory relay terminal with a row of warm amber indicator lamps, a brass push key and a small speaker grille; one child presses the key while the other two lean in, listening, practising a greeting with a distant terminal. Warm amber light on their faces; a round window beside them looks out onto a golden cloud sea at sunset. Gentle and hopeful. Composition: a close medium shot, the group in the centre. Palette and light of this sequence: Warm amber and gold lamplight, ivory and brass, lively, a soft haze of steam and dust. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates, deep indigo-black shadows, restrained luminous teal and warm amber gold, dramatic shadow masses and expressive painted light. A finished, richly painted illustration, never sketchy. Wide 16:9 cinematic composition with the essential subject kept well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface."
+    },
+    {
+      "id": "outer-relays-break",
+      "file": "public/art/lore/outer-relays-break.webp",
+      "sha256": "e368ac71f08f77bf685c3640f3e44a5197f128ce397224006c94a7f130155183",
+      "plate": "P09",
+      "recipe": "env",
+      "seed": 27137111,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "cathedral"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.35,
+      "shift": 1.15,
+      "denoise": 1.0,
+      "prompt": "An extraordinarily detailed cinematic matte painting in the exact finished science-fiction environment art direction of the reference: monumental weathered orbital network infrastructure with richly rendered surfaces, precise mechanical engineering and dramatic naturalistic volumetric lighting. The moment the outer relays break: an immense circular ring gate of dark trusses and ivory relay machinery at the edge of space shatters. A jagged glowing fracture runs right through the ring, huge armour segments tear away and tumble apart, bursts of orange fire and molten sparks vent from the broken seams into the vacuum, clouds of debris, cables and plates fly outward toward the viewer. Behind the gate, far out in deep space, a harsh unexplained white glare floods out of the black, backlighting everything and casting long hard shadows. Below, the curve of the ring and the cloud-covered world. Catastrophic and silent, a violent frozen instant. Palette and light of this sequence: Cold white glare and blue-black shadow, red alarm lamps, then warm amber lift-car windows in the night. Dense layers of trusses, fine gantries, bundled cables and conduits, riveted dark-brass panels, worn ivory ceramic machinery and tiny service lights establish convincing colossal scale. Sophisticated chiaroscuro, deep desaturated midnight-blue shadows, small warm amber highlights and restrained teal signal light, intricate sharp foreground detail gradually lost in immense misty distance. Finished high-end game environment key art with rich oil-painting texture and subtle painterly edge control, never sketchy. Wide 16:9 cinematic composition with the main subject well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface."
+    },
+    {
+      "id": "second-shuttle",
+      "file": "public/art/lore/second-shuttle.webp",
+      "sha256": "decf55960a722a0b97a1c87a518075d14255eb9a3fd728fbf12aa0ba4adf9983",
+      "plate": "P11",
+      "recipe": "fig",
+      "seed": 27204902,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "card",
+        "plate:P41#700,0,1220,1088"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.8,
+      "shift": 1.5,
+      "denoise": 1.0,
+      "prompt": "A dark atmospheric science-fiction oil painting matching the painted look of the reference, set on a ruined orbital relay megastructure where worn network hardware and futuristic equipment are dressed in chipped ivory and tarnished dark brass. Night of the evacuation, a crowded freight lift car doorway on a platform of the orbital ring: linefolk in patched work coats carrying bags, bundles and small children crowd into the lit brass-and-ivory lift car; wardens in chipped ivory powered armour with small amber shoulder lamps guide them with raised hands. In the foreground a young woman of about twenty, dark hair tied back, wearing the same faded teal canvas work jacket with the round ivory relay-crew patch on the shoulder as the woman in Picture 2, looks back over her shoulder toward the viewer, worried. Warm amber light from the lift interior, cold blue night, red warning beacons. Palette and light of this sequence: Cold white glare and blue-black shadow, red alarm lamps, then warm amber lift-car windows in the night. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates, deep indigo-black shadows, restrained luminous teal and warm amber gold, dramatic shadow masses and expressive painted light. A finished, richly painted illustration, never sketchy. Wide 16:9 cinematic composition with the essential subject kept well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface.",
+      "note": "teal jacket from the P41 design reference"
+    },
+    {
+      "id": "evacuation-desk",
+      "file": "public/art/lore/evacuation-desk.webp",
+      "sha256": "8ddb1439ab9144ae83bd8b2186e8a774b968564bd1cbcd4ebac1539a80d62d62",
+      "plate": "P12",
+      "recipe": "fig",
+      "seed": 27827562,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "card",
+        "plate:P24#640,0,1280,1088"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.8,
+      "shift": 1.5,
+      "denoise": 1.0,
+      "prompt": "A dark atmospheric science-fiction oil painting matching the painted look of the reference, set on a ruined orbital relay megastructure where worn network hardware and futuristic equipment are dressed in chipped ivory and tarnished dark brass. The evacuation desk on the night of the disaster: the Operator thirty years younger, a woman of about forty with the same face as the old woman in Picture 2, her dark hair pinned up, the same brass-and-ivory single-ear headset with a thin microphone arm and a dark wool work coat with ivory patches, sits at a vast brass-and-ivory manual switchboard where hundreds of amber lamps are lit, a braided patch cord with a brass plug in each hand, concentrating hard. Behind a brass railing a crowd of worried people press forward holding bags. Red warning lamps and amber lamplight, urgent but controlled. Palette and light of this sequence: Cold white glare and blue-black shadow, red alarm lamps, then warm amber lift-car windows in the night. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates, deep indigo-black shadows, restrained luminous teal and warm amber gold, dramatic shadow masses and expressive painted light. A finished, richly painted illustration, never sketchy. Wide 16:9 cinematic composition with the essential subject kept well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface.",
+      "note": "young Operator from the P24 design reference (face in profile)"
+    },
+    {
+      "id": "null-storm",
+      "file": "public/art/lore/null-storm.webp",
+      "sha256": "ff1b1747f44edd0e6e5bc9eb5191044f830b2881524b252458cb59c8697384fa",
+      "plate": "P13",
+      "recipe": "env",
+      "seed": 27270732,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "cathedral"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.45,
+      "shift": 1.15,
+      "denoise": 1.0,
+      "prompt": "An extraordinarily detailed cinematic matte painting in the exact finished science-fiction environment art direction of the reference: monumental weathered orbital network infrastructure with richly rendered surfaces, precise mechanical engineering and dramatic naturalistic volumetric lighting. The Null Storm: inside a vast relay hall of the orbital ring, rings and loops of pale white-blue light traffic spiral through the air in a huge vortex, countless fine packets of light like sparks circling endlessly along looping paths, loose cables whipping from the racks, relay racks flickering. The vortex fills the centre of the hall; a few tiny engineers shield their eyes on a gantry. Cold white-blue storm light against dark brass and ivory machinery. Palette and light of this sequence: Pale blue-white storm light spiralling, sparks, deep shadow; red warning light for the order. Dense layers of trusses, fine gantries, bundled cables and conduits, riveted dark-brass panels, worn ivory ceramic machinery and tiny service lights establish convincing colossal scale. Sophisticated chiaroscuro, deep desaturated midnight-blue shadows, small warm amber highlights and restrained teal signal light, intricate sharp foreground detail gradually lost in immense misty distance. Finished high-end game environment key art with rich oil-painting texture and subtle painterly edge control, never sketchy. Wide 16:9 cinematic composition with the main subject well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface."
+    },
+    {
+      "id": "last-switch",
+      "file": "public/art/lore/last-switch.webp",
+      "sha256": "160d7f2df46b322635a203d18d7d76a026a3b84c9d65ecae3f825c8e91ceac33",
+      "plate": "P15b",
+      "recipe": "fig",
+      "seed": 27620031,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "card",
+        "warden"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.8,
+      "shift": 1.5,
+      "denoise": 1.0,
+      "prompt": "A dark atmospheric science-fiction oil painting matching the painted look of the reference, set on a ruined orbital relay megastructure where worn network hardware and futuristic equipment are dressed in chipped ivory and tarnished dark brass. The cadet on the night of the disaster: a seventeen-year-old girl, the young Warden with the same face as the woman in Picture 2 but much younger, short dark hair, a light cadet exo-harness of chipped ivory and brass over a dark padded undersuit, crawls through a narrow cable conduit packed with thick cable bundles and pipes, reaching with an outstretched gloved hand toward a big brass switch lever at the end of the conduit. Flashing amber and red warning light, deep shadows, determination and fear on her face. Palette and light of this sequence: Pale blue-white storm light spiralling, sparks, deep shadow; red warning light for the order. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates, deep indigo-black shadows, restrained luminous teal and warm amber gold, dramatic shadow masses and expressive painted light. A finished, richly painted illustration, never sketchy. Wide 16:9 cinematic composition with the essential subject kept well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface.",
+      "note": "cadet from the Warden portrait reference"
+    },
+    {
+      "id": "storm-reaches-the-heart",
+      "file": "public/art/lore/storm-reaches-the-heart.webp",
+      "sha256": "8dd8cfa46ea6aebf7e374a1a6d8cccf9e80eda4dee6c86359215236ba45f019b",
+      "plate": "P14",
+      "recipe": "env",
+      "seed": 27541961,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "cathedral",
+        "plate:P13"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.45,
+      "shift": 1.15,
+      "denoise": 1.0,
+      "prompt": "An extraordinarily detailed cinematic matte painting in the exact finished science-fiction environment art direction of the reference: monumental weathered orbital network infrastructure with richly rendered surfaces, precise mechanical engineering and dramatic naturalistic volumetric lighting. The storm of Picture 2, the same spiralling vortex of pale white-blue light and sparks, now bursts into a vast spherical archive whose inner walls are a honeycomb of small golden hexagonal message cells: where the storm touches them the cells flicker white and red and go dark row by row; red alarm lamps glare on the ivory walkways that cross the sphere; tiny archivists shield their eyes. Palette and light of this sequence: Pale blue-white storm light spiralling, sparks, deep shadow; red warning light for the order. Dense layers of trusses, fine gantries, bundled cables and conduits, riveted dark-brass panels, worn ivory ceramic machinery and tiny service lights establish convincing colossal scale. Sophisticated chiaroscuro, deep desaturated midnight-blue shadows, small warm amber highlights and restrained teal signal light, intricate sharp foreground detail gradually lost in immense misty distance. Finished high-end game environment key art with rich oil-painting texture and subtle painterly edge control, never sketchy. Wide 16:9 cinematic composition with the main subject well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface."
+    },
+    {
+      "id": "iron-regent-sealed",
+      "file": "public/art/lore/iron-regent-sealed.webp",
+      "sha256": "dc29940278c21fe1425323b175e596310d11a952682fd9fcd00b2eb104e60e4c",
+      "plate": "P20",
+      "recipe": "env",
+      "seed": 27743661,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "cathedral"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.45,
+      "shift": 1.15,
+      "initImage": "plate:P20",
+      "denoise": 0.9,
+      "inpaintMask": [
+        [
+          1540,
+          820,
+          130,
+          100
+        ],
+        [
+          1490,
+          950,
+          130,
+          110
+        ]
+      ],
+      "prompt": "An extraordinarily detailed cinematic matte painting in the exact finished science-fiction environment art direction of the reference: monumental weathered orbital network infrastructure with richly rendered surfaces, precise mechanical engineering and dramatic naturalistic volumetric lighting. Small dim amber electric indicator lamps and dark metal fittings, rusted containers and pipes in shadow. No flame, no candle, no fire. Palette and light of this sequence: Ember red fading into cold blue-black silence, dust hanging in still air. Dense layers of trusses, fine gantries, bundled cables and conduits, riveted dark-brass panels, worn ivory ceramic machinery and tiny service lights establish convincing colossal scale. Sophisticated chiaroscuro, deep desaturated midnight-blue shadows, small warm amber highlights and restrained teal signal light, intricate sharp foreground detail gradually lost in immense misty distance. Finished high-end game environment key art with rich oil-painting texture and subtle painterly edge control, never sketchy. Wide 16:9 cinematic composition with the main subject well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface."
+    },
+    {
+      "id": "the-queue",
+      "file": "public/art/lore/the-queue.webp",
+      "sha256": "5c4261662ea7d06371130fc158cf896e70db2cd76100ed9890d2cd3f415d7772",
+      "plate": "P21",
+      "recipe": "env",
+      "seed": 27440942,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "cathedral"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.45,
+      "shift": 1.15,
+      "initImage": "plate:P07",
+      "denoise": 0.74,
+      "inpaintMask": [
+        [
+          0,
+          0,
+          1920,
+          1088
+        ]
+      ],
+      "prompt": "An extraordinarily detailed cinematic matte painting in the exact finished science-fiction environment art direction of the reference: monumental weathered orbital network infrastructure with richly rendered surfaces, precise mechanical engineering and dramatic naturalistic volumetric lighting. The same spherical archive thirty years later, sealed and dark: no daylight, no clouds, the sphere closed and black; the honeycomb walls of message cells are dim, and inside the cells countless tiny warm amber and ember-red points of light still glow like a sea of small lamps receding into darkness; the walkways empty, dust hanging in the still air. Palette and light of this sequence: Ember red fading into cold blue-black silence, dust hanging in still air. Dense layers of trusses, fine gantries, bundled cables and conduits, riveted dark-brass panels, worn ivory ceramic machinery and tiny service lights establish convincing colossal scale. Sophisticated chiaroscuro, deep desaturated midnight-blue shadows, small warm amber highlights and restrained teal signal light, intricate sharp foreground detail gradually lost in immense misty distance. Finished high-end game environment key art with rich oil-painting texture and subtle painterly edge control, never sketchy. Wide 16:9 cinematic composition with the main subject well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface.",
+      "note": "img2img from P07 (same archive, dimmed)"
+    },
+    {
+      "id": "relay-seven-board",
+      "file": "public/art/lore/relay-seven-board.webp",
+      "sha256": "22adcda8f0474e9eb7e6c045130fa75fe32c6d2163a14ac32fe00a1dcb275d0b",
+      "plate": "P23",
+      "recipe": "fig",
+      "seed": 27283242,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "card"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.8,
+      "shift": 1.5,
+      "initImage": "cand:P23/P23-v1-26113001.png",
+      "denoise": 0.92,
+      "inpaintMask": [
+        [
+          0,
+          0,
+          215,
+          1088
+        ],
+        [
+          1690,
+          0,
+          230,
+          1088
+        ]
+      ],
+      "prompt": "A dark atmospheric science-fiction oil painting matching the painted look of the reference, set on a ruined orbital relay megastructure where worn network hardware and futuristic equipment are dressed in chipped ivory and tarnished dark brass. The ancient Relay Seven switchboard in near darkness, seen frontally: a tall worn brass-and-ivory manual switchboard panel with rows of brass jack sockets and braided patch cords, one amber lamp lit above a blank brass nameplate. On both sides of the board, only dark hanging cable bundles, pipes and conduits disappearing into deep indigo-black shadow, nothing else. Palette and light of this sequence: One warm amber lamp in indigo-black darkness. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates, deep indigo-black shadows, restrained luminous teal and warm amber gold, dramatic shadow masses and expressive painted light. A finished, richly painted illustration, never sketchy. Wide 16:9 cinematic composition with the essential subject kept well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface.",
+      "note": "seed 26113001 base; swords at both edges inpainted out (fix1, masked denoise 0.92); blank plate frontal for KEEPER"
+    },
+    {
+      "id": "the-operator",
+      "file": "public/art/lore/the-operator.webp",
+      "sha256": "087209fd327a579980bcd02193896b2560ce6b13550447a45f674dd6893ec849",
+      "plate": "P24",
+      "recipe": "fig",
+      "seed": 26114051,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "card",
+        "cand:P24/P24-v1-26114002.png"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.8,
+      "shift": 1.5,
+      "denoise": 1.0,
+      "prompt": "A dark atmospheric science-fiction oil painting matching the painted look of the reference, set on a ruined orbital relay megastructure where worn network hardware and futuristic equipment are dressed in chipped ivory and tarnished dark brass. Portrait of the Operator, the same old woman as in Picture 2, keeping her face, white pinned-up hair, brass-and-ivory headset with its thin microphone arm, dark patched coat with chipped ivory panels and fingerless knitted gloves. It is night in the switchboard room and almost dark: she leans toward the ancient brass-and-ivory switchboard, one hand at the headset, and looks up at whoever has come in, as if asking a question. Her face is lit strongly from below by the warm amber glow of a single lit indicator lamp on the board just in front of her; everything else falls into deep indigo shadow, dark rows of jacks and hanging patch cords, a round porthole with a faint planet behind. Composition: the woman in three-quarter view slightly right of centre, head and shoulders to the waist, her face large and readable. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates, deep indigo-black shadows, restrained luminous teal and warm amber gold, dramatic shadow masses and expressive painted light. A finished, richly painted illustration, never sketchy. Wide 16:9 cinematic composition with the essential subject kept well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface.",
+      "note": "Operator design reference (all Operator shots, younger P12)"
+    },
+    {
+      "id": "go-ahead",
+      "file": "public/art/lore/go-ahead.webp",
+      "sha256": "b35d6830cdc766a3cea50ffda6daeea13a5948453b34a49a640d146fa42643d8",
+      "plate": "P29",
+      "recipe": "fig",
+      "seed": 27606291,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "card",
+        "plate:P23",
+        "plate:P24#640,0,1280,1088"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.8,
+      "shift": 1.5,
+      "denoise": 1.0,
+      "prompt": "A dark atmospheric science-fiction oil painting matching the painted look of the reference, set on a ruined orbital relay megastructure where worn network hardware and futuristic equipment are dressed in chipped ivory and tarnished dark brass. A close-up at the switchboard of Picture 2: the Operator's old hand in a fingerless knitted glove, the same as in Picture 3, plugs a braided cord with a brass plug into the jack under the single lit amber lamp; from the jack a thin thread of teal light runs away along the board's cables into the dark. Palette and light of this sequence: Indigo-black with each keeper's accent: Architect teal fibre, Warden amber lattice, Ghost pale cyan. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates, deep indigo-black shadows, restrained luminous teal and warm amber gold, dramatic shadow masses and expressive painted light. A finished, richly painted illustration, never sketchy. Wide 16:9 cinematic composition with the essential subject kept well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface."
+    },
+    {
+      "id": "night-shift",
+      "file": "public/art/lore/night-shift.webp",
+      "sha256": "6e4db87655a8dfdc2220d260525b784931c44efa2b1242fa0d1ad2a5254df4dd",
+      "plate": "P22",
+      "recipe": "fig",
+      "seed": 27280302,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "card"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.8,
+      "shift": 1.5,
+      "initImage": "plate:P22",
+      "denoise": 0.92,
+      "inpaintMask": [
+        [
+          676,
+          492,
+          200,
+          372
+        ]
+      ],
+      "prompt": "A dark atmospheric science-fiction oil painting matching the painted look of the reference, set on a ruined orbital relay megastructure where worn network hardware and futuristic equipment are dressed in chipped ivory and tarnished dark brass. A small electric warming lamp on the workbench: a glowing amber heating coil behind a round brass wire guard on a small brass stand, casting warm light; no glass jar, no lantern, no flame, no fire, no candle. Palette and light of this sequence: One warm amber lamp in indigo-black darkness. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates, deep indigo-black shadows, restrained luminous teal and warm amber gold, dramatic shadow masses and expressive painted light. A finished, richly painted illustration, never sketchy. Wide 16:9 cinematic composition with the essential subject kept well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface.",
+      "note": "mixed Night Shift; the lantern-like lamp inpainted into an electric coil lamp (matches P22-b)"
+    },
+    {
+      "id": "copper-reach",
+      "file": "public/art/lore/copper-reach.webp",
+      "sha256": "69a8b9ed8816f84c4b344008fb049e91febaf71a1041d34ffffc2f60441f461a",
+      "plate": "P30",
+      "recipe": "env",
+      "seed": 27897112,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "cathedral",
+        "architect"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.45,
+      "shift": 1.15,
+      "denoise": 1.0,
+      "prompt": "An extraordinarily detailed cinematic matte painting in the exact finished science-fiction environment art direction of the reference: monumental weathered orbital network infrastructure with richly rendered surfaces, precise mechanical engineering and dramatic naturalistic volumetric lighting. A keeper, small in the frame, crossing the Copper Reach: the man of Picture 2 with his relay backpack pays out a glowing teal cable behind him across rusted gantries between towering stacks of shipping containers and huge cranes; copper cable everywhere, gone green and orange with corrosion; vast scale, dust and hazy shafts of light. Palette and light of this sequence: Copper orange and verdigris green rust, dusty shafts of light, a teal cable glow. Dense layers of trusses, fine gantries, bundled cables and conduits, riveted dark-brass panels, worn ivory ceramic machinery and tiny service lights establish convincing colossal scale. Sophisticated chiaroscuro, deep desaturated midnight-blue shadows, small warm amber highlights and restrained teal signal light, intricate sharp foreground detail gradually lost in immense misty distance. Finished high-end game environment key art with rich oil-painting texture and subtle painterly edge control, never sketchy. Wide 16:9 cinematic composition with the main subject well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface."
+    },
+    {
+      "id": "copper-gate-opens",
+      "file": "public/art/lore/copper-gate-opens.webp",
+      "sha256": "3a4d660c71dfd0167ef42e6c5f196b5d1b7a3dfb0b55e1367e5ff90675223b5a",
+      "plate": "P32",
+      "recipe": "env",
+      "seed": 27115821,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "cathedral"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.45,
+      "shift": 1.15,
+      "denoise": 1.0,
+      "prompt": "An extraordinarily detailed cinematic matte painting in the exact finished science-fiction environment art direction of the reference: monumental weathered orbital network infrastructure with richly rendered surfaces, precise mechanical engineering and dramatic naturalistic volumetric lighting. The Copper Gate opening, seen from the rusted Copper Reach side: two massive riveted copper gate doors, green with verdigris, grind apart, and through the widening gap floods a cold VIOLET light from the hall beyond, where huge bells of violet glass hang glinting in the distance. Violet light spills across the rusty orange floor, dust falls in the violet beam, cables slacken. A small keeper stands before the gap. Palette and light of this sequence: Copper orange and verdigris green rust, dusty shafts of light, a teal cable glow. Dense layers of trusses, fine gantries, bundled cables and conduits, riveted dark-brass panels, worn ivory ceramic machinery and tiny service lights establish convincing colossal scale. Sophisticated chiaroscuro, deep desaturated midnight-blue shadows, small warm amber highlights and restrained teal signal light, intricate sharp foreground detail gradually lost in immense misty distance. Finished high-end game environment key art with rich oil-painting texture and subtle painterly edge control, never sketchy. Wide 16:9 cinematic composition with the main subject well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface."
+    },
+    {
+      "id": "hollow-choir",
+      "file": "public/art/lore/hollow-choir.webp",
+      "sha256": "2496becb0a68b36ee7d157e214df08048a8f4e3eb02b3f98b928ee83ed1e03ce",
+      "plate": "P35",
+      "recipe": "env",
+      "seed": 27566511,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "card"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.45,
+      "shift": 1.15,
+      "initImage": "cand:P35/P35-f-27682781.png",
+      "denoise": 0.92,
+      "inpaintMask": [
+        [
+          1640,
+          700,
+          200,
+          260
+        ]
+      ],
+      "prompt": "A dark atmospheric science-fiction oil painting matching the painted look of the reference, set on a ruined orbital relay megastructure where worn network hardware and futuristic equipment are dressed in chipped ivory and tarnished dark brass. A dark chipped ivory machine housing with brass fittings and a small dim violet indicator light, cables in shadow. No flame, no candle, no lamp. Palette and light of this sequence: Violet and cold lilac glass light, dark, glints; warm lamp only at the benches. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates, deep indigo-black shadows, restrained luminous teal and warm amber gold, dramatic shadow masses and expressive painted light. A finished, richly painted illustration, never sketchy. Wide 16:9 cinematic composition with the essential subject kept well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface."
+    },
+    {
+      "id": "a-route-that-holds",
+      "file": "public/art/lore/a-route-that-holds.webp",
+      "sha256": "d4e56f4cc1a567c3a1979f7d432e74631066c8b6a7a58f8aea792b8489ff798b",
+      "plate": "P37",
+      "recipe": "env",
+      "seed": 27855261,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "cathedral",
+        "core"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.45,
+      "shift": 1.15,
+      "denoise": 1.0,
+      "prompt": "An extraordinarily detailed cinematic matte painting in the exact finished science-fiction environment art direction of the reference: monumental weathered orbital network infrastructure with richly rendered surfaces, precise mechanical engineering and dramatic naturalistic volumetric lighting. The Blackout Core in its chamber: the great machine of Picture 2, a blackened spiral shell of riveted plates with three curved blade arms and an ember-red vortex at its centre, with broken shards orbiting it, fills the heart of a vast dark archive chamber; a thin thread of teal route light reaches across the gulf and touches its shell. Confrontation. Palette and light of this sequence: Ember red, turning to flooding gold at the opening. Dense layers of trusses, fine gantries, bundled cables and conduits, riveted dark-brass panels, worn ivory ceramic machinery and tiny service lights establish convincing colossal scale. Sophisticated chiaroscuro, deep desaturated midnight-blue shadows, small warm amber highlights and restrained teal signal light, intricate sharp foreground detail gradually lost in immense misty distance. Finished high-end game environment key art with rich oil-painting texture and subtle painterly edge control, never sketchy. Wide 16:9 cinematic composition with the main subject well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface."
+    },
+    {
+      "id": "settlement-below",
+      "file": "public/art/lore/settlement-below.webp",
+      "sha256": "f626c801b55213827af20594d7b4ac6a326b840c04f6056b9b4394e6011c0350",
+      "plate": "P40",
+      "recipe": "env",
+      "seed": 26130003,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "cathedral"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.45,
+      "shift": 1.15,
+      "denoise": 1.0,
+      "prompt": "An extraordinarily detailed cinematic matte painting in the exact finished science-fiction environment art direction of the reference: monumental weathered orbital network infrastructure with richly rendered surfaces, precise mechanical engineering and dramatic naturalistic volumetric lighting. Below the clouds, on the ground of the world: a small rain-soaked settlement at the foot of a colossal relay spire at dusk. The base of the spire is a vast dark mountain of black stone buttresses and ancient machinery, huge trusses, conduits and sealed lift shafts, rising straight up and vanishing into a low heavy ceiling of grey cloud. Around its foot, old freight lift cars of chipped ivory and tarnished brass have been set down on the wet ground and turned into homes, their windows glowing warm amber, with patched roofs, rain gutters and cable runs between them; terraced vegetable gardens soaked with rain; a tall slender radio mast built from lift parts and cable with a small light at its top. Dark green fern valleys, black wet stone, rain streaks, puddles reflecting lamplight, mist in the valleys, a few tiny figures in coats on a path. Quiet, wet, lived-in and sheltered: deep greens, wet blacks and rain-blue shadows with warm amber windows. Dense layers of trusses, fine gantries, bundled cables and conduits, riveted dark-brass panels, worn ivory ceramic machinery and tiny service lights establish convincing colossal scale. Sophisticated chiaroscuro, deep desaturated midnight-blue shadows, small warm amber highlights and restrained teal signal light, intricate sharp foreground detail gradually lost in immense misty distance. Finished high-end game environment key art with rich oil-painting texture and subtle painterly edge control, never sketchy. Wide 16:9 cinematic composition with the main subject well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface."
+    },
+    {
+      "id": "same-time-every-evening",
+      "file": "public/art/lore/same-time-every-evening.webp",
+      "sha256": "4bb319f9ba3b4d520633e55f24db233b385047f49a781a8797e7d12d484294d4",
+      "plate": "P41",
+      "recipe": "fig",
+      "seed": 26131002,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "card"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.8,
+      "shift": 1.5,
+      "denoise": 1.0,
+      "prompt": "A dark atmospheric science-fiction oil painting matching the painted look of the reference, set on a ruined orbital relay megastructure where worn network hardware and futuristic equipment are dressed in chipped ivory and tarnished dark brass. Inside a small home built from an old freight lift car, far below the clouds on the rainy ground of the world: curved riveted ivory wall panels, brass handrails, a rain-streaked round window showing dark green ferns and night rain, a small warm amber work lamp. An old woman of about fifty-eight sits at a home-made radio transceiver built from a salvaged brass-and-ivory lift control panel, with brass dials, toggle switches, an ivory button plate, a speaker grille and a cable running out to a mast. She wears a faded, sun-washed teal canvas work jacket with a round ivory relay-crew patch sewn on the left shoulder (a plain round cloth patch with a simple ring emblem and no lettering), her grey hair tied back, a weathered patient face; one hand rests on a brass transmit key, an old padded headset hangs around her neck, a chipped enamel mug stands beside the radio. Evening, quiet, patient. Composition: a medium shot, the woman and the radio at the centre-right, her face in three-quarter view clearly lit by the amber lamp, rain-blue shadows around. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates, deep indigo-black shadows, restrained luminous teal and warm amber gold, dramatic shadow masses and expressive painted light. A finished, richly painted illustration, never sketchy. Wide 16:9 cinematic composition with the essential subject kept well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface.",
+      "note": "teal-jacket woman design reference"
+    },
+    {
+      "id": "the-shell-opens",
+      "file": "public/art/lore/the-shell-opens.webp",
+      "sha256": "286adad7a2389f9c404c969c9d5c5b7bab9216eae6ef0e26a376cf968c7a310f",
+      "plate": "P38",
+      "recipe": "env",
+      "seed": 27664041,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "cathedral"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.45,
+      "shift": 1.15,
+      "initImage": "plate:P37",
+      "denoise": 0.86,
+      "inpaintMask": [
+        [
+          0,
+          0,
+          1920,
+          1088
+        ]
+      ],
+      "prompt": "An extraordinarily detailed cinematic matte painting in the exact finished science-fiction environment art direction of the reference: monumental weathered orbital network infrastructure with richly rendered surfaces, precise mechanical engineering and dramatic naturalistic volumetric lighting. The same chamber at the moment the shell opens: the blackened spiral shell plates slide apart and a blinding flood of WARM GOLDEN light pours out of the widening opening, filling the chamber with gold, gold light streaming across the walkway and the tiny keeper, countless small golden sparks of messages rushing out; the ember red swept away by gold. Palette and light of this sequence: Ember red, turning to flooding gold at the opening. Dense layers of trusses, fine gantries, bundled cables and conduits, riveted dark-brass panels, worn ivory ceramic machinery and tiny service lights establish convincing colossal scale. Sophisticated chiaroscuro, deep desaturated midnight-blue shadows, small warm amber highlights and restrained teal signal light, intricate sharp foreground detail gradually lost in immense misty distance. Finished high-end game environment key art with rich oil-painting texture and subtle painterly edge control, never sketchy. Wide 16:9 cinematic composition with the main subject well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface.",
+      "note": "img2img from P37 (denoise 0.86), same chamber opening"
+    },
+    {
+      "id": "river-of-messages",
+      "file": "public/art/lore/river-of-messages.webp",
+      "sha256": "3985f29e37def44e42b4cd2da11b6feffd086b9c6dc6d6b27008b7fdb1eb3e9e",
+      "plate": "P39",
+      "recipe": "env",
+      "seed": 27218231,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "cathedral",
+        "plate:P01"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.45,
+      "shift": 1.15,
+      "denoise": 1.0,
+      "prompt": "An extraordinarily detailed cinematic matte painting in the exact finished science-fiction environment art direction of the reference: monumental weathered orbital network infrastructure with richly rendered surfaces, precise mechanical engineering and dramatic naturalistic volumetric lighting. The same orbital ring and spires as in Picture 2, at night: rivers of bright golden light flow like glowing liquid along the ring's cable conduits and cascade down the colossal spires like waterfalls of light into the cloud sea, which glows gold from within where they fall; lamps along the ring coming back on segment by segment, countless tiny golden sparks of messages racing along. Palette and light of this sequence: Ember red, turning to flooding gold at the opening. Dense layers of trusses, fine gantries, bundled cables and conduits, riveted dark-brass panels, worn ivory ceramic machinery and tiny service lights establish convincing colossal scale. Sophisticated chiaroscuro, deep desaturated midnight-blue shadows, small warm amber highlights and restrained teal signal light, intricate sharp foreground detail gradually lost in immense misty distance. Finished high-end game environment key art with rich oil-painting texture and subtle painterly edge control, never sketchy. Wide 16:9 cinematic composition with the main subject well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface."
+    },
+    {
+      "id": "the-faultline-closes",
+      "file": "public/art/lore/the-faultline-closes.webp",
+      "sha256": "459e70d39ad65bc025ba559e3ad5809e4310d837373508a7459ae8d00909edbe",
+      "plate": "P42",
+      "recipe": "env",
+      "seed": 27719881,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "cathedral",
+        "plate:P19"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.45,
+      "shift": 1.15,
+      "denoise": 1.0,
+      "prompt": "An extraordinarily detailed cinematic matte painting in the exact finished science-fiction environment art direction of the reference: monumental weathered orbital network infrastructure with richly rendered surfaces, precise mechanical engineering and dramatic naturalistic volumetric lighting. The same hillside and sky as in Picture 2, on the night of the answer: the thin arc of the ring across the sky is relighting, golden light running along it and filling the dark gap; the clouds are thin; people stand outside the lift-car houses below and look up. Palette and light of this sequence: Wet blue-green dusk and warm lamp-lit windows, then gold light spreading across a night sky. Dense layers of trusses, fine gantries, bundled cables and conduits, riveted dark-brass panels, worn ivory ceramic machinery and tiny service lights establish convincing colossal scale. Sophisticated chiaroscuro, deep desaturated midnight-blue shadows, small warm amber highlights and restrained teal signal light, intricate sharp foreground detail gradually lost in immense misty distance. Finished high-end game environment key art with rich oil-painting texture and subtle painterly edge control, never sketchy. Wide 16:9 cinematic composition with the main subject well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface."
+    },
+    {
+      "id": "ground-lamp",
+      "file": "public/art/lore/ground-lamp.webp",
+      "sha256": "99c60f368b989643daf8e547bc4a55acd622d59572a4f6e7fd32a7e7afb19a89",
+      "plate": "P45",
+      "recipe": "fig",
+      "seed": 27554692,
+      "size": [
+        1920,
+        1088
+      ],
+      "references": [
+        "card",
+        "plate:P23"
+      ],
+      "lora": "krea2_style_reference.safetensors",
+      "loraStrength": 0.8,
+      "shift": 1.5,
+      "denoise": 1.0,
+      "prompt": "A dark atmospheric science-fiction oil painting matching the painted look of the reference, set on a ruined orbital relay megastructure where worn network hardware and futuristic equipment are dressed in chipped ivory and tarnished dark brass. A different, older part of the same switchboard as in Picture 2, seen frontally and close: a row of old dusty brass-rimmed lamps that have never been lit, and one of them in the centre beginning to glow for the first time, warm gold; directly beneath it a large blank rectangular engraved brass nameplate with a bevelled rim, smooth and empty without any writing; the neighbouring lamps dark with dust. Palette and light of this sequence: Wet blue-green dusk and warm lamp-lit windows, then gold light spreading across a night sky. Rich layered oil-paint brushwork, intricate but clearly illustrated mechanical forms, softly broken painted edges, chipped and pitted dark brass and worn ivory plates, deep indigo-black shadows, restrained luminous teal and warm amber gold, dramatic shadow masses and expressive painted light. A finished, richly painted illustration, never sketchy. Wide 16:9 cinematic composition with the essential subject kept well inside the frame, away from the edges. No medieval fantasy, no sword, no torch, no open flame, no candle, no oil lantern, no parchment scroll, no knight's plate armour, no stone dungeon, no photography, no smooth 3D rendering, no anime, no text, no writing, no labels, no border and no interface."
+    }
+  ]
+}
